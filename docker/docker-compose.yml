@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: csm-db
+    restart: always
+    environment:
+      POSTGRES_USER: csm_user
+      POSTGRES_PASSWORD: csm_password
+      POSTGRES_DB: csm_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - csm_db_data:/var/lib/postgresql/data
+    networks:
+      - csm-network
+
+networks:
+  csm-network:
+    driver: bridge
+
+volumes:
+  csm_db_data:
