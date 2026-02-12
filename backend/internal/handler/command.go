@@ -22,7 +22,16 @@ func NewCommandHandler(repo domain.CommandRepository, executor *service.Executor
 }
 
 func (h *CommandHandler) ListCommands(c *gin.Context) {
-	cmds, err := h.repo.List()
+	namespaceIDStr := c.Query("namespace_id")
+	var namespaceID *uuid.UUID
+	if namespaceIDStr != "" {
+		id, err := uuid.Parse(namespaceIDStr)
+		if err == nil {
+			namespaceID = &id
+		}
+	}
+
+	cmds, err := h.repo.List(namespaceID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

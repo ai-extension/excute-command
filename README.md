@@ -9,16 +9,30 @@ CSM is a powerful, multi-step command execution and management platform with a p
 
 ## Quick Start
 
-### Backend
-1.  Navigate to `./backend`
-2.  Run `go run cmd/server/main.go`
-3.  Server starts at `http://localhost:8080`
+### Prerequisites
+- Docker & Docker Compose
+- Go 1.20+
+- Node.js 18+
 
-### Frontend
-1.  Navigate to `./frontend`
-2.  Install dependencies: `npm install`
-3.  Run development server: `npm run dev`
-4.  Open `http://localhost:5173`
+### Setup & Run
+1.  **Install everything**:
+    ```bash
+    make install
+    ```
+2.  **Start Database**:
+    ```bash
+    make db-up
+    ```
+3.  **Run Backend**:
+    ```bash
+    make run-be
+    ```
+4.  **Run Frontend**:
+    ```bash
+    make run-fe
+    ```
+
+Or use `make help` to see all available commands.
 
 ## Features
 - Sequential command execution.

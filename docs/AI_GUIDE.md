@@ -34,3 +34,10 @@ The system uses GORM for PostgreSQL.
 - **Clarity**: High-level modules should not depend on low-level implementation details.
 - **Scalability**: Add new features by adding new services/handlers, keeping existing ones focused.
 - **Experience**: The UI should feel fast and provide clear feedback during command execution.
+
+## Development Workflow Automation
+We use a root-level `Makefile` to manage the project:
+- `make install`: Install all BE and FE dependencies.
+- `make db-up`: Start the PostgreSQL container.
+- `make run-be`: Start the backend server.
+- `make run-fe`: Start the React development server.
