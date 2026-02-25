@@ -138,12 +138,13 @@ const WorkflowDesignerPage = () => {
                 name,
                 description,
                 status: 'active',
-                default_server_id: defaultServerId,
+                default_server_id: defaultServerId || undefined,
                 namespace_id: activeNamespace.id,
                 inputs: inputs.filter(i => i.key?.trim()),
                 variables: variables.filter(v => v.key?.trim()),
                 groups: groups.map((g, gIdx) => ({
                     ...g,
+                    default_server_id: g.default_server_id || undefined,
                     order: gIdx,
                     steps: g.steps?.map((s, sIdx) => ({
                         ...s,
