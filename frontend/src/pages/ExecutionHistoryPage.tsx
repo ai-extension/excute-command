@@ -32,7 +32,7 @@ import { API_BASE_URL } from '../lib/api';
 import ExecutionMonitor from '../components/ExecutionMonitor';
 
 const ExecutionHistoryPage = () => {
-    const { token } = useAuth();
+    const { apiFetch } = useAuth();
     const { activeNamespace } = useNamespace();
     const [executions, setExecutions] = useState<WorkflowExecution[]>([]);
     const [loading, setLoading] = useState(true);
@@ -41,17 +41,15 @@ const ExecutionHistoryPage = () => {
     const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
-        if (activeNamespace && token) {
+        if (activeNamespace) {
             fetchHistory();
         }
-    }, [activeNamespace, token]);
+    }, [activeNamespace]);
 
     const fetchHistory = async () => {
         try {
             setLoading(true);
-            const response = await fetch(`${API_BASE_URL}/namespaces/${activeNamespace?.id}/executions`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const response = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace?.id}/executions`);
             if (response.ok) {
                 const data = await response.json();
                 setExecutions(data || []);
@@ -66,9 +64,7 @@ const ExecutionHistoryPage = () => {
     const fetchExecutionDetail = async (exec: WorkflowExecution) => {
         try {
             setLoadingDetail(true);
-            const response = await fetch(`${API_BASE_URL}/executions/${exec.id}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const response = await apiFetch(`${API_BASE_URL}/executions/${exec.id}`);
             if (response.ok) {
                 const data = await response.json();
                 setSelectedExec(data);
@@ -234,7 +230,7 @@ const ExecutionHistoryPage = () => {
 
             {/* Log Viewer Dialog */}
             <Dialog open={!!selectedExec} onOpenChange={(open: boolean) => !open && setSelectedExec(null)}>
-                <DialogContent className="max-w-[95vw] w-[1400px] h-[90vh] p-0 overflow-hidden bg-slate-950 border-white/10">
+                <DialogContent hideClose className="max-w-5xl w-[90vw] h-[85vh] p-0 overflow-hidden bg-slate-950 border-white/10">
                     {loadingDetail ? (
                         <div className="h-full flex items-center justify-center">
                             <Loader2 className="w-8 h-8 animate-spin text-primary" />

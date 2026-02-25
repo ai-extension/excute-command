@@ -9,6 +9,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -53,6 +55,11 @@ func (e *WorkflowExecutor) Run(ctx context.Context, workflowID uuid.UUID, inputs
 		return err
 	}
 
+	// Validate inputs against definitions for security
+	if err := e.validateInputs(wf, inputs); err != nil {
+		return err
+	}
+
 	// Create execution record
 	execID := uuid.New()
 	baseDir, _ := os.Getwd()
@@ -85,8 +92,10 @@ func (e *WorkflowExecutor) Run(ctx context.Context, workflowID uuid.UUID, inputs
 	e.hub.BroadcastStatus(wf.ID.String(), "workflow", string(domain.StatusRunning))
 
 	var runErr error
+	groupResults := make(map[string]string) // key -> status string
 	for i := range wf.Groups {
-		err := e.runGroup(ctx, &wf.Groups[i], inputs, wf.DefaultServerID, logFile, workflowID, execID)
+		err := e.runGroup(ctx, &wf.Groups[i], inputs, wf.Variables, groupResults, wf.DefaultServerID, logFile, workflowID, execID)
+		groupResults[wf.Groups[i].Key] = string(wf.Groups[i].Status)
 		if err != nil {
 			runErr = err
 			break
@@ -112,13 +121,144 @@ func (e *WorkflowExecutor) Run(ctx context.Context, workflowID uuid.UUID, inputs
 	return runErr
 }
 
-func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowGroup, inputs map[string]string, defaultServerID uuid.UUID, logFile *os.File, workflowID uuid.UUID, executionID uuid.UUID) error {
+func (e *WorkflowExecutor) validateInputs(wf *domain.Workflow, provided map[string]string) error {
+	for _, input := range wf.Inputs {
+		val, ok := provided[input.Key]
+		if !ok {
+			val = input.DefaultValue
+		}
+
+		if val == "" {
+			continue // Allow empty if allowed by default
+		}
+
+		switch input.Type {
+		case "number":
+			// Simple numeric check using strconv
+			if _, err := strconv.ParseFloat(val, 64); err != nil {
+				return fmt.Errorf("field %s must be a number", input.Label)
+			}
+		case "select":
+			// Value must be one of the comma-separated options in DefaultValue
+			options := strings.Split(input.DefaultValue, ",")
+			valid := false
+			for _, opt := range options {
+				if strings.TrimSpace(opt) == val {
+					valid = true
+					break
+				}
+			}
+			if !valid {
+				return fmt.Errorf("field %s has invalid option: %s", input.Label, val)
+			}
+		default: // "input"
+			// Whitelist approach: only allow alphanumeric, spaces, and basic symbols used in paths/params
+			// We block shell metacharacters: ; & | $ ` > < ( ) etc.
+			matched, _ := regexp.MatchString(`^[a-zA-Z0-9_\-\.\ \/]+$`, val)
+			if !matched {
+				return fmt.Errorf("field %s contains invalid characters. Security policy: only alpha-numeric, space, _, -, ., / are allowed", input.Label)
+			}
+		}
+	}
+	return nil
+}
+
+func (e *WorkflowExecutor) evaluateCondition(condition string, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string) (bool, error) {
+	if strings.TrimSpace(condition) == "" {
+		return true, nil // Empty condition = always run
+	}
+
+	// Resolve all placeholders in the condition first
+	resolved := condition
+
+	// Resolve {{variable.key}}
+	for _, v := range variables {
+		resolved = strings.ReplaceAll(resolved, "{{variable."+v.Key+"}}", v.Value)
+	}
+	// Resolve {{input.key}}
+	for k, v := range inputs {
+		resolved = strings.ReplaceAll(resolved, "{{input."+k+"}}", v)
+	}
+	// Resolve {{step.<group_key>.status}}
+	for key, status := range groupResults {
+		resolved = strings.ReplaceAll(resolved, "{{step."+key+".status}}", status)
+	}
+
+	// Evaluate with || (lower precedence) then && (higher precedence)
+	return e.evalOr(resolved, condition)
+}
+
+// evalOr evaluates an expression split by ||
+func (e *WorkflowExecutor) evalOr(expr, original string) (bool, error) {
+	orParts := strings.Split(expr, "||")
+	for _, part := range orParts {
+		result, err := e.evalAnd(strings.TrimSpace(part), original)
+		if err != nil {
+			return false, err
+		}
+		if result {
+			return true, nil // Short-circuit OR
+		}
+	}
+	return false, nil
+}
+
+// evalAnd evaluates an expression split by &&
+func (e *WorkflowExecutor) evalAnd(expr, original string) (bool, error) {
+	andParts := strings.Split(expr, "&&")
+	for _, part := range andParts {
+		result, err := e.evalAtom(strings.TrimSpace(part), original)
+		if err != nil {
+			return false, err
+		}
+		if !result {
+			return false, nil // Short-circuit AND
+		}
+	}
+	return true, nil
+}
+
+// evalAtom evaluates a single comparison: LHS == RHS or LHS != RHS
+func (e *WorkflowExecutor) evalAtom(expr, original string) (bool, error) {
+	if idx := strings.Index(expr, "!="); idx != -1 {
+		lhs := strings.TrimSpace(strings.Trim(expr[:idx], `"' `))
+		rhs := strings.TrimSpace(strings.Trim(expr[idx+2:], `"' `))
+		return lhs != rhs, nil
+	}
+	if idx := strings.Index(expr, "=="); idx != -1 {
+		lhs := strings.TrimSpace(strings.Trim(expr[:idx], `"' `))
+		rhs := strings.TrimSpace(strings.Trim(expr[idx+2:], `"' `))
+		return lhs == rhs, nil
+	}
+	return false, fmt.Errorf("unsupported condition syntax: %q — use ==, !=, && or ||", original)
+}
+
+func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowGroup, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, defaultServerID uuid.UUID, logFile *os.File, workflowID uuid.UUID, executionID uuid.UUID) error {
+	// Evaluate condition before running
+	if shouldRun, err := e.evaluateCondition(group.Condition, inputs, variables, groupResults); err != nil {
+		return fmt.Errorf("group %q condition error: %w", group.Name, err)
+	} else if !shouldRun {
+		msg := fmt.Sprintf("\n[GROUP SKIPPED] %s (condition: %s)\n", group.Name, group.Condition)
+		fmt.Fprint(logFile, msg)
+		e.hub.BroadcastLog(workflowID.String(), msg)
+		group.Status = "SKIPPED"
+		e.groupRepo.Update(group)
+		e.hub.BroadcastStatus(group.ID.String(), "group", "SKIPPED")
+		return nil
+	}
+
 	msg := fmt.Sprintf("\n[GROUP] %s (Parallel: %v)\n", group.Name, group.IsParallel)
 	fmt.Fprint(logFile, msg)
 	e.hub.BroadcastLog(group.WorkflowID.String(), msg)
 	group.Status = domain.StatusRunning
 	e.groupRepo.Update(group)
 	e.hub.BroadcastStatus(group.ID.String(), "group", string(domain.StatusRunning))
+
+	// Group-level server override: use group's server if set, otherwise fall back to workflow default
+	effectiveServerID := defaultServerID
+	if group.DefaultServerID != uuid.Nil {
+		effectiveServerID = group.DefaultServerID
+	}
 
 	if group.IsParallel {
 		var wg sync.WaitGroup
@@ -128,7 +268,7 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 			wg.Add(1)
 			go func(step *domain.WorkflowStep) {
 				defer wg.Done()
-				if err := e.runStep(ctx, step, inputs, defaultServerID, logFile, workflowID, executionID); err != nil {
+				if err := e.runStep(ctx, step, inputs, variables, effectiveServerID, logFile, workflowID, executionID); err != nil {
 					errs <- err
 				}
 			}(&group.Steps[i])
@@ -147,7 +287,7 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 		}
 	} else {
 		for i := range group.Steps {
-			if err := e.runStep(ctx, &group.Steps[i], inputs, defaultServerID, logFile, workflowID, executionID); err != nil {
+			if err := e.runStep(ctx, &group.Steps[i], inputs, variables, effectiveServerID, logFile, workflowID, executionID); err != nil {
 				group.Status = domain.StatusFailed
 				e.groupRepo.Update(group)
 				e.hub.BroadcastStatus(group.ID.String(), "group", string(domain.StatusFailed))
@@ -161,7 +301,7 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 	return e.groupRepo.Update(group)
 }
 
-func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowStep, inputs map[string]string, defaultServerID uuid.UUID, logFile *os.File, workflowID uuid.UUID, executionID uuid.UUID) error {
+func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowStep, inputs map[string]string, variables []domain.WorkflowVariable, defaultServerID uuid.UUID, logFile *os.File, workflowID uuid.UUID, executionID uuid.UUID) error {
 	step.Status = domain.StatusRunning
 	e.stepRepo.Update(step)
 	e.hub.BroadcastStatus(step.ID.String(), "step", string(domain.StatusRunning))
@@ -188,6 +328,11 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 
 	// Substitute variables in command
 	command := step.CommandText
+	// 1. Static Variables: {{variable.key}}
+	for _, v := range variables {
+		command = strings.ReplaceAll(command, "{{variable."+v.Key+"}}", v.Value)
+	}
+	// 2. Runtime Inputs: {{key}}
 	for k, v := range inputs {
 		command = strings.ReplaceAll(command, "{{"+k+"}}", v)
 	}

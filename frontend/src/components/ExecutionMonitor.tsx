@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import {
     Zap, X, CheckCircle2, AlertCircle, Clock,
     ArrowRight, ChevronDown, ChevronRight,
-    Terminal, Server, Layers, Play, Pause, Square, Monitor
+    Terminal, Server, Layers, Play, Pause, Square, Monitor,
+    Download
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -29,7 +30,25 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
     const [execution, setExecution] = useState<WorkflowExecution | null>(initialExecution || null);
     const [activeStepID, setActiveStepID] = useState<string | null>(null);
     const [globalLogs, setGlobalLogs] = useState<string[]>([]);
-    const { token } = useAuth();
+    const { apiFetch } = useAuth();
+
+    const handleDownloadLogs = () => {
+        if (!workflow) return;
+        const logsToDownload = activeStepID ? getStepOutput(activeStepID) : globalLogs;
+        const content = logsToDownload.join('\n');
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const filename = activeStepID
+            ? `logs-step-${activeStepID}-${new Date().toISOString()}.txt`
+            : `logs-global-${workflow.id}-${new Date().toISOString()}.txt`;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
 
     useEffect(() => {
         if (mode === 'LIVE' && workflow) {
@@ -61,21 +80,17 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
             return () => ws.close();
         } else if (mode === 'HISTORICAL' && execution) {
             // Load full workflow if not present
-            if (!workflow && token) {
-                fetch(`${API_BASE_URL}/workflows/${execution.workflow_id}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                })
+            if (!workflow) {
+                apiFetch(`${API_BASE_URL}/workflows/${execution.workflow_id}`)
                     .then(res => res.json())
                     .then(setWorkflow);
             }
             // Fetch global logs
-            fetch(`${API_BASE_URL}/executions/${execution.id}/logs`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            })
+            apiFetch(`${API_BASE_URL}/executions/${execution.id}/logs`)
                 .then(res => res.text())
                 .then(text => setGlobalLogs([text]));
         }
-    }, [mode, token]);
+    }, [mode]);
 
     if (!workflow) return null;
 
@@ -115,6 +130,29 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                     </div>
                 </div>
                 <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 mr-2">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleDownloadLogs}
+                            className="h-7 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest text-zinc-500 hover:text-primary hover:bg-primary/5 border border-transparent hover:border-primary/20 transition-all"
+                        >
+                            <Download className="w-3.5 h-3.5 mr-2" />
+                            Download Trace
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setActiveStepID(null)}
+                            className={cn(
+                                "h-7 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all",
+                                !activeStepID ? "bg-primary/20 text-primary border border-primary/30" : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+                            )}
+                        >
+                            <Monitor className="w-3.5 h-3.5 mr-2" />
+                            Global Trace
+                        </Button>
+                    </div>
                     <Badge variant="outline" className={cn(
                         "font-black text-[9px] uppercase tracking-widest px-3 py-1",
                         mode === 'LIVE' ? "bg-primary/10 border-primary/20 text-primary animate-pulse" : "bg-zinc-800 border-white/10 text-zinc-400"
@@ -189,35 +227,13 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                     </div>
                 </div>
 
-                {/* Telemetry Window */}
                 <div className="flex-1 flex flex-col bg-black">
-                    <div className="px-6 py-3 bg-[#13151b] border-b border-white/5 flex items-center justify-between shrink-0">
-                        <div className="flex items-center gap-3">
-                            <Terminal className="w-3.5 h-3.5 text-zinc-500" />
-                            <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">
-                                {mode === 'LIVE' ? 'Live Console Output' : 'Historical Execution Trace'}
-                            </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setActiveStepID(null)}
-                                className={cn(
-                                    "h-7 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all",
-                                    !activeStepID ? "bg-primary/20 text-primary border border-primary/30" : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
-                                )}
-                            >
-                                <Monitor className="w-3.5 h-3.5 mr-2" />
-                                Global Trace
-                            </Button>
-                        </div>
-                    </div>
                     <div className="flex-1 overflow-hidden p-1">
                         <TerminalLog
                             targetID={activeStepID || workflow.id}
                             isActive={true}
                             isLive={mode === 'LIVE'}
+                            showHeader={false}
                             initialLogs={activeStepID ? getStepOutput(activeStepID) : globalLogs}
                             className="h-full border-0 rounded-none bg-transparent"
                         />

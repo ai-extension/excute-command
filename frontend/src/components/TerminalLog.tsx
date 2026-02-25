@@ -9,6 +9,7 @@ interface TerminalLogProps {
     isActive: boolean;
     initialLogs?: string[];
     isLive?: boolean;
+    showHeader?: boolean;
     onClear?: () => void;
     className?: string;
 }
@@ -18,6 +19,7 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
     isActive,
     initialLogs = [],
     isLive = true,
+    showHeader = true,
     onClear,
     className
 }) => {
@@ -86,55 +88,57 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
             className
         )}>
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-2 bg-[#13151b] border-b border-[#1a1c23]">
-                <div className="flex items-center gap-2">
-                    <TerminalIcon className="w-3.5 h-3.5 text-primary" />
-                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">
-                        Live Stream Console
-                    </span>
-                    <div className="flex items-center gap-1.5 ml-2">
-                        <div className={cn(
-                            "w-1.5 h-1.5 rounded-full",
-                            isActive ? "bg-emerald-500 animate-pulse" : "bg-zinc-700"
-                        )} />
-                        <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/40">
-                            {isLive ? (isActive ? 'Session Active' : 'Disconnected') : 'Historical Data'}
+            {showHeader && (
+                <div className="flex items-center justify-between px-4 py-2 bg-[#13151b] border-b border-[#1a1c23]">
+                    <div className="flex items-center gap-2">
+                        <TerminalIcon className="w-3.5 h-3.5 text-primary" />
+                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">
+                            Live Stream Console
                         </span>
+                        <div className="flex items-center gap-1.5 ml-2">
+                            <div className={cn(
+                                "w-1.5 h-1.5 rounded-full",
+                                isActive ? "bg-emerald-500 animate-pulse" : "bg-zinc-700"
+                            )} />
+                            <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/40">
+                                {isLive ? (isActive ? 'Session Active' : 'Disconnected') : 'Historical Data'}
+                            </span>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setAutoScroll(!autoScroll)}
+                            className={cn(
+                                "h-7 w-7 rounded-lg transition-colors",
+                                autoScroll ? "text-primary bg-primary/10" : "text-muted-foreground hover:bg-muted"
+                            )}
+                            title="Auto-scroll"
+                        >
+                            <ChevronDown className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={handleDownload}
+                            className="h-7 w-7 rounded-lg text-muted-foreground hover:bg-muted"
+                            title="Download logs"
+                        >
+                            <Download className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={clearLogs}
+                            className="h-7 w-7 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                            title="Clear console"
+                        >
+                            <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
                     </div>
                 </div>
-                <div className="flex items-center gap-1">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setAutoScroll(!autoScroll)}
-                        className={cn(
-                            "h-7 w-7 rounded-lg transition-colors",
-                            autoScroll ? "text-primary bg-primary/10" : "text-muted-foreground hover:bg-muted"
-                        )}
-                        title="Auto-scroll"
-                    >
-                        <ChevronDown className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleDownload}
-                        className="h-7 w-7 rounded-lg text-muted-foreground hover:bg-muted"
-                        title="Download logs"
-                    >
-                        <Download className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={clearLogs}
-                        className="h-7 w-7 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                        title="Clear console"
-                    >
-                        <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                </div>
-            </div>
+            )}
 
             {/* Content */}
             <div

@@ -13,6 +13,7 @@ interface AuthContextType {
     login: (token: string, user: User) => void;
     logout: () => void;
     isAuthenticated: boolean;
+    apiFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -25,8 +26,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [token, setToken] = useState<string | null>(() => {
         return localStorage.getItem('auth_token');
     });
-
-    // Removed useEffect for initialization as it's now handled in useState initializers
 
     const login = (newToken: string, newUser: User) => {
         setToken(newToken);
@@ -42,8 +41,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.removeItem('auth_user');
     };
 
+    const apiFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+        const headers = new Headers(init?.headers);
+        if (token && !headers.has('Authorization')) {
+            headers.set('Authorization', `Bearer ${token}`);
+        }
+
+        const response = await fetch(input, { ...init, headers });
+
+        if (response.status === 401) {
+            const data = await response.clone().json().catch(() => ({}));
+            if (data.error && (data.error.includes('expired') || data.error.includes('invalid claims'))) {
+                logout();
+                // Optionally redirect is handled by App.tsx's ProtectedRoute
+            }
+        }
+
+        return response;
+    };
+
     return (
-        <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!token }}>
+        <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!token, apiFetch }}>
             {children}
         </AuthContext.Provider>
     );

@@ -29,7 +29,7 @@ import WorkflowInputDialog from '../components/WorkflowInputDialog';
 const WorkflowPage = () => {
     const navigate = useNavigate();
     const { activeNamespace } = useNamespace();
-    const { token } = useAuth();
+    const { apiFetch } = useAuth();
     const [searchTerm, setSearchTerm] = useState('');
     const [workflows, setWorkflows] = useState<Workflow[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -39,14 +39,10 @@ const WorkflowPage = () => {
     const [isStarting, setIsStarting] = useState(false);
 
     const fetchWorkflows = async () => {
-        if (!token || !activeNamespace) return;
+        if (!activeNamespace) return;
         setIsLoading(true);
         try {
-            const response = await fetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/workflows`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
+            const response = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/workflows`);
             const data = await response.json();
             setWorkflows(data || []);
         } catch (error) {
@@ -57,8 +53,6 @@ const WorkflowPage = () => {
     };
 
     const handleRunWorkflow = async (workflow: Workflow, inputs?: Record<string, string>) => {
-        if (!token) return;
-
         // If workflow has inputs and they weren't provided yet, show dialog
         if (workflow.inputs && workflow.inputs.length > 0 && !inputs) {
             setRunningWorkflow(workflow);
@@ -73,10 +67,9 @@ const WorkflowPage = () => {
         }
 
         try {
-            await fetch(`${API_BASE_URL}/workflows/${workflow.id}/run`, {
+            await apiFetch(`${API_BASE_URL}/workflows/${workflow.id}/run`, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ inputs: inputs || {} })
@@ -244,7 +237,7 @@ const WorkflowPage = () => {
 
             {/* Workflow Monitor Dialog */}
             <Dialog open={isMonitorOpen} onOpenChange={setIsMonitorOpen}>
-                <DialogContent className="max-w-7xl w-[95vw] h-[90vh] bg-[#0a0b0e] border-[#1a1c23] border-2 rounded-2xl p-0 overflow-hidden shadow-2xl flex flex-col [&>button]:hidden">
+                <DialogContent hideClose className="max-w-5xl w-[90vw] h-[85vh] bg-[#0a0b0e] border-[#1a1c23] border-2 rounded-2xl p-0 overflow-hidden shadow-2xl flex flex-col">
                     {runningWorkflow && (
                         <WorkflowMonitor
                             workflow={runningWorkflow}
@@ -259,7 +252,7 @@ const WorkflowPage = () => {
 
             {/* Runtime Input Dialog */}
             <Dialog open={isInputOpen} onOpenChange={setIsInputOpen}>
-                <DialogContent className="max-w-lg w-[95vw] bg-[#0a0b0e] border-[#1a1c23] border-2 rounded-2xl p-0 overflow-hidden shadow-2xl [&>button]:hidden">
+                <DialogContent hideClose className="max-w-lg w-[95vw] bg-[#0a0b0e] border-[#1a1c23] border-2 rounded-2xl p-0 overflow-hidden shadow-2xl">
                     {runningWorkflow && runningWorkflow.inputs && (
                         <WorkflowInputDialog
                             inputs={runningWorkflow.inputs}

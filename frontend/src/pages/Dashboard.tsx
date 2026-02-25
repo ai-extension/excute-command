@@ -31,18 +31,14 @@ const MetricCard = ({ title, value, label, icon: Icon, color }: any) => (
 
 const Dashboard = () => {
     const { activeNamespace } = useNamespace();
-    const { token } = useAuth();
+    const { apiFetch } = useAuth();
     const [recentCommands, setRecentCommands] = useState<any[]>([]);
 
     useEffect(() => {
         const fetchRecent = async () => {
-            if (!activeNamespace || !token) return;
+            if (!activeNamespace) return;
             try {
-                const response = await fetch(`${API_BASE_URL}/commands?namespace_id=${activeNamespace.id}`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
+                const response = await apiFetch(`${API_BASE_URL}/commands?namespace_id=${activeNamespace.id}`);
                 const data = await response.json();
                 setRecentCommands((data || []).slice(0, 4));
             } catch (error) {

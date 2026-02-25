@@ -6,11 +6,12 @@ import (
 )
 
 type WorkflowService struct {
-	repo      domain.WorkflowRepository
-	groupRepo domain.WorkflowGroupRepository
-	stepRepo  domain.WorkflowStepRepository
-	inputRepo domain.WorkflowInputRepository
-	execRepo  domain.WorkflowExecutionRepository
+	repo         domain.WorkflowRepository
+	groupRepo    domain.WorkflowGroupRepository
+	stepRepo     domain.WorkflowStepRepository
+	inputRepo    domain.WorkflowInputRepository
+	variableRepo domain.WorkflowVariableRepository
+	execRepo     domain.WorkflowExecutionRepository
 }
 
 func NewWorkflowService(
@@ -18,14 +19,16 @@ func NewWorkflowService(
 	groupRepo domain.WorkflowGroupRepository,
 	stepRepo domain.WorkflowStepRepository,
 	inputRepo domain.WorkflowInputRepository,
+	variableRepo domain.WorkflowVariableRepository,
 	execRepo domain.WorkflowExecutionRepository,
 ) *WorkflowService {
 	return &WorkflowService{
-		repo:      repo,
-		groupRepo: groupRepo,
-		stepRepo:  stepRepo,
-		inputRepo: inputRepo,
-		execRepo:  execRepo,
+		repo:         repo,
+		groupRepo:    groupRepo,
+		stepRepo:     stepRepo,
+		inputRepo:    inputRepo,
+		variableRepo: variableRepo,
+		execRepo:     execRepo,
 	}
 }
 
@@ -41,6 +44,13 @@ func (s *WorkflowService) CreateWorkflow(wf *domain.Workflow) error {
 			wf.Inputs[i].ID = uuid.New()
 		}
 		wf.Inputs[i].WorkflowID = wf.ID
+	}
+
+	for i := range wf.Variables {
+		if wf.Variables[i].ID == uuid.Nil {
+			wf.Variables[i].ID = uuid.New()
+		}
+		wf.Variables[i].WorkflowID = wf.ID
 	}
 
 	for i := range wf.Groups {
@@ -68,12 +78,19 @@ func (s *WorkflowService) ListWorkflows(namespaceID uuid.UUID) ([]domain.Workflo
 }
 
 func (s *WorkflowService) UpdateWorkflow(wf *domain.Workflow) error {
-	// Recursively assign IDs to new inputs, groups and steps
+	// Recursively assign IDs to new inputs, variables, groups and steps
 	for i := range wf.Inputs {
 		if wf.Inputs[i].ID == uuid.Nil {
 			wf.Inputs[i].ID = uuid.New()
 		}
 		wf.Inputs[i].WorkflowID = wf.ID
+	}
+
+	for i := range wf.Variables {
+		if wf.Variables[i].ID == uuid.Nil {
+			wf.Variables[i].ID = uuid.New()
+		}
+		wf.Variables[i].WorkflowID = wf.ID
 	}
 
 	for i := range wf.Groups {

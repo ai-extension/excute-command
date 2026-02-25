@@ -36,6 +36,7 @@ func main() {
 		&domain.WorkflowGroup{},
 		&domain.WorkflowStep{},
 		&domain.WorkflowInput{},
+		&domain.WorkflowVariable{},
 		&domain.WorkflowExecution{},
 		&domain.WorkflowExecutionStep{},
 	); err != nil {
@@ -54,6 +55,7 @@ func main() {
 	workflowGroupRepo := repository.NewPostgresWorkflowGroupRepo(db)
 	workflowStepRepo := repository.NewPostgresWorkflowStepRepo(db)
 	workflowInputRepo := repository.NewPostgresWorkflowInputRepo(db)
+	workflowVariableRepo := repository.NewPostgresWorkflowVariableRepo(db)
 	execRepo := repository.NewPostgresWorkflowExecutionRepo(db)
 
 	// Seed Admin User and Default Namespace
@@ -69,7 +71,7 @@ func main() {
 	authService := service.NewAuthService(userRepo)
 	serverService := service.NewServerService(serverRepo, hub)
 	terminalService := service.NewTerminalService(serverRepo, hub)
-	workflowService := service.NewWorkflowService(workflowRepo, workflowGroupRepo, workflowStepRepo, workflowInputRepo, execRepo)
+	workflowService := service.NewWorkflowService(workflowRepo, workflowGroupRepo, workflowStepRepo, workflowInputRepo, workflowVariableRepo, execRepo)
 	workflowExecutor := service.NewWorkflowExecutor(workflowRepo, workflowGroupRepo, workflowStepRepo, workflowInputRepo, execRepo, serverService, hub)
 
 	// Initialize Handlers
@@ -160,24 +162,50 @@ func main() {
 func seedAdmin(db *gorm.DB) {
 	log.Println("Ensuring system permissions...")
 
-	// Default permissions
-	perms := []domain.Permission{
-		{ID: uuid.New(), Name: "Execute Commands", Type: "FUNCTION", Action: "EXECUTE"},
-		{ID: uuid.New(), Name: "Read Commands", Type: "RESOURCE", Action: "READ"},
-		{ID: uuid.New(), Name: "Manage Users", Type: "FUNCTION", Action: "WRITE"},
-		{ID: uuid.New(), Name: "Manage Roles", Type: "FUNCTION", Action: "WRITE"},
-		{ID: uuid.New(), Name: "View Dashboard", Type: "RESOURCE", Action: "READ"},
-	}
-	for i := range perms {
-		db.FirstOrCreate(&perms[i], "name = ?", perms[i].Name)
+	// Default permissions definitions
+	permDefs := []struct {
+		Name   string
+		Type   string
+		Action string
+	}{
+		{Name: "Execute Commands", Type: "FUNCTION", Action: "EXECUTE"},
+		{Name: "Read Commands", Type: "RESOURCE", Action: "READ"},
+		{Name: "Manage Users", Type: "FUNCTION", Action: "WRITE"},
+		{Name: "Manage Roles", Type: "FUNCTION", Action: "WRITE"},
+		{Name: "View Dashboard", Type: "RESOURCE", Action: "READ"},
 	}
 
-	var count int64
-	db.Model(&domain.User{}).Where("username = ?", "admin").Count(&count)
-	if count == 0 {
+	var perms []domain.Permission
+	for _, def := range permDefs {
+		var p domain.Permission
+		err := db.Where("name = ?", def.Name).First(&p).Error
+		if err != nil {
+			if err == gorm.ErrRecordNotFound {
+				p = domain.Permission{
+					ID:     uuid.New(),
+					Name:   def.Name,
+					Type:   def.Type,
+					Action: def.Action,
+				}
+				if err := db.Create(&p).Error; err != nil {
+					log.Printf("Failed to create permission %s: %v", def.Name, err)
+					continue
+				}
+			} else {
+				log.Printf("Error checking permission %s: %v", def.Name, err)
+				continue
+			}
+		}
+		perms = append(perms, p)
+	}
+
+	var adminUser domain.User
+	err := db.Preload("Roles").Where("username = ?", "admin").First(&adminUser).Error
+
+	if err == gorm.ErrRecordNotFound {
 		log.Println("Seeding admin user...")
 		hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
-		admin := domain.User{
+		adminUser = domain.User{
 			ID:           uuid.New(),
 			Username:     "admin",
 			PasswordHash: string(hashedPassword),
@@ -191,20 +219,27 @@ func seedAdmin(db *gorm.DB) {
 			Description: "Full access role",
 			Permissions: perms,
 		}
-		db.FirstOrCreate(&adminRole, "name = ?", adminRole.Name)
 
-		admin.Roles = []domain.Role{adminRole}
-		if err := db.Create(&admin).Error; err != nil {
-			log.Println("Failed to seed admin:", err)
+		if err := db.FirstOrCreate(&adminRole, "name = ?", adminRole.Name).Error; err != nil {
+			log.Println("Failed to create admin role:", err)
+		}
+
+		adminUser.Roles = []domain.Role{adminRole}
+		if err := db.Create(&adminUser).Error; err != nil {
+			log.Println("Failed to seed admin user:", err)
 		} else {
 			log.Println("Admin user seeded successfully (admin/admin)")
 		}
-	} else {
+	} else if err == nil {
 		// Ensure admin role has permissions even if user exists
 		var adminRole domain.Role
 		if err := db.Where("name = ?", "admin").First(&adminRole).Error; err == nil {
-			db.Model(&adminRole).Association("Permissions").Replace(perms)
+			if err := db.Model(&adminRole).Association("Permissions").Replace(perms); err != nil {
+				log.Println("Failed to update admin role permissions:", err)
+			}
 		}
+	} else {
+		log.Println("Error checking admin user:", err)
 	}
 }
 

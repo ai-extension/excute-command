@@ -20,7 +20,13 @@ func (r *PostgresWorkflowRepo) Create(wf *domain.Workflow) error {
 
 func (r *PostgresWorkflowRepo) GetByID(id uuid.UUID) (*domain.Workflow, error) {
 	var wf domain.Workflow
-	if err := r.db.Preload("Inputs").Preload("Groups.Steps").First(&wf, "id = ?", id).Error; err != nil {
+	err := r.db.
+		Preload("Inputs", func(db *gorm.DB) *gorm.DB { return db.Order("\"created_at\" ASC") }).
+		Preload("Variables", func(db *gorm.DB) *gorm.DB { return db.Order("\"created_at\" ASC") }).
+		Preload("Groups", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
+		Preload("Groups.Steps", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
+		First(&wf, "id = ?", id).Error
+	if err != nil {
 		return nil, err
 	}
 	return &wf, nil
@@ -28,7 +34,14 @@ func (r *PostgresWorkflowRepo) GetByID(id uuid.UUID) (*domain.Workflow, error) {
 
 func (r *PostgresWorkflowRepo) List(namespaceID uuid.UUID) ([]domain.Workflow, error) {
 	var wfs []domain.Workflow
-	if err := r.db.Preload("Inputs").Preload("Groups.Steps").Where("namespace_id = ?", namespaceID).Find(&wfs).Error; err != nil {
+	err := r.db.
+		Preload("Inputs").
+		Preload("Variables").
+		Preload("Groups", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
+		Preload("Groups.Steps", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
+		Where("namespace_id = ?", namespaceID).
+		Find(&wfs).Error
+	if err != nil {
 		return nil, err
 	}
 	return wfs, nil
@@ -36,29 +49,58 @@ func (r *PostgresWorkflowRepo) List(namespaceID uuid.UUID) ([]domain.Workflow, e
 
 func (r *PostgresWorkflowRepo) Update(wf *domain.Workflow) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		// Sync Inputs
-		if err := tx.Model(wf).Association("Inputs").Replace(wf.Inputs); err != nil {
+		// Sync Inputs: explicitly delete all old inputs and recreate them.
+		// This avoids GORM's ON CONFLICT DO UPDATE which silently skips the `type` column
+		// (a PostgreSQL reserved word) in the SET clause.
+		if err := tx.Where("workflow_id = ?", wf.ID).Delete(&domain.WorkflowInput{}).Error; err != nil {
 			return err
 		}
-
-		// Sync Groups and their Steps
-		for i := range wf.Groups {
-			// Ensure Group exists if it has an ID, or it will be created by Replace below anyway.
-			// However, to sync Steps for an existing group, we need to do it explicitly or GORM won't delete orphans inside the group.
-			if wf.Groups[i].ID != uuid.Nil {
-				if err := tx.Model(&wf.Groups[i]).Association("Steps").Replace(wf.Groups[i].Steps); err != nil {
-					return err
-				}
+		for i := range wf.Inputs {
+			wf.Inputs[i].ID = uuid.New()
+			wf.Inputs[i].WorkflowID = wf.ID
+			if wf.Inputs[i].Type == "" {
+				wf.Inputs[i].Type = "input"
+			}
+			if err := tx.Create(&wf.Inputs[i]).Error; err != nil {
+				return err
 			}
 		}
 
-		// Now replace the groups list themselves to handle added/removed groups
+		// Sync Variables: explicitly delete all old variables and recreate them.
+		if err := tx.Where("workflow_id = ?", wf.ID).Delete(&domain.WorkflowVariable{}).Error; err != nil {
+			return err
+		}
+		for i := range wf.Variables {
+			wf.Variables[i].ID = uuid.New()
+			wf.Variables[i].WorkflowID = wf.ID
+			if err := tx.Create(&wf.Variables[i]).Error; err != nil {
+				return err
+			}
+		}
+
+		// Step 1: Upsert each group first to ensure it exists in the DB before touching steps.
+		// This prevents FK violations when steps reference a new group that hasn't been saved yet.
+		for i := range wf.Groups {
+			wf.Groups[i].WorkflowID = wf.ID
+			if err := tx.Omit("Steps").Save(&wf.Groups[i]).Error; err != nil {
+				return err
+			}
+		}
+
+		// Step 2: Now that all groups exist, sync their steps.
+		for i := range wf.Groups {
+			if err := tx.Model(&wf.Groups[i]).Association("Steps").Replace(wf.Groups[i].Steps); err != nil {
+				return err
+			}
+		}
+
+		// Step 3: Sync the groups list at the association level to remove deleted groups.
 		if err := tx.Model(wf).Association("Groups").Replace(wf.Groups); err != nil {
 			return err
 		}
 
-		// Update top-level fields
-		return tx.Save(wf).Error
+		// Update top-level fields (omit associations to avoid double-processing)
+		return tx.Omit("Groups", "Inputs", "Variables").Save(wf).Error
 	})
 }
 
@@ -148,6 +190,34 @@ func (r *PostgresWorkflowInputRepo) Update(input *domain.WorkflowInput) error {
 
 func (r *PostgresWorkflowInputRepo) Delete(id uuid.UUID) error {
 	return r.db.Delete(&domain.WorkflowInput{}, "id = ?", id).Error
+}
+
+type PostgresWorkflowVariableRepo struct {
+	db *gorm.DB
+}
+
+func NewPostgresWorkflowVariableRepo(db *gorm.DB) *PostgresWorkflowVariableRepo {
+	return &PostgresWorkflowVariableRepo{db: db}
+}
+
+func (r *PostgresWorkflowVariableRepo) Create(variable *domain.WorkflowVariable) error {
+	return r.db.Create(variable).Error
+}
+
+func (r *PostgresWorkflowVariableRepo) GetByWorkflowID(workflowID uuid.UUID) ([]domain.WorkflowVariable, error) {
+	var variables []domain.WorkflowVariable
+	if err := r.db.Where("workflow_id = ?", workflowID).Find(&variables).Error; err != nil {
+		return nil, err
+	}
+	return variables, nil
+}
+
+func (r *PostgresWorkflowVariableRepo) Update(variable *domain.WorkflowVariable) error {
+	return r.db.Save(variable).Error
+}
+
+func (r *PostgresWorkflowVariableRepo) Delete(id uuid.UUID) error {
+	return r.db.Delete(&domain.WorkflowVariable{}, "id = ?", id).Error
 }
 
 type PostgresWorkflowExecutionRepo struct {

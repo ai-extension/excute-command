@@ -151,28 +151,32 @@ type StepRepository interface {
 // Workflow Management Models
 
 type Workflow struct {
-	ID              uuid.UUID       `json:"id" gorm:"type:uuid;primaryKey"`
-	NamespaceID     uuid.UUID       `json:"namespace_id" gorm:"type:uuid;index"`
-	Name            string          `json:"name" gorm:"not null"`
-	Description     string          `json:"description"`
-	DefaultServerID uuid.UUID       `json:"default_server_id,omitempty" gorm:"type:uuid"`
-	Status          Status          `json:"status"`
-	Inputs          []WorkflowInput `json:"inputs,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Groups          []WorkflowGroup `json:"groups,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	CreatedAt       time.Time       `json:"created_at"`
-	UpdatedAt       time.Time       `json:"updated_at"`
+	ID              uuid.UUID          `json:"id" gorm:"type:uuid;primaryKey"`
+	NamespaceID     uuid.UUID          `json:"namespace_id" gorm:"type:uuid;index"`
+	Name            string             `json:"name" gorm:"not null"`
+	Description     string             `json:"description"`
+	DefaultServerID uuid.UUID          `json:"default_server_id,omitempty" gorm:"type:uuid"`
+	Status          Status             `json:"status"`
+	Inputs          []WorkflowInput    `json:"inputs,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Variables       []WorkflowVariable `json:"variables,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Groups          []WorkflowGroup    `json:"groups,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	CreatedAt       time.Time          `json:"created_at"`
+	UpdatedAt       time.Time          `json:"updated_at"`
 }
 
 type WorkflowGroup struct {
-	ID         uuid.UUID      `json:"id" gorm:"type:uuid;primaryKey"`
-	WorkflowID uuid.UUID      `json:"workflow_id" gorm:"type:uuid;index"`
-	Name       string         `json:"name" gorm:"not null"`
-	Order      int            `json:"order"`
-	IsParallel bool           `json:"is_parallel"`
-	Status     Status         `json:"status"`
-	Steps      []WorkflowStep `json:"steps,omitempty" gorm:"foreignKey:GroupID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	CreatedAt  time.Time      `json:"created_at"`
-	UpdatedAt  time.Time      `json:"updated_at"`
+	ID              uuid.UUID      `json:"id" gorm:"type:uuid;primaryKey"`
+	WorkflowID      uuid.UUID      `json:"workflow_id" gorm:"type:uuid;index"`
+	Name            string         `json:"name" gorm:"not null"`
+	Key             string         `json:"key" gorm:"not null;default:''"`
+	Condition       string         `json:"condition" gorm:"default:''"`
+	DefaultServerID uuid.UUID      `json:"default_server_id,omitempty" gorm:"type:uuid"`
+	Order           int            `json:"order"`
+	IsParallel      bool           `json:"is_parallel"`
+	Status          Status         `json:"status"`
+	Steps           []WorkflowStep `json:"steps,omitempty" gorm:"foreignKey:GroupID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	CreatedAt       time.Time      `json:"created_at"`
+	UpdatedAt       time.Time      `json:"updated_at"`
 }
 
 type WorkflowStep struct {
@@ -193,9 +197,19 @@ type WorkflowInput struct {
 	WorkflowID   uuid.UUID `json:"workflow_id" gorm:"type:uuid;index"`
 	Key          string    `json:"key" gorm:"not null"`
 	Label        string    `json:"label" gorm:"not null"`
+	Type         string    `json:"type" gorm:"not null;default:'input'"` // input, number, or select
 	DefaultValue string    `json:"default_value"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+type WorkflowVariable struct {
+	ID         uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
+	WorkflowID uuid.UUID `json:"workflow_id" gorm:"type:uuid;index"`
+	Key        string    `json:"key" gorm:"not null"`
+	Value      string    `json:"value"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 type WorkflowExecution struct {
@@ -252,6 +266,13 @@ type WorkflowInputRepository interface {
 	Create(input *WorkflowInput) error
 	GetByWorkflowID(workflowID uuid.UUID) ([]WorkflowInput, error)
 	Update(input *WorkflowInput) error
+	Delete(id uuid.UUID) error
+}
+
+type WorkflowVariableRepository interface {
+	Create(variable *WorkflowVariable) error
+	GetByWorkflowID(workflowID uuid.UUID) ([]WorkflowVariable, error)
+	Update(variable *WorkflowVariable) error
 	Delete(id uuid.UUID) error
 }
 

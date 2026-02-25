@@ -28,7 +28,7 @@ import {
 import { Label } from "../components/ui/label";
 
 const UsersPage = () => {
-    const { token } = useAuth();
+    const { apiFetch } = useAuth();
     const [users, setUsers] = useState<any[]>([]);
     const [roles, setRoles] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -41,9 +41,7 @@ const UsersPage = () => {
 
     const fetchUsers = async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/users`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const response = await apiFetch(`${API_BASE_URL}/users`);
             const data = await response.json();
             setUsers(Array.isArray(data) ? data : []);
         } catch (error) {
@@ -55,9 +53,7 @@ const UsersPage = () => {
 
     const fetchRoles = async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/roles`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const response = await apiFetch(`${API_BASE_URL}/roles`);
             const data = await response.json();
             setRoles(Array.isArray(data) ? data : []);
         } catch (error) {
@@ -74,11 +70,10 @@ const UsersPage = () => {
         e.preventDefault();
         setIsSubmitting(true);
         try {
-            const response = await fetch(`${API_BASE_URL}/users`, {
+            const response = await apiFetch(`${API_BASE_URL}/users`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(newUserData)
             });
@@ -104,11 +99,10 @@ const UsersPage = () => {
         if (!selectedUser) return;
         setIsSubmitting(true);
         try {
-            const response = await fetch(`${API_BASE_URL}/users/${selectedUser.id}/roles`, {
+            const response = await apiFetch(`${API_BASE_URL}/users/${selectedUser.id}/roles`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ role_ids: selectedRoleIDs })
             });

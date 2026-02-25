@@ -16,6 +16,7 @@ backend/*.so
 backend/*.dylib
 backend/vendor/
 backend/go.work
+backend/data/
 
 # Frontend (Node/React/Vite)
 frontend/node_modules/
@@ -29,9 +30,10 @@ frontend/yarn-debug.log*
 frontend/yarn-error.log*
 frontend/pnpm-debug.log*
 
-# Docker
+# Docker / Data
 docker/data/
 .docker-data/
+
 
 # IDEs
 .idea/

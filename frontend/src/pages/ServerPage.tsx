@@ -36,7 +36,7 @@ import { API_BASE_URL } from '../lib/api';
 import { Server } from '../types';
 
 const ServerPage = () => {
-    const { token } = useAuth();
+    const { apiFetch } = useAuth();
     const [servers, setServers] = useState<Server[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -59,12 +59,9 @@ const ServerPage = () => {
     const [isMaximized, setIsMaximized] = useState(false);
 
     const fetchServers = async () => {
-        if (!token) return;
         setIsLoading(true);
         try {
-            const response = await fetch(`${API_BASE_URL}/servers`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const response = await apiFetch(`${API_BASE_URL}/servers`);
             const data = await response.json();
             setServers(data || []);
         } catch (error) {
@@ -76,7 +73,7 @@ const ServerPage = () => {
 
     useEffect(() => {
         fetchServers();
-    }, [token]);
+    }, []);
 
     const handleOpenForm = (server?: Server) => {
         if (server) {
@@ -99,17 +96,15 @@ const ServerPage = () => {
     };
 
     const handleSaveServer = async () => {
-        if (!token) return;
         try {
             const url = editingServer
                 ? `${API_BASE_URL}/servers/${editingServer.id}`
                 : `${API_BASE_URL}/servers`;
             const method = editingServer ? 'PUT' : 'POST';
 
-            const response = await fetch(url, {
+            const response = await apiFetch(url, {
                 method,
                 headers: {
-                    'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(formData)
@@ -125,11 +120,10 @@ const ServerPage = () => {
     };
 
     const handleDeleteServer = async (id: string) => {
-        if (!token || !confirm('Are you sure you want to delete this server?')) return;
+        if (!confirm('Are you sure you want to delete this server?')) return;
         try {
-            await fetch(`${API_BASE_URL}/servers/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
+            await apiFetch(`${API_BASE_URL}/servers/${id}`, {
+                method: 'DELETE'
             });
             fetchServers();
         } catch (error) {
@@ -144,11 +138,9 @@ const ServerPage = () => {
         setIsMaximized(false);
 
         // Automatically start interactive session
-        if (!token) return;
         try {
-            const response = await fetch(`${API_BASE_URL}/servers/${server.id}/terminal`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` }
+            const response = await apiFetch(`${API_BASE_URL}/servers/${server.id}/terminal`, {
+                method: 'POST'
             });
             const data = await response.json();
             if (response.ok) {

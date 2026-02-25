@@ -21,30 +21,29 @@ import { WorkflowExecution } from '../types';
 import { format } from 'date-fns';
 import { API_BASE_URL } from '../lib/api';
 import ExecutionMonitor from './ExecutionMonitor';
+import { useAuth } from '../context/AuthContext';
 
 interface WorkflowHistoryProps {
     workflowId: string;
-    token: string | null;
 }
 
-const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({ workflowId, token }) => {
+const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({ workflowId }) => {
+    const { apiFetch } = useAuth();
     const [executions, setExecutions] = useState<WorkflowExecution[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedExec, setSelectedExec] = useState<WorkflowExecution | null>(null);
     const [loadingDetail, setLoadingDetail] = useState(false);
 
     useEffect(() => {
-        if (workflowId && token) {
+        if (workflowId) {
             fetchHistory();
         }
-    }, [workflowId, token]);
+    }, [workflowId]);
 
     const fetchHistory = async () => {
         try {
             setLoading(true);
-            const response = await fetch(`${API_BASE_URL}/workflows/${workflowId}/executions`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const response = await apiFetch(`${API_BASE_URL}/workflows/${workflowId}/executions`);
             if (response.ok) {
                 const data = await response.json();
                 setExecutions(data || []);
@@ -59,9 +58,7 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({ workflowId, token }) 
     const fetchExecutionDetail = async (exec: WorkflowExecution) => {
         try {
             setLoadingDetail(true);
-            const response = await fetch(`${API_BASE_URL}/executions/${exec.id}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const response = await apiFetch(`${API_BASE_URL}/executions/${exec.id}`);
             if (response.ok) {
                 const data = await response.json();
                 setSelectedExec(data);
@@ -158,7 +155,7 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({ workflowId, token }) 
             )}
 
             <Dialog open={!!selectedExec} onOpenChange={(open: boolean) => !open && setSelectedExec(null)}>
-                <DialogContent className="max-w-[95vw] w-[1400px] h-[90vh] p-0 overflow-hidden bg-slate-950 border-white/10">
+                <DialogContent hideClose className="max-w-5xl w-[90vw] h-[85vh] p-0 overflow-hidden bg-slate-950 border-white/10">
                     {loadingDetail ? (
                         <div className="h-full flex items-center justify-center">
                             <Loader2 className="w-8 h-8 animate-spin text-primary" />

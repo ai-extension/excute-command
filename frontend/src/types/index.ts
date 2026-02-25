@@ -54,6 +54,9 @@ export interface WorkflowGroup {
     id: string;
     workflow_id: string;
     name: string;
+    key: string;
+    condition?: string;
+    default_server_id?: string;
     order: number;
     is_parallel: boolean;
     status: Status;
@@ -70,6 +73,7 @@ export interface Workflow {
     default_server_id?: string;
     status: Status;
     inputs?: WorkflowInput[];
+    variables?: WorkflowVariable[];
     groups?: WorkflowGroup[];
     created_at: string;
     updated_at: string;
@@ -105,7 +109,17 @@ export interface WorkflowInput {
     workflow_id: string;
     key: string;
     label: string;
+    type: 'input' | 'number' | 'select';
     default_value: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface WorkflowVariable {
+    id: string;
+    workflow_id: string;
+    key: string;
+    value: string;
     created_at: string;
     updated_at: string;
 }
