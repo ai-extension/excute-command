@@ -3,6 +3,7 @@ package service
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/google/uuid"
@@ -42,7 +43,7 @@ func (s *ServerService) DeleteServer(id uuid.UUID) error {
 	return s.repo.Delete(id)
 }
 
-func (s *ServerService) ExecuteCommand(serverID uuid.UUID, commandText string) (string, error) {
+func (s *ServerService) ExecuteCommand(serverID uuid.UUID, commandText string, writers ...io.Writer) (string, error) {
 	server, err := s.repo.GetByID(serverID)
 	if err != nil {
 		return "", fmt.Errorf("failed to get server: %w", err)
@@ -82,10 +83,13 @@ func (s *ServerService) ExecuteCommand(serverID uuid.UUID, commandText string) (
 	defer session.Close()
 
 	var stdout, stderr bytes.Buffer
-	stdoutWriter := &wsWriter{hub: s.hub, targetID: serverID.String(), buffer: &stdout}
-	stderrWriter := &wsWriter{hub: s.hub, targetID: serverID.String(), buffer: &stderr}
-	session.Stdout = stdoutWriter
-	session.Stderr = stderrWriter
+
+	// Create multiwriters for capturing AND streaming
+	stdoutWriters := append([]io.Writer{&stdout}, writers...)
+	stderrWriters := append([]io.Writer{&stderr}, writers...)
+
+	session.Stdout = io.MultiWriter(stdoutWriters...)
+	session.Stderr = io.MultiWriter(stderrWriters...)
 
 	if err := session.Run(commandText); err != nil {
 		return stdout.String() + stderr.String(), fmt.Errorf("failed to run command: %w", err)

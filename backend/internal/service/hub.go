@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -32,6 +33,9 @@ func NewHub() *Hub {
 }
 
 func (h *Hub) Run() {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case client := <-h.register:
@@ -46,16 +50,22 @@ func (h *Hub) Run() {
 			}
 			h.mu.Unlock()
 		case message := <-h.broadcast:
-			h.mu.Lock()
-			for client := range h.clients {
-				err := client.WriteMessage(websocket.TextMessage, message)
-				if err != nil {
-					log.Printf("error: %v", err)
-					client.Close()
-					delete(h.clients, client)
-				}
-			}
-			h.mu.Unlock()
+			h.broadcastToAll(message)
+		case <-ticker.C:
+			h.broadcastToAll([]byte(`{"type":"ping"}`))
+		}
+	}
+}
+
+func (h *Hub) broadcastToAll(message []byte) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for client := range h.clients {
+		err := client.WriteMessage(websocket.TextMessage, message)
+		if err != nil {
+			log.Printf("websocket write error: %v", err)
+			client.Close()
+			delete(h.clients, client)
 		}
 	}
 }

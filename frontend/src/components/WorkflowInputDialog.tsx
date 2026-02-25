@@ -74,17 +74,6 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
 
     return (
         <div className="flex flex-col bg-[#0a0b0e] text-slate-200 min-h-[400px]">
-            <DialogHeader className="p-6 border-b border-border/10 bg-gradient-to-r from-indigo-500/10 to-transparent flex-shrink-0">
-                <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-primary/20 flex items-center justify-center border border-primary/30">
-                        <Settings2 className="w-5 h-5 text-primary" />
-                    </div>
-                    <div>
-                        <DialogTitle className="text-sm font-black uppercase tracking-widest text-white">Runtime Parameters</DialogTitle>
-                        <p className="text-[10px] font-medium text-slate-400 mt-0.5">Define variable values for this execution session</p>
-                    </div>
-                </div>
-            </DialogHeader>
 
             <form onSubmit={handleSubmit} className="flex-1 p-6 space-y-5 overflow-y-auto max-h-[60vh]">
                 {inputs.map((input) => (
@@ -97,9 +86,6 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                                 {errors[input.key] && (
                                     <span className="text-[9px] font-bold text-destructive animate-pulse">{errors[input.key]}</span>
                                 )}
-                                <span className="text-[8px] font-mono text-slate-500 bg-slate-800/50 px-1.5 py-0.5 rounded border border-slate-700/50">
-                                    {"{{"}{input.key}{"}}"}
-                                </span>
                             </div>
                         </div>
                         <div className="relative">

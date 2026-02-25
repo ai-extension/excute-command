@@ -49,7 +49,7 @@ func NewWorkflowExecutor(
 	}
 }
 
-func (e *WorkflowExecutor) Run(ctx context.Context, workflowID uuid.UUID, inputs map[string]string) error {
+func (e *WorkflowExecutor) Run(ctx context.Context, workflowID uuid.UUID, execID uuid.UUID, inputs map[string]string) error {
 	wf, err := e.wfRepo.GetByID(workflowID)
 	if err != nil {
 		return err
@@ -61,29 +61,32 @@ func (e *WorkflowExecutor) Run(ctx context.Context, workflowID uuid.UUID, inputs
 	}
 
 	// Create execution record
-	execID := uuid.New()
 	baseDir, _ := os.Getwd()
-	logDir := filepath.Join(baseDir, "data", "logs", "workflows")
-	os.MkdirAll(logDir, 0755)
-	logPath := filepath.Join(logDir, execID.String()+".log")
+	execLogDir := filepath.Join(baseDir, "data", "logs", "executions", execID.String())
+	if err := os.MkdirAll(execLogDir, 0755); err != nil {
+		return fmt.Errorf("failed to create log directory: %w", err)
+	}
 
+	mainLogPath := filepath.Join(execLogDir, "workflow.log")
 	inputsJSON, _ := json.Marshal(inputs)
 	execution := &domain.WorkflowExecution{
 		ID:         execID,
 		WorkflowID: workflowID,
 		Status:     domain.StatusRunning,
 		Inputs:     string(inputsJSON),
-		LogPath:    logPath,
+		LogPath:    mainLogPath,
 		StartedAt:  time.Now(),
 	}
 	e.execRepo.Create(execution)
 
-	logFile, _ := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	logFile, _ := os.OpenFile(mainLogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	defer logFile.Close()
 
+	fmt.Fprintf(logFile, "================================================================================\n")
 	fmt.Fprintf(logFile, "--- WORKFLOW EXECUTION STARTED: %s ---\n", execution.StartedAt.Format(time.RFC3339))
 	fmt.Fprintf(logFile, "Workflow: %s (%s)\n", wf.Name, workflowID)
-	fmt.Fprintf(logFile, "Inputs: %s\n\n", execution.Inputs)
+	fmt.Fprintf(logFile, "Inputs: %s\n", execution.Inputs)
+	fmt.Fprintf(logFile, "================================================================================\n\n")
 
 	e.hub.BroadcastLog(workflowID.String(), fmt.Sprintf("--- WORKFLOW EXECUTION STARTED: %s ---\n", wf.Name))
 
@@ -238,7 +241,7 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 	if shouldRun, err := e.evaluateCondition(group.Condition, inputs, variables, groupResults); err != nil {
 		return fmt.Errorf("group %q condition error: %w", group.Name, err)
 	} else if !shouldRun {
-		msg := fmt.Sprintf("\n[GROUP SKIPPED] %s (condition: %s)\n", group.Name, group.Condition)
+		msg := fmt.Sprintf("\n%s\n[GROUP SKIPPED] %s\nCondition: %s\n%s\n", strings.Repeat("-", 80), group.Name, group.Condition, strings.Repeat("-", 80))
 		fmt.Fprint(logFile, msg)
 		e.hub.BroadcastLog(workflowID.String(), msg)
 		group.Status = "SKIPPED"
@@ -247,7 +250,7 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 		return nil
 	}
 
-	msg := fmt.Sprintf("\n[GROUP] %s (Parallel: %v)\n", group.Name, group.IsParallel)
+	msg := fmt.Sprintf("\n%s\n[GROUP] %s\nParallel: %v\n%s\n", strings.Repeat("=", 80), group.Name, group.IsParallel, strings.Repeat("=", 80))
 	fmt.Fprint(logFile, msg)
 	e.hub.BroadcastLog(group.WorkflowID.String(), msg)
 	group.Status = domain.StatusRunning
@@ -301,7 +304,7 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 	return e.groupRepo.Update(group)
 }
 
-func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowStep, inputs map[string]string, variables []domain.WorkflowVariable, defaultServerID uuid.UUID, logFile *os.File, workflowID uuid.UUID, executionID uuid.UUID) error {
+func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowStep, inputs map[string]string, variables []domain.WorkflowVariable, defaultServerID uuid.UUID, mainLogFile *os.File, workflowID uuid.UUID, executionID uuid.UUID) error {
 	step.Status = domain.StatusRunning
 	e.stepRepo.Update(step)
 	e.hub.BroadcastStatus(step.ID.String(), "step", string(domain.StatusRunning))
@@ -317,11 +320,19 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 	}
 	e.execRepo.CreateStepResult(stepExec)
 
-	msg := fmt.Sprintf("\n  [STEP] %s\n", step.Name)
-	fmt.Fprint(logFile, msg)
+	// Create step-specific log file
+	baseDir, _ := os.Getwd()
+	stepLogPath := filepath.Join(baseDir, "data", "logs", "executions", executionID.String(), step.ID.String()+".log")
+	stepLogFile, _ := os.OpenFile(stepLogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	defer stepLogFile.Close()
+
+	msg := fmt.Sprintf("\n[STEP] %s\n%s\n", step.Name, strings.Repeat("─", 40))
+	fmt.Fprint(mainLogFile, msg)
+	fmt.Fprint(stepLogFile, msg)
+
 	e.hub.BroadcastLog(step.ID.String(), msg)
-	e.hub.BroadcastLog(step.GroupID.String(), msg) // Also broadcast to group
-	e.hub.BroadcastLog(workflowID.String(), msg)   // Also broadcast to workflow global log
+	e.hub.BroadcastLog(step.GroupID.String(), msg)
+	e.hub.BroadcastLog(workflowID.String(), msg)
 
 	var output string
 	var err error
@@ -343,16 +354,16 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 	}
 
 	if targetServerID != uuid.Nil {
-		// Run on remote server via ServerService
-		output, err = e.serverService.ExecuteCommand(targetServerID, command)
-		// Broadcast to live terminals
-		e.hub.BroadcastLog(step.ID.String(), output)
-		e.hub.BroadcastLog(workflowID.String(), "  [OUTPUT]\n"+output)
-		// Write to persistent file
-		fmt.Fprintf(logFile, "  [OUTPUT]\n%s\n", output)
+		// Run on remote server via ServerService with real-time streaming
+		var out bytes.Buffer
+		w1 := &wsWriter{hub: e.hub, targetID: step.ID.String(), buffer: &out}
+		w2 := &wsWriter{hub: e.hub, targetID: workflowID.String(), buffer: mainLogFile}
+		w3 := &fileWriter{file: stepLogFile}
+
+		output, err = e.serverService.ExecuteCommand(targetServerID, command, w1, w2, w3)
 	} else {
 		// Run locally
-		output, err = e.runLocalStep(ctx, step, command, logFile, workflowID)
+		output, err = e.runLocalStep(ctx, step, command, mainLogFile, stepLogFile, workflowID)
 	}
 
 	step.Output = output
@@ -376,18 +387,29 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 	return e.stepRepo.Update(step)
 }
 
-func (e *WorkflowExecutor) runLocalStep(ctx context.Context, step *domain.WorkflowStep, command string, logFile *os.File, workflowID uuid.UUID) (string, error) {
+func (e *WorkflowExecutor) runLocalStep(ctx context.Context, step *domain.WorkflowStep, command string, mainLogFile *os.File, stepLogFile *os.File, workflowID uuid.UUID) (string, error) {
 	c := exec.CommandContext(ctx, "sh", "-c", command)
 	var out bytes.Buffer
+
 	// Multi-broadcast writer
-	// We want to send to step console, group console (if implemented), and overall global console
+	// Send to step console, main log file, and specific step log file
 	w1 := &wsWriter{hub: e.hub, targetID: step.ID.String(), buffer: &out}
-	w2 := &wsWriter{hub: e.hub, targetID: workflowID.String(), buffer: logFile}
-	mw := io.MultiWriter(w1, w2)
+	w2 := &wsWriter{hub: e.hub, targetID: workflowID.String(), buffer: mainLogFile}
+	w3 := &fileWriter{file: stepLogFile} // We need a simple writer for the step log file
+	mw := io.MultiWriter(w1, w2, w3)
 
 	c.Stdout = mw
 	c.Stderr = mw
 
 	err := c.Run()
 	return out.String(), err
+}
+
+// Helper for io.MultiWriter with os.File
+type fileWriter struct {
+	file *os.File
+}
+
+func (w *fileWriter) Write(p []byte) (n int, err error) {
+	return w.file.Write(p)
 }

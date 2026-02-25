@@ -17,14 +17,7 @@ import { useNamespace } from '../context/NamespaceContext';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../lib/api';
 import { Workflow } from '../types';
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-} from "../components/ui/dialog";
-import WorkflowMonitor from '../components/WorkflowMonitor';
-import WorkflowInputDialog from '../components/WorkflowInputDialog';
+import WorkflowRunner from '../components/WorkflowRunner';
 
 const WorkflowPage = () => {
     const navigate = useNavigate();
@@ -33,10 +26,6 @@ const WorkflowPage = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [workflows, setWorkflows] = useState<Workflow[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [isMonitorOpen, setIsMonitorOpen] = useState(false);
-    const [isInputOpen, setIsInputOpen] = useState(false);
-    const [runningWorkflow, setRunningWorkflow] = useState<Workflow | null>(null);
-    const [isStarting, setIsStarting] = useState(false);
 
     const fetchWorkflows = async () => {
         if (!activeNamespace) return;
@@ -52,38 +41,6 @@ const WorkflowPage = () => {
         }
     };
 
-    const handleRunWorkflow = async (workflow: Workflow, inputs?: Record<string, string>) => {
-        // If workflow has inputs and they weren't provided yet, show dialog
-        if (workflow.inputs && workflow.inputs.length > 0 && !inputs) {
-            setRunningWorkflow(workflow);
-            setIsInputOpen(true);
-            return;
-        }
-
-        setIsStarting(true);
-        if (!isMonitorOpen) {
-            setRunningWorkflow(workflow);
-            setIsMonitorOpen(true);
-        }
-
-        try {
-            await apiFetch(`${API_BASE_URL}/workflows/${workflow.id}/run`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ inputs: inputs || {} })
-            });
-            // Refresh list to see running status
-            fetchWorkflows();
-            setIsInputOpen(false);
-        } catch (error) {
-            console.error('Failed to run workflow:', error);
-        } finally {
-            setIsStarting(false);
-        }
-    };
-
     useEffect(() => {
         fetchWorkflows();
     }, [activeNamespace]);
@@ -94,176 +51,152 @@ const WorkflowPage = () => {
     );
 
     return (
-        <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <div className="flex items-center gap-2 px-1">
-                <Zap className="w-3.5 h-3.5 text-primary" />
-                <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.2em]">
-                    <span className="text-primary">Automations</span>
-                    <ChevronRight className="w-2.5 h-2.5 text-muted-foreground/30" />
-                    <span className="text-muted-foreground font-black">Workflow Orchestrator</span>
+        <WorkflowRunner onRunComplete={fetchWorkflows} onCloseMonitor={fetchWorkflows}>
+            {(runWorkflow) => (
+                <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                    <div className="flex items-center gap-2 px-1">
+                        <Zap className="w-3.5 h-3.5 text-primary" />
+                        <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.2em]">
+                            <span className="text-primary">Automations</span>
+                            <ChevronRight className="w-2.5 h-2.5 text-muted-foreground/30" />
+                            <span className="text-muted-foreground font-black">Workflow Orchestrator</span>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-4 bg-card p-2.5 rounded-xl border border-border shadow-card">
+                        <div className="relative flex-1 max-w-md group">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground transition-all group-focus-within:text-primary group-focus-within:scale-110" />
+                            <Input
+                                placeholder="Search workflows by name or description..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="pl-11 h-9 bg-background border-border rounded-lg focus-visible:ring-primary/20 placeholder:text-muted-foreground/50 font-semibold text-xs transition-all focus:bg-muted/30"
+                            />
+                        </div>
+                        <div className="flex gap-1.5 items-center">
+                            <Button variant="outline" className="h-9 rounded-lg border-border px-3.5 font-black uppercase tracking-tight text-[8.5px] bg-background gap-1 shadow-sm hover:bg-muted transition-all">
+                                <Filter className="w-3 h-3" /> Filter
+                            </Button>
+                            <Button
+                                onClick={() => navigate('/workflows/new')}
+                                className="h-9 px-5 rounded-lg premium-gradient font-black uppercase tracking-widest text-[9px] shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
+                            >
+                                <Plus className="w-3.5 h-3.5" />
+                                New Workflow
+                            </Button>
+                        </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-border bg-card shadow-card overflow-hidden transition-all duration-500">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="bg-muted hover:bg-muted/80 border-border">
+                                    <TableHead className="w-[350px] h-12 font-black uppercase tracking-[0.15em] text-[9px] px-6 text-muted-foreground">Workflow Information</TableHead>
+                                    <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Status</TableHead>
+                                    <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Orchestration</TableHead>
+                                    <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Last Updated</TableHead>
+                                    <TableHead className="text-right h-12 px-6 font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {isLoading ? (
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="h-32">
+                                            <div className="flex flex-col items-center justify-center gap-2 opacity-50">
+                                                <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                                                <span className="text-[10px] font-black uppercase tracking-widest">Loading workflows...</span>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ) : filteredWorkflows.length > 0 ? filteredWorkflows.map((wf) => (
+                                    <TableRow key={wf.id} className="group border-border hover:bg-muted/40 transition-colors duration-200">
+                                        <TableCell className="px-6 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="h-8 w-8 rounded-xl bg-indigo-500/10 flex items-center justify-center shrink-0 border border-indigo-500/20 group-hover:scale-110 transition-all duration-500">
+                                                    <Zap className="w-3.5 h-3.5 text-indigo-500" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-[13px] font-black tracking-tight group-hover:text-primary transition-colors">{wf.name}</p>
+                                                    <p className="text-[10px] text-muted-foreground font-medium line-clamp-1 opacity-70">
+                                                        {wf.description || 'No description provided'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge
+                                                variant="outline"
+                                                className={cn(
+                                                    "font-black text-[9px] uppercase tracking-widest px-3 py-1.5 rounded-xl border-none",
+                                                    wf.status === 'SUCCESS' && "bg-emerald-500/10 text-emerald-500",
+                                                    wf.status === 'FAILED' && "bg-destructive/10 text-destructive",
+                                                    wf.status === 'RUNNING' && "bg-primary/10 text-primary animate-pulse",
+                                                    wf.status === 'PENDING' && "bg-amber-500/10 text-amber-500"
+                                                )}
+                                            >
+                                                {wf.status}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex items-center gap-1.5 grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100 transition-all">
+                                                <div className="px-2 py-0.5 rounded bg-muted text-[10px] font-bold">
+                                                    {wf.groups?.length || 0} Groups
+                                                </div>
+                                                <ChevronRight className="w-3 h-3 text-muted-foreground" />
+                                                <div className="px-2 py-0.5 rounded bg-muted text-[10px] font-bold">
+                                                    {wf.groups?.reduce((acc, g) => acc + (g.steps?.length || 0), 0) || 0} Steps
+                                                </div>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-[11px] font-semibold text-muted-foreground/60 tracking-tight">
+                                            {new Date(wf.updated_at).toLocaleString()}
+                                        </TableCell>
+                                        <TableCell className="text-right px-8">
+                                            <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-4 group-hover:translate-x-0">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() => runWorkflow(wf)}
+                                                    className="h-10 w-10 rounded-xl hover:bg-emerald-500/10 hover:text-emerald-500 transition-colors"
+                                                >
+                                                    <Play className="w-4 h-4 fill-current" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() => navigate(`/workflows/${wf.id}/edit`)}
+                                                    className="h-10 w-10 rounded-xl hover:bg-muted"
+                                                >
+                                                    <Settings className="w-4 h-4" />
+                                                </Button>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                )) : (
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="h-48 text-center">
+                                            <div className="flex flex-col items-center justify-center gap-3 opacity-30">
+                                                <Zap className="w-12 h-12" />
+                                                <p className="text-[11px] font-black uppercase tracking-widest">No workflows found in this namespace</p>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => navigate('/workflows/new')}
+                                                    className="mt-2 rounded-full border-dashed"
+                                                >
+                                                    Create your first workflow
+                                                </Button>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+
                 </div>
-            </div>
-
-            <div className="flex items-center justify-between gap-4 bg-card p-2.5 rounded-xl border border-border shadow-card">
-                <div className="relative flex-1 max-w-md group">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground transition-all group-focus-within:text-primary group-focus-within:scale-110" />
-                    <Input
-                        placeholder="Search workflows by name or description..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-11 h-9 bg-background border-border rounded-lg focus-visible:ring-primary/20 placeholder:text-muted-foreground/50 font-semibold text-xs transition-all focus:bg-muted/30"
-                    />
-                </div>
-                <div className="flex gap-1.5 items-center">
-                    <Button variant="outline" className="h-9 rounded-lg border-border px-3.5 font-black uppercase tracking-tight text-[8.5px] bg-background gap-1 shadow-sm hover:bg-muted transition-all">
-                        <Filter className="w-3 h-3" /> Filter
-                    </Button>
-                    <Button
-                        onClick={() => navigate('/workflows/new')}
-                        className="h-9 px-5 rounded-lg premium-gradient font-black uppercase tracking-widest text-[9px] shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
-                    >
-                        <Plus className="w-3.5 h-3.5" />
-                        New Workflow
-                    </Button>
-                </div>
-            </div>
-
-            <div className="rounded-2xl border border-border bg-card shadow-card overflow-hidden transition-all duration-500">
-                <Table>
-                    <TableHeader>
-                        <TableRow className="bg-muted hover:bg-muted/80 border-border">
-                            <TableHead className="w-[350px] h-12 font-black uppercase tracking-[0.15em] text-[9px] px-6 text-muted-foreground">Workflow Information</TableHead>
-                            <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Status</TableHead>
-                            <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Orchestration</TableHead>
-                            <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Last Updated</TableHead>
-                            <TableHead className="text-right h-12 px-6 font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Actions</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {isLoading ? (
-                            <TableRow>
-                                <TableCell colSpan={5} className="h-32">
-                                    <div className="flex flex-col items-center justify-center gap-2 opacity-50">
-                                        <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                                        <span className="text-[10px] font-black uppercase tracking-widest">Loading workflows...</span>
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                        ) : filteredWorkflows.length > 0 ? filteredWorkflows.map((wf) => (
-                            <TableRow key={wf.id} className="group border-border hover:bg-muted/40 transition-colors duration-200">
-                                <TableCell className="px-6 py-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-8 w-8 rounded-xl bg-indigo-500/10 flex items-center justify-center shrink-0 border border-indigo-500/20 group-hover:scale-110 transition-all duration-500">
-                                            <Zap className="w-3.5 h-3.5 text-indigo-500" />
-                                        </div>
-                                        <div>
-                                            <p className="text-[13px] font-black tracking-tight group-hover:text-primary transition-colors">{wf.name}</p>
-                                            <p className="text-[10px] text-muted-foreground font-medium line-clamp-1 opacity-70">
-                                                {wf.description || 'No description provided'}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </TableCell>
-                                <TableCell>
-                                    <Badge
-                                        variant="outline"
-                                        className={cn(
-                                            "font-black text-[9px] uppercase tracking-widest px-3 py-1.5 rounded-xl border-none",
-                                            wf.status === 'SUCCESS' && "bg-emerald-500/10 text-emerald-500",
-                                            wf.status === 'FAILED' && "bg-destructive/10 text-destructive",
-                                            wf.status === 'RUNNING' && "bg-primary/10 text-primary animate-pulse",
-                                            wf.status === 'PENDING' && "bg-amber-500/10 text-amber-500"
-                                        )}
-                                    >
-                                        {wf.status}
-                                    </Badge>
-                                </TableCell>
-                                <TableCell>
-                                    <div className="flex items-center gap-1.5 grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100 transition-all">
-                                        <div className="px-2 py-0.5 rounded bg-muted text-[10px] font-bold">
-                                            {wf.groups?.length || 0} Groups
-                                        </div>
-                                        <ChevronRight className="w-3 h-3 text-muted-foreground" />
-                                        <div className="px-2 py-0.5 rounded bg-muted text-[10px] font-bold">
-                                            {wf.groups?.reduce((acc, g) => acc + (g.steps?.length || 0), 0) || 0} Steps
-                                        </div>
-                                    </div>
-                                </TableCell>
-                                <TableCell className="text-[11px] font-semibold text-muted-foreground/60 tracking-tight">
-                                    {new Date(wf.updated_at).toLocaleString()}
-                                </TableCell>
-                                <TableCell className="text-right px-8">
-                                    <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-4 group-hover:translate-x-0">
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={() => handleRunWorkflow(wf)}
-                                            className="h-10 w-10 rounded-xl hover:bg-emerald-500/10 hover:text-emerald-500 transition-colors"
-                                        >
-                                            <Play className="w-4 h-4 fill-current" />
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={() => navigate(`/workflows/${wf.id}/edit`)}
-                                            className="h-10 w-10 rounded-xl hover:bg-muted"
-                                        >
-                                            <Settings className="w-4 h-4" />
-                                        </Button>
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                        )) : (
-                            <TableRow>
-                                <TableCell colSpan={5} className="h-48 text-center">
-                                    <div className="flex flex-col items-center justify-center gap-3 opacity-30">
-                                        <Zap className="w-12 h-12" />
-                                        <p className="text-[11px] font-black uppercase tracking-widest">No workflows found in this namespace</p>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => navigate('/workflows/new')}
-                                            className="mt-2 rounded-full border-dashed"
-                                        >
-                                            Create your first workflow
-                                        </Button>
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                        )}
-                    </TableBody>
-                </Table>
-            </div>
-
-            {/* Workflow Monitor Dialog */}
-            <Dialog open={isMonitorOpen} onOpenChange={setIsMonitorOpen}>
-                <DialogContent hideClose className="max-w-5xl w-[90vw] h-[85vh] bg-[#0a0b0e] border-[#1a1c23] border-2 rounded-2xl p-0 overflow-hidden shadow-2xl flex flex-col">
-                    {runningWorkflow && (
-                        <WorkflowMonitor
-                            workflow={runningWorkflow}
-                            onClose={() => {
-                                setIsMonitorOpen(false);
-                                fetchWorkflows();
-                            }}
-                        />
-                    )}
-                </DialogContent>
-            </Dialog>
-
-            {/* Runtime Input Dialog */}
-            <Dialog open={isInputOpen} onOpenChange={setIsInputOpen}>
-                <DialogContent hideClose className="max-w-lg w-[95vw] bg-[#0a0b0e] border-[#1a1c23] border-2 rounded-2xl p-0 overflow-hidden shadow-2xl">
-                    {runningWorkflow && runningWorkflow.inputs && (
-                        <WorkflowInputDialog
-                            inputs={runningWorkflow.inputs}
-                            isStarting={isStarting}
-                            onConfirm={(values) => handleRunWorkflow(runningWorkflow, values)}
-                            onCancel={() => setIsInputOpen(false)}
-                        />
-                    )}
-                </DialogContent>
-            </Dialog>
-        </div>
+            )}
+        </WorkflowRunner>
     );
 };
 

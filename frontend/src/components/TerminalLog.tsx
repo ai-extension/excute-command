@@ -3,29 +3,62 @@ import { cn } from '../lib/utils';
 import { Terminal as TerminalIcon, Download, Trash2, ChevronDown } from 'lucide-react';
 import { Button } from './ui/button';
 import Ansi from 'ansi-to-react';
+import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from '../lib/api';
 
 interface TerminalLogProps {
     targetID: string;
+    executionID?: string;
     isActive: boolean;
+    isGlobal?: boolean;
     initialLogs?: string[];
     isLive?: boolean;
     showHeader?: boolean;
     onClear?: () => void;
+    onReady?: () => void;
     className?: string;
 }
 
 const TerminalLog: React.FC<TerminalLogProps> = ({
     targetID,
+    executionID,
     isActive,
     initialLogs = [],
     isLive = true,
+    isGlobal = false,
     showHeader = true,
     onClear,
+    onReady,
     className
 }) => {
     const [logs, setLogs] = useState<string[]>(initialLogs);
+    const { apiFetch } = useAuth();
     const scrollRef = useRef<HTMLDivElement>(null);
     const [autoScroll, setAutoScroll] = useState(true);
+    const targetRef = useRef(targetID);
+
+    useEffect(() => {
+        targetRef.current = targetID;
+        if (isLive) {
+            setLogs([]); // Clear logs immediately when switching targets in live mode
+            if (executionID) {
+                // Fetch existing logs for the new target
+                const url = isGlobal
+                    ? `${API_BASE_URL}/executions/${executionID}/logs`
+                    : `${API_BASE_URL}/executions/${executionID}/logs?step_id=${targetID}`;
+
+                apiFetch(url)
+                    .then(res => res.text())
+                    .then((text: string) => {
+                        // Only update if targetID hasn't changed since we started fetching
+                        if (targetRef.current === targetID) {
+                            setLogs(text.split('\n').filter((l: string) => l.length > 0));
+                        }
+                    })
+                    .catch((err: Error) => console.error('Failed to fetch historical context:', err));
+            }
+        }
+    }, [targetID, executionID, isLive, isGlobal, apiFetch]);
 
     useEffect(() => {
         if (!isLive) {
@@ -42,15 +75,21 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
         socket.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
-                if (data.target_id === targetID) {
-                    setLogs(prev => [...prev, data.content]);
+                // Type guard: only process log messages here. 
+                // Status messages are handled by ExecutionMonitor.
+                if (data.type === 'log' && data.target_id === targetID && data.content) {
+                    const newLines = data.content.split('\n').filter((l: string) => l.length > 0);
+                    setLogs(prev => [...prev, ...newLines]);
                 }
             } catch (err) {
                 console.error('Failed to parse WS message:', err);
             }
         };
 
-        socket.onopen = () => console.log('WebSocket connected');
+        socket.onopen = () => {
+            console.log('WebSocket connected');
+            if (onReady) onReady();
+        };
         socket.onclose = () => console.log('WebSocket disconnected');
 
         return () => {
@@ -84,7 +123,7 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
 
     return (
         <div className={cn(
-            "flex flex-col bg-[#0a0b0e] border border-[#1a1c23] rounded-2xl overflow-hidden shadow-2xl transition-all duration-500",
+            "flex flex-col bg-[#0a0b0e] border border-[#1a1c23] rounded-2xl overflow-hidden shadow-2xl transition-all duration-500 h-full min-h-0",
             className
         )}>
             {/* Header */}
@@ -143,7 +182,7 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
             {/* Content */}
             <div
                 ref={scrollRef}
-                className="flex-1 p-4 font-mono text-[13px] overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent selection:bg-primary/30"
+                className="flex-1 p-4 font-mono text-[13px] overflow-y-auto min-h-0 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent selection:bg-primary/30"
             >
                 {logs.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center opacity-20 gap-3 grayscale">

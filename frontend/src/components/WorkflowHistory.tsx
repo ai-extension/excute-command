@@ -25,9 +25,10 @@ import { useAuth } from '../context/AuthContext';
 
 interface WorkflowHistoryProps {
     workflowId: string;
+    onReRun?: (workflow: any, inputs: Record<string, string>) => void;
 }
 
-const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({ workflowId }) => {
+const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({ workflowId, onReRun }) => {
     const { apiFetch } = useAuth();
     const [executions, setExecutions] = useState<WorkflowExecution[]>([]);
     const [loading, setLoading] = useState(true);
@@ -165,6 +166,7 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({ workflowId }) => {
                             mode="HISTORICAL"
                             execution={selectedExec}
                             onClose={() => setSelectedExec(null)}
+                            onReRun={onReRun}
                         />
                     )}
                 </DialogContent>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Zap, X, CheckCircle2, AlertCircle, Clock,
     ArrowRight, ChevronDown, ChevronRight,
@@ -18,23 +18,45 @@ interface ExecutionMonitorProps {
     workflow?: Workflow;
     execution?: WorkflowExecution;
     onClose: () => void;
+    onReady?: () => void;
+    onReRun?: (workflow: Workflow, inputs: Record<string, string>) => void;
 }
 
 const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
     mode,
     workflow: initialWorkflow,
     execution: initialExecution,
-    onClose
+    onClose,
+    onReady,
+    onReRun
 }) => {
     const [workflow, setWorkflow] = useState<Workflow | null>(initialWorkflow || initialExecution?.workflow || null);
     const [execution, setExecution] = useState<WorkflowExecution | null>(initialExecution || null);
     const [activeStepID, setActiveStepID] = useState<string | null>(null);
     const [globalLogs, setGlobalLogs] = useState<string[]>([]);
+    const [stepLogs, setStepLogs] = useState<string[]>([]);
+    const [isStatusWSReady, setIsStatusWSReady] = useState(false);
+    const [isTerminalReady, setIsTerminalReady] = useState(false);
     const { apiFetch } = useAuth();
+    const workflowID = workflow?.id;
 
+    // Sync internal workflow state with initialWorkflow prop
+    // This is crucial in LIVE mode because the runner initially opens the monitor
+    // and then later provides the execution_id once the backend responds.
+    useEffect(() => {
+        if (initialWorkflow) {
+            setWorkflow(prev => {
+                // Only update if we don't have an execution_id yet but the new prop does
+                if (!(prev as any)?.execution_id && (initialWorkflow as any).execution_id) {
+                    return { ...prev, ...initialWorkflow };
+                }
+                return prev;
+            });
+        }
+    }, [initialWorkflow]);
     const handleDownloadLogs = () => {
         if (!workflow) return;
-        const logsToDownload = activeStepID ? getStepOutput(activeStepID) : globalLogs;
+        const logsToDownload = activeStepID ? stepLogs : globalLogs;
         const content = logsToDownload.join('\n');
         const blob = new Blob([content], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
@@ -50,35 +72,74 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
         URL.revokeObjectURL(url);
     };
 
+    const syncStatus = useCallback(async () => {
+        if (!workflowID) return;
+        try {
+            const data = await apiFetch(`${API_BASE_URL}/workflows/${workflowID}`);
+            const updatedWF = await data.json();
+            setWorkflow(updatedWF);
+        } catch (err) {
+            console.error('Failed to sync workflow status:', err);
+        }
+    }, [workflowID, apiFetch]);
+
     useEffect(() => {
-        if (mode === 'LIVE' && workflow) {
-            const ws = new WebSocket(`ws://${window.location.host.split(':')[0]}:8080/api/ws`);
-            ws.onmessage = (event) => {
-                const msg = JSON.parse(event.data);
-                if (msg.type === 'status') {
-                    if (msg.target_type === 'step' && msg.status === 'RUNNING') {
-                        setActiveStepID(msg.target_id);
-                    }
-                    setWorkflow(prev => {
-                        if (!prev) return prev;
-                        const next = { ...prev };
-                        if (msg.target_id === next.id) next.status = msg.status;
-                        next.groups = next.groups?.map(g => {
-                            if (g.id === msg.target_id) return { ...g, status: msg.status };
-                            return {
-                                ...g,
-                                steps: g.steps?.map(s => {
-                                    if (s.id === msg.target_id) return { ...s, status: msg.status };
-                                    return s;
-                                })
-                            };
-                        });
-                        return next;
+        if (mode === 'LIVE' && isStatusWSReady && isTerminalReady) {
+            if (onReady) onReady();
+        } else if (mode === 'HISTORICAL') {
+            // In historical mode, it's always "ready" as soon as it mounts or logic completes
+            // but we don't usually need onReady for historical
+            if (onReady) onReady();
+        }
+    }, [isStatusWSReady, isTerminalReady, mode, onReady]);
+
+    // Effect for WebSocket (Live Mode)
+    useEffect(() => {
+        if (mode !== 'LIVE' || !workflowID) return;
+
+        console.log('Establishing Status WebSocket connection...');
+        const ws = new WebSocket(`ws://${window.location.host.split(':')[0]}:8080/api/ws`);
+
+        ws.onmessage = (event) => {
+            const msg = JSON.parse(event.data);
+            if (msg.type === 'status') {
+                setWorkflow(prev => {
+                    if (!prev) return prev;
+                    if (msg.target_id === prev.id) return { ...prev, status: msg.status };
+
+                    const next = { ...prev };
+                    next.groups = next.groups?.map(g => {
+                        if (g.id === msg.target_id) return { ...g, status: msg.status };
+                        return {
+                            ...g,
+                            steps: g.steps?.map(s => {
+                                if (s.id === msg.target_id) return { ...s, status: msg.status };
+                                return s;
+                            })
+                        };
                     });
-                }
-            };
-            return () => ws.close();
-        } else if (mode === 'HISTORICAL' && execution) {
+                    return next;
+                });
+            }
+        };
+
+        ws.onopen = () => {
+            console.log('Status WebSocket connected');
+            setIsStatusWSReady(true);
+            syncStatus();
+        };
+
+        ws.onclose = () => {
+            console.log('Status WebSocket disconnected');
+            setIsStatusWSReady(false);
+        };
+
+        return () => ws.close();
+    }, [mode, workflowID, syncStatus]);
+
+    // Effect for Data Fetching (Historical Mode)
+    useEffect(() => {
+        if (mode === 'HISTORICAL' && execution) {
             // Load full workflow if not present
             if (!workflow) {
                 apiFetch(`${API_BASE_URL}/workflows/${execution.workflow_id}`)
@@ -88,18 +149,26 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
             // Fetch global logs
             apiFetch(`${API_BASE_URL}/executions/${execution.id}/logs`)
                 .then(res => res.text())
-                .then(text => setGlobalLogs([text]));
+                .then(text => setGlobalLogs(text.split('\n').filter(line => line.length > 0)));
         }
-    }, [mode]);
+    }, [mode, execution?.id, apiFetch, !!workflow]);
+
+    useEffect(() => {
+        if (mode === 'HISTORICAL' && execution && activeStepID) {
+            apiFetch(`${API_BASE_URL}/executions/${execution.id}/logs?step_id=${activeStepID}`)
+                .then(res => res.text())
+                .then(text => setStepLogs(text.split('\n').filter(line => line.length > 0)))
+                .catch(() => setStepLogs(['[Log file not found]']));
+        } else {
+            setStepLogs([]);
+        }
+    }, [activeStepID, execution, mode]);
 
     if (!workflow) return null;
 
     const getStepOutput = (stepID: string) => {
-        if (mode === 'HISTORICAL' && execution?.steps) {
-            const stepResult = execution.steps.find(s => s.step_id === stepID);
-            return stepResult ? [stepResult.output] : [];
-        }
-        return [];
+        if (mode === 'LIVE') return [];
+        return stepLogs;
     };
 
     const getStepStatus = (stepID: string) => {
@@ -113,14 +182,14 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
     };
 
     return (
-        <div className="flex flex-col h-full bg-[#0a0b0e] animate-in fade-in zoom-in-95 duration-300">
+        <div className="flex flex-col h-full bg-[#0a0b0e] animate-in fade-in zoom-in-95 duration-300 max-h-full overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 bg-[#13151b] border-b border-[#1f212a] select-none shrink-0">
                 <div className="flex items-center gap-4">
                     <div className="flex gap-2 mr-1">
-                        <button onClick={onClose} className="w-3 h-3 rounded-full bg-[#ff5f56] shadow-inner hover:bg-[#ff5f56]/80 transition-colors" />
-                        <div className="w-3 h-3 rounded-full bg-[#ffbd2e] shadow-inner" />
-                        <div className="w-3 h-3 rounded-full bg-[#27c93f] shadow-inner" />
+                        <button onClick={onClose} className="w-3 h-3 rounded-full bg-[#ff5f56] shadow-inner hover:bg-[#ff5f56]/80 transition-colors cursor-pointer" />
+                        <button className="w-3 h-3 rounded-full bg-[#ffbd2e] shadow-inner hover:bg-[#ffbd2e]/80 transition-colors cursor-pointer" />
+                        <button className="w-3 h-3 rounded-full bg-[#27c93f] shadow-inner hover:bg-[#27c93f]/80 transition-colors cursor-pointer" />
                     </div>
                     <div className="flex items-center gap-3 py-1 px-3 bg-black/30 rounded-full border border-white/5">
                         <Zap className={cn("w-3.5 h-3.5 shadow-[0_0_10px_rgba(99,102,241,0.5)]", mode === 'LIVE' ? "text-primary" : "text-amber-500")} />
@@ -152,6 +221,27 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                             <Monitor className="w-3.5 h-3.5 mr-2" />
                             Global Trace
                         </Button>
+                        {onReRun && workflow && (workflow.status !== 'RUNNING' && workflow.status !== 'PENDING') && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                    let inputs: Record<string, string> = {};
+                                    if (mode === 'HISTORICAL' && execution?.inputs) {
+                                        try {
+                                            inputs = JSON.parse(execution.inputs);
+                                        } catch (e) {
+                                            console.error('Failed to parse inputs for rerun:', e);
+                                        }
+                                    }
+                                    onReRun(workflow, inputs);
+                                }}
+                                className="h-7 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/5 border border-emerald-500/20 transition-all ml-1"
+                            >
+                                <Play className="w-3.5 h-3.5 mr-2" />
+                                Run Again
+                            </Button>
+                        )}
                     </div>
                     <Badge variant="outline" className={cn(
                         "font-black text-[9px] uppercase tracking-widest px-3 py-1",
@@ -162,7 +252,7 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                 </div>
             </div>
 
-            <div className="flex-1 flex overflow-hidden">
+            <div className="flex-1 flex overflow-hidden min-h-0">
                 {/* Workflow Structure */}
                 <div className="w-1/2 overflow-y-auto border-r border-white/5 p-6 bg-black/20 custom-scrollbar">
                     <div className="space-y-6">
@@ -227,15 +317,18 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                     </div>
                 </div>
 
-                <div className="flex-1 flex flex-col bg-black">
-                    <div className="flex-1 overflow-hidden p-1">
+                <div className="flex-1 flex flex-col bg-black min-h-0">
+                    <div className="flex-1 flex flex-col overflow-hidden p-1 min-h-0">
                         <TerminalLog
-                            targetID={activeStepID || workflow.id}
+                            targetID={activeStepID || (workflow?.id || 'GLOBAL')}
+                            executionID={execution?.id || (workflow as any)?.execution_id}
                             isActive={true}
+                            isGlobal={!activeStepID}
                             isLive={mode === 'LIVE'}
                             showHeader={false}
-                            initialLogs={activeStepID ? getStepOutput(activeStepID) : globalLogs}
-                            className="h-full border-0 rounded-none bg-transparent"
+                            initialLogs={activeStepID ? stepLogs : globalLogs}
+                            onReady={() => setIsTerminalReady(true)}
+                            className="flex-1 border-0 rounded-none bg-transparent"
                         />
                     </div>
                 </div>
