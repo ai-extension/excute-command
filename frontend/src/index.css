@@ -106,3 +106,12 @@
         background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
     }
 }
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite linear;
+}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os/exec"
 	"time"
 
@@ -14,12 +15,26 @@ import (
 type ExecutorService struct {
 	repo     domain.CommandRepository
 	stepRepo domain.StepRepository
+	hub      *Hub
 }
 
-func NewExecutorService(repo domain.CommandRepository, stepRepo domain.StepRepository) *ExecutorService {
+type wsWriter struct {
+	hub      *Hub
+	targetID string
+	buffer   io.Writer
+}
+
+func (w *wsWriter) Write(p []byte) (n int, err error) {
+	n, err = w.buffer.Write(p)
+	w.hub.BroadcastLog(w.targetID, string(p))
+	return n, err
+}
+
+func NewExecutorService(repo domain.CommandRepository, stepRepo domain.StepRepository, hub *Hub) *ExecutorService {
 	return &ExecutorService{
 		repo:     repo,
 		stepRepo: stepRepo,
+		hub:      hub,
 	}
 }
 
@@ -60,8 +75,9 @@ func (s *ExecutorService) runStep(ctx context.Context, step *domain.Step) error 
 	// In a real app, we might want to use a more sophisticated shell exec
 	c := exec.CommandContext(ctx, "sh", "-c", step.CommandText)
 	var out bytes.Buffer
-	c.Stdout = &out
-	c.Stderr = &out
+	writer := &wsWriter{hub: s.hub, targetID: step.CommandID.String(), buffer: &out}
+	c.Stdout = writer
+	c.Stderr = writer
 
 	err := c.Run()
 	step.Output = out.String()

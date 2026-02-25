@@ -22,3 +22,90 @@ export interface Command {
     updated_at: string;
     steps?: Step[];
 }
+
+export interface Server {
+    id: string;
+    name: string;
+    description: string;
+    host: string;
+    port: number;
+    user: string;
+    auth_type: 'PASSWORD' | 'PUBLIC_KEY';
+    password?: string;
+    private_key?: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface WorkflowStep {
+    id: string;
+    group_id: string;
+    server_id?: string;
+    name: string;
+    command_text: string;
+    order: number;
+    status: Status;
+    output: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface WorkflowGroup {
+    id: string;
+    workflow_id: string;
+    name: string;
+    order: number;
+    is_parallel: boolean;
+    status: Status;
+    steps?: WorkflowStep[];
+    created_at: string;
+    updated_at: string;
+}
+
+export interface Workflow {
+    id: string;
+    namespace_id: string;
+    name: string;
+    description: string;
+    default_server_id?: string;
+    status: Status;
+    inputs?: WorkflowInput[];
+    groups?: WorkflowGroup[];
+    created_at: string;
+    updated_at: string;
+}
+
+export interface WorkflowExecution {
+    id: string;
+    workflow_id: string;
+    status: Status;
+    inputs: string;
+    log_path: string;
+    started_at: string;
+    finished_at?: string;
+    created_at: string;
+    updated_at: string;
+    workflow?: Workflow;
+    steps?: WorkflowExecutionStep[];
+}
+
+export interface WorkflowExecutionStep {
+    id: string;
+    execution_id: string;
+    step_id: string;
+    name: string;
+    status: string;
+    output: string;
+    started_at: string;
+    finished_at?: string;
+}
+
+export interface WorkflowInput {
+    id: string;
+    workflow_id: string;
+    key: string;
+    label: string;
+    default_value: string;
+    created_at: string;
+    updated_at: string;
+}

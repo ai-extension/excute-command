@@ -1,0 +1,90 @@
+package service
+
+import (
+	"encoding/json"
+	"log"
+	"sync"
+
+	"github.com/gorilla/websocket"
+)
+
+type Hub struct {
+	clients    map[*websocket.Conn]bool
+	broadcast  chan []byte
+	register   chan *websocket.Conn
+	unregister chan *websocket.Conn
+	mu         sync.Mutex
+}
+
+type terminalMessage struct {
+	SessionID string `json:"session_id"`
+	Content   string `json:"content"`
+	Type      string `json:"type"` // "input", "resize", etc.
+}
+
+func NewHub() *Hub {
+	return &Hub{
+		clients:    make(map[*websocket.Conn]bool),
+		broadcast:  make(chan []byte),
+		register:   make(chan *websocket.Conn),
+		unregister: make(chan *websocket.Conn),
+	}
+}
+
+func (h *Hub) Run() {
+	for {
+		select {
+		case client := <-h.register:
+			h.mu.Lock()
+			h.clients[client] = true
+			h.mu.Unlock()
+		case client := <-h.unregister:
+			h.mu.Lock()
+			if _, ok := h.clients[client]; ok {
+				delete(h.clients, client)
+				client.Close()
+			}
+			h.mu.Unlock()
+		case message := <-h.broadcast:
+			h.mu.Lock()
+			for client := range h.clients {
+				err := client.WriteMessage(websocket.TextMessage, message)
+				if err != nil {
+					log.Printf("error: %v", err)
+					client.Close()
+					delete(h.clients, client)
+				}
+			}
+			h.mu.Unlock()
+		}
+	}
+}
+
+func (h *Hub) BroadcastLog(targetID string, content string) {
+	msg := map[string]string{
+		"type":      "log",
+		"target_id": targetID,
+		"content":   content,
+	}
+	jsonMsg, _ := json.Marshal(msg)
+	h.broadcast <- jsonMsg
+}
+
+func (h *Hub) BroadcastStatus(targetID string, targetType string, status string) {
+	msg := map[string]string{
+		"type":        "status",
+		"target_id":   targetID,
+		"target_type": targetType, // workflow, group, or step
+		"status":      status,
+	}
+	jsonMsg, _ := json.Marshal(msg)
+	h.broadcast <- jsonMsg
+}
+
+func (h *Hub) Register(conn *websocket.Conn) {
+	h.register <- conn
+}
+
+func (h *Hub) Unregister(conn *websocket.Conn) {
+	h.unregister <- conn
+}

@@ -119,9 +119,147 @@ type NamespaceRepository interface {
 	Delete(id uuid.UUID) error
 }
 
+type Server struct {
+	ID          uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
+	Name        string    `json:"name" gorm:"not null"`
+	Description string    `json:"description"`
+	Host        string    `json:"host" gorm:"not null"`
+	Port        int       `json:"port" gorm:"default:22"`
+	User        string    `json:"user" gorm:"not null"`
+	AuthType    string    `json:"auth_type" gorm:"not null"` // PASSWORD or PUBLIC_KEY
+	Password    string    `json:"password,omitempty"`
+	PrivateKey  string    `json:"private_key,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type ServerRepository interface {
+	Create(server *Server) error
+	GetByID(id uuid.UUID) (*Server, error)
+	List() ([]Server, error)
+	Update(server *Server) error
+	Delete(id uuid.UUID) error
+}
+
 type StepRepository interface {
 	Create(step *Step) error
 	GetByCommandID(commandID uuid.UUID) ([]Step, error)
 	Update(step *Step) error
 	Delete(id uuid.UUID) error
+}
+
+// Workflow Management Models
+
+type Workflow struct {
+	ID              uuid.UUID       `json:"id" gorm:"type:uuid;primaryKey"`
+	NamespaceID     uuid.UUID       `json:"namespace_id" gorm:"type:uuid;index"`
+	Name            string          `json:"name" gorm:"not null"`
+	Description     string          `json:"description"`
+	DefaultServerID uuid.UUID       `json:"default_server_id,omitempty" gorm:"type:uuid"`
+	Status          Status          `json:"status"`
+	Inputs          []WorkflowInput `json:"inputs,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Groups          []WorkflowGroup `json:"groups,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	CreatedAt       time.Time       `json:"created_at"`
+	UpdatedAt       time.Time       `json:"updated_at"`
+}
+
+type WorkflowGroup struct {
+	ID         uuid.UUID      `json:"id" gorm:"type:uuid;primaryKey"`
+	WorkflowID uuid.UUID      `json:"workflow_id" gorm:"type:uuid;index"`
+	Name       string         `json:"name" gorm:"not null"`
+	Order      int            `json:"order"`
+	IsParallel bool           `json:"is_parallel"`
+	Status     Status         `json:"status"`
+	Steps      []WorkflowStep `json:"steps,omitempty" gorm:"foreignKey:GroupID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	CreatedAt  time.Time      `json:"created_at"`
+	UpdatedAt  time.Time      `json:"updated_at"`
+}
+
+type WorkflowStep struct {
+	ID          uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
+	GroupID     uuid.UUID `json:"group_id" gorm:"type:uuid;index"`
+	ServerID    uuid.UUID `json:"server_id,omitempty" gorm:"type:uuid"` // Optional: If empty, run locally
+	Name        string    `json:"name" gorm:"not null"`
+	CommandText string    `json:"command_text" gorm:"not null"`
+	Order       int       `json:"order"`
+	Status      Status    `json:"status"`
+	Output      string    `json:"output"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type WorkflowInput struct {
+	ID           uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
+	WorkflowID   uuid.UUID `json:"workflow_id" gorm:"type:uuid;index"`
+	Key          string    `json:"key" gorm:"not null"`
+	Label        string    `json:"label" gorm:"not null"`
+	DefaultValue string    `json:"default_value"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+type WorkflowExecution struct {
+	ID         uuid.UUID               `json:"id" gorm:"type:uuid;primaryKey"`
+	WorkflowID uuid.UUID               `json:"workflow_id" gorm:"type:uuid;index"`
+	Status     Status                  `json:"status"`
+	Inputs     string                  `json:"inputs"` // JSON string
+	ExecutedBy uuid.UUID               `json:"executed_by" gorm:"type:uuid"`
+	LogPath    string                  `json:"log_path"`
+	StartedAt  time.Time               `json:"started_at"`
+	FinishedAt *time.Time              `json:"finished_at,omitempty"`
+	CreatedAt  time.Time               `json:"created_at"`
+	UpdatedAt  time.Time               `json:"updated_at"`
+	Workflow   *Workflow               `json:"workflow,omitempty" gorm:"foreignKey:WorkflowID"`
+	Steps      []WorkflowExecutionStep `json:"steps,omitempty" gorm:"foreignKey:ExecutionID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+}
+
+type WorkflowExecutionStep struct {
+	ID          uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey"`
+	ExecutionID uuid.UUID  `json:"execution_id" gorm:"type:uuid;index"`
+	StepID      uuid.UUID  `json:"step_id" gorm:"type:uuid;index"`
+	Name        string     `json:"name"`
+	Status      Status     `json:"status"`
+	Output      string     `json:"output"`
+	StartedAt   time.Time  `json:"started_at"`
+	FinishedAt  *time.Time `json:"finished_at,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+}
+
+type WorkflowRepository interface {
+	Create(wf *Workflow) error
+	GetByID(id uuid.UUID) (*Workflow, error)
+	List(namespaceID uuid.UUID) ([]Workflow, error)
+	Update(wf *Workflow) error
+	Delete(id uuid.UUID) error
+}
+
+type WorkflowGroupRepository interface {
+	Create(group *WorkflowGroup) error
+	GetByWorkflowID(workflowID uuid.UUID) ([]WorkflowGroup, error)
+	Update(group *WorkflowGroup) error
+	Delete(id uuid.UUID) error
+}
+
+type WorkflowStepRepository interface {
+	Create(step *WorkflowStep) error
+	GetByGroupID(groupID uuid.UUID) ([]WorkflowStep, error)
+	Update(step *WorkflowStep) error
+	Delete(id uuid.UUID) error
+}
+
+type WorkflowInputRepository interface {
+	Create(input *WorkflowInput) error
+	GetByWorkflowID(workflowID uuid.UUID) ([]WorkflowInput, error)
+	Update(input *WorkflowInput) error
+	Delete(id uuid.UUID) error
+}
+
+type WorkflowExecutionRepository interface {
+	Create(exec *WorkflowExecution) error
+	GetByID(id uuid.UUID) (*WorkflowExecution, error)
+	ListByWorkflowID(workflowID uuid.UUID) ([]WorkflowExecution, error)
+	ListByNamespaceID(namespaceID uuid.UUID) ([]WorkflowExecution, error)
+	Update(exec *WorkflowExecution) error
+	CreateStepResult(stepExec *WorkflowExecutionStep) error
 }

@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Terminal, Settings, Box, ChevronsLeft, ChevronsRight, Zap, LogOut, Users, Shield } from 'lucide-react';
+import { LayoutDashboard, Terminal, Settings, Box, ChevronsLeft, ChevronsRight, Zap, LogOut, Users, Shield, Server, History } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 import { useAuth } from '../context/AuthContext';
@@ -17,8 +17,9 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
 
     const navItems = [
         { name: 'Dashboard', path: '/', icon: LayoutDashboard },
-        { name: 'Workflow', path: '/commands', icon: Terminal },
-        { name: 'Packages', path: '/packages', icon: Box },
+        { name: 'Workflows', path: '/workflows', icon: Zap },
+        { name: 'History', path: '/history', icon: History },
+        { name: 'Servers', path: '/servers', icon: Server },
     ];
 
     const identityItems = [

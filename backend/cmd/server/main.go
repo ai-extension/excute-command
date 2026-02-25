@@ -31,6 +31,13 @@ func main() {
 		&domain.User{},
 		&domain.Role{},
 		&domain.Permission{},
+		&domain.Server{},
+		&domain.Workflow{},
+		&domain.WorkflowGroup{},
+		&domain.WorkflowStep{},
+		&domain.WorkflowInput{},
+		&domain.WorkflowExecution{},
+		&domain.WorkflowExecutionStep{},
 	); err != nil {
 		log.Fatal("Failed to migrate database:", err)
 	}
@@ -42,13 +49,28 @@ func main() {
 	userRepo := repository.NewPostgresUserRepo(db)
 	roleRepo := repository.NewPostgresRoleRepo(db)
 	permRepo := repository.NewPostgresPermissionRepo(db)
+	serverRepo := repository.NewPostgresServerRepo(db)
+	workflowRepo := repository.NewPostgresWorkflowRepo(db)
+	workflowGroupRepo := repository.NewPostgresWorkflowGroupRepo(db)
+	workflowStepRepo := repository.NewPostgresWorkflowStepRepo(db)
+	workflowInputRepo := repository.NewPostgresWorkflowInputRepo(db)
+	execRepo := repository.NewPostgresWorkflowExecutionRepo(db)
 
-	// Seed Admin User
+	// Seed Admin User and Default Namespace
 	seedAdmin(db)
+	seedDefaultNamespace(db)
+
+	// Initialize Hub
+	hub := service.NewHub()
+	go hub.Run()
 
 	// Initialize Services
-	executorService := service.NewExecutorService(commandRepo, stepRepo)
+	executorService := service.NewExecutorService(commandRepo, stepRepo, hub)
 	authService := service.NewAuthService(userRepo)
+	serverService := service.NewServerService(serverRepo, hub)
+	terminalService := service.NewTerminalService(serverRepo, hub)
+	workflowService := service.NewWorkflowService(workflowRepo, workflowGroupRepo, workflowStepRepo, workflowInputRepo, execRepo)
+	workflowExecutor := service.NewWorkflowExecutor(workflowRepo, workflowGroupRepo, workflowStepRepo, workflowInputRepo, execRepo, serverService, hub)
 
 	// Initialize Handlers
 	namespaceHandler := handler.NewNamespaceHandler(namespaceRepo)
@@ -57,9 +79,17 @@ func main() {
 	userHandler := handler.NewUserHandler(userRepo, roleRepo)
 	roleHandler := handler.NewRoleHandler(roleRepo, permRepo)
 	permHandler := handler.NewPermissionHandler(permRepo)
+	serverHandler := handler.NewServerHandler(serverService, terminalService)
+	wsHandler := handler.NewWSHandler(hub, terminalService)
+	workflowHandler := handler.NewWorkflowHandler(workflowService, workflowExecutor)
 
 	// Initialize Router
 	r := gin.Default()
+
+	// Debug: Print routes
+	for _, route := range r.Routes() {
+		log.Printf("Route: %s %s", route.Method, route.Path)
+	}
 
 	// CORS Middleware
 	r.Use(func(c *gin.Context) {
@@ -77,6 +107,7 @@ func main() {
 	{
 		api.POST("/login", authHandler.Login)
 		api.POST("/logout", authHandler.Logout)
+		api.GET("/ws", wsHandler.HandleWS)
 
 		// Protected routes
 		protected := api.Group("")
@@ -98,6 +129,25 @@ func main() {
 			protected.POST("/roles", roleHandler.CreateRole)
 			protected.POST("/roles/:id/permissions", roleHandler.UpdateRolePermissions)
 			protected.GET("/permissions", permHandler.ListPermissions)
+
+			protected.GET("/servers", serverHandler.ListServers)
+			protected.POST("/servers", serverHandler.CreateServer)
+			protected.PUT("/servers/:id", serverHandler.UpdateServer)
+			protected.DELETE("/servers/:id", serverHandler.DeleteServer)
+			protected.POST("/servers/:id/execute", serverHandler.ExecuteCommand)
+			protected.POST("/servers/:id/terminal", serverHandler.StartTerminalSession)
+
+			protected.GET("/namespaces/:ns_id/workflows", workflowHandler.ListWorkflows)
+			protected.POST("/namespaces/:ns_id/workflows", workflowHandler.CreateWorkflow)
+			protected.GET("/namespaces/:ns_id/executions", workflowHandler.ListAllExecutions)
+			protected.GET("/workflows/:id", workflowHandler.GetWorkflow)
+			protected.PUT("/workflows/:id", workflowHandler.UpdateWorkflow)
+			protected.POST("/workflows/:id/run", workflowHandler.RunWorkflow)
+			protected.POST("/workflow-groups", workflowHandler.CreateGroup)
+			protected.POST("/workflow-steps", workflowHandler.CreateStep)
+			protected.GET("/workflows/:id/executions", workflowHandler.ListExecutions)
+			protected.GET("/executions/:id", workflowHandler.GetExecution)
+			protected.GET("/executions/:id/logs", workflowHandler.GetExecutionLogs)
 		}
 	}
 
@@ -154,6 +204,24 @@ func seedAdmin(db *gorm.DB) {
 		var adminRole domain.Role
 		if err := db.Where("name = ?", "admin").First(&adminRole).Error; err == nil {
 			db.Model(&adminRole).Association("Permissions").Replace(perms)
+		}
+	}
+}
+
+func seedDefaultNamespace(db *gorm.DB) {
+	var count int64
+	db.Model(&domain.Namespace{}).Where("name = ?", "Default").Count(&count)
+	if count == 0 {
+		log.Println("Seeding default namespace...")
+		defaultNs := domain.Namespace{
+			ID:          uuid.New(),
+			Name:        "Default",
+			Description: "The default system workspace for all operations.",
+		}
+		if err := db.Create(&defaultNs).Error; err != nil {
+			log.Println("Failed to seed default namespace:", err)
+		} else {
+			log.Println("Default namespace seeded successfully.")
 		}
 	}
 }
