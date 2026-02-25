@@ -90,8 +90,27 @@ const WorkflowDesignerPage = () => {
                 const data = await response.json();
                 setName(data.name);
                 setDescription(data.description);
-                setDefaultServerId(data.default_server_id);
-                setGroups(data.groups || []);
+                const defaultServerIdVal = data.default_server_id === '00000000-0000-0000-0000-000000000000' ? '' : (data.default_server_id || '');
+                setDefaultServerId(defaultServerIdVal);
+
+                const cleanGroups = (data.groups || []).map((g: any) => {
+                    const cleanedGroup = { ...g };
+                    if (cleanedGroup.default_server_id === '00000000-0000-0000-0000-000000000000') {
+                        cleanedGroup.default_server_id = undefined;
+                    }
+                    if (cleanedGroup.steps) {
+                        cleanedGroup.steps = cleanedGroup.steps.map((s: any) => {
+                            const cleanedStep = { ...s };
+                            if (cleanedStep.server_id === '00000000-0000-0000-0000-000000000000') {
+                                cleanedStep.server_id = undefined;
+                            }
+                            return cleanedStep;
+                        });
+                    }
+                    return cleanedGroup;
+                });
+
+                setGroups(cleanGroups.sort((a: any, b: any) => a.order - b.order));
                 setInputs((data.inputs || []).map((inp: WorkflowInput) => ({
                     ...inp,
                     type: inp.type || 'input',
