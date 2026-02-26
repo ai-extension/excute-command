@@ -34,6 +34,8 @@ import { Label } from "../components/ui/label";
 import WorkflowInputDialog from '../components/WorkflowInputDialog';
 import { AlertCircle } from 'lucide-react';
 import ScheduleCalendar from '../components/ScheduleCalendar';
+import HookManager from '../components/HookManager';
+import { WorkflowHook } from '../types';
 
 const SchedulesPage = () => {
     const navigate = useNavigate();
@@ -47,6 +49,7 @@ const SchedulesPage = () => {
     const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+    const [activeDialogTab, setActiveDialogTab] = useState<'config' | 'hooks'>('config');
 
     const [formData, setFormData] = useState({
         name: '',
@@ -56,6 +59,7 @@ const SchedulesPage = () => {
         status: 'ACTIVE',
         retries: 0,
         workflows: [] as { id: string, name: string, inputs: string }[],
+        hooks: [] as WorkflowHook[],
         tags: [] as Tag[]
     });
 
@@ -113,7 +117,8 @@ const SchedulesPage = () => {
                     ? new Date(formData.next_run_at).toISOString()
                     : formData.next_run_at,
                 tags: formData.tags,
-                workflows: formData.workflows.map(w => ({ id: w.id, inputs: w.inputs }))
+                workflows: formData.workflows.map(w => ({ id: w.id, inputs: w.inputs })),
+                hooks: formData.hooks.map((h, idx) => ({ ...h, order: idx, target_workflow: undefined }))
             };
             console.log('[SchedulesPage] Sending payload:', payload);
 
@@ -127,7 +132,8 @@ const SchedulesPage = () => {
                 setIsCreateOpen(false);
                 setIsEditing(false);
                 setEditingID(null);
-                setFormData({ name: '', type: 'ONE_TIME', cron_expression: '', next_run_at: '', status: 'ACTIVE', retries: 0, workflows: [], tags: [] });
+                setFormData({ name: '', type: 'ONE_TIME', cron_expression: '', next_run_at: '', status: 'ACTIVE', retries: 0, workflows: [], hooks: [], tags: [] });
+                setActiveDialogTab('config');
             }
         } catch (error) {
             console.error('Failed to create schedule:', error);
@@ -188,6 +194,7 @@ const SchedulesPage = () => {
                 name: sw.workflow?.name || 'Unknown',
                 inputs: sw.inputs || '{}'
             })) || [],
+            hooks: schedule.hooks || [],
             tags: schedule.tags || []
         });
         setIsCreateOpen(true);
@@ -210,6 +217,7 @@ const SchedulesPage = () => {
             status: 'ACTIVE',
             retries: 0,
             workflows: [],
+            hooks: [],
             tags: []
         });
         setIsCreateOpen(true);
@@ -268,148 +276,195 @@ const SchedulesPage = () => {
                                 <Plus className="w-4 h-4" /> New Schedule
                             </Button>
                         </DialogTrigger>
-                        <DialogContent className="sm:max-w-[450px]">
+                        <DialogContent className="sm:max-w-[500px]">
                             <DialogHeader>
                                 <DialogTitle className="text-2xl font-black tracking-tight">
                                     {isEditing ? 'Edit Automation' : 'Create Automation'}
                                 </DialogTitle>
-                                <DialogDescription className="text-[11px] font-medium text-muted-foreground">
-                                    {isEditing ? 'Modify your timing plan and workflows.' : 'Set up a timing plan and select workflows to execute.'}
-                                </DialogDescription>
-                            </DialogHeader>
-                            <form onSubmit={handleCreate} className="space-y-4 py-4">
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Plan Name</Label>
-                                    <Input
-                                        placeholder="e.g. Daily Database Backup"
-                                        className="h-10 bg-muted/30 border-border rounded-xl font-bold tracking-tight focus:bg-background transition-all"
-                                        value={formData.name}
-                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                        required
-                                    />
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Type</Label>
-                                        <select
-                                            className="w-full h-10 bg-muted/30 border border-border rounded-xl font-bold px-3 text-xs outline-none focus:bg-background transition-all"
-                                            value={formData.type}
-                                            onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                                        >
-                                            <option value="ONE_TIME">ONE-TIME</option>
-                                            <option value="RECURRING">RECURRING</option>
-                                        </select>
-                                    </div>
-                                    <div className="space-y-2">
-                                        {formData.type === 'RECURRING' ? (
-                                            <>
-                                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Cron Expression</Label>
-                                                <Input
-                                                    placeholder="* * * * * *"
-                                                    className="h-10 bg-muted/30 border-border rounded-xl font-bold font-mono text-xs"
-                                                    value={formData.cron_expression}
-                                                    onChange={(e) => setFormData({ ...formData, cron_expression: e.target.value })}
-                                                    required
-                                                />
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Next Run (ISO)</Label>
-                                                <Input
-                                                    type="datetime-local"
-                                                    className="h-10 bg-muted/30 border-border rounded-xl font-bold text-xs"
-                                                    value={formData.next_run_at}
-                                                    onChange={(e) => setFormData({ ...formData, next_run_at: e.target.value })}
-                                                    required
-                                                />
-                                            </>
+                                <div className="flex p-0.5 bg-muted/50 rounded-lg border border-border mt-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveDialogTab('config')}
+                                        className={cn(
+                                            "flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all",
+                                            activeDialogTab === 'config' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                                         )}
-                                    </div>
+                                    >
+                                        <Clock className="w-3 h-3" /> Configuration
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveDialogTab('hooks')}
+                                        className={cn(
+                                            "flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all",
+                                            activeDialogTab === 'hooks' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                                        )}
+                                    >
+                                        <Zap className="w-3 h-3" /> Hooks
+                                    </button>
                                 </div>
+                            </DialogHeader>
 
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Max Retries</Label>
-                                        <Input
-                                            type="number"
-                                            min="0"
-                                            max="5"
-                                            className="h-10 bg-muted/30 border-border rounded-xl font-bold text-xs transition-all"
-                                            value={formData.retries}
-                                            onChange={(e) => setFormData({ ...formData, retries: parseInt(e.target.value) || 0 })}
+                            <form onSubmit={handleCreate} className="space-y-4 py-4">
+                                {activeDialogTab === 'config' ? (
+                                    <>
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Plan Name</Label>
+                                            <Input
+                                                placeholder="e.g. Daily Database Backup"
+                                                className="h-10 bg-muted/30 border-border rounded-xl font-bold tracking-tight focus:bg-background transition-all"
+                                                value={formData.name}
+                                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                                required
+                                            />
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Type</Label>
+                                                <select
+                                                    className="w-full h-10 bg-muted/30 border border-border rounded-xl font-bold px-3 text-xs outline-none focus:bg-background transition-all"
+                                                    value={formData.type}
+                                                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                                                >
+                                                    <option value="ONE_TIME">ONE-TIME</option>
+                                                    <option value="RECURRING">RECURRING</option>
+                                                </select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                {formData.type === 'RECURRING' ? (
+                                                    <>
+                                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Cron Expression</Label>
+                                                        <Input
+                                                            placeholder="* * * * * *"
+                                                            className="h-10 bg-muted/30 border-border rounded-xl font-bold font-mono text-xs"
+                                                            value={formData.cron_expression}
+                                                            onChange={(e) => setFormData({ ...formData, cron_expression: e.target.value })}
+                                                            required
+                                                        />
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Next Run (ISO)</Label>
+                                                        <Input
+                                                            type="datetime-local"
+                                                            className="h-10 bg-muted/30 border-border rounded-xl font-bold text-xs"
+                                                            value={formData.next_run_at}
+                                                            onChange={(e) => setFormData({ ...formData, next_run_at: e.target.value })}
+                                                            required
+                                                        />
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Max Retries</Label>
+                                                <Input
+                                                    type="number"
+                                                    min="0"
+                                                    max="5"
+                                                    className="h-10 bg-muted/30 border-border rounded-xl font-bold text-xs transition-all"
+                                                    value={formData.retries}
+                                                    onChange={(e) => setFormData({ ...formData, retries: parseInt(e.target.value) || 0 })}
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Initial Status</Label>
+                                                <select
+                                                    className="w-full h-10 bg-muted/30 border border-border rounded-xl font-bold px-3 text-xs outline-none focus:bg-background transition-all"
+                                                    value={formData.status}
+                                                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                                                >
+                                                    <option value="ACTIVE">ACTIVE</option>
+                                                    <option value="PAUSED">PAUSED</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Tags</Label>
+                                            <TagSelector
+                                                selectedTags={formData.tags}
+                                                onChange={(tags) => setFormData({ ...formData, tags })}
+                                            />
+                                        </div>
+                                        <p className="text-[9px] text-muted-foreground font-medium px-1 italic">Retries occur every 10 seconds upon workflow failure.</p>
+
+                                        <div className="space-y-4">
+                                            <div className="flex items-center justify-between">
+                                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Workflows to Execute</Label>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => setIsPickerOpen(true)}
+                                                    className="h-8 text-[9px] font-black uppercase tracking-widest rounded-lg border-primary/20 bg-primary/5 text-primary"
+                                                >
+                                                    <Plus className="w-3 h-3 mr-1" /> Add Workflow
+                                                </Button>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                {formData.workflows.length === 0 ? (
+                                                    <div className="flex flex-col items-center justify-center py-8 bg-muted/20 border border-dashed border-border rounded-xl">
+                                                        <AlertCircle className="w-6 h-6 text-muted-foreground/20 mb-2" />
+                                                        <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">No workflows selected</p>
+                                                    </div>
+                                                ) : (
+                                                    <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1 text-slate-200">
+                                                        {formData.workflows.map((wf, idx) => (
+                                                            <div key={idx} className="flex items-center justify-between p-3 bg-muted/30 border border-border rounded-xl group transition-all">
+                                                                <div className="flex flex-col gap-1">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <Zap className="w-3 h-3 text-primary" />
+                                                                        <span className="text-[11px] font-black uppercase tracking-tight">{wf.name}</span>
+                                                                    </div>
+                                                                    {wf.inputs !== "{}" && (
+                                                                        <p className="text-[9px] font-medium text-muted-foreground truncate max-w-[200px]">
+                                                                            Inputs: {wf.inputs}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-8 w-8 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                                                    onClick={() => removeWorkflowFromForm(idx)}
+                                                                >
+                                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                                </Button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="space-y-8 max-h-[500px] overflow-y-auto pr-1">
+                                        <HookManager
+                                            hooks={formData.hooks}
+                                            workflows={workflows}
+                                            hookType="BEFORE"
+                                            onChange={(hooks) => setFormData({ ...formData, hooks })}
+                                        />
+                                        <div className="h-px bg-border/40 w-full" />
+                                        <HookManager
+                                            hooks={formData.hooks}
+                                            workflows={workflows}
+                                            hookType="AFTER_SUCCESS"
+                                            onChange={(hooks) => setFormData({ ...formData, hooks })}
+                                        />
+                                        <div className="h-px bg-border/40 w-full" />
+                                        <HookManager
+                                            hooks={formData.hooks}
+                                            workflows={workflows}
+                                            hookType="AFTER_FAILED"
+                                            onChange={(hooks) => setFormData({ ...formData, hooks })}
                                         />
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Initial Status</Label>
-                                        <select
-                                            className="w-full h-10 bg-muted/30 border border-border rounded-xl font-bold px-3 text-xs outline-none focus:bg-background transition-all"
-                                            value={formData.status}
-                                            onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                                        >
-                                            <option value="ACTIVE">ACTIVE</option>
-                                            <option value="PAUSED">PAUSED</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Tags</Label>
-                                    <TagSelector
-                                        selectedTags={formData.tags}
-                                        onChange={(tags) => setFormData({ ...formData, tags })}
-                                    />
-                                </div>
-                                <p className="text-[9px] text-muted-foreground font-medium px-1 italic">Retries occur every 10 seconds upon workflow failure.</p>
-
-                                <div className="space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Workflows to Execute</Label>
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => setIsPickerOpen(true)}
-                                            className="h-8 text-[9px] font-black uppercase tracking-widest rounded-lg border-primary/20 bg-primary/5 text-primary"
-                                        >
-                                            <Plus className="w-3 h-3 mr-1" /> Add Workflow
-                                        </Button>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        {formData.workflows.length === 0 ? (
-                                            <div className="flex flex-col items-center justify-center py-8 bg-muted/20 border border-dashed border-border rounded-xl">
-                                                <AlertCircle className="w-6 h-6 text-muted-foreground/20 mb-2" />
-                                                <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">No workflows selected</p>
-                                            </div>
-                                        ) : (
-                                            <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1 text-slate-200">
-                                                {formData.workflows.map((wf, idx) => (
-                                                    <div key={idx} className="flex items-center justify-between p-3 bg-muted/30 border border-border rounded-xl group transition-all">
-                                                        <div className="flex flex-col gap-1">
-                                                            <div className="flex items-center gap-2">
-                                                                <Zap className="w-3 h-3 text-primary" />
-                                                                <span className="text-[11px] font-black uppercase tracking-tight">{wf.name}</span>
-                                                            </div>
-                                                            {wf.inputs !== "{}" && (
-                                                                <p className="text-[9px] font-medium text-muted-foreground truncate max-w-[200px]">
-                                                                    Inputs: {wf.inputs}
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-8 w-8 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                                                            onClick={() => removeWorkflowFromForm(idx)}
-                                                        >
-                                                            <Trash2 className="w-3.5 h-3.5" />
-                                                        </Button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
+                                )}
 
                                 <DialogFooter className="pt-4">
                                     <Button

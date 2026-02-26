@@ -74,6 +74,19 @@ export interface Tag {
     updated_at: string;
 }
 
+export type HookType = 'BEFORE' | 'AFTER_SUCCESS' | 'AFTER_FAILED';
+
+export interface WorkflowHook {
+    id: string;
+    workflow_id?: string;
+    schedule_id?: string;
+    target_workflow_id: string;
+    hook_type: HookType;
+    inputs: string;
+    order: number;
+    target_workflow?: Workflow;
+}
+
 export interface Workflow {
     id: string;
     namespace_id: string;
@@ -85,8 +98,23 @@ export interface Workflow {
     variables?: WorkflowVariable[];
     groups?: WorkflowGroup[];
     tags?: Tag[];
-    created_at: string;
-    updated_at: string;
+    files?: WorkflowFile[];
+    target_folder?: string;
+    cleanup_files?: boolean;
+    hooks?: WorkflowHook[];
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface WorkflowFile {
+    id?: string;
+    workflow_id: string;
+    file_name: string;
+    file_size: number;
+    local_path?: string;
+    target_path: string;
+    created_at?: string;
+    updated_at?: string;
 }
 
 export interface WorkflowExecution {
@@ -168,6 +196,7 @@ export interface Schedule {
     updated_at: string;
     workflows?: Workflow[]; // Legacy many-to-many
     scheduled_workflows?: ScheduleWorkflow[]; // Granular configurations
+    hooks?: WorkflowHook[];
     tags?: Tag[];
     total_runs: number;
     last_run_status: string;

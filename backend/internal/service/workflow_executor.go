@@ -53,6 +53,14 @@ func NewWorkflowExecutor(
 }
 
 func (e *WorkflowExecutor) Run(ctx context.Context, workflowID uuid.UUID, execID uuid.UUID, inputs map[string]string, scheduledID *uuid.UUID) error {
+	return e.RunWithDepth(ctx, workflowID, execID, inputs, scheduledID, 0)
+}
+
+func (e *WorkflowExecutor) RunWithDepth(ctx context.Context, workflowID uuid.UUID, execID uuid.UUID, inputs map[string]string, scheduledID *uuid.UUID, depth int) error {
+	if depth > 3 {
+		return fmt.Errorf("maximum hook depth exceeded (circular dependency?)")
+	}
+
 	wf, err := e.wfRepo.GetByID(workflowID)
 	if err != nil {
 		return err
@@ -99,26 +107,110 @@ func (e *WorkflowExecutor) Run(ctx context.Context, workflowID uuid.UUID, execID
 	e.hub.BroadcastStatus(wf.ID.String(), "workflow", string(domain.StatusRunning))
 
 	var runErr error
-	groupResults := make(map[string]string) // key -> status string
-	for i := range wf.Groups {
-		err := e.runGroup(ctx, &wf.Groups[i], inputs, wf.Variables, groupResults, wf.DefaultServerID, logFile, workflowID, execID, wf.NamespaceID)
-		groupResults[wf.Groups[i].Key] = string(wf.Groups[i].Status)
-		if err != nil {
-			runErr = err
-			break
+	var serverIDs []uuid.UUID
+	var cleanupPaths []string
+	serverSet := make(map[uuid.UUID]bool)
+
+	// 0. Execute BEFORE hooks
+	if err := e.RunHooks(ctx, wf.Hooks, domain.HookTypeBefore, wf.NamespaceID, logFile, depth); err != nil {
+		runErr = fmt.Errorf("before hook failed: %w", err)
+		goto finalize
+	}
+
+	// Get all unique servers in this workflow
+	if wf.DefaultServerID != uuid.Nil {
+		serverSet[wf.DefaultServerID] = true
+	}
+	for _, g := range wf.Groups {
+		if g.DefaultServerID != uuid.Nil {
+			serverSet[g.DefaultServerID] = true
+		}
+		for _, s := range g.Steps {
+			if s.ServerID != uuid.Nil {
+				serverSet[s.ServerID] = true
+			}
 		}
 	}
 
+	for id := range serverSet {
+		serverIDs = append(serverIDs, id)
+	}
+
+	// 1. Transfer files to servers
+	if len(wf.Files) > 0 && len(serverIDs) > 0 {
+		fmt.Fprintf(logFile, "--- TRANSFERRING %d FILES TO %d SERVERS ---\n", len(wf.Files), len(serverIDs))
+		for _, f := range wf.Files {
+			targetPath := f.TargetPath // Fallback to file-specific if present (for backward compatibility), but standard is to use wf.TargetFolder now
+			if wf.TargetFolder != "" {
+				targetPath = filepath.Join(wf.TargetFolder, f.FileName)
+			}
+			cleanupPaths = append(cleanupPaths, targetPath)
+
+			fmt.Fprintf(logFile, "Copying %s to %s... ", f.FileName, targetPath)
+			e.hub.BroadcastLog(workflowID.String(), fmt.Sprintf("Copying %s to %s...", f.FileName, targetPath))
+
+			err := e.serverService.UploadFileToServers(ctx, serverIDs, f.LocalPath, targetPath)
+			if err != nil {
+				runErr = fmt.Errorf("failed to transfer file %s: %w", f.FileName, err)
+				fmt.Fprintf(logFile, "ERROR: %v\n", err)
+				e.hub.BroadcastLog(workflowID.String(), fmt.Sprintf("Error transferring file: %v", err))
+				break
+			} else {
+				fmt.Fprintf(logFile, "SUCCESS\n")
+			}
+		}
+		fmt.Fprintf(logFile, "--- TRANSFER COMPLETE ---\n\n")
+	}
+
+	// 2. Execute workflow groups
+	if runErr == nil {
+		groupResults := make(map[string]string) // key -> status string
+		for i := range wf.Groups {
+			err := e.runGroup(ctx, &wf.Groups[i], inputs, wf.Variables, groupResults, wf.DefaultServerID, logFile, workflowID, execID, wf.NamespaceID)
+			groupResults[wf.Groups[i].Key] = string(wf.Groups[i].Status)
+			if err != nil {
+				runErr = err
+				break
+			}
+		}
+	}
+
+	// 3. Cleanup files if requested
+	if wf.CleanupFiles && len(cleanupPaths) > 0 && len(serverIDs) > 0 {
+		fmt.Fprintf(logFile, "\n--- CLEANING UP TRANSFERRED FILES ---\n")
+		for _, path := range cleanupPaths {
+			cmdStr := fmt.Sprintf("rm -f %s", path)
+			for _, serverID := range serverIDs {
+				_, err := e.serverService.ExecuteCommand(serverID, cmdStr, nil, nil, nil)
+				if err != nil {
+					fmt.Fprintf(logFile, "Failed to cleanup %s on server %s: %v\n", path, serverID, err)
+				}
+			}
+			fmt.Fprintf(logFile, "Cleaned up %s\n", path)
+		}
+		fmt.Fprintf(logFile, "--- CLEANUP COMPLETE ---\n")
+	}
+
+	e.hub.BroadcastStatus(wf.ID.String(), "workflow", string(wf.Status))
+
+finalize:
 	finishedAt := time.Now()
 	execution.FinishedAt = &finishedAt
+
 	if runErr != nil {
 		wf.Status = domain.StatusFailed
 		execution.Status = domain.StatusFailed
 		fmt.Fprintf(logFile, "\n--- WORKFLOW FAILED: %v ---\n", runErr)
+
+		// Execute AFTER_FAILED hooks
+		e.RunHooks(ctx, wf.Hooks, domain.HookTypeAfterFailed, wf.NamespaceID, logFile, depth)
 	} else {
 		wf.Status = domain.StatusSuccess
 		execution.Status = domain.StatusSuccess
 		fmt.Fprintf(logFile, "\n--- WORKFLOW SUCCESS ---\n")
+
+		// Execute AFTER_SUCCESS hooks
+		e.RunHooks(ctx, wf.Hooks, domain.HookTypeAfterSuccess, wf.NamespaceID, logFile, depth)
 	}
 
 	e.execRepo.Update(execution)
@@ -126,6 +218,31 @@ func (e *WorkflowExecutor) Run(ctx context.Context, workflowID uuid.UUID, execID
 	e.hub.BroadcastStatus(wf.ID.String(), "workflow", string(wf.Status))
 
 	return runErr
+}
+
+func (e *WorkflowExecutor) RunHooks(ctx context.Context, hooks []domain.WorkflowHook, hookType domain.HookType, namespaceID uuid.UUID, logFile *os.File, depth int) error {
+	for _, hook := range hooks {
+		if hook.HookType != hookType {
+			continue
+		}
+
+		fmt.Fprintf(logFile, "\n>>> EXECUTING %s HOOK: %s <<<\n", hookType, hook.TargetWorkflowID)
+		e.hub.BroadcastLog(hook.WorkflowID.String(), fmt.Sprintf(">>> Executing %s hook...", hookType))
+
+		var hookInputs map[string]string
+		if hook.Inputs != "" {
+			json.Unmarshal([]byte(hook.Inputs), &hookInputs)
+		}
+
+		hookExecID := uuid.New()
+		err := e.RunWithDepth(ctx, hook.TargetWorkflowID, hookExecID, hookInputs, nil, depth+1)
+		if err != nil {
+			fmt.Fprintf(logFile, "!!! HOOK FAILED: %v !!!\n", err)
+			return err
+		}
+		fmt.Fprintf(logFile, ">>> HOOK SUCCESS <<<\n\n")
+	}
+	return nil
 }
 
 func (e *WorkflowExecutor) validateInputs(wf *domain.Workflow, provided map[string]string) error {

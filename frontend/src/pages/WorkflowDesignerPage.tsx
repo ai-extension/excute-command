@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
     Zap, Save, ChevronLeft, Layout,
     Settings as SettingsIcon, Layers, Server,
-    Plus, Terminal, Trash2, Clock, History, Database, SlidersHorizontal, ChevronDown, Play, GripVertical
+    Plus, Terminal, Trash2, Clock, History, Database, SlidersHorizontal, ChevronDown, Play, GripVertical, File
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -13,10 +13,13 @@ import { Workflow, WorkflowGroup, WorkflowStep, WorkflowInput, WorkflowVariable,
 import WorkflowHistory from '../components/WorkflowHistory';
 import WorkflowRunner from '../components/WorkflowRunner';
 import { TagSelector } from '../components/TagSelector';
+import { WorkflowFilesTab } from '../components/WorkflowFilesTab';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { useNamespace } from '../context/NamespaceContext';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../lib/api';
+import HookManager from '../components/HookManager';
+import { WorkflowHook } from '../types';
 
 const WorkflowDesignerPage = () => {
     const { id } = useParams();
@@ -32,8 +35,12 @@ const WorkflowDesignerPage = () => {
     const [groups, setGroups] = useState<Partial<WorkflowGroup>[]>([]);
     const [availableServers, setAvailableServers] = useState<ServerType[]>([]);
     const [isSaving, setIsSaving] = useState(false);
-    const [activeTab, setActiveTab] = useState<'general' | 'steps' | 'inputs' | 'variables' | 'history'>('general');
+    const [activeTab, setActiveTab] = useState<'general' | 'steps' | 'variables' | 'files' | 'hooks' | 'history'>('general');
+    const [hooks, setHooks] = useState<WorkflowHook[]>([]);
+    const [allWorkflows, setAllWorkflows] = useState<Workflow[]>([]);
     const [defaultServerId, setDefaultServerId] = useState<string | undefined>(undefined);
+    const [targetFolder, setTargetFolder] = useState<string>('');
+    const [cleanupFiles, setCleanupFiles] = useState<boolean>(false);
     const [openSettingsGroupIdx, setOpenSettingsGroupIdx] = useState<number | null>(null);
 
     useEffect(() => {
@@ -47,6 +54,17 @@ const WorkflowDesignerPage = () => {
             }
         };
 
+        const fetchAllWorkflows = async () => {
+            if (!activeNamespace) return;
+            try {
+                const response = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/workflows`);
+                const data = await response.json();
+                setAllWorkflows(data || []);
+            } catch (error) {
+                console.error('Failed to fetch all workflows:', error);
+            }
+        };
+
         const fetchWorkflow = async () => {
             if (!id) return;
             try {
@@ -56,6 +74,8 @@ const WorkflowDesignerPage = () => {
                 setDescription(data.description);
                 const defaultServerIdVal = data.default_server_id === '00000000-0000-0000-0000-000000000000' ? '' : (data.default_server_id || '');
                 setDefaultServerId(defaultServerIdVal);
+                setTargetFolder(data.target_folder || '');
+                setCleanupFiles(!!data.cleanup_files);
                 setTags(data.tags || []);
 
                 const cleanGroups = (data.groups || []).map((g: any) => {
@@ -81,14 +101,16 @@ const WorkflowDesignerPage = () => {
                     type: inp.type || 'input',
                 })));
                 setVariables(data.variables || []);
+                setHooks(data.hooks || []);
             } catch (error) {
                 console.error('Failed to fetch workflow:', error);
             }
         };
 
         fetchServers();
+        fetchAllWorkflows();
         if (id) fetchWorkflow();
-    }, [id]);
+    }, [id, activeNamespace]);
 
     const handleSave = async () => {
         if (!activeNamespace) {
@@ -104,6 +126,8 @@ const WorkflowDesignerPage = () => {
                 description,
                 status: 'active',
                 default_server_id: defaultServerId || undefined,
+                target_folder: targetFolder,
+                cleanup_files: cleanupFiles,
                 namespace_id: activeNamespace.id,
                 tags,
                 inputs: inputs.filter(i => i.key?.trim()),
@@ -117,6 +141,11 @@ const WorkflowDesignerPage = () => {
                         order: sIdx,
                         server_id: s.server_id || undefined
                     }))
+                })),
+                hooks: hooks.map((h, hIdx) => ({
+                    ...h,
+                    order: hIdx,
+                    target_workflow: undefined // Don't send cyclic data
                 }))
             };
 
@@ -254,15 +283,6 @@ const WorkflowDesignerPage = () => {
                                     <Layout className="w-3 h-3" /> Steps
                                 </button>
                                 <button
-                                    onClick={() => setActiveTab('inputs')}
-                                    className={cn(
-                                        "flex items-center gap-2 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all",
-                                        activeTab === 'inputs' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                                    )}
-                                >
-                                    <Terminal className="w-3 h-3" /> Inputs
-                                </button>
-                                <button
                                     onClick={() => setActiveTab('variables')}
                                     className={cn(
                                         "flex items-center gap-2 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all",
@@ -270,6 +290,24 @@ const WorkflowDesignerPage = () => {
                                     )}
                                 >
                                     <Database className="w-3 h-3" /> Variables
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('files')}
+                                    className={cn(
+                                        "flex items-center gap-2 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all",
+                                        activeTab === 'files' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    <File className="w-3 h-3" /> Files
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('hooks')}
+                                    className={cn(
+                                        "flex items-center gap-2 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all",
+                                        activeTab === 'hooks' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    <Zap className="w-3 h-3" /> Hooks
                                 </button>
                                 {id && (
                                     <button
@@ -371,218 +409,210 @@ const WorkflowDesignerPage = () => {
                                         </div>
                                     </div>
                                 </div>
-                            ) : activeTab === 'inputs' ? (
-                                <div className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-300">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-500">
-                                                <Terminal className="w-4 h-4" />
+                            ) : activeTab === 'variables' ? (
+                                <div className="space-y-8 animate-in fade-in slide-in-from-right-2 duration-300">
+                                    {/* Runtime Inputs Section */}
+                                    <div className="space-y-6">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-500">
+                                                    <Terminal className="w-4 h-4" />
+                                                </div>
+                                                <h2 className="text-sm font-bold text-foreground uppercase tracking-tight">Runtime Variable Definitions (Inputs)</h2>
                                             </div>
-                                            <h2 className="text-sm font-bold text-foreground uppercase tracking-tight">Runtime Variable Definitions</h2>
+                                            <Button
+                                                onClick={() => setInputs([...inputs, { key: '', label: '', type: 'input', default_value: '' }])}
+                                                className="h-8 text-[9px] font-bold uppercase tracking-widest px-4"
+                                                variant="outline"
+                                            >
+                                                <Plus className="w-3 h-3 mr-2" /> Add Input
+                                            </Button>
                                         </div>
-                                        <Button
-                                            onClick={() => setInputs([...inputs, { key: '', label: '', type: 'input', default_value: '' }])}
-                                            className="h-8 text-[9px] font-bold uppercase tracking-widest px-4"
-                                            variant="outline"
-                                        >
-                                            <Plus className="w-3 h-3 mr-2" /> Add Input
-                                        </Button>
-                                    </div>
 
-                                    <div className="bg-card rounded-xl border border-border p-6 shadow-sm overflow-hidden">
-                                        {inputs.length === 0 ? (
-                                            <div className="py-12 text-center opacity-30 select-none">
-                                                <Terminal className="w-12 h-12 mx-auto mb-4" />
-                                                <p className="text-[10px] font-bold uppercase tracking-widest">No runtime variables defined</p>
-                                                <p className="text-[9px] mt-1 font-medium italic">Use variables in your commands via {"{{variable_name}}"}</p>
-                                            </div>
-                                        ) : (
-                                            <div className="space-y-4">
-                                                {inputs.map((input, idx) => (
-                                                    <div key={idx} className="flex flex-col gap-4 p-5 bg-background/50 rounded-xl border border-border/50 animate-in fade-in slide-in-from-bottom-1 duration-300">
-                                                        <div className="grid grid-cols-12 gap-5 items-start">
-                                                            {/* Left side: Label & Key */}
-                                                            <div className="col-span-5 space-y-4">
-                                                                <div className="space-y-1.5">
-                                                                    <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Display Label</label>
-                                                                    <Input
-                                                                        value={input.label}
-                                                                        onChange={(e) => {
-                                                                            const ni = [...inputs];
-                                                                            ni[idx].label = e.target.value;
+                                        <div className="bg-card rounded-xl border border-border p-6 shadow-sm overflow-hidden">
+                                            {inputs.length === 0 ? (
+                                                <div className="py-6 text-center opacity-40 select-none">
+                                                    <Terminal className="w-8 h-8 mx-auto mb-3" />
+                                                    <p className="text-[10px] font-bold uppercase tracking-widest">No runtime variables defined</p>
+                                                    <p className="text-[9px] mt-1 font-medium italic">Use runtime variables in your commands via {"{{key}}"}</p>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-4">
+                                                    {inputs.map((input, idx) => (
+                                                        <div key={idx} className="flex flex-col gap-4 p-5 bg-background/50 rounded-xl border border-border/50 animate-in fade-in slide-in-from-bottom-1 duration-300">
+                                                            <div className="grid grid-cols-12 gap-5 items-start">
+                                                                {/* Left side: Label & Key */}
+                                                                <div className="col-span-5 space-y-4">
+                                                                    <div className="space-y-1.5">
+                                                                        <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Display Label</label>
+                                                                        <Input
+                                                                            value={input.label}
+                                                                            onChange={(e) => {
+                                                                                const ni = [...inputs];
+                                                                                ni[idx].label = e.target.value;
+                                                                                setInputs(ni);
+                                                                            }}
+                                                                            placeholder="What should the user see?"
+                                                                            className="h-8 text-[11px] border-border bg-background"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="space-y-1.5">
+                                                                        <label className="text-[8px] font-black uppercase tracking-widest text-primary">Variable Key</label>
+                                                                        <Input
+                                                                            value={input.key}
+                                                                            onChange={(e) => {
+                                                                                const ni = [...inputs];
+                                                                                ni[idx].key = e.target.value.replace(/[^a-zA-Z0-9_]/g, '');
+                                                                                setInputs(ni);
+                                                                            }}
+                                                                            placeholder="e.g. app_node_version"
+                                                                            className="h-8 text-[11px] font-mono border-border bg-background"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Right side: Type & Default Value */}
+                                                                <div className="col-span-6 space-y-4">
+                                                                    <div className="space-y-1.5">
+                                                                        <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Type</label>
+                                                                        <select
+                                                                            value={input.type || 'input'}
+                                                                            onChange={(e) => { const ni = [...inputs]; ni[idx].type = e.target.value as WorkflowInput['type']; setInputs(ni); }}
+                                                                            className="h-8 px-2 w-full text-[11px] font-semibold border border-border rounded-md bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 cursor-pointer"
+                                                                        >
+                                                                            <option value="input">Input</option>
+                                                                            <option value="number">Number</option>
+                                                                            <option value="select">Select</option>
+                                                                        </select>
+                                                                    </div>
+                                                                    <div className="space-y-1.5">
+                                                                        <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">
+                                                                            {input.type === 'select' ? 'Options (comma-separated)' : 'Default Value'}
+                                                                        </label>
+                                                                        <Input
+                                                                            type={input.type === 'number' ? 'number' : 'text'}
+                                                                            value={input.default_value}
+                                                                            onChange={(e) => {
+                                                                                const ni = [...inputs];
+                                                                                ni[idx].default_value = e.target.value;
+                                                                                setInputs(ni);
+                                                                            }}
+                                                                            placeholder={
+                                                                                input.type === 'number' ? '0'
+                                                                                    : input.type === 'select' ? 'option1, option2, option3'
+                                                                                        : 'default text...'
+                                                                            }
+                                                                            className="h-8 text-[11px] border-border bg-background"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Delete Button */}
+                                                                <div className="col-span-1 flex justify-end items-center h-[120px]">
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                                                                        onClick={() => {
+                                                                            const ni = inputs.filter((_, i) => i !== idx);
                                                                             setInputs(ni);
                                                                         }}
-                                                                        placeholder="What should the user see?"
-                                                                        className="h-8 text-[11px] border-border bg-background"
-                                                                    />
-                                                                </div>
-                                                                <div className="space-y-1.5">
-                                                                    <label className="text-[8px] font-black uppercase tracking-widest text-primary">Variable Key</label>
-                                                                    <Input
-                                                                        value={input.key}
-                                                                        onChange={(e) => {
-                                                                            const ni = [...inputs];
-                                                                            ni[idx].key = e.target.value.replace(/[^a-zA-Z0-9_]/g, '');
-                                                                            setInputs(ni);
-                                                                        }}
-                                                                        placeholder="e.g. app_node_version"
-                                                                        className="h-8 text-[11px] font-mono border-border bg-background"
-                                                                    />
-                                                                </div>
-                                                            </div>
-
-                                                            {/* Right side: Type & Default Value */}
-                                                            <div className="col-span-6 space-y-4">
-                                                                <div className="space-y-1.5">
-                                                                    <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Type</label>
-                                                                    <select
-                                                                        value={input.type || 'input'}
-                                                                        onChange={(e) => { const ni = [...inputs]; ni[idx].type = e.target.value as WorkflowInput['type']; setInputs(ni); }}
-                                                                        className="h-8 px-2 w-full text-[11px] font-semibold border border-border rounded-md bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 cursor-pointer"
+                                                                        title="Delete input"
                                                                     >
-                                                                        <option value="input">Input</option>
-                                                                        <option value="number">Number</option>
-                                                                        <option value="select">Select</option>
-                                                                    </select>
+                                                                        <Trash2 className="w-4 h-4" />
+                                                                    </Button>
                                                                 </div>
-                                                                <div className="space-y-1.5">
-                                                                    <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">
-                                                                        {input.type === 'select' ? 'Options (comma-separated)' : 'Default Value'}
-                                                                    </label>
-                                                                    <Input
-                                                                        type={input.type === 'number' ? 'number' : 'text'}
-                                                                        value={input.default_value}
-                                                                        onChange={(e) => {
-                                                                            const ni = [...inputs];
-                                                                            ni[idx].default_value = e.target.value;
-                                                                            setInputs(ni);
-                                                                        }}
-                                                                        placeholder={
-                                                                            input.type === 'number' ? '0'
-                                                                                : input.type === 'select' ? 'option1, option2, option3'
-                                                                                    : 'default text...'
-                                                                        }
-                                                                        className="h-8 text-[11px] border-border bg-background"
-                                                                    />
-                                                                </div>
-                                                            </div>
-
-                                                            {/* Delete Button */}
-                                                            <div className="col-span-1 flex justify-end items-center h-[120px]">
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                                                                    onClick={() => {
-                                                                        const ni = inputs.filter((_, i) => i !== idx);
-                                                                        setInputs(ni);
-                                                                    }}
-                                                                    title="Delete input"
-                                                                >
-                                                                    <Trash2 className="w-4 h-4" />
-                                                                </Button>
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="bg-primary/5 border border-primary/10 rounded-lg p-4 flex items-start gap-3">
-                                        <div className="p-1 rounded-full bg-primary/20 text-primary shrink-0 mt-0.5">
-                                            <Zap className="w-3 h-3" />
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
-                                        <div className="space-y-1">
-                                            <p className="text-[9px] font-bold text-primary uppercase tracking-tight">Pro-tip: Dynamic Orchestration</p>
-                                            <p className="text-[10px] text-muted-foreground leading-relaxed">
-                                                Define variables here to reuse them in your commands using the <code className="bg-primary/10 px-1 rounded text-primary">{"{{key}}"}</code> syntax.
-                                                When this workflow runs, a prompt will appear for values.
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                            ) : activeTab === 'variables' ? (
-                                <div className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-300">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-500">
-                                                <Database className="w-4 h-4" />
-                                            </div>
-                                            <h2 className="text-sm font-bold text-foreground uppercase tracking-tight">Static Variables</h2>
-                                        </div>
-                                        <Button
-                                            onClick={() => setVariables([...variables, { key: '', value: '' }])}
-                                            className="h-8 text-[9px] font-bold uppercase tracking-widest px-4"
-                                            variant="outline"
-                                        >
-                                            <Plus className="w-3 h-3 mr-2" /> Add Variable
-                                        </Button>
                                     </div>
 
-                                    <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
-                                        {variables.length === 0 ? (
-                                            <div className="py-12 text-center opacity-30 select-none">
-                                                <Database className="w-12 h-12 mx-auto mb-4" />
-                                                <p className="text-[10px] font-bold uppercase tracking-widest">No static variables defined</p>
-                                                <p className="text-[9px] mt-1 font-medium italic">Reference via {'{{'}{"variable.key"}{'}}'} in commands</p>
+                                    {/* Static Variables Section */}
+                                    <div className="space-y-6 pt-6 border-t border-border/50">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-500">
+                                                    <Database className="w-4 h-4" />
+                                                </div>
+                                                <h2 className="text-sm font-bold text-foreground uppercase tracking-tight">Static Variables</h2>
                                             </div>
-                                        ) : (
-                                            <div className="space-y-3">
-                                                {variables.map((variable, idx) => (
-                                                    <div key={idx} className="flex items-end gap-3 p-4 bg-background/50 rounded-lg border border-border/50 animate-in fade-in slide-in-from-bottom-1 duration-300">
-                                                        <div className="flex-1 space-y-1.5">
-                                                            <label className="text-[8px] font-black uppercase tracking-widest text-emerald-500">Variable Key</label>
-                                                            <div className="relative">
-                                                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-muted-foreground/60 font-mono select-none">$</span>
+                                            <Button
+                                                onClick={() => setVariables([...variables, { key: '', value: '' }])}
+                                                className="h-8 text-[9px] font-bold uppercase tracking-widest px-4"
+                                                variant="outline"
+                                            >
+                                                <Plus className="w-3 h-3 mr-2" /> Add Variable
+                                            </Button>
+                                        </div>
+
+                                        <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
+                                            {variables.length === 0 ? (
+                                                <div className="py-6 text-center opacity-40 select-none">
+                                                    <Database className="w-8 h-8 mx-auto mb-3" />
+                                                    <p className="text-[10px] font-bold uppercase tracking-widest">No static variables defined</p>
+                                                    <p className="text-[9px] mt-1 font-medium italic">Reference via {'{{'}{"variable.key"}{'}}'} in commands</p>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-3">
+                                                    {variables.map((variable, idx) => (
+                                                        <div key={idx} className="flex items-end gap-3 p-4 bg-background/50 rounded-lg border border-border/50 animate-in fade-in slide-in-from-bottom-1 duration-300">
+                                                            <div className="flex-1 space-y-1.5">
+                                                                <label className="text-[8px] font-black uppercase tracking-widest text-emerald-500">Variable Key</label>
+                                                                <div className="relative">
+                                                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-muted-foreground/60 font-mono select-none">$</span>
+                                                                    <Input
+                                                                        value={variable.key}
+                                                                        onChange={(e) => {
+                                                                            const nv = [...variables];
+                                                                            nv[idx].key = e.target.value.replace(/[^a-zA-Z0-9_]/g, '');
+                                                                            setVariables(nv);
+                                                                        }}
+                                                                        placeholder="e.g. db_host"
+                                                                        className="h-8 text-[11px] font-mono border-border bg-background pl-5"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex-[2] space-y-1.5">
+                                                                <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Value</label>
                                                                 <Input
-                                                                    value={variable.key}
+                                                                    value={variable.value}
                                                                     onChange={(e) => {
                                                                         const nv = [...variables];
-                                                                        nv[idx].key = e.target.value.replace(/[^a-zA-Z0-9_]/g, '');
+                                                                        nv[idx].value = e.target.value;
                                                                         setVariables(nv);
                                                                     }}
-                                                                    placeholder="e.g. db_host"
-                                                                    className="h-8 text-[11px] font-mono border-border bg-background pl-5"
+                                                                    placeholder="Static value..."
+                                                                    className="h-8 text-[11px] border-border bg-background font-mono"
                                                                 />
                                                             </div>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-8 w-8 text-muted-foreground hover:text-destructive transition-colors shrink-0 mb-0.5"
+                                                                onClick={() => setVariables(variables.filter((_, i) => i !== idx))}
+                                                            >
+                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                            </Button>
                                                         </div>
-                                                        <div className="flex-[2] space-y-1.5">
-                                                            <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Value</label>
-                                                            <Input
-                                                                value={variable.value}
-                                                                onChange={(e) => {
-                                                                    const nv = [...variables];
-                                                                    nv[idx].value = e.target.value;
-                                                                    setVariables(nv);
-                                                                }}
-                                                                placeholder="Static value..."
-                                                                className="h-8 text-[11px] border-border bg-background font-mono"
-                                                            />
-                                                        </div>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-8 w-8 text-muted-foreground hover:text-destructive transition-colors shrink-0 mb-0.5"
-                                                            onClick={() => setVariables(variables.filter((_, i) => i !== idx))}
-                                                        >
-                                                            <Trash2 className="w-3.5 h-3.5" />
-                                                        </Button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-lg p-4 flex items-start gap-3">
-                                        <div className="p-1 rounded-full bg-emerald-500/20 text-emerald-500 shrink-0 mt-0.5">
-                                            <Database className="w-3 h-3" />
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
-                                        <div className="space-y-1">
-                                            <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-tight">Static Variables vs Runtime Inputs</p>
-                                            <p className="text-[10px] text-muted-foreground leading-relaxed">
-                                                Variables are <strong>saved with the workflow</strong> and automatically injected at runtime using <code className="bg-emerald-500/10 px-1 rounded text-emerald-600">{"{{variable.key}}"}</code>.
-                                                Use <code className="bg-primary/10 px-1 rounded text-primary">{"{{key}}"}</code> for runtime inputs that are prompted on each run.
-                                            </p>
+
+                                        <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-lg p-4 flex items-start gap-3">
+                                            <div className="p-1 rounded-full bg-emerald-500/20 text-emerald-500 shrink-0 mt-0.5">
+                                                <Zap className="w-3 h-3" />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-tight">Static Variables vs Runtime Inputs</p>
+                                                <p className="text-[10px] text-muted-foreground leading-relaxed">
+                                                    <strong>Static Variables</strong> are saved with the workflow and automatically injected at runtime using <code className="bg-emerald-500/10 px-1 rounded text-emerald-600">{"{{variable.key}}"}</code>.<br />
+                                                    <strong>Runtime Inputs</strong> prompt the user for values on each run and are used via <code className="bg-primary/10 px-1 rounded text-primary">{"{{key}}"}</code>.
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -892,6 +922,56 @@ const WorkflowDesignerPage = () => {
                                             </Droppable>
                                         </DragDropContext>
                                     )}
+                                </div>
+                            ) : activeTab === 'files' ? (
+                                <div className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-300">
+                                    <WorkflowFilesTab
+                                        workflowId={id as string}
+                                        targetFolder={targetFolder}
+                                        setTargetFolder={setTargetFolder}
+                                        cleanupFiles={cleanupFiles}
+                                        setCleanupFiles={setCleanupFiles}
+                                    />
+                                </div>
+                            ) : activeTab === 'hooks' ? (
+                                <div className="flex-1 overflow-y-auto p-8 bg-[#0a0b0e] animate-in fade-in slide-in-from-right-2 duration-300">
+                                    <div className="max-w-4xl mx-auto space-y-12 pb-20">
+                                        <div className="flex flex-col gap-2 border-b border-white/5 pb-6">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
+                                                    <Zap className="w-5 h-5 text-primary" />
+                                                </div>
+                                                <h2 className="text-2xl font-black tracking-tight text-white uppercase italic">Execution Hooks</h2>
+                                            </div>
+                                            <p className="text-xs font-medium text-muted-foreground opacity-60">Configure secondary workflows to trigger automatically during this pipeline's lifecycle.</p>
+                                        </div>
+
+                                        <div className="space-y-12">
+                                            <HookManager
+                                                hooks={hooks}
+                                                workflows={allWorkflows}
+                                                hookType="BEFORE"
+                                                onChange={setHooks}
+                                            />
+
+                                            <div className="h-px bg-white/5 w-full" />
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                                                <HookManager
+                                                    hooks={hooks}
+                                                    workflows={allWorkflows}
+                                                    hookType="AFTER_SUCCESS"
+                                                    onChange={setHooks}
+                                                />
+                                                <HookManager
+                                                    hooks={hooks}
+                                                    workflows={allWorkflows}
+                                                    hookType="AFTER_FAILED"
+                                                    onChange={setHooks}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             ) : activeTab === 'history' ? (
                                 <div className="animate-in fade-in slide-in-from-right-2 duration-300">

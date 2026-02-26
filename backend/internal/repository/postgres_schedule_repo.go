@@ -23,6 +23,8 @@ func (r *PostgresScheduleRepo) GetByID(id uuid.UUID) (*domain.Schedule, error) {
 	if err := r.db.
 		Preload("ScheduledWorkflows").
 		Preload("ScheduledWorkflows.Workflow").
+		Preload("Hooks", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
+		Preload("Hooks.TargetWorkflow").
 		Preload("Tags").
 		First(&s, "id = ?", id).Error; err != nil {
 		return nil, err
@@ -36,6 +38,8 @@ func (r *PostgresScheduleRepo) List(namespaceID uuid.UUID) ([]domain.Schedule, e
 	if err := r.db.
 		Preload("ScheduledWorkflows").
 		Preload("ScheduledWorkflows.Workflow").
+		Preload("Hooks", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
+		Preload("Hooks.TargetWorkflow").
 		Preload("Tags").
 		Where("namespace_id = ?", namespaceID).
 		Order("created_at desc").
@@ -53,7 +57,20 @@ func (r *PostgresScheduleRepo) Update(s *domain.Schedule) error {
 		if err := tx.Model(s).Association("Tags").Replace(s.Tags); err != nil {
 			return err
 		}
-		return tx.Omit("Tags", "ScheduledWorkflows").Save(s).Error
+
+		// Sync Hooks
+		if err := tx.Where("schedule_id = ?", s.ID).Delete(&domain.WorkflowHook{}).Error; err != nil {
+			return err
+		}
+		for i := range s.Hooks {
+			s.Hooks[i].ID = uuid.New()
+			s.Hooks[i].ScheduleID = &s.ID
+			if err := tx.Omit("TargetWorkflow").Create(&s.Hooks[i]).Error; err != nil {
+				return err
+			}
+		}
+
+		return tx.Omit("Tags", "ScheduledWorkflows", "Hooks").Save(s).Error
 	})
 }
 
@@ -74,6 +91,8 @@ func (r *PostgresScheduleRepo) ListActive() ([]domain.Schedule, error) {
 	if err := r.db.
 		Preload("ScheduledWorkflows").
 		Preload("ScheduledWorkflows.Workflow").
+		Preload("Hooks", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
+		Preload("Hooks.TargetWorkflow").
 		Preload("Tags").
 		Where("status = ?", "ACTIVE").
 		Find(&schedules).Error; err != nil {

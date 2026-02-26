@@ -9,6 +9,14 @@ import {
     TableHeader,
     TableRow
 } from '../components/ui/table';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
+} from '../components/ui/dialog';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
@@ -29,6 +37,12 @@ const WorkflowPage = () => {
     const [workflows, setWorkflows] = useState<Workflow[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
+    // Create workflow dialog state
+    const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+    const [newWorkflowName, setNewWorkflowName] = useState('');
+    const [newWorkflowDescription, setNewWorkflowDescription] = useState('');
+    const [isCreating, setIsCreating] = useState(false);
+
     const fetchWorkflows = async () => {
         if (!activeNamespace) return;
         setIsLoading(true);
@@ -40,6 +54,42 @@ const WorkflowPage = () => {
             console.error('Failed to fetch workflows:', error);
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleCreateWorkflow = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!activeNamespace || !newWorkflowName.trim()) return;
+
+        setIsCreating(true);
+        try {
+            const response = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/workflows`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    name: newWorkflowName,
+                    description: newWorkflowDescription,
+                    status: 'active',
+                }),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                setIsCreateDialogOpen(false);
+                setNewWorkflowName('');
+                setNewWorkflowDescription('');
+                navigate(`/workflows/${data.id}/edit`);
+            } else {
+                const error = await response.json();
+                alert(error.error || 'Failed to create workflow');
+            }
+        } catch (error) {
+            console.error('Failed to create workflow:', error);
+            alert('An unexpected error occurred');
+        } finally {
+            setIsCreating(false);
         }
     };
 
@@ -83,7 +133,7 @@ const WorkflowPage = () => {
                                 <Filter className="w-3 h-3" /> Filter
                             </Button>
                             <Button
-                                onClick={() => navigate('/workflows/new')}
+                                onClick={() => setIsCreateDialogOpen(true)}
                                 className="h-9 px-5 rounded-lg premium-gradient font-black uppercase tracking-widest text-[9px] shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
                             >
                                 <Plus className="w-3.5 h-3.5" />
@@ -173,7 +223,7 @@ const WorkflowPage = () => {
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-[11px] font-semibold text-muted-foreground/60 tracking-tight">
-                                            {new Date(wf.updated_at).toLocaleString()}
+                                            {wf.updated_at ? new Date(wf.updated_at).toLocaleString() : 'Never'}
                                         </TableCell>
                                         <TableCell className="text-right px-8">
                                             <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-4 group-hover:translate-x-0">
@@ -205,7 +255,7 @@ const WorkflowPage = () => {
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
-                                                    onClick={() => navigate('/workflows/new')}
+                                                    onClick={() => setIsCreateDialogOpen(true)}
                                                     className="mt-2 rounded-full border-dashed"
                                                 >
                                                     Create your first workflow
@@ -218,6 +268,57 @@ const WorkflowPage = () => {
                         </Table>
                     </div>
 
+                    <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                        <DialogContent className="sm:max-w-md">
+                            <DialogHeader>
+                                <DialogTitle className="flex items-center gap-2">
+                                    <Zap className="w-5 h-5 text-primary" />
+                                    Create New Workflow
+                                </DialogTitle>
+                                <DialogDescription>
+                                    Define the core identification for your new automation pipeline.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <form onSubmit={handleCreateWorkflow} className="space-y-4 py-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold uppercase tracking-widest text-primary">Workflow Name</label>
+                                    <Input
+                                        value={newWorkflowName}
+                                        onChange={(e) => setNewWorkflowName(e.target.value)}
+                                        placeholder="e.g. Daily Data Backup"
+                                        autoFocus
+                                        className="h-10 text-sm font-medium focus:ring-1 focus:ring-primary/30"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Description</label>
+                                    <Input
+                                        value={newWorkflowDescription}
+                                        onChange={(e) => setNewWorkflowDescription(e.target.value)}
+                                        placeholder="What does this workflow automate?"
+                                        className="h-10 text-sm font-medium"
+                                    />
+                                </div>
+                                <DialogFooter className="pt-4">
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        onClick={() => setIsCreateDialogOpen(false)}
+                                        className="h-9 text-[10px] font-bold uppercase tracking-widest px-6"
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        type="submit"
+                                        disabled={!newWorkflowName.trim() || isCreating}
+                                        className="h-9 text-[10px] font-bold uppercase tracking-widest px-6 premium-gradient"
+                                    >
+                                        {isCreating ? 'Creating...' : 'Initialize Pipeline'}
+                                    </Button>
+                                </DialogFooter>
+                            </form>
+                        </DialogContent>
+                    </Dialog>
                 </div>
             )}
         </WorkflowRunner>

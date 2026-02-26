@@ -25,6 +25,8 @@ func (r *PostgresWorkflowRepo) GetByID(id uuid.UUID) (*domain.Workflow, error) {
 		Preload("Variables", func(db *gorm.DB) *gorm.DB { return db.Order("\"created_at\" ASC") }).
 		Preload("Groups", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
 		Preload("Groups.Steps", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
+		Preload("Hooks", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
+		Preload("Hooks.TargetWorkflow").
 		Preload("Tags").
 		First(&wf, "id = ?", id).Error
 	if err != nil {
@@ -40,6 +42,8 @@ func (r *PostgresWorkflowRepo) List(namespaceID uuid.UUID) ([]domain.Workflow, e
 		Preload("Variables").
 		Preload("Groups", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
 		Preload("Groups.Steps", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
+		Preload("Hooks", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
+		Preload("Hooks.TargetWorkflow").
 		Preload("Tags").
 		Where("namespace_id = ?", namespaceID).
 		Find(&wfs).Error
@@ -101,13 +105,25 @@ func (r *PostgresWorkflowRepo) Update(wf *domain.Workflow) error {
 			return err
 		}
 
+		// Sync Hooks
+		if err := tx.Where("workflow_id = ?", wf.ID).Delete(&domain.WorkflowHook{}).Error; err != nil {
+			return err
+		}
+		for i := range wf.Hooks {
+			wf.Hooks[i].ID = uuid.New()
+			wf.Hooks[i].WorkflowID = &wf.ID
+			if err := tx.Omit("TargetWorkflow").Create(&wf.Hooks[i]).Error; err != nil {
+				return err
+			}
+		}
+
 		// Sync Tags Many-to-Many
 		if err := tx.Model(wf).Association("Tags").Replace(wf.Tags); err != nil {
 			return err
 		}
 
 		// Update top-level fields (omit associations to avoid double-processing)
-		return tx.Omit("Groups", "Inputs", "Variables", "Tags").Save(wf).Error
+		return tx.Omit("Groups", "Inputs", "Variables", "Tags", "Hooks").Save(wf).Error
 	})
 }
 

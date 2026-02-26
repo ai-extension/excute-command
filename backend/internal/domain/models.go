@@ -150,6 +150,25 @@ type StepRepository interface {
 
 // Workflow Management Models
 
+type HookType string
+
+const (
+	HookTypeBefore       HookType = "BEFORE"
+	HookTypeAfterSuccess HookType = "AFTER_SUCCESS"
+	HookTypeAfterFailed  HookType = "AFTER_FAILED"
+)
+
+type WorkflowHook struct {
+	ID               uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey"`
+	WorkflowID       *uuid.UUID `json:"workflow_id,omitempty" gorm:"type:uuid;index"`
+	ScheduleID       *uuid.UUID `json:"schedule_id,omitempty" gorm:"type:uuid;index"`
+	TargetWorkflowID uuid.UUID  `json:"target_workflow_id" gorm:"type:uuid;not null"`
+	HookType         HookType   `json:"hook_type" gorm:"not null"`
+	Inputs           string     `json:"inputs"` // JSON string
+	Order            int        `json:"order"`
+	TargetWorkflow   *Workflow  `json:"target_workflow,omitempty" gorm:"foreignKey:TargetWorkflowID"`
+}
+
 type Workflow struct {
 	ID              uuid.UUID          `json:"id" gorm:"type:uuid;primaryKey"`
 	NamespaceID     uuid.UUID          `json:"namespace_id" gorm:"type:uuid;index"`
@@ -161,8 +180,23 @@ type Workflow struct {
 	Variables       []WorkflowVariable `json:"variables,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Groups          []WorkflowGroup    `json:"groups,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Tags            []Tag              `json:"tags,omitempty" gorm:"many2many:workflow_tags;"`
+	Files           []WorkflowFile     `json:"files,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	TargetFolder    string             `json:"target_folder,omitempty" gorm:"default:''"`
+	CleanupFiles    bool               `json:"cleanup_files,omitempty" gorm:"default:false"`
+	Hooks           []WorkflowHook     `json:"hooks,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	CreatedAt       time.Time          `json:"created_at"`
 	UpdatedAt       time.Time          `json:"updated_at"`
+}
+
+type WorkflowFile struct {
+	ID         uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
+	WorkflowID uuid.UUID `json:"workflow_id" gorm:"type:uuid;index"`
+	FileName   string    `json:"file_name" gorm:"not null"`
+	FileSize   int64     `json:"file_size" gorm:"not null"`
+	LocalPath  string    `json:"local_path" gorm:"not null"`
+	TargetPath string    `json:"target_path" gorm:"not null"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 type WorkflowGroup struct {
@@ -251,6 +285,7 @@ type Schedule struct {
 	CreatedAt          time.Time          `json:"created_at"`
 	UpdatedAt          time.Time          `json:"updated_at"`
 	ScheduledWorkflows []ScheduleWorkflow `json:"scheduled_workflows" gorm:"foreignKey:ScheduleID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Hooks              []WorkflowHook     `json:"hooks,omitempty" gorm:"foreignKey:ScheduleID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Tags               []Tag              `json:"tags,omitempty" gorm:"many2many:schedule_tags;"`
 	TotalRuns          int                `json:"total_runs" gorm:"-"`
 	LastRunStatus      string             `json:"last_run_status" gorm:"-"`
@@ -360,6 +395,14 @@ type ScheduleRepository interface {
 	RemoveWorkflows(scheduleID uuid.UUID) error
 	ListActive() ([]Schedule, error)
 	UpdateStatus(id uuid.UUID, status string) error
+}
+
+type WorkflowFileRepository interface {
+	Create(file *WorkflowFile) error
+	GetByID(id uuid.UUID) (*WorkflowFile, error)
+	GetByWorkflowID(workflowID uuid.UUID) ([]WorkflowFile, error)
+	Update(file *WorkflowFile) error
+	Delete(id uuid.UUID) error
 }
 
 type TagRepository interface {

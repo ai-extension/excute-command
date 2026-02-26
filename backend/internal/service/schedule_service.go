@@ -213,7 +213,19 @@ func (s *ScheduleService) runScheduledWorkflows(scheduleID uuid.UUID) {
 
 	log.Printf("[ScheduleService] Triggering schedule: %s", schedule.Name)
 
+	ctx := context.Background()
+
+	// 1. Run BEFORE hooks
+	if err := s.executor.RunHooks(ctx, schedule.Hooks, domain.HookTypeBefore, schedule.NamespaceID, nil, 0); err != nil {
+		log.Printf("[ScheduleService] Before hook failed for schedule %s: %v", schedule.Name, err)
+		return
+	}
+
 	maxRetries := schedule.Retries
+	var wg sync.WaitGroup
+	var hasFailure bool
+	var mu sync.Mutex
+
 	for _, sw := range schedule.ScheduledWorkflows {
 		if sw.Workflow == nil {
 			continue
@@ -224,19 +236,38 @@ func (s *ScheduleService) runScheduledWorkflows(scheduleID uuid.UUID) {
 			json.Unmarshal([]byte(sw.Inputs), &inputs)
 		}
 
+		wg.Add(1)
 		go func(w domain.Workflow, in map[string]string) {
+			defer wg.Done()
+			var success bool
 			for attempt := 0; attempt <= maxRetries; attempt++ {
 				execID := uuid.New()
-				err := s.executor.Run(context.Background(), w.ID, execID, in, &schedule.ID)
+				err := s.executor.Run(ctx, w.ID, execID, in, &schedule.ID)
 				if err == nil {
-					return // Success
+					success = true
+					break
 				}
 				log.Printf("[ScheduleService] Workflow %s execution failed (attempt %d/%d): %v", w.Name, attempt+1, maxRetries+1, err)
 				if attempt < maxRetries {
-					time.Sleep(10 * time.Second) // Simple backoff
+					time.Sleep(10 * time.Second)
 				}
 			}
+
+			if !success {
+				mu.Lock()
+				hasFailure = true
+				mu.Unlock()
+			}
 		}(*sw.Workflow, inputs)
+	}
+
+	wg.Wait()
+
+	// 2. Run AFTER hooks
+	if hasFailure {
+		s.executor.RunHooks(ctx, schedule.Hooks, domain.HookTypeAfterFailed, schedule.NamespaceID, nil, 0)
+	} else {
+		s.executor.RunHooks(ctx, schedule.Hooks, domain.HookTypeAfterSuccess, schedule.NamespaceID, nil, 0)
 	}
 
 	// Update NextRunAt for recurring

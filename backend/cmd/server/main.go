@@ -43,6 +43,7 @@ func main() {
 		&domain.Schedule{},
 		&domain.ScheduleWorkflow{},
 		&domain.Tag{},
+		&domain.WorkflowFile{},
 	); err != nil {
 		log.Fatal("Failed to migrate database:", err)
 	}
@@ -64,6 +65,7 @@ func main() {
 	globalVarRepo := repository.NewPostgresGlobalVariableRepo(db)
 	scheduleRepo := repository.NewPostgresScheduleRepo(db)
 	tagRepo := repository.NewPostgresTagRepo(db)
+	workflowFileRepo := repository.NewPostgresWorkflowFileRepo(db)
 
 	// Seed Admin User and Default Namespace
 	seedAdmin(db)
@@ -100,6 +102,8 @@ func main() {
 	globalVarHandler := handler.NewGlobalVariableHandler(globalVarService)
 	scheduleHandler := handler.NewScheduleHandler(scheduleService)
 	tagHandler := handler.NewTagHandler(tagService)
+	workflowFileService := service.NewWorkflowFileService(workflowFileRepo)
+	workflowFileHandler := handler.NewWorkflowFileHandler(workflowFileService)
 
 	// Initialize Router
 	r := gin.Default()
@@ -163,6 +167,12 @@ func main() {
 			protected.POST("/workflows/:id/run", workflowHandler.RunWorkflow)
 			protected.POST("/workflow-groups", workflowHandler.CreateGroup)
 			protected.POST("/workflow-steps", workflowHandler.CreateStep)
+
+			protected.GET("/workflows/:id/files", workflowFileHandler.List)
+			protected.POST("/workflows/:id/files", workflowFileHandler.Upload)
+			protected.PUT("/workflow-files/:id", workflowFileHandler.UpdateTargetPath)
+			protected.DELETE("/workflow-files/:id", workflowFileHandler.Delete)
+
 			protected.GET("/workflows/:id/executions", workflowHandler.ListExecutions)
 			protected.GET("/executions/:id", workflowHandler.GetExecution)
 			protected.GET("/executions/:id/logs", workflowHandler.GetExecutionLogs)
