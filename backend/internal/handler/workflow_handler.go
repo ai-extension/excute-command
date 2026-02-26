@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -125,7 +126,7 @@ func (h *WorkflowHandler) RunWorkflow(c *gin.Context) {
 
 	// Run inside a goroutine to not block the request
 	go func() {
-		err := h.executor.Run(context.Background(), id, execID, req.Inputs)
+		err := h.executor.Run(context.Background(), id, execID, req.Inputs, nil)
 		if err != nil {
 			// Hub broadcast will handle status updates, but we can log error
 			println("Workflow execution error:", err.Error())
@@ -174,12 +175,25 @@ func (h *WorkflowHandler) ListExecutions(c *gin.Context) {
 		return
 	}
 
-	execs, err := h.service.ListExecutions(id)
+	limit := 20
+	offset := 0
+	if l := c.Query("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 {
+			limit = v
+		}
+	}
+	if o := c.Query("offset"); o != "" {
+		if v, err := strconv.Atoi(o); err == nil && v >= 0 {
+			offset = v
+		}
+	}
+
+	execs, total, err := h.service.ListExecutionsPaginated(id, limit, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, execs)
+	c.JSON(http.StatusOK, gin.H{"items": execs, "total": total, "limit": limit, "offset": offset})
 }
 
 func (h *WorkflowHandler) ListAllExecutions(c *gin.Context) {

@@ -25,6 +25,7 @@ type WorkflowExecutor struct {
 	stepRepo      domain.WorkflowStepRepository
 	inputRepo     domain.WorkflowInputRepository
 	execRepo      domain.WorkflowExecutionRepository
+	globalVarRepo domain.GlobalVariableRepository
 	serverService *ServerService
 	hub           *Hub
 }
@@ -37,6 +38,7 @@ func NewWorkflowExecutor(
 	execRepo domain.WorkflowExecutionRepository,
 	serverService *ServerService,
 	hub *Hub,
+	globalVarRepo domain.GlobalVariableRepository,
 ) *WorkflowExecutor {
 	return &WorkflowExecutor{
 		wfRepo:        wfRepo,
@@ -44,12 +46,13 @@ func NewWorkflowExecutor(
 		stepRepo:      stepRepo,
 		inputRepo:     inputRepo,
 		execRepo:      execRepo,
+		globalVarRepo: globalVarRepo,
 		serverService: serverService,
 		hub:           hub,
 	}
 }
 
-func (e *WorkflowExecutor) Run(ctx context.Context, workflowID uuid.UUID, execID uuid.UUID, inputs map[string]string) error {
+func (e *WorkflowExecutor) Run(ctx context.Context, workflowID uuid.UUID, execID uuid.UUID, inputs map[string]string, scheduledID *uuid.UUID) error {
 	wf, err := e.wfRepo.GetByID(workflowID)
 	if err != nil {
 		return err
@@ -70,12 +73,13 @@ func (e *WorkflowExecutor) Run(ctx context.Context, workflowID uuid.UUID, execID
 	mainLogPath := filepath.Join(execLogDir, "workflow.log")
 	inputsJSON, _ := json.Marshal(inputs)
 	execution := &domain.WorkflowExecution{
-		ID:         execID,
-		WorkflowID: workflowID,
-		Status:     domain.StatusRunning,
-		Inputs:     string(inputsJSON),
-		LogPath:    mainLogPath,
-		StartedAt:  time.Now(),
+		ID:          execID,
+		WorkflowID:  workflowID,
+		ScheduledID: scheduledID,
+		Status:      domain.StatusRunning,
+		Inputs:      string(inputsJSON),
+		LogPath:     mainLogPath,
+		StartedAt:   time.Now(),
 	}
 	e.execRepo.Create(execution)
 
@@ -97,7 +101,7 @@ func (e *WorkflowExecutor) Run(ctx context.Context, workflowID uuid.UUID, execID
 	var runErr error
 	groupResults := make(map[string]string) // key -> status string
 	for i := range wf.Groups {
-		err := e.runGroup(ctx, &wf.Groups[i], inputs, wf.Variables, groupResults, wf.DefaultServerID, logFile, workflowID, execID)
+		err := e.runGroup(ctx, &wf.Groups[i], inputs, wf.Variables, groupResults, wf.DefaultServerID, logFile, workflowID, execID, wf.NamespaceID)
 		groupResults[wf.Groups[i].Key] = string(wf.Groups[i].Status)
 		if err != nil {
 			runErr = err
@@ -166,13 +170,21 @@ func (e *WorkflowExecutor) validateInputs(wf *domain.Workflow, provided map[stri
 	return nil
 }
 
-func (e *WorkflowExecutor) evaluateCondition(condition string, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string) (bool, error) {
+func (e *WorkflowExecutor) evaluateCondition(condition string, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, namespaceID uuid.UUID) (bool, error) {
 	if strings.TrimSpace(condition) == "" {
 		return true, nil // Empty condition = always run
 	}
 
 	// Resolve all placeholders in the condition first
 	resolved := condition
+
+	// 1. Resolve {{global.key}}
+	if e.globalVarRepo != nil {
+		gvs, _ := e.globalVarRepo.List(namespaceID)
+		for _, v := range gvs {
+			resolved = strings.ReplaceAll(resolved, "{{global."+v.Key+"}}", v.Value)
+		}
+	}
 
 	// Resolve {{variable.key}}
 	for _, v := range variables {
@@ -236,9 +248,9 @@ func (e *WorkflowExecutor) evalAtom(expr, original string) (bool, error) {
 	return false, fmt.Errorf("unsupported condition syntax: %q — use ==, !=, && or ||", original)
 }
 
-func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowGroup, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, defaultServerID uuid.UUID, logFile *os.File, workflowID uuid.UUID, executionID uuid.UUID) error {
+func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowGroup, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, defaultServerID uuid.UUID, logFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, namespaceID uuid.UUID) error {
 	// Evaluate condition before running
-	if shouldRun, err := e.evaluateCondition(group.Condition, inputs, variables, groupResults); err != nil {
+	if shouldRun, err := e.evaluateCondition(group.Condition, inputs, variables, groupResults, namespaceID); err != nil {
 		return fmt.Errorf("group %q condition error: %w", group.Name, err)
 	} else if !shouldRun {
 		msg := fmt.Sprintf("\n%s\n[GROUP SKIPPED] %s\nCondition: %s\n%s\n", strings.Repeat("-", 80), group.Name, group.Condition, strings.Repeat("-", 80))
@@ -271,7 +283,7 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 			wg.Add(1)
 			go func(step *domain.WorkflowStep) {
 				defer wg.Done()
-				if err := e.runStep(ctx, step, inputs, variables, effectiveServerID, logFile, workflowID, executionID); err != nil {
+				if err := e.runStep(ctx, step, inputs, variables, effectiveServerID, logFile, workflowID, executionID, namespaceID); err != nil {
 					errs <- err
 				}
 			}(&group.Steps[i])
@@ -290,7 +302,7 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 		}
 	} else {
 		for i := range group.Steps {
-			if err := e.runStep(ctx, &group.Steps[i], inputs, variables, effectiveServerID, logFile, workflowID, executionID); err != nil {
+			if err := e.runStep(ctx, &group.Steps[i], inputs, variables, effectiveServerID, logFile, workflowID, executionID, namespaceID); err != nil {
 				group.Status = domain.StatusFailed
 				e.groupRepo.Update(group)
 				e.hub.BroadcastStatus(group.ID.String(), "group", string(domain.StatusFailed))
@@ -304,7 +316,7 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 	return e.groupRepo.Update(group)
 }
 
-func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowStep, inputs map[string]string, variables []domain.WorkflowVariable, defaultServerID uuid.UUID, mainLogFile *os.File, workflowID uuid.UUID, executionID uuid.UUID) error {
+func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowStep, inputs map[string]string, variables []domain.WorkflowVariable, defaultServerID uuid.UUID, mainLogFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, namespaceID uuid.UUID) error {
 	step.Status = domain.StatusRunning
 	e.stepRepo.Update(step)
 	e.hub.BroadcastStatus(step.ID.String(), "step", string(domain.StatusRunning))
@@ -346,6 +358,13 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 	// 2. Runtime Inputs: {{key}}
 	for k, v := range inputs {
 		command = strings.ReplaceAll(command, "{{"+k+"}}", v)
+	}
+	// 3. Global Variables: {{global.key}}
+	if e.globalVarRepo != nil {
+		gvs, _ := e.globalVarRepo.List(namespaceID)
+		for _, v := range gvs {
+			command = strings.ReplaceAll(command, "{{global."+v.Key+"}}", v.Value)
+		}
 	}
 
 	targetServerID := step.ServerID

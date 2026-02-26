@@ -197,6 +197,11 @@ const ExecutionHistoryPage = () => {
                                                                 {exec.workflow?.name || 'TERMINATED_FLOW'}
                                                             </h3>
                                                             {getStatusBadge(exec.status)}
+                                                            {exec.scheduled_id && (
+                                                                <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 font-black text-[9px] uppercase tracking-widest px-2 py-0.5">
+                                                                    <Calendar className="w-3 h-3 mr-1" /> Scheduled
+                                                                </Badge>
+                                                            )}
                                                         </div>
                                                         <div className="flex items-center gap-4 text-[10px] text-muted-foreground font-bold tracking-wider uppercase opacity-80">
                                                             <span className="flex items-center gap-1.5 font-mono text-primary/60">

@@ -9,9 +9,10 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
 import { cn } from '../lib/utils';
-import { Workflow, WorkflowGroup, WorkflowStep, WorkflowInput, WorkflowVariable, Server as ServerType } from '../types';
+import { Workflow, WorkflowGroup, WorkflowStep, WorkflowInput, WorkflowVariable, Server as ServerType, Tag } from '../types';
 import WorkflowHistory from '../components/WorkflowHistory';
 import WorkflowRunner from '../components/WorkflowRunner';
+import { TagSelector } from '../components/TagSelector';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { useNamespace } from '../context/NamespaceContext';
 import { useAuth } from '../context/AuthContext';
@@ -25,6 +26,7 @@ const WorkflowDesignerPage = () => {
 
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
+    const [tags, setTags] = useState<Tag[]>([]);
     const [inputs, setInputs] = useState<Partial<WorkflowInput>[]>([]);
     const [variables, setVariables] = useState<Partial<WorkflowVariable>[]>([]);
     const [groups, setGroups] = useState<Partial<WorkflowGroup>[]>([]);
@@ -54,6 +56,7 @@ const WorkflowDesignerPage = () => {
                 setDescription(data.description);
                 const defaultServerIdVal = data.default_server_id === '00000000-0000-0000-0000-000000000000' ? '' : (data.default_server_id || '');
                 setDefaultServerId(defaultServerIdVal);
+                setTags(data.tags || []);
 
                 const cleanGroups = (data.groups || []).map((g: any) => {
                     const cleanedGroup = { ...g };
@@ -102,6 +105,7 @@ const WorkflowDesignerPage = () => {
                 status: 'active',
                 default_server_id: defaultServerId || undefined,
                 namespace_id: activeNamespace.id,
+                tags,
                 inputs: inputs.filter(i => i.key?.trim()),
                 variables: variables.filter(v => v.key?.trim()),
                 groups: groups.map((g, gIdx) => ({
@@ -331,6 +335,10 @@ const WorkflowDesignerPage = () => {
                                                         placeholder="What is the objective of this automation?"
                                                         className="bg-background border-border h-10 text-sm font-medium"
                                                     />
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Organize Tags</label>
+                                                    <TagSelector selectedTags={tags} onChange={setTags} />
                                                 </div>
                                             </div>
                                         </div>

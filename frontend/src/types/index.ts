@@ -65,6 +65,15 @@ export interface WorkflowGroup {
     updated_at: string;
 }
 
+export interface Tag {
+    id: string;
+    namespace_id: string;
+    name: string;
+    color: string;
+    created_at: string;
+    updated_at: string;
+}
+
 export interface Workflow {
     id: string;
     namespace_id: string;
@@ -75,6 +84,7 @@ export interface Workflow {
     inputs?: WorkflowInput[];
     variables?: WorkflowVariable[];
     groups?: WorkflowGroup[];
+    tags?: Tag[];
     created_at: string;
     updated_at: string;
 }
@@ -82,6 +92,7 @@ export interface Workflow {
 export interface WorkflowExecution {
     id: string;
     workflow_id: string;
+    scheduled_id?: string;
     status: Status;
     inputs: string;
     log_path: string;
@@ -122,4 +133,43 @@ export interface WorkflowVariable {
     value: string;
     created_at: string;
     updated_at: string;
+}
+
+export interface GlobalVariable {
+    id: string;
+    namespace_id: string;
+    key: string;
+    value: string;
+    description: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export type ScheduleType = 'ONE_TIME' | 'RECURRING';
+
+export interface ScheduleWorkflow {
+    id: string;
+    schedule_id: string;
+    workflow_id: string;
+    inputs: string;
+    workflow?: Workflow;
+}
+
+export interface Schedule {
+    id: string;
+    namespace_id: string;
+    name: string;
+    type: ScheduleType;
+    cron_expression?: string;
+    next_run_at?: string;
+    status: 'ACTIVE' | 'PAUSED';
+    retries: number;
+    created_at: string;
+    updated_at: string;
+    workflows?: Workflow[]; // Legacy many-to-many
+    scheduled_workflows?: ScheduleWorkflow[]; // Granular configurations
+    tags?: Tag[];
+    total_runs: number;
+    last_run_status: string;
+    last_run_at?: string;
 }

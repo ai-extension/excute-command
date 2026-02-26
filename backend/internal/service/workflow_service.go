@@ -116,6 +116,10 @@ func (s *WorkflowService) ListExecutions(workflowID uuid.UUID) ([]domain.Workflo
 	return s.execRepo.ListByWorkflowID(workflowID)
 }
 
+func (s *WorkflowService) ListExecutionsPaginated(workflowID uuid.UUID, limit, offset int) ([]domain.WorkflowExecution, int64, error) {
+	return s.execRepo.ListByWorkflowIDPaginated(workflowID, limit, offset)
+}
+
 func (s *WorkflowService) ListNamespaceExecutions(namespaceID uuid.UUID) ([]domain.WorkflowExecution, error) {
 	return s.execRepo.ListByNamespaceID(namespaceID)
 }

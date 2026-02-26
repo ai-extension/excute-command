@@ -196,6 +196,11 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                         <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">
                             {mode === 'LIVE' ? 'Live Orchestration Monitor' : 'Execution Audit Vault'} <span className="text-zinc-600 px-1">•</span> {workflow.name}
                         </span>
+                        {execution?.scheduled_id && (
+                            <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 font-black text-[8px] uppercase tracking-widest px-2 py-0.5 ml-2">
+                                Scheduled
+                            </Badge>
+                        )}
                     </div>
                 </div>
                 <div className="flex items-center gap-4">

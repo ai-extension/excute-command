@@ -18,12 +18,14 @@ import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../lib/api';
 import { Workflow } from '../types';
 import WorkflowRunner from '../components/WorkflowRunner';
+import { TagFilter } from '../components/TagFilter';
 
 const WorkflowPage = () => {
     const navigate = useNavigate();
     const { activeNamespace } = useNamespace();
     const { apiFetch } = useAuth();
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
     const [workflows, setWorkflows] = useState<Workflow[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -45,10 +47,13 @@ const WorkflowPage = () => {
         fetchWorkflows();
     }, [activeNamespace]);
 
-    const filteredWorkflows = workflows.filter(wf =>
-        wf.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        wf.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredWorkflows = workflows.filter(wf => {
+        const matchesSearch = wf.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            wf.description?.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesTags = selectedTagIds.length === 0 ||
+            selectedTagIds.every(tagId => wf.tags?.some(wt => wt.id === tagId));
+        return matchesSearch && matchesTags;
+    });
 
     return (
         <WorkflowRunner onRunComplete={fetchWorkflows} onCloseMonitor={fetchWorkflows}>
@@ -87,6 +92,12 @@ const WorkflowPage = () => {
                         </div>
                     </div>
 
+                    <TagFilter
+                        selectedTagIds={selectedTagIds}
+                        onChange={setSelectedTagIds}
+                        className="px-1"
+                    />
+
                     <div className="rounded-2xl border border-border bg-card shadow-card overflow-hidden transition-all duration-500">
                         <Table>
                             <TableHeader>
@@ -117,9 +128,22 @@ const WorkflowPage = () => {
                                                 </div>
                                                 <div>
                                                     <p className="text-[13px] font-black tracking-tight group-hover:text-primary transition-colors">{wf.name}</p>
-                                                    <p className="text-[10px] text-muted-foreground font-medium line-clamp-1 opacity-70">
+                                                    <p className="text-[10px] text-muted-foreground font-medium line-clamp-1 opacity-70 mb-1.5">
                                                         {wf.description || 'No description provided'}
                                                     </p>
+                                                    {wf.tags && wf.tags.length > 0 && (
+                                                        <div className="flex flex-wrap gap-1 mt-1">
+                                                            {wf.tags.map(tag => (
+                                                                <span
+                                                                    key={tag.id}
+                                                                    className="px-1.5 py-0.5 rounded text-[8px] font-bold border"
+                                                                    style={{ backgroundColor: `${tag.color}20`, color: tag.color, borderColor: `${tag.color}40` }}
+                                                                >
+                                                                    {tag.name}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </TableCell>

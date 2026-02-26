@@ -1,14 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     History,
-    FileText,
     Clock,
     CheckCircle2,
     XCircle,
     Loader2,
     Calendar,
     ChevronRight,
-    Monitor
+    CalendarClock,
+    RefreshCw,
+    ChevronDown
 } from 'lucide-react';
 import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
@@ -22,6 +23,9 @@ import { format } from 'date-fns';
 import { API_BASE_URL } from '../lib/api';
 import ExecutionMonitor from './ExecutionMonitor';
 import { useAuth } from '../context/AuthContext';
+import { cn } from '../lib/utils';
+
+const PAGE_SIZE = 20;
 
 interface WorkflowHistoryProps {
     workflowId: string;
@@ -32,38 +36,53 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({ workflowId, onReRun }
     const { apiFetch } = useAuth();
     const [executions, setExecutions] = useState<WorkflowExecution[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [total, setTotal] = useState(0);
+    const offsetRef = useRef(0);
     const [selectedExec, setSelectedExec] = useState<WorkflowExecution | null>(null);
     const [loadingDetail, setLoadingDetail] = useState(false);
 
-    useEffect(() => {
-        if (workflowId) {
-            fetchHistory();
-        }
-    }, [workflowId]);
+    const loadPage = async (currentOffset: number, replace = false) => {
+        if (replace) setLoading(true);
+        else setLoadingMore(true);
 
-    const fetchHistory = async () => {
         try {
-            setLoading(true);
-            const response = await apiFetch(`${API_BASE_URL}/workflows/${workflowId}/executions`);
+            const response = await apiFetch(
+                `${API_BASE_URL}/workflows/${workflowId}/executions?limit=${PAGE_SIZE}&offset=${currentOffset}`
+            );
             if (response.ok) {
                 const data = await response.json();
-                setExecutions(data || []);
+                const items: WorkflowExecution[] = Array.isArray(data) ? data : (data.items || []);
+                const totalCount: number = Array.isArray(data) ? data.length : (data.total || 0);
+                setTotal(totalCount);
+                setExecutions(prev => replace ? items : [...prev, ...items]);
+                offsetRef.current = currentOffset + items.length;
             }
         } catch (error) {
             console.error('Failed to fetch history:', error);
         } finally {
             setLoading(false);
+            setLoadingMore(false);
         }
     };
+
+    const refresh = () => {
+        offsetRef.current = 0;
+        setExecutions([]);
+        setTotal(0);
+        loadPage(0, true);
+    };
+
+    useEffect(() => {
+        if (workflowId) refresh();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [workflowId]);
 
     const fetchExecutionDetail = async (exec: WorkflowExecution) => {
         try {
             setLoadingDetail(true);
             const response = await apiFetch(`${API_BASE_URL}/executions/${exec.id}`);
-            if (response.ok) {
-                const data = await response.json();
-                setSelectedExec(data);
-            }
+            if (response.ok) setSelectedExec(await response.json());
         } catch (error) {
             console.error('Failed to fetch execution detail:', error);
         } finally {
@@ -74,11 +93,11 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({ workflowId, onReRun }
     const getStatusBadge = (status: string) => {
         switch (status) {
             case 'SUCCESS':
-                return <Badge className="bg-green-500/10 text-green-500 hover:bg-green-500/20 border-green-500/20"><CheckCircle2 className="w-3 h-3 mr-1" /> Success</Badge>;
+                return <Badge className="bg-green-500/10 text-green-500 hover:bg-green-500/20 border-green-500/20"><CheckCircle2 className="w-3 h-3 mr-1" />Success</Badge>;
             case 'FAILED':
-                return <Badge variant="destructive" className="bg-red-500/10 text-red-500 border-red-500/20"><XCircle className="w-3 h-3 mr-1" /> Failed</Badge>;
+                return <Badge variant="destructive" className="bg-red-500/10 text-red-500 border-red-500/20"><XCircle className="w-3 h-3 mr-1" />Failed</Badge>;
             case 'RUNNING':
-                return <Badge className="bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 border-blue-500/20"><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Running</Badge>;
+                return <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20"><Loader2 className="w-3 h-3 mr-1 animate-spin" />Running</Badge>;
             default:
                 return <Badge variant="outline">{status}</Badge>;
         }
@@ -86,14 +105,12 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({ workflowId, onReRun }
 
     const getDuration = (start: string, end?: string) => {
         if (!end) return 'Running...';
-        const startTime = new Date(start).getTime();
-        const endTime = new Date(end).getTime();
-        const diff = Math.floor((endTime - startTime) / 1000);
+        const diff = Math.floor((new Date(end).getTime() - new Date(start).getTime()) / 1000);
         if (diff < 60) return `${diff}s`;
-        const mins = Math.floor(diff / 60);
-        const secs = diff % 60;
-        return `${mins}m ${secs}s`;
+        return `${Math.floor(diff / 60)}m ${diff % 60}s`;
     };
+
+    const hasMore = executions.length < total;
 
     if (loading) {
         return (
@@ -109,8 +126,15 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({ workflowId, onReRun }
                 <div className="flex items-center gap-2">
                     <History className="w-4 h-4 text-emerald-500" />
                     <h3 className="font-semibold text-sm">Execution History</h3>
+                    {total > 0 && (
+                        <Badge variant="outline" className="text-[9px] font-black px-1.5 py-0">
+                            {total} runs
+                        </Badge>
+                    )}
                 </div>
-                <Button variant="ghost" size="sm" onClick={fetchHistory}>Refresh</Button>
+                <Button variant="ghost" size="sm" onClick={refresh} className="gap-1 text-xs">
+                    <RefreshCw className="w-3 h-3" /> Refresh
+                </Button>
             </div>
 
             {executions.length === 0 ? (
@@ -119,7 +143,7 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({ workflowId, onReRun }
                     <p className="text-sm text-muted-foreground">No execution history found for this workflow.</p>
                 </div>
             ) : (
-                <div className="overflow-y-auto max-h-[calc(100vh-450px)] space-y-2 px-1 custom-scrollbar">
+                <div className="space-y-2 px-1">
                     {executions.map((exec) => (
                         <Card
                             key={exec.id}
@@ -128,13 +152,21 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({ workflowId, onReRun }
                         >
                             <CardContent className="p-3 flex items-center justify-between gap-4">
                                 <div className="flex items-center gap-3">
-                                    <div className={`w-1 h-10 rounded-full ${exec.status === 'SUCCESS' ? 'bg-green-500' :
-                                        exec.status === 'FAILED' ? 'bg-red-500' : 'bg-blue-500'
-                                        }`} />
+                                    <div className={cn(
+                                        "w-1 h-10 rounded-full shrink-0",
+                                        exec.status === 'SUCCESS' ? 'bg-green-500' :
+                                            exec.status === 'FAILED' ? 'bg-red-500' : 'bg-blue-500'
+                                    )} />
                                     <div className="space-y-1">
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 flex-wrap">
                                             <span className="text-xs font-mono text-muted-foreground">#{exec.id.slice(0, 8)}</span>
                                             {getStatusBadge(exec.status)}
+                                            {exec.scheduled_id && (
+                                                <Badge className="bg-violet-500/10 text-violet-400 border-violet-500/20 text-[8px] font-black uppercase tracking-widest px-1.5 gap-1">
+                                                    <CalendarClock className="w-2.5 h-2.5" />
+                                                    {(exec as any).schedule?.name || 'Scheduled'}
+                                                </Badge>
+                                            )}
                                         </div>
                                         <div className="flex items-center gap-4 text-xs text-muted-foreground font-medium">
                                             <span className="flex items-center gap-1">
@@ -148,10 +180,35 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({ workflowId, onReRun }
                                         </div>
                                     </div>
                                 </div>
-                                <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                                <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
                             </CardContent>
                         </Card>
                     ))}
+
+                    {/* Load More button */}
+                    {hasMore && (
+                        <div className="pt-2 flex justify-center">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => loadPage(offsetRef.current)}
+                                disabled={loadingMore}
+                                className="gap-2 border-white/10 text-muted-foreground hover:text-foreground hover:bg-white/5 font-bold text-xs"
+                            >
+                                {loadingMore ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                    <ChevronDown className="w-3.5 h-3.5" />
+                                )}
+                                {loadingMore ? 'Loading...' : `Load more (${total - executions.length} remaining)`}
+                            </Button>
+                        </div>
+                    )}
+                    {!hasMore && executions.length >= PAGE_SIZE && (
+                        <p className="text-center text-[10px] text-muted-foreground/40 font-bold uppercase tracking-widest pt-2">
+                            All {total} runs loaded
+                        </p>
+                    )}
                 </div>
             )}
 

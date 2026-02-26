@@ -1,0 +1,43 @@
+package repository
+
+import (
+	"github.com/google/uuid"
+	"github.com/user/csm-backend/internal/domain"
+	"gorm.io/gorm"
+)
+
+type PostgresGlobalVariableRepo struct {
+	db *gorm.DB
+}
+
+func NewPostgresGlobalVariableRepo(db *gorm.DB) *PostgresGlobalVariableRepo {
+	return &PostgresGlobalVariableRepo{db: db}
+}
+
+func (r *PostgresGlobalVariableRepo) Create(gv *domain.GlobalVariable) error {
+	return r.db.Create(gv).Error
+}
+
+func (r *PostgresGlobalVariableRepo) GetByID(id uuid.UUID) (*domain.GlobalVariable, error) {
+	var gv domain.GlobalVariable
+	if err := r.db.First(&gv, "id = ?", id).Error; err != nil {
+		return nil, err
+	}
+	return &gv, nil
+}
+
+func (r *PostgresGlobalVariableRepo) List(namespaceID uuid.UUID) ([]domain.GlobalVariable, error) {
+	var gvs []domain.GlobalVariable
+	if err := r.db.Where("namespace_id = ?", namespaceID).Find(&gvs).Error; err != nil {
+		return nil, err
+	}
+	return gvs, nil
+}
+
+func (r *PostgresGlobalVariableRepo) Update(gv *domain.GlobalVariable) error {
+	return r.db.Save(gv).Error
+}
+
+func (r *PostgresGlobalVariableRepo) Delete(id uuid.UUID) error {
+	return r.db.Delete(&domain.GlobalVariable{}, "id = ?", id).Error
+}

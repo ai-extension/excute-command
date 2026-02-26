@@ -160,6 +160,7 @@ type Workflow struct {
 	Inputs          []WorkflowInput    `json:"inputs,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Variables       []WorkflowVariable `json:"variables,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Groups          []WorkflowGroup    `json:"groups,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Tags            []Tag              `json:"tags,omitempty" gorm:"many2many:workflow_tags;"`
 	CreatedAt       time.Time          `json:"created_at"`
 	UpdatedAt       time.Time          `json:"updated_at"`
 }
@@ -212,19 +213,73 @@ type WorkflowVariable struct {
 	UpdatedAt  time.Time `json:"updated_at"`
 }
 
+type GlobalVariable struct {
+	ID          uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
+	NamespaceID uuid.UUID `json:"namespace_id" gorm:"type:uuid;index"`
+	Key         string    `json:"key" gorm:"not null"`
+	Value       string    `json:"value"`
+	Description string    `json:"description"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type Tag struct {
+	ID          uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
+	NamespaceID uuid.UUID `json:"namespace_id" gorm:"type:uuid;index"`
+	Name        string    `json:"name" gorm:"not null"`
+	Color       string    `json:"color" gorm:"not null;default:'#6366f1'"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type ScheduleType string
+
+const (
+	ScheduleTypeOneTime   ScheduleType = "ONE_TIME"
+	ScheduleTypeRecurring ScheduleType = "RECURRING"
+)
+
+type Schedule struct {
+	ID                 uuid.UUID          `json:"id" gorm:"type:uuid;primaryKey"`
+	NamespaceID        uuid.UUID          `json:"namespace_id" gorm:"type:uuid;index"`
+	Name               string             `json:"name" gorm:"not null"`
+	Type               ScheduleType       `json:"type" gorm:"not null"`
+	CronExpression     string             `json:"cron_expression"`
+	NextRunAt          *time.Time         `json:"next_run_at"`
+	Status             string             `json:"status" gorm:"default:'ACTIVE'"` // ACTIVE, PAUSED
+	Retries            int                `json:"retries" gorm:"default:0"`
+	CreatedAt          time.Time          `json:"created_at"`
+	UpdatedAt          time.Time          `json:"updated_at"`
+	ScheduledWorkflows []ScheduleWorkflow `json:"scheduled_workflows" gorm:"foreignKey:ScheduleID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Tags               []Tag              `json:"tags,omitempty" gorm:"many2many:schedule_tags;"`
+	TotalRuns          int                `json:"total_runs" gorm:"-"`
+	LastRunStatus      string             `json:"last_run_status" gorm:"-"`
+	LastRunAt          *time.Time         `json:"last_run_at" gorm:"-"`
+}
+
+type ScheduleWorkflow struct {
+	ID         uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
+	ScheduleID uuid.UUID `json:"schedule_id" gorm:"type:uuid;index;not null"`
+	WorkflowID uuid.UUID `json:"workflow_id" gorm:"type:uuid;index;not null"`
+	Inputs     string    `json:"inputs"` // JSON string
+	Workflow   *Workflow `json:"workflow,omitempty" gorm:"foreignKey:WorkflowID"`
+}
+
 type WorkflowExecution struct {
-	ID         uuid.UUID               `json:"id" gorm:"type:uuid;primaryKey"`
-	WorkflowID uuid.UUID               `json:"workflow_id" gorm:"type:uuid;index"`
-	Status     Status                  `json:"status"`
-	Inputs     string                  `json:"inputs"` // JSON string
-	ExecutedBy uuid.UUID               `json:"executed_by" gorm:"type:uuid"`
-	LogPath    string                  `json:"log_path"`
-	StartedAt  time.Time               `json:"started_at"`
-	FinishedAt *time.Time              `json:"finished_at,omitempty"`
-	CreatedAt  time.Time               `json:"created_at"`
-	UpdatedAt  time.Time               `json:"updated_at"`
-	Workflow   *Workflow               `json:"workflow,omitempty" gorm:"foreignKey:WorkflowID"`
-	Steps      []WorkflowExecutionStep `json:"steps,omitempty" gorm:"foreignKey:ExecutionID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	ID          uuid.UUID               `json:"id" gorm:"type:uuid;primaryKey"`
+	WorkflowID  uuid.UUID               `json:"workflow_id" gorm:"type:uuid;index"`
+	ScheduledID *uuid.UUID              `json:"scheduled_id" gorm:"type:uuid;index"`
+	Status      Status                  `json:"status"`
+	Inputs      string                  `json:"inputs"` // JSON string
+	ExecutedBy  uuid.UUID               `json:"executed_by" gorm:"type:uuid"`
+	LogPath     string                  `json:"log_path"`
+	StartedAt   time.Time               `json:"started_at"`
+	FinishedAt  *time.Time              `json:"finished_at,omitempty"`
+	CreatedAt   time.Time               `json:"created_at"`
+	UpdatedAt   time.Time               `json:"updated_at"`
+	Workflow    *Workflow               `json:"workflow,omitempty" gorm:"foreignKey:WorkflowID"`
+	Schedule    *Schedule               `json:"schedule,omitempty" gorm:"foreignKey:ScheduledID"`
+	Steps       []WorkflowExecutionStep `json:"steps,omitempty" gorm:"foreignKey:ExecutionID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 }
 
 type WorkflowExecutionStep struct {
@@ -280,7 +335,37 @@ type WorkflowExecutionRepository interface {
 	Create(exec *WorkflowExecution) error
 	GetByID(id uuid.UUID) (*WorkflowExecution, error)
 	ListByWorkflowID(workflowID uuid.UUID) ([]WorkflowExecution, error)
+	ListByWorkflowIDPaginated(workflowID uuid.UUID, limit, offset int) ([]WorkflowExecution, int64, error)
 	ListByNamespaceID(namespaceID uuid.UUID) ([]WorkflowExecution, error)
+	ListByScheduledID(scheduledID uuid.UUID) ([]WorkflowExecution, error)
 	Update(exec *WorkflowExecution) error
 	CreateStepResult(stepExec *WorkflowExecutionStep) error
+}
+
+type GlobalVariableRepository interface {
+	Create(gv *GlobalVariable) error
+	GetByID(id uuid.UUID) (*GlobalVariable, error)
+	List(namespaceID uuid.UUID) ([]GlobalVariable, error)
+	Update(gv *GlobalVariable) error
+	Delete(id uuid.UUID) error
+}
+
+type ScheduleRepository interface {
+	Create(s *Schedule) error
+	GetByID(id uuid.UUID) (*Schedule, error)
+	List(namespaceID uuid.UUID) ([]Schedule, error)
+	Update(s *Schedule) error
+	Delete(id uuid.UUID) error
+	AddScheduledWorkflow(sw *ScheduleWorkflow) error
+	RemoveWorkflows(scheduleID uuid.UUID) error
+	ListActive() ([]Schedule, error)
+	UpdateStatus(id uuid.UUID, status string) error
+}
+
+type TagRepository interface {
+	Create(tag *Tag) error
+	GetByID(id uuid.UUID) (*Tag, error)
+	ListByNamespace(namespaceID uuid.UUID) ([]Tag, error)
+	Update(tag *Tag) error
+	Delete(id uuid.UUID) error
 }

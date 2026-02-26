@@ -1,0 +1,257 @@
+package service
+
+import (
+	"context"
+	"encoding/json"
+	"log"
+	"sync"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/robfig/cron/v3"
+	"github.com/user/csm-backend/internal/domain"
+)
+
+type ScheduleService struct {
+	repo     domain.ScheduleRepository
+	execRepo domain.WorkflowExecutionRepository
+	executor *WorkflowExecutor
+	cron     *cron.Cron
+	entries  map[uuid.UUID]cron.EntryID
+	mu       sync.Mutex
+}
+
+func NewScheduleService(repo domain.ScheduleRepository, execRepo domain.WorkflowExecutionRepository, executor *WorkflowExecutor) *ScheduleService {
+	s := &ScheduleService{
+		repo:     repo,
+		execRepo: execRepo,
+		executor: executor,
+		cron:     cron.New(cron.WithParser(cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor))),
+		entries:  make(map[uuid.UUID]cron.EntryID),
+	}
+	s.cron.Start()
+	return s
+}
+
+func (s *ScheduleService) Init() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	schedules, err := s.repo.ListActive()
+	if err != nil {
+		log.Printf("[ScheduleService] Failed to list active schedules: %v", err)
+		return
+	}
+
+	for _, schedule := range schedules {
+		s.addScheduleToCron(schedule)
+	}
+	log.Printf("[ScheduleService] Initialized with %d active schedules", len(schedules))
+}
+
+func (s *ScheduleService) Create(schedule *domain.Schedule, workflowConfigs []domain.ScheduleWorkflow) error {
+	schedule.ID = uuid.New()
+	if err := s.repo.Create(schedule); err != nil {
+		return err
+	}
+
+	for _, config := range workflowConfigs {
+		config.ID = uuid.New()
+		config.ScheduleID = schedule.ID
+		if err := s.repo.AddScheduledWorkflow(&config); err != nil {
+			return err
+		}
+	}
+
+	// Reload to get preloaded workflows
+	reloaded, err := s.repo.GetByID(schedule.ID)
+	if err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if reloaded.Status == "ACTIVE" {
+		s.addScheduleToCron(*reloaded)
+	}
+	return nil
+}
+
+func (s *ScheduleService) Update(schedule *domain.Schedule, workflowConfigs []domain.ScheduleWorkflow) error {
+	if err := s.repo.Update(schedule); err != nil {
+		return err
+	}
+
+	// Update workflows association
+	if err := s.repo.RemoveWorkflows(schedule.ID); err != nil {
+		return err
+	}
+	for _, config := range workflowConfigs {
+		config.ID = uuid.New()
+		config.ScheduleID = schedule.ID
+		if err := s.repo.AddScheduledWorkflow(&config); err != nil {
+			return err
+		}
+	}
+
+	// Reload and sync cron
+	reloaded, err := s.repo.GetByID(schedule.ID)
+	if err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.removeScheduleFromCron(schedule.ID)
+	if reloaded.Status == "ACTIVE" {
+		s.addScheduleToCron(*reloaded)
+	}
+	return nil
+}
+
+func (s *ScheduleService) Delete(id uuid.UUID) error {
+	s.mu.Lock()
+	s.removeScheduleFromCron(id)
+	s.mu.Unlock()
+
+	if err := s.repo.RemoveWorkflows(id); err != nil {
+		return err
+	}
+	return s.repo.Delete(id)
+}
+
+func (s *ScheduleService) ToggleStatus(id uuid.UUID) error {
+	schedule, err := s.repo.GetByID(id)
+	if err != nil {
+		return err
+	}
+
+	if schedule.Status == "ACTIVE" {
+		schedule.Status = "PAUSED"
+	} else {
+		schedule.Status = "ACTIVE"
+	}
+
+	if err := s.repo.Update(schedule); err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if schedule.Status == "ACTIVE" {
+		s.addScheduleToCron(*schedule)
+	} else {
+		s.removeScheduleFromCron(id)
+	}
+	return nil
+}
+
+func (s *ScheduleService) List(namespaceID uuid.UUID) ([]domain.Schedule, error) {
+	return s.repo.List(namespaceID)
+}
+
+func (s *ScheduleService) GetByID(id uuid.UUID) (*domain.Schedule, error) {
+	return s.repo.GetByID(id)
+}
+
+// Internal helpers
+
+func (s *ScheduleService) addScheduleToCron(schedule domain.Schedule) {
+	if schedule.Type == domain.ScheduleTypeRecurring {
+		entryID, err := s.cron.AddFunc(schedule.CronExpression, func() {
+			s.runScheduledWorkflows(schedule.ID)
+		})
+		if err != nil {
+			log.Printf("[ScheduleService] Failed to add cron for %s: %v", schedule.Name, err)
+			return
+		}
+		s.entries[schedule.ID] = entryID
+
+		// Update NextRunAt
+		entry := s.cron.Entry(entryID)
+		next := entry.Next
+		schedule.NextRunAt = &next
+		s.repo.Update(&schedule)
+	} else if schedule.Type == domain.ScheduleTypeOneTime {
+		if schedule.NextRunAt != nil {
+			now := time.Now().UTC()
+			scheduledAt := schedule.NextRunAt.UTC()
+			log.Printf("[ScheduleService] OneTime schedule '%s': NextRunAt=%v, Now=%v", schedule.Name, scheduledAt, now)
+			if scheduledAt.After(now) {
+				delay := scheduledAt.Sub(now)
+				log.Printf("[ScheduleService] Scheduling '%s' to fire in %v", schedule.Name, delay)
+				time.AfterFunc(delay, func() {
+					log.Printf("[ScheduleService] Firing one-time schedule: %s", schedule.Name)
+					s.runScheduledWorkflows(schedule.ID)
+					s.repo.UpdateStatus(schedule.ID, "PAUSED")
+				})
+			} else if schedule.Status == "ACTIVE" {
+				// If it's active but in the past, run it immediately (catch-up)
+				log.Printf("[ScheduleService] Running missed one-time schedule: %s (was %v ago)", schedule.Name, now.Sub(scheduledAt))
+				go func() {
+					s.runScheduledWorkflows(schedule.ID)
+					s.repo.UpdateStatus(schedule.ID, "PAUSED")
+				}()
+			}
+		}
+	}
+}
+
+func (s *ScheduleService) removeScheduleFromCron(id uuid.UUID) {
+	if entryID, ok := s.entries[id]; ok {
+		s.cron.Remove(entryID)
+		delete(s.entries, id)
+	}
+}
+
+func (s *ScheduleService) runScheduledWorkflows(scheduleID uuid.UUID) {
+	schedule, err := s.repo.GetByID(scheduleID)
+	if err != nil {
+		log.Printf("[ScheduleService] Failed to run schedule %s: %v", scheduleID, err)
+		return
+	}
+
+	log.Printf("[ScheduleService] Triggering schedule: %s", schedule.Name)
+
+	maxRetries := schedule.Retries
+	for _, sw := range schedule.ScheduledWorkflows {
+		if sw.Workflow == nil {
+			continue
+		}
+
+		var inputs map[string]string
+		if sw.Inputs != "" {
+			json.Unmarshal([]byte(sw.Inputs), &inputs)
+		}
+
+		go func(w domain.Workflow, in map[string]string) {
+			for attempt := 0; attempt <= maxRetries; attempt++ {
+				execID := uuid.New()
+				err := s.executor.Run(context.Background(), w.ID, execID, in, &schedule.ID)
+				if err == nil {
+					return // Success
+				}
+				log.Printf("[ScheduleService] Workflow %s execution failed (attempt %d/%d): %v", w.Name, attempt+1, maxRetries+1, err)
+				if attempt < maxRetries {
+					time.Sleep(10 * time.Second) // Simple backoff
+				}
+			}
+		}(*sw.Workflow, inputs)
+	}
+
+	// Update NextRunAt for recurring
+	if schedule.Type == domain.ScheduleTypeRecurring {
+		s.mu.Lock()
+		if entryID, ok := s.entries[schedule.ID]; ok {
+			entry := s.cron.Entry(entryID)
+			next := entry.Next
+			schedule.NextRunAt = &next
+			s.repo.Update(schedule)
+		}
+		s.mu.Unlock()
+	}
+}
+
+func (s *ScheduleService) GetScheduleExecutions(scheduleID uuid.UUID) ([]domain.WorkflowExecution, error) {
+	return s.execRepo.ListByScheduledID(scheduleID)
+}

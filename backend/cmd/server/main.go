@@ -17,7 +17,7 @@ import (
 
 func main() {
 	// Database connection string
-	dsn := "host=localhost user=csm_user password=csm_password dbname=csm_db port=5432 sslmode=disable"
+	dsn := "host=localhost user=csm_user password=csm_password dbname=csm_db port=5432 sslmode=disable TimeZone=UTC"
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
@@ -39,6 +39,10 @@ func main() {
 		&domain.WorkflowVariable{},
 		&domain.WorkflowExecution{},
 		&domain.WorkflowExecutionStep{},
+		&domain.GlobalVariable{},
+		&domain.Schedule{},
+		&domain.ScheduleWorkflow{},
+		&domain.Tag{},
 	); err != nil {
 		log.Fatal("Failed to migrate database:", err)
 	}
@@ -57,6 +61,9 @@ func main() {
 	workflowInputRepo := repository.NewPostgresWorkflowInputRepo(db)
 	workflowVariableRepo := repository.NewPostgresWorkflowVariableRepo(db)
 	execRepo := repository.NewPostgresWorkflowExecutionRepo(db)
+	globalVarRepo := repository.NewPostgresGlobalVariableRepo(db)
+	scheduleRepo := repository.NewPostgresScheduleRepo(db)
+	tagRepo := repository.NewPostgresTagRepo(db)
 
 	// Seed Admin User and Default Namespace
 	seedAdmin(db)
@@ -72,7 +79,13 @@ func main() {
 	serverService := service.NewServerService(serverRepo, hub)
 	terminalService := service.NewTerminalService(serverRepo, hub)
 	workflowService := service.NewWorkflowService(workflowRepo, workflowGroupRepo, workflowStepRepo, workflowInputRepo, workflowVariableRepo, execRepo)
-	workflowExecutor := service.NewWorkflowExecutor(workflowRepo, workflowGroupRepo, workflowStepRepo, workflowInputRepo, execRepo, serverService, hub)
+	globalVarService := service.NewGlobalVariableService(globalVarRepo)
+	workflowExecutor := service.NewWorkflowExecutor(workflowRepo, workflowGroupRepo, workflowStepRepo, workflowInputRepo, execRepo, serverService, hub, globalVarRepo)
+	scheduleService := service.NewScheduleService(scheduleRepo, execRepo, workflowExecutor)
+	tagService := service.NewTagService(tagRepo)
+
+	// Initialize scheduling engine
+	scheduleService.Init()
 
 	// Initialize Handlers
 	namespaceHandler := handler.NewNamespaceHandler(namespaceRepo)
@@ -84,6 +97,9 @@ func main() {
 	serverHandler := handler.NewServerHandler(serverService, terminalService)
 	wsHandler := handler.NewWSHandler(hub, terminalService)
 	workflowHandler := handler.NewWorkflowHandler(workflowService, workflowExecutor)
+	globalVarHandler := handler.NewGlobalVariableHandler(globalVarService)
+	scheduleHandler := handler.NewScheduleHandler(scheduleService)
+	tagHandler := handler.NewTagHandler(tagService)
 
 	// Initialize Router
 	r := gin.Default()
@@ -150,6 +166,27 @@ func main() {
 			protected.GET("/workflows/:id/executions", workflowHandler.ListExecutions)
 			protected.GET("/executions/:id", workflowHandler.GetExecution)
 			protected.GET("/executions/:id/logs", workflowHandler.GetExecutionLogs)
+
+			// Global Variables
+			protected.GET("/namespaces/:ns_id/global-variables", globalVarHandler.List)
+			protected.POST("/namespaces/:ns_id/global-variables", globalVarHandler.Create)
+			protected.PUT("/global-variables/:id", globalVarHandler.Update)
+			protected.DELETE("/global-variables/:id", globalVarHandler.Delete)
+
+			// Schedules
+			protected.GET("/namespaces/:ns_id/schedules", scheduleHandler.List)
+			protected.POST("/namespaces/:ns_id/schedules", scheduleHandler.Create)
+			protected.GET("/schedules/:id", scheduleHandler.GetByID)
+			protected.GET("/schedules/:id/executions", scheduleHandler.GetExecutions)
+			protected.PUT("/schedules/:id", scheduleHandler.Update)
+			protected.DELETE("/schedules/:id", scheduleHandler.Delete)
+			protected.POST("/schedules/:id/toggle", scheduleHandler.ToggleStatus)
+
+			// Tags
+			protected.GET("/namespaces/:ns_id/tags", tagHandler.List)
+			protected.POST("/namespaces/:ns_id/tags", tagHandler.Create)
+			protected.PUT("/tags/:id", tagHandler.Update)
+			protected.DELETE("/tags/:id", tagHandler.Delete)
 		}
 	}
 

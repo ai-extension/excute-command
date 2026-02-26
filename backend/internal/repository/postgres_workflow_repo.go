@@ -25,6 +25,7 @@ func (r *PostgresWorkflowRepo) GetByID(id uuid.UUID) (*domain.Workflow, error) {
 		Preload("Variables", func(db *gorm.DB) *gorm.DB { return db.Order("\"created_at\" ASC") }).
 		Preload("Groups", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
 		Preload("Groups.Steps", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
+		Preload("Tags").
 		First(&wf, "id = ?", id).Error
 	if err != nil {
 		return nil, err
@@ -39,6 +40,7 @@ func (r *PostgresWorkflowRepo) List(namespaceID uuid.UUID) ([]domain.Workflow, e
 		Preload("Variables").
 		Preload("Groups", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
 		Preload("Groups.Steps", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
+		Preload("Tags").
 		Where("namespace_id = ?", namespaceID).
 		Find(&wfs).Error
 	if err != nil {
@@ -99,8 +101,13 @@ func (r *PostgresWorkflowRepo) Update(wf *domain.Workflow) error {
 			return err
 		}
 
+		// Sync Tags Many-to-Many
+		if err := tx.Model(wf).Association("Tags").Replace(wf.Tags); err != nil {
+			return err
+		}
+
 		// Update top-level fields (omit associations to avoid double-processing)
-		return tx.Omit("Groups", "Inputs", "Variables").Save(wf).Error
+		return tx.Omit("Groups", "Inputs", "Variables", "Tags").Save(wf).Error
 	})
 }
 
@@ -248,6 +255,26 @@ func (r *PostgresWorkflowExecutionRepo) ListByWorkflowID(workflowID uuid.UUID) (
 	return execs, nil
 }
 
+func (r *PostgresWorkflowExecutionRepo) ListByWorkflowIDPaginated(workflowID uuid.UUID, limit, offset int) ([]domain.WorkflowExecution, int64, error) {
+	var execs []domain.WorkflowExecution
+	var total int64
+
+	// Separate count query
+	if err := r.db.Model(&domain.WorkflowExecution{}).Where("workflow_id = ?", workflowID).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Separate paginated fetch with schedule preload
+	err := r.db.
+		Where("workflow_id = ?", workflowID).
+		Preload("Schedule").
+		Order("created_at DESC").
+		Limit(limit).
+		Offset(offset).
+		Find(&execs).Error
+	return execs, total, err
+}
+
 func (r *PostgresWorkflowExecutionRepo) ListByNamespaceID(namespaceID uuid.UUID) ([]domain.WorkflowExecution, error) {
 	var execs []domain.WorkflowExecution
 	err := r.db.
@@ -260,6 +287,16 @@ func (r *PostgresWorkflowExecutionRepo) ListByNamespaceID(namespaceID uuid.UUID)
 		return nil, err
 	}
 	return execs, nil
+}
+
+func (r *PostgresWorkflowExecutionRepo) ListByScheduledID(scheduledID uuid.UUID) ([]domain.WorkflowExecution, error) {
+	var execs []domain.WorkflowExecution
+	err := r.db.
+		Preload("Workflow").
+		Where("scheduled_id = ?", scheduledID).
+		Order("created_at DESC").
+		Find(&execs).Error
+	return execs, err
 }
 
 func (r *PostgresWorkflowExecutionRepo) Update(exec *domain.WorkflowExecution) error {

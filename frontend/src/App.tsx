@@ -9,6 +9,10 @@ import ServerPage from './pages/ServerPage';
 import WorkflowPage from './pages/WorkflowPage';
 import WorkflowDesignerPage from './pages/WorkflowDesignerPage';
 import ExecutionHistoryPage from './pages/ExecutionHistoryPage';
+import GlobalVariablesPage from './pages/GlobalVariablesPage';
+import SchedulesPage from './pages/SchedulesPage';
+import ScheduleDetailPage from './pages/ScheduleDetailPage';
+import TagsPage from './pages/TagsPage';
 import { useAuth } from './context/AuthContext';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -43,6 +47,10 @@ function App() {
                     <Route path="servers" element={<ServerPage />} />
                     <Route path="users" element={<UsersPage />} />
                     <Route path="roles" element={<RolesPage />} />
+                    <Route path="variables" element={<GlobalVariablesPage />} />
+                    <Route path="tags" element={<TagsPage />} />
+                    <Route path="schedules" element={<SchedulesPage />} />
+                    <Route path="schedules/:id" element={<ScheduleDetailPage />} />
                     <Route path="settings" element={<div className="p-8 text-white">Settings coming soon...</div>} />
                 </Route>
                 <Route path="*" element={<Navigate to="/" replace />} />

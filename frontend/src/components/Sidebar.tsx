@@ -1,5 +1,6 @@
+import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Terminal, Settings, Box, ChevronsLeft, ChevronsRight, Zap, LogOut, Users, Shield, Server, History } from 'lucide-react';
+import { LayoutDashboard, Terminal, Settings, Box, ChevronsLeft, ChevronsRight, Zap, LogOut, Users, Shield, Server, History, Globe, Calendar, Tag } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 import { useAuth } from '../context/AuthContext';
@@ -15,17 +16,51 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
     const { logout, user } = useAuth();
     const navigate = useNavigate();
 
-    const navItems = [
+    const globalNavItems = [
+        { name: 'Servers', path: '/servers', icon: Server },
+    ];
+
+    const namespaceNavItems = [
         { name: 'Dashboard', path: '/', icon: LayoutDashboard },
         { name: 'Workflows', path: '/workflows', icon: Zap },
         { name: 'History', path: '/history', icon: History },
-        { name: 'Servers', path: '/servers', icon: Server },
+        { name: 'Variables', path: '/variables', icon: Globe },
+        { name: 'Tags', path: '/tags', icon: Tag },
+        { name: 'Schedules', path: '/schedules', icon: Calendar },
     ];
 
     const identityItems = [
         { name: 'Users', path: '/users', icon: Users },
         { name: 'Roles', path: '/roles', icon: Shield },
     ];
+
+    const renderNavLink = (item: { name: string; path: string; icon: React.ElementType }, opts?: { indent?: boolean }) => (
+        <NavLink
+            key={item.name}
+            to={item.path}
+            title={isCollapsed ? item.name : ""}
+            className={({ isActive }) =>
+                cn(
+                    "flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-300 group relative overflow-hidden",
+                    isActive
+                        ? "bg-primary text-white shadow-premium scale-[1.02]"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground hover:translate-x-1",
+                    isCollapsed && "justify-center px-0 h-11 w-11 mx-auto",
+                    opts?.indent && !isCollapsed && "ml-2"
+                )
+            }
+        >
+            <item.icon className={cn("w-4 h-4 transition-transform duration-300 group-hover:scale-110 shrink-0")} />
+            {!isCollapsed && (
+                <span className="text-[13px] font-semibold tracking-tight animate-in fade-in slide-in-from-left-1 duration-300">{item.name}</span>
+            )}
+            {!isCollapsed && (
+                <div className="absolute right-3 opacity-20 group-hover:opacity-100 transition-opacity">
+                    <Zap className="w-3 h-3 fill-current" />
+                </div>
+            )}
+        </NavLink>
+    );
 
     return (
         <aside
@@ -49,66 +84,47 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
             <NamespaceSwitcher isCollapsed={isCollapsed} />
 
             <div className="flex-1 flex flex-col gap-6 w-full overflow-y-auto py-4">
+
+                {/* Namespace-scoped items */}
                 <div className="w-full">
                     {!isCollapsed && (
-                        <p className="px-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-4 opacity-50 animate-in fade-in duration-500">Operational</p>
+                        <div className="flex items-center justify-between px-4 mb-2">
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-50">Operational</p>
+                        </div>
                     )}
-                    <nav className="flex flex-col gap-1.5 w-full">
-                        {navItems.map((item) => (
-                            <NavLink
-                                key={item.name}
-                                to={item.path}
-                                title={isCollapsed ? item.name : ""}
-                                className={({ isActive }) =>
-                                    cn(
-                                        "flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-300 group relative overflow-hidden",
-                                        isActive
-                                            ? "bg-primary text-white shadow-premium scale-[1.02]"
-                                            : "text-muted-foreground hover:bg-muted hover:text-foreground hover:translate-x-1",
-                                        isCollapsed && "justify-center px-0 h-11 w-11 mx-auto"
-                                    )
-                                }
-                            >
-                                <item.icon className={cn("w-4 h-4 transition-transform duration-300 group-hover:scale-110 shrink-0")} />
-                                {!isCollapsed && (
-                                    <span className="text-[13px] font-semibold tracking-tight animate-in fade-in slide-in-from-left-1 duration-300">{item.name}</span>
-                                )}
-                                {!isCollapsed && (
-                                    <div className="absolute right-3 opacity-20 group-hover:opacity-100 transition-opacity">
-                                        <Zap className="w-3 h-3 fill-current" />
-                                    </div>
-                                )}
-                            </NavLink>
-                        ))}
+                    {!isCollapsed && (
+                        <div className="flex items-center gap-1.5 px-4 mb-2 mt-1">
+                            <div className="h-px flex-1 bg-border/50" />
+                            <span className="text-[8px] font-black uppercase tracking-[0.2em] text-primary/50">Namespace</span>
+                            <div className="h-px flex-1 bg-border/50" />
+                        </div>
+                    )}
+                    <nav className="flex flex-col gap-1.5 w-full pl-0">
+                        {namespaceNavItems.map((item) => renderNavLink(item, { indent: false }))}
                     </nav>
                 </div>
 
+                {/* Global items */}
+                <div className="w-full">
+                    {!isCollapsed && (
+                        <div className="flex items-center gap-1.5 px-4 mb-2">
+                            <div className="h-px flex-1 bg-border/50" />
+                            <span className="text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">Global</span>
+                            <div className="h-px flex-1 bg-border/50" />
+                        </div>
+                    )}
+                    <nav className="flex flex-col gap-1.5 w-full">
+                        {globalNavItems.map((item) => renderNavLink(item))}
+                    </nav>
+                </div>
+
+                {/* Identity items */}
                 <div className="w-full">
                     {!isCollapsed && (
                         <p className="px-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-4 opacity-50 animate-in fade-in duration-500">Identity</p>
                     )}
                     <nav className="flex flex-col gap-1.5 w-full">
-                        {identityItems.map((item) => (
-                            <NavLink
-                                key={item.name}
-                                to={item.path}
-                                title={isCollapsed ? item.name : ""}
-                                className={({ isActive }) =>
-                                    cn(
-                                        "flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-300 group relative overflow-hidden",
-                                        isActive
-                                            ? "bg-primary text-white shadow-premium scale-[1.02]"
-                                            : "text-muted-foreground hover:bg-muted hover:text-foreground hover:translate-x-1",
-                                        isCollapsed && "justify-center px-0 h-11 w-11 mx-auto"
-                                    )
-                                }
-                            >
-                                <item.icon className={cn("w-4 h-4 transition-transform duration-300 group-hover:scale-110 shrink-0")} />
-                                {!isCollapsed && (
-                                    <span className="text-[13px] font-semibold tracking-tight animate-in fade-in slide-in-from-left-1 duration-300">{item.name}</span>
-                                )}
-                            </NavLink>
-                        ))}
+                        {identityItems.map((item) => renderNavLink(item))}
                     </nav>
                 </div>
             </div>

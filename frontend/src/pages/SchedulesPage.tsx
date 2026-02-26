@@ -1,0 +1,729 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Calendar, Plus, Search, MoreHorizontal, Trash2, Edit3, Clock, Play, Pause, Zap, CheckCircle2, Circle, LayoutList, CalendarDays } from 'lucide-react';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow
+} from '../components/ui/table';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Badge } from '../components/ui/badge';
+import { cn } from '../lib/utils';
+import { Card } from '../components/ui/card';
+import { useAuth } from '../context/AuthContext';
+import { useNamespace } from '../context/NamespaceContext';
+import { API_BASE_URL } from '../lib/api';
+import { Schedule, Workflow, WorkflowInput, Tag } from '../types';
+import { TagSelector } from '../components/TagSelector';
+import { TagFilter } from '../components/TagFilter';
+
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "../components/ui/dialog";
+import { Label } from "../components/ui/label";
+import WorkflowInputDialog from '../components/WorkflowInputDialog';
+import { AlertCircle } from 'lucide-react';
+import ScheduleCalendar from '../components/ScheduleCalendar';
+
+const SchedulesPage = () => {
+    const navigate = useNavigate();
+    const { apiFetch } = useAuth();
+    const { activeNamespace } = useNamespace();
+    const [schedules, setSchedules] = useState<Schedule[]>([]);
+    const [workflows, setWorkflows] = useState<Workflow[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+
+    const [formData, setFormData] = useState({
+        name: '',
+        type: 'ONE_TIME',
+        cron_expression: '',
+        next_run_at: '',
+        status: 'ACTIVE',
+        retries: 0,
+        workflows: [] as { id: string, name: string, inputs: string }[],
+        tags: [] as Tag[]
+    });
+
+    const [isEditing, setIsEditing] = useState(false);
+    const [editingID, setEditingID] = useState<string | null>(null);
+
+    const [isInputDialogOpen, setIsInputDialogOpen] = useState(false);
+    const [isPickerOpen, setIsPickerOpen] = useState(false);
+    const [pendingWorkflow, setPendingWorkflow] = useState<Workflow | null>(null);
+    const [workflowSearch, setWorkflowSearch] = useState('');
+
+    const fetchSchedules = async () => {
+        if (!activeNamespace) return;
+        setIsLoading(true);
+        try {
+            const response = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/schedules`);
+            const data = await response.json();
+            setSchedules(Array.isArray(data) ? data : []);
+        } catch (error) {
+            console.error('Failed to fetch schedules:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const fetchWorkflows = async () => {
+        if (!activeNamespace) return;
+        try {
+            const response = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/workflows`);
+            const data = await response.json();
+            setWorkflows(Array.isArray(data) ? data : []);
+        } catch (error) {
+            console.error('Failed to fetch workflows:', error);
+        }
+    };
+
+    useEffect(() => {
+        fetchSchedules();
+        fetchWorkflows();
+    }, [activeNamespace]);
+
+    const handleCreate = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!activeNamespace) return;
+        setIsSubmitting(true);
+        try {
+            const method = isEditing ? 'PUT' : 'POST';
+            const url = isEditing
+                ? `${API_BASE_URL}/schedules/${editingID}`
+                : `${API_BASE_URL}/namespaces/${activeNamespace.id}/schedules`;
+
+            const payload = {
+                ...formData,
+                next_run_at: formData.type === 'ONE_TIME' && formData.next_run_at
+                    ? new Date(formData.next_run_at).toISOString()
+                    : formData.next_run_at,
+                tags: formData.tags,
+                workflows: formData.workflows.map(w => ({ id: w.id, inputs: w.inputs }))
+            };
+            console.log('[SchedulesPage] Sending payload:', payload);
+
+            const response = await apiFetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (response.ok) {
+                await fetchSchedules();
+                setIsCreateOpen(false);
+                setIsEditing(false);
+                setEditingID(null);
+                setFormData({ name: '', type: 'ONE_TIME', cron_expression: '', next_run_at: '', status: 'ACTIVE', retries: 0, workflows: [], tags: [] });
+            }
+        } catch (error) {
+            console.error('Failed to create schedule:', error);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleDelete = async (id: string) => {
+        if (!confirm('Are you sure you want to delete this schedule?')) return;
+        try {
+            const response = await apiFetch(`${API_BASE_URL}/schedules/${id}`, {
+                method: 'DELETE'
+            });
+            if (response.ok) {
+                await fetchSchedules();
+            }
+        } catch (error) {
+            console.error('Failed to delete schedule:', error);
+        }
+    };
+
+    const handleToggleStatus = async (id: string) => {
+        try {
+            const response = await apiFetch(`${API_BASE_URL}/schedules/${id}/toggle`, {
+                method: 'POST'
+            });
+            if (response.ok) {
+                await fetchSchedules();
+            }
+        } catch (error) {
+            console.error('Failed to toggle schedule status:', error);
+        }
+    };
+
+    const handleEdit = (schedule: Schedule) => {
+        setIsEditing(true);
+        setEditingID(schedule.id);
+        const formatForInput = (isoString?: string) => {
+            if (!isoString) return '';
+            try {
+                // Ensure the string is proper ISO, slice off the Z and decimal seconds if needed
+                return new Date(isoString).toISOString().slice(0, 16);
+            } catch (e) {
+                return '';
+            }
+        };
+
+        setFormData({
+            name: schedule.name,
+            type: schedule.type,
+            cron_expression: schedule.cron_expression || '',
+            next_run_at: formatForInput(schedule.next_run_at),
+            status: schedule.status,
+            retries: schedule.retries || 0,
+            workflows: schedule.scheduled_workflows?.map(sw => ({
+                id: sw.workflow_id,
+                name: sw.workflow?.name || 'Unknown',
+                inputs: sw.inputs || '{}'
+            })) || [],
+            tags: schedule.tags || []
+        });
+        setIsCreateOpen(true);
+    };
+
+    const handleCreateFromCalendar = (date: Date) => {
+        setIsEditing(false);
+        setEditingID(null);
+
+        // Preserve local time visually when pre-filling
+        const offset = date.getTimezoneOffset();
+        const localDate = new Date(date.getTime() - (offset * 60 * 1000));
+        const dateString = localDate.toISOString().slice(0, 16);
+
+        setFormData({
+            name: '',
+            type: 'ONE_TIME',
+            cron_expression: '',
+            next_run_at: dateString,
+            status: 'ACTIVE',
+            retries: 0,
+            workflows: [],
+            tags: []
+        });
+        setIsCreateOpen(true);
+    };
+
+    const handleSelectWorkflow = (wf: Workflow) => {
+        if (wf.inputs && wf.inputs.length > 0) {
+            setPendingWorkflow(wf);
+            setIsInputDialogOpen(true);
+        } else {
+            addWorkflowToForm(wf, {});
+        }
+    };
+
+    const addWorkflowToForm = (wf: Workflow, inputs: Record<string, string>) => {
+        setFormData(prev => ({
+            ...prev,
+            workflows: [...prev.workflows, {
+                id: wf.id,
+                name: wf.name,
+                inputs: JSON.stringify(inputs)
+            }]
+        }));
+    };
+
+    const removeWorkflowFromForm = (index: number) => {
+        setFormData(prev => ({
+            ...prev,
+            workflows: prev.workflows.filter((_, i) => i !== index)
+        }));
+    };
+
+    const filteredSchedules = schedules.filter(s => {
+        const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesTags = selectedTagIds.length === 0 ||
+            selectedTagIds.every(tagId => s.tags?.some(st => st.id === tagId));
+        return matchesSearch && matchesTags;
+    });
+
+    return (
+        <>
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <div className="flex flex-row justify-between items-end">
+                    <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2 mb-1">
+                            <Calendar className="w-4 h-4 text-primary" />
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Execution Planning</span>
+                        </div>
+                        <h1 className="text-3xl font-black tracking-tighter">Workflow Schedules</h1>
+                        <p className="text-muted-foreground text-sm font-medium">Automate your workflows with one-time or recurring execution plans.</p>
+                    </div>
+
+                    <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+                        <DialogTrigger asChild>
+                            <Button className="premium-gradient font-black uppercase tracking-widest text-[10px] h-11 px-6 shadow-premium rounded-xl gap-2">
+                                <Plus className="w-4 h-4" /> New Schedule
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[450px]">
+                            <DialogHeader>
+                                <DialogTitle className="text-2xl font-black tracking-tight">
+                                    {isEditing ? 'Edit Automation' : 'Create Automation'}
+                                </DialogTitle>
+                                <DialogDescription className="text-[11px] font-medium text-muted-foreground">
+                                    {isEditing ? 'Modify your timing plan and workflows.' : 'Set up a timing plan and select workflows to execute.'}
+                                </DialogDescription>
+                            </DialogHeader>
+                            <form onSubmit={handleCreate} className="space-y-4 py-4">
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Plan Name</Label>
+                                    <Input
+                                        placeholder="e.g. Daily Database Backup"
+                                        className="h-10 bg-muted/30 border-border rounded-xl font-bold tracking-tight focus:bg-background transition-all"
+                                        value={formData.name}
+                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                        required
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Type</Label>
+                                        <select
+                                            className="w-full h-10 bg-muted/30 border border-border rounded-xl font-bold px-3 text-xs outline-none focus:bg-background transition-all"
+                                            value={formData.type}
+                                            onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                                        >
+                                            <option value="ONE_TIME">ONE-TIME</option>
+                                            <option value="RECURRING">RECURRING</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        {formData.type === 'RECURRING' ? (
+                                            <>
+                                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Cron Expression</Label>
+                                                <Input
+                                                    placeholder="* * * * * *"
+                                                    className="h-10 bg-muted/30 border-border rounded-xl font-bold font-mono text-xs"
+                                                    value={formData.cron_expression}
+                                                    onChange={(e) => setFormData({ ...formData, cron_expression: e.target.value })}
+                                                    required
+                                                />
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Next Run (ISO)</Label>
+                                                <Input
+                                                    type="datetime-local"
+                                                    className="h-10 bg-muted/30 border-border rounded-xl font-bold text-xs"
+                                                    value={formData.next_run_at}
+                                                    onChange={(e) => setFormData({ ...formData, next_run_at: e.target.value })}
+                                                    required
+                                                />
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Max Retries</Label>
+                                        <Input
+                                            type="number"
+                                            min="0"
+                                            max="5"
+                                            className="h-10 bg-muted/30 border-border rounded-xl font-bold text-xs transition-all"
+                                            value={formData.retries}
+                                            onChange={(e) => setFormData({ ...formData, retries: parseInt(e.target.value) || 0 })}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Initial Status</Label>
+                                        <select
+                                            className="w-full h-10 bg-muted/30 border border-border rounded-xl font-bold px-3 text-xs outline-none focus:bg-background transition-all"
+                                            value={formData.status}
+                                            onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                                        >
+                                            <option value="ACTIVE">ACTIVE</option>
+                                            <option value="PAUSED">PAUSED</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Tags</Label>
+                                    <TagSelector
+                                        selectedTags={formData.tags}
+                                        onChange={(tags) => setFormData({ ...formData, tags })}
+                                    />
+                                </div>
+                                <p className="text-[9px] text-muted-foreground font-medium px-1 italic">Retries occur every 10 seconds upon workflow failure.</p>
+
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Workflows to Execute</Label>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setIsPickerOpen(true)}
+                                            className="h-8 text-[9px] font-black uppercase tracking-widest rounded-lg border-primary/20 bg-primary/5 text-primary"
+                                        >
+                                            <Plus className="w-3 h-3 mr-1" /> Add Workflow
+                                        </Button>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        {formData.workflows.length === 0 ? (
+                                            <div className="flex flex-col items-center justify-center py-8 bg-muted/20 border border-dashed border-border rounded-xl">
+                                                <AlertCircle className="w-6 h-6 text-muted-foreground/20 mb-2" />
+                                                <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">No workflows selected</p>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1 text-slate-200">
+                                                {formData.workflows.map((wf, idx) => (
+                                                    <div key={idx} className="flex items-center justify-between p-3 bg-muted/30 border border-border rounded-xl group transition-all">
+                                                        <div className="flex flex-col gap-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <Zap className="w-3 h-3 text-primary" />
+                                                                <span className="text-[11px] font-black uppercase tracking-tight">{wf.name}</span>
+                                                            </div>
+                                                            {wf.inputs !== "{}" && (
+                                                                <p className="text-[9px] font-medium text-muted-foreground truncate max-w-[200px]">
+                                                                    Inputs: {wf.inputs}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                                            onClick={() => removeWorkflowFromForm(idx)}
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </Button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <DialogFooter className="pt-4">
+                                    <Button
+                                        type="submit"
+                                        disabled={isSubmitting || formData.workflows.length === 0}
+                                        className="premium-gradient font-black uppercase tracking-widest text-[10px] h-10 w-full shadow-premium rounded-xl"
+                                    >
+                                        {isSubmitting ? "Syncing..." : isEditing ? "Save Changes" : "Schedule Automation"}
+                                    </Button>
+                                </DialogFooter>
+                            </form>
+                        </DialogContent>
+                    </Dialog>
+                </div>
+
+                <div className="flex items-center gap-4 bg-card p-3 rounded-2xl border border-border shadow-card">
+                    <div className="relative flex-1 group">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-all group-focus-within:text-primary" />
+                        <Input
+                            placeholder="Search schedules..."
+                            className="pl-11 h-11 bg-background border-border rounded-xl font-semibold text-sm transition-all focus:bg-muted/30"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                    {/* View toggle */}
+                    <div className="flex items-center gap-1 bg-muted/40 rounded-xl p-1 border border-border">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setViewMode('list')}
+                            className={cn(
+                                "h-9 px-3 rounded-lg gap-1.5 text-xs font-black uppercase tracking-widest transition-all",
+                                viewMode === 'list' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+                            )}
+                        >
+                            <LayoutList className="w-3.5 h-3.5" /> List
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setViewMode('calendar')}
+                            className={cn(
+                                "h-9 px-3 rounded-lg gap-1.5 text-xs font-black uppercase tracking-widest transition-all",
+                                viewMode === 'calendar' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+                            )}
+                        >
+                            <CalendarDays className="w-3.5 h-3.5" /> Calendar
+                        </Button>
+                    </div>
+                </div>
+
+                <TagFilter
+                    selectedTagIds={selectedTagIds}
+                    onChange={setSelectedTagIds}
+                    className="px-1"
+                />
+
+                {viewMode === 'calendar' ? (
+                    <ScheduleCalendar
+                        schedules={filteredSchedules}
+                        onEdit={handleEdit}
+                        onToggleStatus={handleToggleStatus}
+                        onCreate={handleCreateFromCalendar}
+                    />
+                ) : (
+                    <Card className="border-border bg-card shadow-premium overflow-hidden rounded-2xl">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="bg-muted/50 border-border hover:bg-muted/50">
+                                    <TableHead className="w-[300px] h-14 font-black uppercase tracking-widest text-[9px] px-8">Schedule</TableHead>
+                                    <TableHead className="font-black uppercase tracking-widest text-[9px]">Timing & Pattern</TableHead>
+                                    <TableHead className="font-black uppercase tracking-widest text-[9px]">Performance</TableHead>
+                                    <TableHead className="font-black uppercase tracking-widest text-[9px]">Workflows</TableHead>
+                                    <TableHead className="text-right h-14 px-8 font-black uppercase tracking-widest text-[9px]">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {isLoading ? (
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="h-48 text-center bg-transparent">
+                                            <div className="flex flex-col items-center justify-center gap-3">
+                                                <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                                                <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40">Synchronizing chronometer...</p>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ) : filteredSchedules.length > 0 ? filteredSchedules.map((s) => (
+                                    <TableRow key={s.id} className="group border-border hover:bg-muted/30 transition-all duration-200">
+                                        <TableCell className="px-8 py-5">
+                                            <div className="flex items-center gap-4">
+                                                <div className={cn(
+                                                    "h-10 w-10 rounded-xl flex items-center justify-center border shadow-sm shrink-0 transition-colors",
+                                                    s.status === 'ACTIVE' ? "bg-emerald-500/10 border-emerald-500/20" : "bg-slate-500/10 border-slate-500/20"
+                                                )}>
+                                                    <Clock className={cn("w-5 h-5", s.status === 'ACTIVE' ? "text-emerald-500" : "text-slate-500")} />
+                                                </div>
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <p
+                                                            className="text-sm font-black tracking-tight text-white uppercase cursor-pointer hover:text-primary transition-colors"
+                                                            onClick={() => navigate(`/schedules/${s.id}`)}
+                                                        >
+                                                            {s.name}
+                                                        </p>
+                                                        <Badge className={cn(
+                                                            "font-black text-[8px] uppercase tracking-widest px-1.5 py-0 rounded",
+                                                            s.status === 'ACTIVE' ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-slate-500/10 text-slate-500 border-slate-500/10"
+                                                        )}>
+                                                            {s.status}
+                                                        </Badge>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 mt-0.5">
+                                                        <Badge variant="outline" className="text-[8px] font-black tracking-widest bg-muted/20 px-1.5 py-0 border-white/5">
+                                                            {s.type}
+                                                        </Badge>
+                                                        <span className="text-[10px] text-muted-foreground font-bold opacity-40">
+                                                            {s.id.substring(0, 8)}
+                                                        </span>
+                                                    </div>
+                                                    {s.tags && s.tags.length > 0 && (
+                                                        <div className="flex flex-wrap gap-1 mt-1.5">
+                                                            {s.tags.map(tag => (
+                                                                <span
+                                                                    key={tag.id}
+                                                                    className="px-1.5 py-0.5 rounded text-[8px] font-bold border"
+                                                                    style={{ backgroundColor: `${tag.color}20`, color: tag.color, borderColor: `${tag.color}40` }}
+                                                                >
+                                                                    {tag.name}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-col gap-1">
+                                                <div className="flex items-center gap-2">
+                                                    <Calendar className="w-3.5 h-3.5 text-muted-foreground/40" />
+                                                    <span className="text-[11px] font-black text-slate-300">
+                                                        {s.next_run_at ? new Date(s.next_run_at).toLocaleString() : 'Not set/Finished'}
+                                                    </span>
+                                                </div>
+                                                {s.type === 'RECURRING' && (
+                                                    <code className="text-[9px] font-bold text-indigo-400 font-mono opacity-80">
+                                                        {s.cron_expression}
+                                                    </code>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-col gap-2">
+                                                <div className="flex items-center gap-2">
+                                                    {s.type === 'ONE_TIME' ? (
+                                                        <span className={cn(
+                                                            "text-[9px] font-black tracking-widest px-1.5 py-0.5 rounded",
+                                                            s.total_runs > 0 ? "bg-indigo-500/10 text-indigo-400" : "bg-muted text-muted-foreground opacity-40"
+                                                        )}>
+                                                            {s.total_runs > 0 ? 'EXECUTED' : 'PENDING'}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-[10px] font-black text-emerald-500/80">
+                                                            RUNS: {s.total_runs}
+                                                        </span>
+                                                    )}
+
+                                                    {s.last_run_status && (
+                                                        <Badge className={cn(
+                                                            "font-black text-[8px] uppercase tracking-widest px-1.5 py-0 rounded",
+                                                            s.last_run_status === 'SUCCESS' ? "bg-green-500/10 text-green-500 border-green-500/20" :
+                                                                s.last_run_status === 'FAILED' ? "bg-red-500/10 text-red-500 border-red-500/20" :
+                                                                    "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                                                        )}>
+                                                            {s.last_run_status}
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                                {s.retries > 0 && (
+                                                    <span className="text-[9px] font-bold text-amber-500/60 uppercase">
+                                                        Retries: {s.retries}x
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-wrap gap-1 max-w-[200px]">
+                                                {s.scheduled_workflows?.map(sw => (
+                                                    <Badge key={sw.id} variant="secondary" className="bg-primary/5 text-primary border-primary/10 font-black text-[8px] px-1.5 py-0.5 rounded-md">
+                                                        {sw.workflow?.name?.split(' ')[0] || 'Unknown'}
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-right px-8">
+                                            <div className="flex items-center justify-end gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all duration-300">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-9 w-9 rounded-xl hover:bg-muted transition-colors text-zinc-400 hover:text-white"
+                                                    onClick={() => handleToggleStatus(s.id)}
+                                                    title={s.status === 'ACTIVE' ? "Pause" : "Activate"}
+                                                >
+                                                    {s.status === 'ACTIVE' ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-9 w-9 rounded-xl hover:bg-muted transition-colors text-zinc-400 hover:text-white"
+                                                    onClick={() => handleEdit(s)}
+                                                >
+                                                    <Edit3 className="w-4 h-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-9 w-9 rounded-xl hover:bg-destructive/10 hover:text-destructive transition-colors text-zinc-400"
+                                                    onClick={() => handleDelete(s.id)}
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </Button>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                )) : (
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="h-48 text-center bg-transparent">
+                                            <div className="flex flex-col items-center justify-center gap-4 opacity-40">
+                                                <Calendar className="w-10 h-10" />
+                                                <div className="space-y-1">
+                                                    <p className="text-[11px] font-black uppercase tracking-[0.2em]">No active schedules</p>
+                                                    <p className="text-[9px] font-bold opacity-60">Plan your first automation to optimize operations.</p>
+                                                </div>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </Card>
+                )}
+
+                <Dialog open={isPickerOpen} onOpenChange={setIsPickerOpen}>
+                    <DialogContent className="sm:max-w-[400px]">
+                        <DialogHeader>
+                            <DialogTitle className="text-xl font-black uppercase tracking-tight">Select Workflow</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Filter blueprints..."
+                                    className="pl-10 h-10 rounded-xl"
+                                    value={workflowSearch}
+                                    onChange={(e) => setWorkflowSearch(e.target.value)}
+                                />
+                            </div>
+                            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                                {workflows
+                                    .filter(wf => wf.name.toLowerCase().includes(workflowSearch.toLowerCase()))
+                                    .map(wf => (
+                                        <div
+                                            key={wf.id}
+                                            className="flex items-center justify-between p-4 bg-muted/20 hover:bg-muted/40 border border-border rounded-2xl cursor-pointer transition-all group"
+                                            onClick={() => {
+                                                handleSelectWorkflow(wf);
+                                                setIsPickerOpen(false);
+                                                setWorkflowSearch('');
+                                            }}
+                                        >
+                                            <div className="flex flex-col gap-1">
+                                                <span className="font-bold text-sm tracking-tight text-white">{wf.name}</span>
+                                                <span className="text-[9px] opacity-40 uppercase font-black tracking-widest">{wf.inputs?.length || 0} inputs required</span>
+                                            </div>
+                                            <Plus className="w-4 h-4 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        </div>
+                                    ))
+                                }
+                            </div>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+
+                <Dialog open={isInputDialogOpen} onOpenChange={setIsInputDialogOpen}>
+                    <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden bg-slate-950 border-white/10 rounded-2xl shadow-2xl">
+                        {pendingWorkflow && (
+                            <>
+                                <DialogHeader className="p-6 border-b border-white/5 bg-slate-900/40">
+                                    <DialogTitle className="text-xl font-black uppercase tracking-tight text-white flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
+                                            <Zap className="w-4 h-4 text-indigo-400" />
+                                        </div>
+                                        Configure {pendingWorkflow.name}
+                                    </DialogTitle>
+                                </DialogHeader>
+                                <WorkflowInputDialog
+                                    inputs={pendingWorkflow.inputs as WorkflowInput[]}
+                                    onConfirm={(values) => {
+                                        addWorkflowToForm(pendingWorkflow, values);
+                                        setIsInputDialogOpen(false);
+                                        setPendingWorkflow(null);
+                                    }}
+                                    onCancel={() => {
+                                        setIsInputDialogOpen(false);
+                                        setPendingWorkflow(null);
+                                    }}
+                                />
+                            </>
+                        )}
+                    </DialogContent>
+                </Dialog>
+            </div>
+        </>
+    );
+};
+
+export default SchedulesPage;
