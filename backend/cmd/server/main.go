@@ -17,7 +17,7 @@ import (
 
 func main() {
 	// Database connection string
-	dsn := "host=localhost user=csm_user password=csm_password dbname=csm_db port=5432 sslmode=disable TimeZone=UTC"
+	dsn := "host=localhost user=root password=root dbname=csm_db port=5432 sslmode=disable TimeZone=UTC"
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
@@ -44,6 +44,7 @@ func main() {
 		&domain.ScheduleWorkflow{},
 		&domain.Tag{},
 		&domain.WorkflowFile{},
+		&domain.WorkflowHook{},
 	); err != nil {
 		log.Fatal("Failed to migrate database:", err)
 	}
