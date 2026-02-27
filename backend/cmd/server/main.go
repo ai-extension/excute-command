@@ -142,6 +142,7 @@ func main() {
 		{
 			protected.GET("/namespaces", namespaceHandler.ListNamespaces)
 			protected.POST("/namespaces", namespaceHandler.CreateNamespace)
+			protected.PUT("/namespaces/:id", namespaceHandler.UpdateNamespace)
 			protected.DELETE("/namespaces/:id", namespaceHandler.DeleteNamespace)
 
 			protected.GET("/commands", commandHandler.ListCommands)

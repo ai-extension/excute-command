@@ -35,6 +35,10 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
         { name: 'Roles', path: '/roles', icon: Shield },
     ];
 
+    const systemItems = [
+        { name: 'Settings', path: '/settings', icon: Settings },
+    ];
+
     const renderNavLink = (item: { name: string; path: string; icon: React.ElementType }, opts?: { indent?: boolean }) => (
         <NavLink
             key={item.name}
@@ -96,7 +100,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
                     {!isCollapsed && (
                         <div className="flex items-center gap-1.5 px-4 mb-2 mt-1">
                             <div className="h-px flex-1 bg-border/50" />
-                            <span className="text-[8px] font-black uppercase tracking-[0.2em] text-primary/50">Namespace</span>
+                            <span className="text-[8px] font-black uppercase tracking-[0.2em] text-primary/50">Contextual Namespace</span>
                             <div className="h-px flex-1 bg-border/50" />
                         </div>
                     )}
@@ -126,6 +130,16 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
                     )}
                     <nav className="flex flex-col gap-1.5 w-full">
                         {identityItems.map((item) => renderNavLink(item))}
+                    </nav>
+                </div>
+
+                {/* System items */}
+                <div className="w-full">
+                    {!isCollapsed && (
+                        <p className="px-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-4 opacity-50 animate-in fade-in duration-500">System</p>
+                    )}
+                    <nav className="flex flex-col gap-1.5 w-full">
+                        {systemItems.map((item) => renderNavLink(item))}
                     </nav>
                 </div>
             </div>

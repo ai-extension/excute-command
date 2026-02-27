@@ -14,6 +14,7 @@ import GlobalVariablesPage from './pages/GlobalVariablesPage';
 import SchedulesPage from './pages/SchedulesPage';
 import ScheduleDetailPage from './pages/ScheduleDetailPage';
 import TagsPage from './pages/TagsPage';
+import SettingsPage from './pages/SettingsPage';
 import { useAuth } from './context/AuthContext';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -53,7 +54,7 @@ function App() {
                     <Route path="tags" element={<TagsPage />} />
                     <Route path="schedules" element={<SchedulesPage />} />
                     <Route path="schedules/:id" element={<ScheduleDetailPage />} />
-                    <Route path="settings" element={<div className="p-8 text-white">Settings coming soon...</div>} />
+                    <Route path="settings" element={<SettingsPage />} />
                 </Route>
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

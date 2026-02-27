@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { Moon, Sun, Bell, Command as CmdIcon, Search, LogOut, User as UserIcon, Settings } from 'lucide-react';
 import { Button } from './ui/button';
@@ -15,6 +15,7 @@ import {
 
 const Layout = () => {
     const { logout, user } = useAuth();
+    const navigate = useNavigate();
     const [isDark, setIsDark] = useState(true); // Default to dark for premium feel
     const [isCollapsed, setIsCollapsed] = useState(false);
     const location = useLocation();
@@ -30,8 +31,17 @@ const Layout = () => {
     const getPageTitle = () => {
         const path = location.pathname;
         if (path === '/') return 'Control Dashboard';
-        if (path === '/commands') return 'Workflow Studio';
-        return 'Settings';
+        if (path === '/workflows') return 'Blueprint Editor';
+        if (path === '/history') return 'Audit Discovery';
+        if (path === '/servers') return 'Node Repository';
+        if (path === '/vpns') return 'Network Transit';
+        if (path === '/users') return 'Identity Management';
+        if (path === '/roles') return 'Access Policies';
+        if (path === '/variables') return 'Registry Explorer';
+        if (path === '/tags') return 'Metadata Labels';
+        if (path === '/schedules') return 'Temporal Engine';
+        if (path === '/settings') return 'System Configuration';
+        return 'Control Center';
     };
 
     return (
@@ -102,7 +112,10 @@ const Layout = () => {
                                     <UserIcon className="w-4 h-4 text-primary" />
                                     <span className="text-sm font-semibold">Account Detail</span>
                                 </DropdownMenuItem>
-                                <DropdownMenuItem className="rounded-xl px-3 py-2.5 flex items-center gap-2 cursor-pointer focus:bg-primary/10 transition-colors">
+                                <DropdownMenuItem
+                                    onClick={() => navigate('/settings')}
+                                    className="rounded-xl px-3 py-2.5 flex items-center gap-2 cursor-pointer focus:bg-primary/10 transition-colors"
+                                >
                                     <Settings className="w-4 h-4 text-primary" />
                                     <span className="text-sm font-semibold">Preferences</span>
                                 </DropdownMenuItem>
