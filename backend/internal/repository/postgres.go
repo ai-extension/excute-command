@@ -200,8 +200,21 @@ func (r *PostgresRoleRepo) GetByIDs(ids []uuid.UUID) ([]domain.Role, error) {
 	return roles, err
 }
 
-func (r *PostgresRoleRepo) SetPermissions(roleID uuid.UUID, perms []domain.Permission) error {
-	return r.db.Model(&domain.Role{ID: roleID}).Association("Permissions").Replace(perms)
+func (r *PostgresRoleRepo) SetPermissions(roleID uuid.UUID, rolePerms []domain.RolePermission) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		// Clear existing permissions
+		if err := tx.Where("role_id = ?", roleID).Delete(&domain.RolePermission{}).Error; err != nil {
+			return err
+		}
+		// Insert new permissions
+		for _, rp := range rolePerms {
+			rp.RoleID = roleID
+			if err := tx.Create(&rp).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 type PostgresPermissionRepo struct {

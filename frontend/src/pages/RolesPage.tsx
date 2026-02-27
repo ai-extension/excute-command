@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Badge } from '../components/ui/badge';
 import { useAuth } from '../context/AuthContext';
 import { cn } from '../lib/utils';
+import { useNavigate } from 'react-router-dom';
 
 import {
     Dialog,
@@ -22,13 +23,10 @@ import { Input } from "../components/ui/input";
 
 const RolesPage = () => {
     const { apiFetch } = useAuth();
+    const navigate = useNavigate();
     const [roles, setRoles] = useState<any[]>([]);
-    const [permissions, setPermissions] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
-    const [isPermsOpen, setIsPermsOpen] = useState(false);
-    const [selectedRole, setSelectedRole] = useState<any>(null);
-    const [selectedPermIDs, setSelectedPermIDs] = useState<string[]>([]);
     const [newRoleData, setNewRoleData] = useState({ name: '', description: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -48,19 +46,8 @@ const RolesPage = () => {
         }
     };
 
-    const fetchPermissions = async () => {
-        try {
-            const response = await apiFetch(`${API_BASE_URL}/permissions`);
-            const data = await response.json();
-            setPermissions(Array.isArray(data) ? data : []);
-        } catch (error) {
-            console.error('Failed to fetch permissions:', error);
-        }
-    };
-
     useEffect(() => {
         fetchRoles();
-        fetchPermissions();
     }, []);
 
     const handleCreateRole = async (e: React.FormEvent) => {
@@ -86,103 +73,8 @@ const RolesPage = () => {
         }
     };
 
-    const openPermsDialog = (role: any) => {
-        setSelectedRole(role);
-        setSelectedPermIDs((role.permissions || []).map((p: any) => p.id));
-        setIsPermsOpen(true);
-    };
-
-    const handleUpdatePermissions = async () => {
-        if (!selectedRole) return;
-        setIsSubmitting(true);
-        try {
-            const response = await apiFetch(`${API_BASE_URL}/roles/${selectedRole.id}/permissions`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ permission_ids: selectedPermIDs })
-            });
-            if (response.ok) {
-                await fetchRoles();
-                setIsPermsOpen(false);
-            }
-        } catch (error) {
-            console.error('Failed to update permissions:', error);
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
-    const togglePermission = (permID: string) => {
-        setSelectedPermIDs(prev =>
-            prev.includes(permID)
-                ? prev.filter(id => id !== permID)
-                : [...prev, permID]
-        );
-    };
-
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            {/* Manage Permissions Dialog */}
-            <Dialog open={isPermsOpen} onOpenChange={setIsPermsOpen}>
-                <DialogContent className="sm:max-w-[500px]">
-                    <DialogHeader>
-                        <DialogTitle className="text-2xl">Policy Configuration</DialogTitle>
-                        <DialogDescription>
-                            Configure functional access for the <span className="text-primary font-black">{selectedRole?.name}</span> role.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="py-6 space-y-4 max-h-[400px] overflow-y-auto pr-2">
-                        <p className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Capability Matrix</p>
-                        <div className="grid gap-2">
-                            {permissions.map((perm) => (
-                                <button
-                                    key={perm.id}
-                                    onClick={() => togglePermission(perm.id)}
-                                    className={cn(
-                                        "flex items-center justify-between p-4 rounded-2xl border transition-all duration-300 text-left group",
-                                        selectedPermIDs.includes(perm.id)
-                                            ? "bg-primary/5 border-primary/50 shadow-sm"
-                                            : "bg-muted/30 border-border hover:border-primary/20"
-                                    )}
-                                >
-                                    <div className="flex items-center gap-4">
-                                        <div className={cn(
-                                            "w-10 h-10 rounded-xl flex items-center justify-center transition-colors shrink-0",
-                                            selectedPermIDs.includes(perm.id) ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground group-hover:bg-primary/10"
-                                        )}>
-                                            <Settings className="w-5 h-5" />
-                                        </div>
-                                        <div>
-                                            <div className="flex items-center gap-2">
-                                                <p className="font-black text-sm tracking-tight">{perm.name}</p>
-                                                <Badge className="text-[8px] px-1.5 h-4 bg-muted text-muted-foreground border-none font-bold uppercase">{perm.type}</Badge>
-                                            </div>
-                                            <p className="text-[10px] font-medium opacity-60 mt-0.5 tracking-tight uppercase">Action: {perm.action}</p>
-                                        </div>
-                                    </div>
-                                    <div className={cn(
-                                        "w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all",
-                                        selectedPermIDs.includes(perm.id) ? "bg-primary border-primary" : "border-border group-hover:border-primary/30"
-                                    )}>
-                                        {selectedPermIDs.includes(perm.id) && <Check className="w-3 h-3 text-white" />}
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            onClick={handleUpdatePermissions}
-                            disabled={isSubmitting}
-                            className="premium-gradient font-black uppercase tracking-widest text-[10px] h-12 w-full shadow-premium rounded-xl"
-                        >
-                            {isSubmitting ? "Updating Policy..." : "Enforce Capability Matrix"}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
 
             <div className="flex flex-row justify-between items-end">
                 <div className="flex flex-col gap-1">
@@ -294,7 +186,7 @@ const RolesPage = () => {
                                         <Button
                                             variant="outline"
                                             className="flex-1 h-9 rounded-xl border-border bg-background text-[9px] font-black uppercase tracking-widest shadow-sm hover:bg-muted transition-all"
-                                            onClick={() => openPermsDialog(role)}
+                                            onClick={() => navigate(`/roles/${role.id}/permissions`)}
                                         >
                                             <Settings className="w-3 h-3 mr-2" /> Permissions
                                         </Button>

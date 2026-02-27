@@ -60,7 +60,10 @@ func (h *RoleHandler) UpdateRolePermissions(c *gin.Context) {
 	}
 
 	var input struct {
-		PermissionIDs []uuid.UUID `json:"permission_ids" binding:"required"`
+		Permissions []struct {
+			PermissionID uuid.UUID `json:"permission_id" binding:"required"`
+			ResourceID   *string   `json:"resource_id"`
+		} `json:"permissions" binding:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -68,13 +71,17 @@ func (h *RoleHandler) UpdateRolePermissions(c *gin.Context) {
 		return
 	}
 
-	perms, err := h.permRepo.GetByIDs(input.PermissionIDs)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch permissions"})
-		return
+	var rolePerms []domain.RolePermission
+	for _, p := range input.Permissions {
+		rolePerms = append(rolePerms, domain.RolePermission{
+			ID:           uuid.New(),
+			RoleID:       roleID,
+			PermissionID: p.PermissionID,
+			ResourceID:   p.ResourceID,
+		})
 	}
 
-	if err := h.roleRepo.SetPermissions(roleID, perms); err != nil {
+	if err := h.roleRepo.SetPermissions(roleID, rolePerms); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

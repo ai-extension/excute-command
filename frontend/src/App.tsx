@@ -17,6 +17,7 @@ import TagsPage from './pages/TagsPage';
 import SettingsPage from './pages/SettingsPage';
 import PagesListPage from './pages/PagesListPage';
 import PageDesignerPage from './pages/PageDesignerPage';
+import RolePermissionsPage from './pages/RolePermissionsPage';
 import PublicPageView from './pages/PublicPageView';
 import { useAuth } from './context/AuthContext';
 
@@ -53,6 +54,7 @@ function App() {
                     <Route path="vpns" element={<VpnPage />} />
                     <Route path="users" element={<UsersPage />} />
                     <Route path="roles" element={<RolesPage />} />
+                    <Route path="roles/:id/permissions" element={<RolePermissionsPage />} />
                     <Route path="variables" element={<GlobalVariablesPage />} />
                     <Route path="tags" element={<TagsPage />} />
                     <Route path="schedules" element={<SchedulesPage />} />

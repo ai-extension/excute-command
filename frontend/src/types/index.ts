@@ -244,3 +244,30 @@ export interface Page {
     created_at?: string;
     updated_at?: string;
 }
+
+export interface Permission {
+    id: string;
+    name: string;
+    type: string;
+    action: string;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface RolePermission {
+    id: string;
+    role_id: string;
+    permission_id: string;
+    resource_id?: string;
+    permission?: Permission;
+}
+
+export interface Role {
+    id: string;
+    name: string;
+    description: string;
+    permissions?: RolePermission[];
+    created_at?: string;
+    updated_at?: string;
+}
+

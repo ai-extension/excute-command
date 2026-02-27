@@ -59,12 +59,20 @@ type User struct {
 }
 
 type Role struct {
-	ID          uuid.UUID    `json:"id" gorm:"type:uuid;primaryKey"`
-	Name        string       `json:"name" gorm:"uniqueIndex;not null"`
-	Description string       `json:"description"`
-	Permissions []Permission `json:"permissions" gorm:"many2many:role_permissions;"`
-	CreatedAt   time.Time    `json:"created_at"`
-	UpdatedAt   time.Time    `json:"updated_at"`
+	ID          uuid.UUID        `json:"id" gorm:"type:uuid;primaryKey"`
+	Name        string           `json:"name" gorm:"uniqueIndex;not null"`
+	Description string           `json:"description"`
+	Permissions []RolePermission `json:"permissions" gorm:"foreignKey:RoleID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	CreatedAt   time.Time        `json:"created_at"`
+	UpdatedAt   time.Time        `json:"updated_at"`
+}
+
+type RolePermission struct {
+	ID           uuid.UUID   `json:"id" gorm:"type:uuid;primaryKey"`
+	RoleID       uuid.UUID   `json:"role_id" gorm:"type:uuid;index;not null"`
+	PermissionID uuid.UUID   `json:"permission_id" gorm:"type:uuid;index;not null"`
+	ResourceID   *string     `json:"resource_id,omitempty"` // nullable UUID string or identifier
+	Permission   *Permission `json:"permission,omitempty" gorm:"foreignKey:PermissionID"`
 }
 
 type Permission struct {
@@ -93,7 +101,7 @@ type RoleRepository interface {
 	Update(role *Role) error
 	Delete(id uuid.UUID) error
 	GetByIDs(ids []uuid.UUID) ([]Role, error)
-	SetPermissions(roleID uuid.UUID, perms []Permission) error
+	SetPermissions(roleID uuid.UUID, rolePerms []RolePermission) error
 }
 
 type PermissionRepository interface {

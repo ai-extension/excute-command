@@ -254,6 +254,9 @@ func seedAdmin(db *gorm.DB) {
 	}
 
 	var perms []domain.Permission
+	var rolePerms []domain.RolePermission
+	adminRoleID := uuid.New()
+
 	for _, def := range permDefs {
 		var p domain.Permission
 		err := db.Where("name = ?", def.Name).First(&p).Error
@@ -275,6 +278,12 @@ func seedAdmin(db *gorm.DB) {
 			}
 		}
 		perms = append(perms, p)
+		rolePerms = append(rolePerms, domain.RolePermission{
+			ID:           uuid.New(),
+			RoleID:       adminRoleID,
+			PermissionID: p.ID,
+			ResourceID:   nil, // Admin gets all resources
+		})
 	}
 
 	var adminUser domain.User
@@ -292,10 +301,10 @@ func seedAdmin(db *gorm.DB) {
 
 		// Create admin role
 		adminRole := domain.Role{
-			ID:          uuid.New(),
+			ID:          adminRoleID,
 			Name:        "admin",
 			Description: "Full access role",
-			Permissions: perms,
+			Permissions: rolePerms,
 		}
 
 		if err := db.FirstOrCreate(&adminRole, "name = ?", adminRole.Name).Error; err != nil {
