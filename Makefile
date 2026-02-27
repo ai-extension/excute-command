@@ -18,7 +18,7 @@ db-down: ## Stop PostgreSQL database
 	cd docker && docker-compose down
 
 run-be: ## Run backend server
-	cd backend && go run cmd/server/main.go
+	kill -9 $(lsof -t -i:8080) || true && cd backend && go run cmd/server/main.go
 
 run-fe: ## Run frontend development server
 	cd frontend && npm run dev

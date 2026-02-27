@@ -226,8 +226,12 @@ func (e *WorkflowExecutor) RunHooks(ctx context.Context, hooks []domain.Workflow
 			continue
 		}
 
-		fmt.Fprintf(logFile, "\n>>> EXECUTING %s HOOK: %s <<<\n", hookType, hook.TargetWorkflowID)
-		e.hub.BroadcastLog(hook.WorkflowID.String(), fmt.Sprintf(">>> Executing %s hook...", hookType))
+		if logFile != nil {
+			fmt.Fprintf(logFile, "\n>>> EXECUTING %s HOOK: %s <<<\n", hookType, hook.TargetWorkflowID)
+		}
+		if hook.WorkflowID != nil {
+			e.hub.BroadcastLog(hook.WorkflowID.String(), fmt.Sprintf(">>> Executing %s hook...", hookType))
+		}
 
 		var hookInputs map[string]string
 		if hook.Inputs != "" {
@@ -237,10 +241,14 @@ func (e *WorkflowExecutor) RunHooks(ctx context.Context, hooks []domain.Workflow
 		hookExecID := uuid.New()
 		err := e.RunWithDepth(ctx, hook.TargetWorkflowID, hookExecID, hookInputs, nil, depth+1)
 		if err != nil {
-			fmt.Fprintf(logFile, "!!! HOOK FAILED: %v !!!\n", err)
+			if logFile != nil {
+				fmt.Fprintf(logFile, "!!! HOOK FAILED: %v !!!\n", err)
+			}
 			return err
 		}
-		fmt.Fprintf(logFile, ">>> HOOK SUCCESS <<<\n\n")
+		if logFile != nil {
+			fmt.Fprintf(logFile, ">>> HOOK SUCCESS <<<\n\n")
+		}
 	}
 	return nil
 }
