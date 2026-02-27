@@ -30,6 +30,7 @@ import { Label } from "../components/ui/label";
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../lib/api';
 import { VpnConfig } from '../types';
+import { Pagination } from '../components/Pagination';
 
 const VpnPage = () => {
     const { apiFetch } = useAuth();
@@ -48,6 +49,9 @@ const VpnPage = () => {
         password: '',
         private_key: ''
     });
+
+    const [limit, setLimit] = useState(20);
+    const [offset, setOffset] = useState(0);
 
     const fetchVpns = async () => {
         setIsLoading(true);
@@ -127,6 +131,8 @@ const VpnPage = () => {
         v.host.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    const paginatedVpns = filteredVpns.slice(offset, offset + limit);
+
     return (
         <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-700">
             {/* Breadcrumb */}
@@ -173,7 +179,7 @@ const VpnPage = () => {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {filteredVpns.length > 0 ? filteredVpns.map((vpn) => (
+                        {filteredVpns.length > 0 ? paginatedVpns.map((vpn) => (
                             <TableRow key={vpn.id} className="group border-border hover:bg-muted/40 transition-colors">
                                 <TableCell className="px-6 py-4">
                                     <div className="flex items-center gap-3">
@@ -234,6 +240,14 @@ const VpnPage = () => {
                     </TableBody>
                 </Table>
             </div>
+
+            <Pagination
+                total={filteredVpns.length}
+                offset={offset}
+                limit={limit}
+                itemName="VPN Configs"
+                onPageChange={setOffset}
+            />
 
             {/* Add/Edit Dialog */}
             <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>

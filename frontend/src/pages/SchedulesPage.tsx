@@ -20,6 +20,7 @@ import { API_BASE_URL } from '../lib/api';
 import { Schedule, Workflow, WorkflowInput, Tag } from '../types';
 import { TagSelector } from '../components/TagSelector';
 import { TagFilter } from '../components/TagFilter';
+import { Pagination } from '../components/Pagination';
 
 import {
     Dialog,
@@ -50,6 +51,9 @@ const SchedulesPage = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
     const [activeDialogTab, setActiveDialogTab] = useState<'config' | 'hooks'>('config');
+
+    const [limit, setLimit] = useState(20);
+    const [offset, setOffset] = useState(0);
 
     const [formData, setFormData] = useState({
         name: '',
@@ -256,6 +260,8 @@ const SchedulesPage = () => {
             selectedTagIds.every(tagId => s.tags?.some(st => st.id === tagId));
         return matchesSearch && matchesTags;
     });
+
+    const paginatedSchedules = filteredSchedules.slice(offset, offset + limit);
 
     return (
         <>
@@ -552,7 +558,7 @@ const SchedulesPage = () => {
                                             </div>
                                         </TableCell>
                                     </TableRow>
-                                ) : filteredSchedules.length > 0 ? filteredSchedules.map((s) => (
+                                ) : filteredSchedules.length > 0 ? paginatedSchedules.map((s) => (
                                     <TableRow key={s.id} className="group border-border hover:bg-muted/30 transition-all duration-200">
                                         <TableCell className="px-8 py-5">
                                             <div className="flex items-center gap-4">
@@ -704,6 +710,14 @@ const SchedulesPage = () => {
                                 )}
                             </TableBody>
                         </Table>
+
+                        <Pagination
+                            total={filteredSchedules.length}
+                            offset={offset}
+                            limit={limit}
+                            itemName="Schedules"
+                            onPageChange={setOffset}
+                        />
                     </Card>
                 )}
 

@@ -31,6 +31,7 @@ import { format } from 'date-fns';
 import { API_BASE_URL } from '../lib/api';
 import ExecutionMonitor from '../components/ExecutionMonitor';
 import WorkflowRunner from '../components/WorkflowRunner';
+import { Pagination } from '../components/Pagination';
 
 const ExecutionHistoryPage = () => {
     const { apiFetch } = useAuth();
@@ -40,6 +41,9 @@ const ExecutionHistoryPage = () => {
     const [selectedExec, setSelectedExec] = useState<WorkflowExecution | null>(null);
     const [loadingDetail, setLoadingDetail] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+
+    const [limit, setLimit] = useState(20);
+    const [offset, setOffset] = useState(0);
 
     useEffect(() => {
         if (activeNamespace) {
@@ -105,6 +109,8 @@ const ExecutionHistoryPage = () => {
         exec.workflow?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         exec.id.toLowerCase().includes(searchQuery.toLowerCase())
     );
+
+    const paginatedExecutions = filteredExecutions.slice(offset, offset + limit);
 
     return (
         <WorkflowRunner>
@@ -172,9 +178,9 @@ const ExecutionHistoryPage = () => {
                                 </Button>
                             </div>
                         ) : (
-                            <div className="overflow-y-auto flex-1 pr-2 custom-scrollbar">
-                                <div className="space-y-3">
-                                    {filteredExecutions.map((exec) => (
+                            <div className="overflow-y-auto flex-1 pr-2 custom-scrollbar flex flex-col">
+                                <div className="space-y-3 flex-1">
+                                    {paginatedExecutions.map((exec) => (
                                         <Card
                                             key={exec.id}
                                             className="bg-card hover:bg-muted/50 border-border/50 hover:border-primary/20 transition-all duration-300 cursor-pointer group shadow-sm hover:translate-x-1"
@@ -231,6 +237,15 @@ const ExecutionHistoryPage = () => {
                                             </CardContent>
                                         </Card>
                                     ))}
+                                </div>
+                                <div className="mt-6 border-t border-border pt-4">
+                                    <Pagination
+                                        total={filteredExecutions.length}
+                                        offset={offset}
+                                        limit={limit}
+                                        itemName="Executions"
+                                        onPageChange={setOffset}
+                                    />
                                 </div>
                             </div>
                         )}

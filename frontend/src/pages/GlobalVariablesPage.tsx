@@ -17,6 +17,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNamespace } from '../context/NamespaceContext';
 import { API_BASE_URL } from '../lib/api';
 import { GlobalVariable } from '../types';
+import { Pagination } from '../components/Pagination';
 
 import {
     Dialog,
@@ -40,6 +41,9 @@ const GlobalVariablesPage = () => {
     const [selectedVar, setSelectedVar] = useState<GlobalVariable | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const [limit, setLimit] = useState(20);
+    const [offset, setOffset] = useState(0);
 
     const [formData, setFormData] = useState({
         key: '',
@@ -138,6 +142,8 @@ const GlobalVariablesPage = () => {
         v.key.toLowerCase().includes(searchTerm.toLowerCase()) ||
         v.description?.toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    const paginatedVariables = filteredVariables.slice(offset, offset + limit);
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -243,7 +249,7 @@ const GlobalVariablesPage = () => {
                                     </div>
                                 </TableCell>
                             </TableRow>
-                        ) : filteredVariables.length > 0 ? filteredVariables.map((v) => (
+                        ) : filteredVariables.length > 0 ? paginatedVariables.map((v) => (
                             <TableRow key={v.id} className="group border-border hover:bg-muted/30 transition-all duration-200">
                                 <TableCell className="px-8 py-5">
                                     <div className="flex items-center gap-4">
@@ -317,6 +323,14 @@ const GlobalVariablesPage = () => {
                         )}
                     </TableBody>
                 </Table>
+
+                <Pagination
+                    total={filteredVariables.length}
+                    offset={offset}
+                    limit={limit}
+                    itemName="Global Variables"
+                    onPageChange={setOffset}
+                />
             </Card>
 
             {/* Edit Dialog */}

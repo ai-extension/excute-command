@@ -34,6 +34,7 @@ import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../lib/api';
 import { Server, VpnConfig } from '../types';
+import { Pagination } from '../components/Pagination';
 
 const ServerPage = () => {
     const { apiFetch } = useAuth();
@@ -54,6 +55,9 @@ const ServerPage = () => {
         private_key: '',
         vpn_id: 'none'
     });
+
+    const [limit, setLimit] = useState(20);
+    const [offset, setOffset] = useState(0);
 
     const [terminalOpen, setTerminalOpen] = useState(false);
     const [activeTerminalServer, setActiveTerminalServer] = useState<Server | null>(null);
@@ -176,6 +180,8 @@ const ServerPage = () => {
         s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         s.host.toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    const paginatedServers = filteredServers.slice(offset, offset + limit);
 
     return (
         <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-700">

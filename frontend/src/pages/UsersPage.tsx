@@ -15,6 +15,7 @@ import { cn } from '../lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../lib/api';
+import { Pagination } from '../components/Pagination';
 
 import {
     Dialog,
@@ -38,6 +39,10 @@ const UsersPage = () => {
     const [selectedRoleIDs, setSelectedRoleIDs] = useState<string[]>([]);
     const [newUserData, setNewUserData] = useState({ username: '', password: '', email: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const [limit, setLimit] = useState(20);
+    const [offset, setOffset] = useState(0);
 
     const fetchUsers = async () => {
         try {
@@ -124,6 +129,14 @@ const UsersPage = () => {
                 : [...prev, roleID]
         );
     };
+
+    const filteredUsers = users.filter(u =>
+        u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (u.email && u.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (u.roles && u.roles.some((r: any) => r.name.toLowerCase().includes(searchTerm.toLowerCase())))
+    );
+
+    const paginatedUsers = filteredUsers.slice(offset, offset + limit);
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -261,6 +274,8 @@ const UsersPage = () => {
                     <Input
                         placeholder="Search by name, email, or role..."
                         className="pl-11 h-11 bg-background border-border rounded-xl font-semibold text-sm transition-all focus:bg-muted/30"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
             </div>
@@ -277,7 +292,7 @@ const UsersPage = () => {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {users.length > 0 ? users.map((u) => (
+                        {filteredUsers.length > 0 ? paginatedUsers.map((u) => (
                             <TableRow key={u.id} className="group border-border hover:bg-muted/30 transition-all duration-200">
                                 <TableCell className="px-8 py-5">
                                     <div className="flex items-center gap-4">
@@ -341,6 +356,14 @@ const UsersPage = () => {
                         )}
                     </TableBody>
                 </Table>
+
+                <Pagination
+                    total={filteredUsers.length}
+                    offset={offset}
+                    limit={limit}
+                    itemName="Users"
+                    onPageChange={setOffset}
+                />
             </Card>
         </div>
     );

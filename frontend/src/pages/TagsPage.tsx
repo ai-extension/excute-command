@@ -15,6 +15,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNamespace } from '../context/NamespaceContext';
 import { API_BASE_URL } from '../lib/api';
 import { Tag } from '../types';
+import { Pagination } from '../components/Pagination';
 
 import {
     Dialog,
@@ -37,6 +38,9 @@ const TagsPage = () => {
     const [selectedTag, setSelectedTag] = useState<Tag | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const [limit, setLimit] = useState(20);
+    const [offset, setOffset] = useState(0);
 
     const [formData, setFormData] = useState({
         name: '',
@@ -132,6 +136,8 @@ const TagsPage = () => {
     const filteredTags = tags.filter(t =>
         t.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    const paginatedTags = filteredTags.slice(offset, offset + limit);
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -234,7 +240,7 @@ const TagsPage = () => {
                                     </div>
                                 </TableCell>
                             </TableRow>
-                        ) : filteredTags.length > 0 ? filteredTags.map((t) => (
+                        ) : filteredTags.length > 0 ? paginatedTags.map((t) => (
                             <TableRow key={t.id} className="group border-border hover:bg-muted/30 transition-all duration-200">
                                 <TableCell className="px-8 py-5">
                                     <div className="flex items-center gap-4">
@@ -298,6 +304,14 @@ const TagsPage = () => {
                         )}
                     </TableBody>
                 </Table>
+
+                <Pagination
+                    total={filteredTags.length}
+                    offset={offset}
+                    limit={limit}
+                    itemName="Tags"
+                    onPageChange={setOffset}
+                />
             </Card>
 
             {/* Edit Dialog */}
