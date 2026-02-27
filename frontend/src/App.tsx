@@ -15,6 +15,9 @@ import SchedulesPage from './pages/SchedulesPage';
 import ScheduleDetailPage from './pages/ScheduleDetailPage';
 import TagsPage from './pages/TagsPage';
 import SettingsPage from './pages/SettingsPage';
+import PagesListPage from './pages/PagesListPage';
+import PageDesignerPage from './pages/PageDesignerPage';
+import PublicPageView from './pages/PublicPageView';
 import { useAuth } from './context/AuthContext';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -55,7 +58,10 @@ function App() {
                     <Route path="schedules" element={<SchedulesPage />} />
                     <Route path="schedules/:id" element={<ScheduleDetailPage />} />
                     <Route path="settings" element={<SettingsPage />} />
+                    <Route path="pages" element={<PagesListPage />} />
+                    <Route path="pages/:id/edit" element={<PageDesignerPage />} />
                 </Route>
+                <Route path="/public/pages/:slug" element={<PublicPageView />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
         </BrowserRouter>

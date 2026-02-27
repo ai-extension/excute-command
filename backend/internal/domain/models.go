@@ -430,6 +430,41 @@ type WorkflowFileRepository interface {
 	Delete(id uuid.UUID) error
 }
 
+type Page struct {
+	ID          uuid.UUID      `json:"id" gorm:"type:uuid;primaryKey"`
+	NamespaceID uuid.UUID      `json:"namespace_id" gorm:"type:uuid;index"`
+	Title       string         `json:"title" gorm:"not null"`
+	Description string         `json:"description"`
+	Slug        string         `json:"slug" gorm:"uniqueIndex;not null"`
+	IsPublic    bool           `json:"is_public" gorm:"default:false"`
+	Password    string         `json:"password,omitempty" gorm:"column:password"`
+	ExpiresAt   *time.Time     `json:"expires_at" gorm:"index"`
+	Layout      string         `json:"layout" gorm:"type:text"`
+	Workflows   []PageWorkflow `json:"workflows,omitempty" gorm:"foreignKey:PageID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+}
+
+type PageWorkflow struct {
+	ID         uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
+	PageID     uuid.UUID `json:"page_id" gorm:"type:uuid;index"`
+	WorkflowID uuid.UUID `json:"workflow_id" gorm:"type:uuid;index"`
+	Order      int       `json:"order"`
+	Label      string    `json:"label"`    // Custom label for the button
+	Style      string    `json:"style"`    // Button style (color, etc.)
+	ShowLog    bool      `json:"show_log"` // Whether to show execution logs
+	Workflow   *Workflow `json:"workflow,omitempty" gorm:"foreignKey:WorkflowID"`
+}
+
+type PageRepository interface {
+	Create(page *Page) error
+	GetByID(id uuid.UUID) (*Page, error)
+	GetBySlug(slug string) (*Page, error)
+	List(namespaceID uuid.UUID) ([]Page, error)
+	Update(page *Page) error
+	Delete(id uuid.UUID) error
+}
+
 type TagRepository interface {
 	Create(tag *Tag) error
 	GetByID(id uuid.UUID) (*Tag, error)

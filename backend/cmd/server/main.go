@@ -46,6 +46,8 @@ func main() {
 		&domain.WorkflowFile{},
 		&domain.WorkflowHook{},
 		&domain.VpnConfig{},
+		&domain.Page{},
+		&domain.PageWorkflow{},
 	); err != nil {
 		log.Fatal("Failed to migrate database:", err)
 	}
@@ -69,6 +71,7 @@ func main() {
 	tagRepo := repository.NewPostgresTagRepo(db)
 	workflowFileRepo := repository.NewPostgresWorkflowFileRepo(db)
 	vpnRepo := repository.NewPostgresVpnConfigRepo(db)
+	pageRepo := repository.NewPostgresPageRepo(db)
 
 	// Seed Admin User and Default Namespace
 	seedAdmin(db)
@@ -89,6 +92,7 @@ func main() {
 	scheduleService := service.NewScheduleService(scheduleRepo, execRepo, workflowExecutor)
 	tagService := service.NewTagService(tagRepo)
 	vpnService := service.NewVpnConfigService(vpnRepo)
+	pageService := service.NewPageService(pageRepo)
 
 	// Initialize scheduling engine
 	scheduleService.Init()
@@ -109,6 +113,7 @@ func main() {
 	workflowFileService := service.NewWorkflowFileService(workflowFileRepo)
 	workflowFileHandler := handler.NewWorkflowFileHandler(workflowFileService)
 	vpnHandler := handler.NewVpnConfigHandler(vpnService)
+	pageHandler := handler.NewPageHandler(pageService, workflowService, workflowExecutor)
 
 	// Initialize Router
 	r := gin.Default()
@@ -122,7 +127,7 @@ func main() {
 	r.Use(func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, X-Page-Password")
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
 			return
@@ -209,7 +214,21 @@ func main() {
 			protected.POST("/vpns", vpnHandler.Create)
 			protected.PUT("/vpns/:id", vpnHandler.Update)
 			protected.DELETE("/vpns/:id", vpnHandler.Delete)
+
+			// Pages
+			protected.GET("/namespaces/:ns_id/pages", pageHandler.ListPages)
+			protected.POST("/namespaces/:ns_id/pages", pageHandler.CreatePage)
+			protected.GET("/pages/:id", pageHandler.GetPage)
+			protected.PUT("/pages/:id", pageHandler.UpdatePage)
+			protected.DELETE("/pages/:id", pageHandler.DeletePage)
 		}
+
+		// Public Page access (no auth required)
+		api.GET("/public/pages/:slug", pageHandler.GetPublicPage)
+		api.POST("/public/pages/:slug/verify", pageHandler.VerifyPublicPage)
+		api.POST("/public/pages/:slug/run/:workflow_id", pageHandler.RunPublicWorkflow)
+		api.GET("/public/pages/:slug/executions/:exec_id", pageHandler.GetPublicExecutionStatus)
+		api.GET("/public/pages/:slug/executions/:exec_id/logs", pageHandler.GetPublicExecutionLogs)
 	}
 
 	log.Println("Server starting on :8080")

@@ -218,3 +218,29 @@ export interface Schedule {
     last_run_status: string;
     last_run_at?: string;
 }
+
+export interface PageWorkflow {
+    id: string;
+    page_id: string;
+    workflow_id: string;
+    order: number;
+    label: string;
+    style: string;
+    show_log: boolean;
+    workflow?: Workflow;
+}
+
+export interface Page {
+    id: string;
+    namespace_id: string;
+    title: string;
+    description: string;
+    slug: string;
+    is_public: boolean;
+    password?: string;
+    expires_at?: string;
+    layout: string;
+    workflows?: PageWorkflow[];
+    created_at?: string;
+    updated_at?: string;
+}
