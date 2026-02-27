@@ -40,27 +40,9 @@ func (s *TerminalService) StartSession(serverID uuid.UUID) (string, error) {
 		return "", fmt.Errorf("failed to get server: %w", err)
 	}
 
-	var auth ssh.AuthMethod
-	if server.AuthType == "PASSWORD" {
-		auth = ssh.Password(server.Password)
-	} else if server.AuthType == "PUBLIC_KEY" {
-		signer, err := ssh.ParsePrivateKey([]byte(server.PrivateKey))
-		if err != nil {
-			return "", fmt.Errorf("failed to parse private key: %w", err)
-		}
-		auth = ssh.PublicKeys(signer)
-	}
-
-	config := &ssh.ClientConfig{
-		User:            server.User,
-		Auth:            []ssh.AuthMethod{auth},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-	}
-
-	addr := fmt.Sprintf("%s:%d", server.Host, server.Port)
-	client, err := ssh.Dial("tcp", addr, config)
+	client, err := ConnectSSH(server)
 	if err != nil {
-		return "", fmt.Errorf("failed to dial: %w", err)
+		return "", err
 	}
 
 	session, err := client.NewSession()

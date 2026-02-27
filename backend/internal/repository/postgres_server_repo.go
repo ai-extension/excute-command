@@ -20,7 +20,7 @@ func (r *PostgresServerRepo) Create(server *domain.Server) error {
 
 func (r *PostgresServerRepo) GetByID(id uuid.UUID) (*domain.Server, error) {
 	var server domain.Server
-	if err := r.db.First(&server, "id = ?", id).Error; err != nil {
+	if err := r.db.Preload("Vpn").First(&server, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	return &server, nil
@@ -28,7 +28,7 @@ func (r *PostgresServerRepo) GetByID(id uuid.UUID) (*domain.Server, error) {
 
 func (r *PostgresServerRepo) List() ([]domain.Server, error) {
 	var servers []domain.Server
-	if err := r.db.Find(&servers).Error; err != nil {
+	if err := r.db.Preload("Vpn").Find(&servers).Error; err != nil {
 		return nil, err
 	}
 	return servers, nil

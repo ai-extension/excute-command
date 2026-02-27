@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Terminal, Settings, Box, ChevronsLeft, ChevronsRight, Zap, LogOut, Users, Shield, Server, History, Globe, Calendar, Tag } from 'lucide-react';
+import { LayoutDashboard, Terminal, Settings, Box, ChevronsLeft, ChevronsRight, Zap, LogOut, Users, Shield, Server, Network, History, Globe, Calendar, Tag } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 import { useAuth } from '../context/AuthContext';
@@ -18,6 +18,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
 
     const globalNavItems = [
         { name: 'Servers', path: '/servers', icon: Server },
+        { name: 'VPN Configs', path: '/vpns', icon: Network },
     ];
 
     const namespaceNavItems = [

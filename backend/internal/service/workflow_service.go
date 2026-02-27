@@ -77,6 +77,10 @@ func (s *WorkflowService) ListWorkflows(namespaceID uuid.UUID) ([]domain.Workflo
 	return s.repo.List(namespaceID)
 }
 
+func (s *WorkflowService) ListWorkflowsPaginated(namespaceID uuid.UUID, limit, offset int) ([]domain.Workflow, int64, error) {
+	return s.repo.ListPaginated(namespaceID, limit, offset)
+}
+
 func (s *WorkflowService) UpdateWorkflow(wf *domain.Workflow) error {
 	// Recursively assign IDs to new inputs, variables, groups and steps
 	for i := range wf.Inputs {

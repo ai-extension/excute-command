@@ -46,11 +46,39 @@ func (r *PostgresWorkflowRepo) List(namespaceID uuid.UUID) ([]domain.Workflow, e
 		Preload("Hooks.TargetWorkflow").
 		Preload("Tags").
 		Where("namespace_id = ?", namespaceID).
+		Order("created_at DESC").
 		Find(&wfs).Error
 	if err != nil {
 		return nil, err
 	}
 	return wfs, nil
+}
+
+func (r *PostgresWorkflowRepo) ListPaginated(namespaceID uuid.UUID, limit, offset int) ([]domain.Workflow, int64, error) {
+	var wfs []domain.Workflow
+	var total int64
+
+	// Count total
+	if err := r.db.Model(&domain.Workflow{}).Where("namespace_id = ?", namespaceID).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Fetch paginated
+	err := r.db.
+		Preload("Inputs").
+		Preload("Variables").
+		Preload("Groups", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
+		Preload("Groups.Steps", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
+		Preload("Hooks", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
+		Preload("Hooks.TargetWorkflow").
+		Preload("Tags").
+		Where("namespace_id = ?", namespaceID).
+		Order("created_at DESC").
+		Limit(limit).
+		Offset(offset).
+		Find(&wfs).Error
+
+	return wfs, total, err
 }
 
 func (r *PostgresWorkflowRepo) Update(wf *domain.Workflow) error {

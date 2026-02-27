@@ -37,12 +37,30 @@ func (h *WorkflowHandler) ListWorkflows(c *gin.Context) {
 		return
 	}
 
-	wfs, err := h.service.ListWorkflows(nsID)
+	limit := 20
+	offset := 0
+	if l := c.Query("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 {
+			limit = v
+		}
+	}
+	if o := c.Query("offset"); o != "" {
+		if v, err := strconv.Atoi(o); err == nil && v >= 0 {
+			offset = v
+		}
+	}
+
+	wfs, total, err := h.service.ListWorkflowsPaginated(nsID, limit, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, wfs)
+	c.JSON(http.StatusOK, gin.H{
+		"items":  wfs,
+		"total":  total,
+		"limit":  limit,
+		"offset": offset,
+	})
 }
 
 func (h *WorkflowHandler) CreateWorkflow(c *gin.Context) {

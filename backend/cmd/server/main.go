@@ -45,6 +45,7 @@ func main() {
 		&domain.Tag{},
 		&domain.WorkflowFile{},
 		&domain.WorkflowHook{},
+		&domain.VpnConfig{},
 	); err != nil {
 		log.Fatal("Failed to migrate database:", err)
 	}
@@ -67,6 +68,7 @@ func main() {
 	scheduleRepo := repository.NewPostgresScheduleRepo(db)
 	tagRepo := repository.NewPostgresTagRepo(db)
 	workflowFileRepo := repository.NewPostgresWorkflowFileRepo(db)
+	vpnRepo := repository.NewPostgresVpnConfigRepo(db)
 
 	// Seed Admin User and Default Namespace
 	seedAdmin(db)
@@ -86,6 +88,7 @@ func main() {
 	workflowExecutor := service.NewWorkflowExecutor(workflowRepo, workflowGroupRepo, workflowStepRepo, workflowInputRepo, execRepo, serverService, hub, globalVarRepo)
 	scheduleService := service.NewScheduleService(scheduleRepo, execRepo, workflowExecutor)
 	tagService := service.NewTagService(tagRepo)
+	vpnService := service.NewVpnConfigService(vpnRepo)
 
 	// Initialize scheduling engine
 	scheduleService.Init()
@@ -105,6 +108,7 @@ func main() {
 	tagHandler := handler.NewTagHandler(tagService)
 	workflowFileService := service.NewWorkflowFileService(workflowFileRepo)
 	workflowFileHandler := handler.NewWorkflowFileHandler(workflowFileService)
+	vpnHandler := handler.NewVpnConfigHandler(vpnService)
 
 	// Initialize Router
 	r := gin.Default()
@@ -198,6 +202,12 @@ func main() {
 			protected.POST("/namespaces/:ns_id/tags", tagHandler.Create)
 			protected.PUT("/tags/:id", tagHandler.Update)
 			protected.DELETE("/tags/:id", tagHandler.Delete)
+
+			// VPNs
+			protected.GET("/vpns", vpnHandler.List)
+			protected.POST("/vpns", vpnHandler.Create)
+			protected.PUT("/vpns/:id", vpnHandler.Update)
+			protected.DELETE("/vpns/:id", vpnHandler.Delete)
 		}
 	}
 

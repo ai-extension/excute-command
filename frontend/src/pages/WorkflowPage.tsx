@@ -36,6 +36,13 @@ const WorkflowPage = () => {
     const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
     const [workflows, setWorkflows] = useState<Workflow[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [total, setTotal] = useState(0);
+    const [limit, setLimit] = useState(20);
+    const [offset, setOffset] = useState(0);
+    const [jumpPage, setJumpPage] = useState("");
+
+    const totalPages = Math.ceil(total / limit);
+    const currentPage = Math.floor(offset / limit) + 1;
 
     // Create workflow dialog state
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -43,13 +50,19 @@ const WorkflowPage = () => {
     const [newWorkflowDescription, setNewWorkflowDescription] = useState('');
     const [isCreating, setIsCreating] = useState(false);
 
-    const fetchWorkflows = async () => {
+    const fetchWorkflows = async (pageOffset = offset) => {
         if (!activeNamespace) return;
         setIsLoading(true);
         try {
-            const response = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/workflows`);
+            const response = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/workflows?limit=${limit}&offset=${pageOffset}`);
             const data = await response.json();
-            setWorkflows(data || []);
+            if (data && data.items) {
+                setWorkflows(data.items);
+                setTotal(data.total);
+            } else {
+                setWorkflows(Array.isArray(data) ? data : []);
+                setTotal(Array.isArray(data) ? data.length : 0);
+            }
         } catch (error) {
             console.error('Failed to fetch workflows:', error);
         } finally {
@@ -105,8 +118,22 @@ const WorkflowPage = () => {
         return matchesSearch && matchesTags;
     });
 
+    const handlePageChange = (newOffset: number) => {
+        setOffset(newOffset);
+        fetchWorkflows(newOffset);
+    };
+
+    const handleJumpPage = (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        const page = parseInt(jumpPage, 10);
+        if (!isNaN(page) && page >= 1 && page <= totalPages) {
+            handlePageChange((page - 1) * limit);
+            setJumpPage("");
+        }
+    };
+
     return (
-        <WorkflowRunner onRunComplete={fetchWorkflows} onCloseMonitor={fetchWorkflows}>
+        <WorkflowRunner onRunComplete={() => fetchWorkflows()} onCloseMonitor={() => fetchWorkflows()}>
             {(runWorkflow) => (
                 <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-700">
                     <div className="flex items-center gap-2 px-1">
@@ -268,6 +295,39 @@ const WorkflowPage = () => {
                         </Table>
                     </div>
 
+                    {total > 0 && (
+                        <div className="flex items-center justify-between px-4 py-4 bg-muted/10 border-t border-border/50">
+                            <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                                Showing {total === 0 ? 0 : offset + 1} to {Math.min(offset + limit, total)} of {total} Workflows
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <span className="text-[10px] font-bold text-muted-foreground">
+                                    Page {currentPage} of {Math.max(1, totalPages)}
+                                </span>
+                                
+                                <form onSubmit={handleJumpPage} className="flex items-center border border-border rounded-lg overflow-hidden h-8 bg-background shadow-sm hover:border-primary/50 focus-within:border-primary/50 transition-colors">
+                                    <Input 
+                                        type="number" 
+                                        min={1} 
+                                        max={Math.max(1, totalPages)}
+                                        value={jumpPage} 
+                                        onChange={(e) => setJumpPage(e.target.value)}
+                                        placeholder={currentPage.toString()}
+                                        className="h-full w-14 px-2 text-[10px] font-bold text-center border-0 focus-visible:ring-0 rounded-none bg-transparent"
+                                    />
+                                    <Button 
+                                        type="submit"
+                                        disabled={!jumpPage || parseInt(jumpPage) < 1 || parseInt(jumpPage) > totalPages}
+                                        variant="ghost" 
+                                        className="h-full rounded-none border-l border-border px-3 text-[9px] font-black uppercase tracking-widest text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
+                                    >
+                                        Go
+                                    </Button>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
                     <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
                         <DialogContent className="sm:max-w-md">
                             <DialogHeader>
@@ -319,9 +379,9 @@ const WorkflowPage = () => {
                             </form>
                         </DialogContent>
                     </Dialog>
-                </div>
+                </div >
             )}
-        </WorkflowRunner>
+        </WorkflowRunner >
     );
 };
 

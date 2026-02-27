@@ -86,7 +86,8 @@ func (h *ScheduleHandler) Create(c *gin.Context) {
 			ID     uuid.UUID `json:"id"`
 			Inputs string    `json:"inputs"`
 		} `json:"workflows" binding:"required"`
-		Tags []domain.Tag `json:"tags"`
+		Hooks []domain.WorkflowHook `json:"hooks"`
+		Tags  []domain.Tag          `json:"tags"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -106,6 +107,7 @@ func (h *ScheduleHandler) Create(c *gin.Context) {
 		CronExpression: req.CronExpression,
 		Status:         status,
 		Retries:        req.Retries,
+		Hooks:          req.Hooks,
 		Tags:           req.Tags,
 	}
 
@@ -179,7 +181,8 @@ func (h *ScheduleHandler) Update(c *gin.Context) {
 			ID     uuid.UUID `json:"id"`
 			Inputs string    `json:"inputs"`
 		} `json:"workflows" binding:"required"`
-		Tags []domain.Tag `json:"tags"`
+		Hooks []domain.WorkflowHook `json:"hooks"`
+		Tags  []domain.Tag          `json:"tags"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -200,6 +203,7 @@ func (h *ScheduleHandler) Update(c *gin.Context) {
 	if req.Status != "" {
 		schedule.Status = req.Status
 	}
+	schedule.Hooks = req.Hooks
 	schedule.Tags = req.Tags
 
 	if req.NextRunAt != "" {

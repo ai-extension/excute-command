@@ -57,9 +57,9 @@ const WorkflowDesignerPage = () => {
         const fetchAllWorkflows = async () => {
             if (!activeNamespace) return;
             try {
-                const response = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/workflows`);
+                const response = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/workflows?limit=1000`);
                 const data = await response.json();
-                setAllWorkflows(data || []);
+                setAllWorkflows(data.items || (Array.isArray(data) ? data : []));
             } catch (error) {
                 console.error('Failed to fetch all workflows:', error);
             }

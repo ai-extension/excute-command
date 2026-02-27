@@ -23,6 +23,20 @@ export interface Command {
     steps?: Step[];
 }
 
+export interface VpnConfig {
+    id: string;
+    name: string;
+    description: string;
+    host: string;
+    port: number;
+    user: string;
+    auth_type: 'PASSWORD' | 'PUBLIC_KEY';
+    password?: string;
+    private_key?: string;
+    created_at: string;
+    updated_at: string;
+}
+
 export interface Server {
     id: string;
     name: string;
@@ -33,6 +47,8 @@ export interface Server {
     auth_type: 'PASSWORD' | 'PUBLIC_KEY';
     password?: string;
     private_key?: string;
+    vpn_id?: string;
+    vpn?: VpnConfig;
     created_at: string;
     updated_at: string;
 }

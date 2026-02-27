@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage';
 import UsersPage from './pages/UsersPage';
 import RolesPage from './pages/RolesPage';
 import ServerPage from './pages/ServerPage';
+import VpnPage from './pages/VpnPage';
 import WorkflowPage from './pages/WorkflowPage';
 import WorkflowDesignerPage from './pages/WorkflowDesignerPage';
 import ExecutionHistoryPage from './pages/ExecutionHistoryPage';
@@ -45,6 +46,7 @@ function App() {
                     <Route path="workflows/:id/edit" element={<WorkflowDesignerPage />} />
                     <Route path="history" element={<ExecutionHistoryPage />} />
                     <Route path="servers" element={<ServerPage />} />
+                    <Route path="vpns" element={<VpnPage />} />
                     <Route path="users" element={<UsersPage />} />
                     <Route path="roles" element={<RolesPage />} />
                     <Route path="variables" element={<GlobalVariablesPage />} />

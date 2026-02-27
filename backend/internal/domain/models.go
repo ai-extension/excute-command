@@ -120,6 +120,30 @@ type NamespaceRepository interface {
 }
 
 type Server struct {
+	ID          uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey"`
+	Name        string     `json:"name" gorm:"not null"`
+	Description string     `json:"description"`
+	Host        string     `json:"host" gorm:"not null"`
+	Port        int        `json:"port" gorm:"default:22"`
+	User        string     `json:"user" gorm:"not null"`
+	AuthType    string     `json:"auth_type" gorm:"not null"` // PASSWORD or PUBLIC_KEY
+	Password    string     `json:"password,omitempty"`
+	PrivateKey  string     `json:"private_key,omitempty"`
+	VpnID       *uuid.UUID `json:"vpn_id,omitempty" gorm:"type:uuid"`
+	Vpn         *VpnConfig `json:"vpn,omitempty" gorm:"foreignKey:VpnID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+}
+
+type ServerRepository interface {
+	Create(server *Server) error
+	GetByID(id uuid.UUID) (*Server, error)
+	List() ([]Server, error)
+	Update(server *Server) error
+	Delete(id uuid.UUID) error
+}
+
+type VpnConfig struct {
 	ID          uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
 	Name        string    `json:"name" gorm:"not null"`
 	Description string    `json:"description"`
@@ -133,11 +157,11 @@ type Server struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
-type ServerRepository interface {
-	Create(server *Server) error
-	GetByID(id uuid.UUID) (*Server, error)
-	List() ([]Server, error)
-	Update(server *Server) error
+type VpnConfigRepository interface {
+	Create(vpn *VpnConfig) error
+	GetByID(id uuid.UUID) (*VpnConfig, error)
+	List() ([]VpnConfig, error)
+	Update(vpn *VpnConfig) error
 	Delete(id uuid.UUID) error
 }
 
@@ -334,6 +358,7 @@ type WorkflowRepository interface {
 	Create(wf *Workflow) error
 	GetByID(id uuid.UUID) (*Workflow, error)
 	List(namespaceID uuid.UUID) ([]Workflow, error)
+	ListPaginated(namespaceID uuid.UUID, limit, offset int) ([]Workflow, int64, error)
 	Update(wf *Workflow) error
 	Delete(id uuid.UUID) error
 }
