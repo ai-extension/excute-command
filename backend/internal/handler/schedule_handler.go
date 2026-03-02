@@ -27,7 +27,8 @@ func (h *ScheduleHandler) List(c *gin.Context) {
 		return
 	}
 
-	schedules, err := h.service.List(nsID)
+	user, _ := c.Get("user")
+	schedules, err := h.service.List(nsID, user.(*domain.User))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -43,7 +44,8 @@ func (h *ScheduleHandler) GetByID(c *gin.Context) {
 		return
 	}
 
-	schedule, err := h.service.GetByID(id)
+	user, _ := c.Get("user")
+	schedule, err := h.service.GetByID(id, user.(*domain.User))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "schedule not found"})
 		return
@@ -59,7 +61,8 @@ func (h *ScheduleHandler) GetExecutions(c *gin.Context) {
 		return
 	}
 
-	executions, err := h.service.GetScheduleExecutions(id)
+	user, _ := c.Get("user")
+	executions, err := h.service.GetScheduleExecutions(id, user.(*domain.User))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -125,7 +128,16 @@ func (h *ScheduleHandler) Create(c *gin.Context) {
 		})
 	}
 
-	if err := h.service.Create(schedule, workflowConfigs); err != nil {
+	uVal, _ := c.Get("user")
+	u := uVal.(*domain.User)
+	nsIDStr := nsID.String()
+	// Schedules usually check against management/schedules permission or namespace if applicable
+	if !domain.HasPermission(u, "schedules", "WRITE", &nsIDStr, nil, nil) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "permission denied to create schedule in this namespace"})
+		return
+	}
+
+	if err := h.service.Create(schedule, workflowConfigs, u); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -140,7 +152,8 @@ func (h *ScheduleHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.Delete(id); err != nil {
+	user, _ := c.Get("user")
+	if err := h.service.Delete(id, user.(*domain.User)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -155,7 +168,8 @@ func (h *ScheduleHandler) ToggleStatus(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.ToggleStatus(id); err != nil {
+	user, _ := c.Get("user")
+	if err := h.service.ToggleStatus(id, user.(*domain.User)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -190,7 +204,8 @@ func (h *ScheduleHandler) Update(c *gin.Context) {
 		return
 	}
 
-	schedule, err := h.service.GetByID(id)
+	user, _ := c.Get("user")
+	schedule, err := h.service.GetByID(id, user.(*domain.User))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "schedule not found"})
 		return
@@ -222,7 +237,8 @@ func (h *ScheduleHandler) Update(c *gin.Context) {
 		})
 	}
 
-	if err := h.service.Update(schedule, workflowConfigs); err != nil {
+	userVal, _ := c.Get("user")
+	if err := h.service.Update(schedule, workflowConfigs, userVal.(*domain.User)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

@@ -18,17 +18,19 @@ func (r *PostgresVpnConfigRepo) Create(vpn *domain.VpnConfig) error {
 	return r.db.Create(vpn).Error
 }
 
-func (r *PostgresVpnConfigRepo) GetByID(id uuid.UUID) (*domain.VpnConfig, error) {
+func (r *PostgresVpnConfigRepo) GetByID(id uuid.UUID, scope *domain.PermissionScope) (*domain.VpnConfig, error) {
 	var vpn domain.VpnConfig
-	if err := r.db.First(&vpn, "id = ?", id).Error; err != nil {
+	db := applyScope(r.db, scope, "", "")
+	if err := db.First(&vpn, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	return &vpn, nil
 }
 
-func (r *PostgresVpnConfigRepo) List() ([]domain.VpnConfig, error) {
+func (r *PostgresVpnConfigRepo) List(scope *domain.PermissionScope) ([]domain.VpnConfig, error) {
 	var vpns []domain.VpnConfig
-	if err := r.db.Find(&vpns).Error; err != nil {
+	db := applyScope(r.db, scope, "", "")
+	if err := db.Find(&vpns).Error; err != nil {
 		return nil, err
 	}
 	return vpns, nil

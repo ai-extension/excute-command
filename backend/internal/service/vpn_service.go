@@ -20,18 +20,30 @@ func (s *VpnConfigService) Create(vpn *domain.VpnConfig) error {
 	return s.repo.Create(vpn)
 }
 
-func (s *VpnConfigService) GetByID(id uuid.UUID) (*domain.VpnConfig, error) {
-	return s.repo.GetByID(id)
+func (s *VpnConfigService) GetByID(id uuid.UUID, user *domain.User) (*domain.VpnConfig, error) {
+	scope := domain.GetPermissionScope(user, "vpns", "READ")
+	return s.repo.GetByID(id, &scope)
 }
 
-func (s *VpnConfigService) List() ([]domain.VpnConfig, error) {
-	return s.repo.List()
+func (s *VpnConfigService) List(user *domain.User) ([]domain.VpnConfig, error) {
+	scope := domain.GetPermissionScope(user, "vpns", "READ")
+	return s.repo.List(&scope)
 }
 
-func (s *VpnConfigService) Update(vpn *domain.VpnConfig) error {
+func (s *VpnConfigService) Update(vpn *domain.VpnConfig, user *domain.User) error {
+	scope := domain.GetPermissionScope(user, "vpns", "WRITE")
+	_, err := s.repo.GetByID(vpn.ID, &scope)
+	if err != nil {
+		return err
+	}
 	return s.repo.Update(vpn)
 }
 
-func (s *VpnConfigService) Delete(id uuid.UUID) error {
+func (s *VpnConfigService) Delete(id uuid.UUID, user *domain.User) error {
+	scope := domain.GetPermissionScope(user, "vpns", "DELETE")
+	_, err := s.repo.GetByID(id, &scope)
+	if err != nil {
+		return err
+	}
 	return s.repo.Delete(id)
 }

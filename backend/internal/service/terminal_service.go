@@ -34,8 +34,9 @@ func NewTerminalService(repo domain.ServerRepository, hub *Hub) *TerminalService
 	}
 }
 
-func (s *TerminalService) StartSession(serverID uuid.UUID) (string, error) {
-	server, err := s.repo.GetByID(serverID)
+func (s *TerminalService) StartSession(serverID uuid.UUID, user *domain.User) (string, error) {
+	scope := domain.GetPermissionScope(user, "servers", "EXECUTE")
+	server, err := s.repo.GetByID(serverID, &scope)
 	if err != nil {
 		return "", fmt.Errorf("failed to get server: %w", err)
 	}

@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/user/csm-backend/internal/domain"
 	"github.com/user/csm-backend/internal/service"
 )
 
@@ -30,7 +31,8 @@ func (h *WorkflowFileHandler) Upload(c *gin.Context) {
 		return
 	}
 
-	wfFile, err := h.service.UploadFile(wfID, file, targetPath)
+	user, _ := c.Get("user")
+	wfFile, err := h.service.UploadFile(wfID, file, targetPath, user.(*domain.User))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -46,7 +48,8 @@ func (h *WorkflowFileHandler) List(c *gin.Context) {
 		return
 	}
 
-	files, err := h.service.ListFiles(wfID)
+	user, _ := c.Get("user")
+	files, err := h.service.ListFiles(wfID, user.(*domain.User))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -62,7 +65,8 @@ func (h *WorkflowFileHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.DeleteFile(fileID); err != nil {
+	user, _ := c.Get("user")
+	if err := h.service.DeleteFile(fileID, user.(*domain.User)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -86,7 +90,8 @@ func (h *WorkflowFileHandler) UpdateTargetPath(c *gin.Context) {
 		return
 	}
 
-	updatedFile, err := h.service.UpdateTargetPath(fileID, req.TargetPath)
+	user, _ := c.Get("user")
+	updatedFile, err := h.service.UpdateTargetPath(fileID, req.TargetPath, user.(*domain.User))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

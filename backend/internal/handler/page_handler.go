@@ -38,7 +38,8 @@ func (h *PageHandler) ListPages(c *gin.Context) {
 		return
 	}
 
-	pages, err := h.service.ListPages(nsID)
+	user, _ := c.Get("user")
+	pages, err := h.service.ListPages(nsID, user.(*domain.User))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -61,6 +62,14 @@ func (h *PageHandler) CreatePage(c *gin.Context) {
 	}
 	page.NamespaceID = nsID
 
+	authUser, _ := c.Get("user")
+	userObj := authUser.(*domain.User)
+	nsIDStr = nsID.String()
+	if !domain.HasPermission(userObj, "pages", "WRITE", &nsIDStr, nil, nil) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "permission denied to create page in this namespace"})
+		return
+	}
+
 	if err := h.service.CreatePage(&page); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -76,7 +85,8 @@ func (h *PageHandler) GetPage(c *gin.Context) {
 		return
 	}
 
-	page, err := h.service.GetPage(id)
+	user, _ := c.Get("user")
+	page, err := h.service.GetPage(id, user.(*domain.User))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "page not found"})
 		return
@@ -99,7 +109,8 @@ func (h *PageHandler) UpdatePage(c *gin.Context) {
 	}
 	page.ID = id
 
-	if err := h.service.UpdatePage(&page); err != nil {
+	user, _ := c.Get("user")
+	if err := h.service.UpdatePage(&page, user.(*domain.User)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -114,7 +125,8 @@ func (h *PageHandler) DeletePage(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.DeletePage(id); err != nil {
+	user, _ := c.Get("user")
+	if err := h.service.DeletePage(id, user.(*domain.User)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -245,7 +257,7 @@ func (h *PageHandler) RunPublicWorkflow(c *gin.Context) {
 	execID := uuid.New()
 	go func() {
 		// Public run uses background context
-		h.executor.Run(context.Background(), workflowID, execID, inputReq.Inputs, nil)
+		h.executor.Run(context.Background(), workflowID, execID, inputReq.Inputs, nil, nil)
 	}()
 
 	c.JSON(http.StatusAccepted, gin.H{
@@ -281,7 +293,7 @@ func (h *PageHandler) GetPublicExecutionStatus(c *gin.Context) {
 		}
 	}
 
-	execution, err := h.workflowService.GetExecution(execID)
+	execution, err := h.workflowService.GetExecution(execID, nil)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "execution not found"})
 		return
@@ -331,7 +343,7 @@ func (h *PageHandler) GetPublicExecutionLogs(c *gin.Context) {
 		}
 	}
 
-	execution, err := h.workflowService.GetExecution(execID)
+	execution, err := h.workflowService.GetExecution(execID, nil)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "execution not found"})
 		return
@@ -371,7 +383,8 @@ func (h *PageHandler) serveLogs(c *gin.Context, execution *domain.WorkflowExecut
 	}
 
 	// If finished, or no workflow.log, merge step logs sequentially for a clean view
-	wf, err := h.workflowService.GetWorkflow(execution.WorkflowID)
+	// Public context has already verified access to this execution and its workflow ID via page check
+	wf, err := h.workflowService.GetWorkflow(execution.WorkflowID, nil)
 	if err == nil {
 		// Set headers for streaming
 		c.Header("Content-Type", "text/plain; charset=utf-8")

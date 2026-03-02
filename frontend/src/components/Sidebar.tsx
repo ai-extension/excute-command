@@ -13,32 +13,32 @@ interface SidebarProps {
 }
 
 const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
-    const { logout, user } = useAuth();
+    const { logout, user, hasPermission } = useAuth();
     const navigate = useNavigate();
 
     const globalNavItems = [
-        { name: 'Servers', path: '/servers', icon: Server },
-        { name: 'VPN Configs', path: '/vpns', icon: Network },
-    ];
+        { name: 'Servers', path: '/servers', icon: Server, type: 'servers' },
+        { name: 'VPN Configs', path: '/vpns', icon: Network, type: 'vpns' },
+    ].filter(item => hasPermission(item.type, 'READ'));
 
     const namespaceNavItems = [
-        { name: 'Dashboard', path: '/', icon: LayoutDashboard },
-        { name: 'Workflows', path: '/workflows', icon: Zap },
-        { name: 'History', path: '/history', icon: History },
-        { name: 'Variables', path: '/variables', icon: Globe },
-        { name: 'Tags', path: '/tags', icon: Tag },
-        { name: 'Schedules', path: '/schedules', icon: Calendar },
-        { name: 'Pages', path: '/pages', icon: Layout },
-    ];
+        { name: 'Dashboard', path: '/', icon: LayoutDashboard, type: 'dashboard' },
+        { name: 'Workflows', path: '/workflows', icon: Zap, type: 'workflows' },
+        { name: 'History', path: '/history', icon: History, type: 'history' },
+        { name: 'Variables', path: '/variables', icon: Globe, type: 'variables' },
+        { name: 'Tags', path: '/tags', icon: Tag, type: 'tags' },
+        { name: 'Schedules', path: '/schedules', icon: Calendar, type: 'schedules' },
+        { name: 'Pages', path: '/pages', icon: Layout, type: 'pages' },
+    ].filter(item => hasPermission(item.type, 'READ'));
 
     const identityItems = [
-        { name: 'Users', path: '/users', icon: Users },
-        { name: 'Roles', path: '/roles', icon: Shield },
-    ];
+        { name: 'Users', path: '/users', icon: Users, type: 'users' },
+        { name: 'Roles', path: '/roles', icon: Shield, type: 'roles' },
+    ].filter(item => hasPermission(item.type, 'READ'));
 
     const systemItems = [
-        { name: 'Settings', path: '/settings', icon: Settings },
-    ];
+        { name: 'Settings', path: '/settings', icon: Settings, type: 'settings' },
+    ].filter(item => hasPermission(item.type, 'READ'));
 
     const renderNavLink = (item: { name: string; path: string; icon: React.ElementType }, opts?: { indent?: boolean }) => (
         <NavLink

@@ -14,6 +14,7 @@ interface AuthContextType {
     logout: () => void;
     isAuthenticated: boolean;
     apiFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+    hasPermission: (type: string, action: string, resourceId?: string | null) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -60,8 +61,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return response;
     };
 
+    const hasPermission = (type: string, action: string, resourceId: string | null = null): boolean => {
+        if (!user || !user.username) return false;
+        if (user.username === 'admin') return true;
+
+        // Flatten permissions from all roles
+        const allPerms = user.roles?.flatMap(role => role.permissions || []) || [];
+
+        return allPerms.some((rp: any) => {
+            const perm = rp.permission;
+            if (!perm) return false;
+
+            if (perm.type === type && perm.action === action) {
+                // Global permission
+                if (!rp.resource_id) return true;
+                // Specific resource permission
+                if (resourceId && rp.resource_id === resourceId) return true;
+            }
+            return false;
+        });
+    };
+
     return (
-        <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!token, apiFetch }}>
+        <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!token, apiFetch, hasPermission }}>
             {children}
         </AuthContext.Provider>
     );

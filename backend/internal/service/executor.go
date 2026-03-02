@@ -38,8 +38,9 @@ func NewExecutorService(repo domain.CommandRepository, stepRepo domain.StepRepos
 	}
 }
 
-func (s *ExecutorService) ExecuteCommand(ctx context.Context, commandID uuid.UUID) error {
-	cmd, err := s.repo.GetByID(commandID)
+func (s *ExecutorService) ExecuteCommand(ctx context.Context, commandID uuid.UUID, user *domain.User) error {
+	scope := domain.GetPermissionScope(user, "commands", "EXECUTE")
+	cmd, err := s.repo.GetByID(commandID, &scope)
 	if err != nil {
 		return err
 	}

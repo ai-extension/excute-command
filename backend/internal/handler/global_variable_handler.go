@@ -24,7 +24,8 @@ func (h *GlobalVariableHandler) List(c *gin.Context) {
 		return
 	}
 
-	gvs, err := h.service.List(nsID)
+	user, _ := c.Get("user")
+	gvs, err := h.service.List(nsID, user.(*domain.User))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -47,6 +48,14 @@ func (h *GlobalVariableHandler) Create(c *gin.Context) {
 	}
 
 	gv.NamespaceID = nsID
+	currentUser, _ := c.Get("user")
+	user, _ := currentUser.(*domain.User)
+	nsIDStr := nsID.String()
+	if !domain.HasPermission(user, "namespaces", "WRITE", &nsIDStr, nil, nil) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "permission denied to create variable in this namespace"})
+		return
+	}
+
 	if err := h.service.Create(&gv); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -69,12 +78,8 @@ func (h *GlobalVariableHandler) Update(c *gin.Context) {
 	}
 	gv.ID = id
 
-	if err := h.service.Update(&gv).Error; err != nil {
-		// Note: Service Update usually returns Error if we use GORM's Save.
-		// Let's ensure service.Update returns error.
-	}
-	// Update service call to match my implementation in global_variable_service.go
-	if err := h.service.Update(&gv); err != nil {
+	user, _ := c.Get("user")
+	if err := h.service.Update(&gv, user.(*domain.User)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -89,7 +94,10 @@ func (h *GlobalVariableHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.Delete(id); err != nil {
+	userVal, _ := c.Get("user")
+	user := userVal.(*domain.User)
+
+	if err := h.service.Delete(id, user); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

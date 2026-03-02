@@ -42,21 +42,24 @@ func (s *PageService) CreatePage(page *domain.Page) error {
 	return s.repo.Create(page)
 }
 
-func (s *PageService) GetPage(id uuid.UUID) (*domain.Page, error) {
-	return s.repo.GetByID(id)
+func (s *PageService) GetPage(id uuid.UUID, user *domain.User) (*domain.Page, error) {
+	scope := domain.GetPermissionScope(user, "pages", "READ")
+	return s.repo.GetByID(id, &scope)
 }
 
 func (s *PageService) GetPageBySlug(slug string) (*domain.Page, error) {
 	return s.repo.GetBySlug(slug)
 }
 
-func (s *PageService) ListPages(namespaceID uuid.UUID) ([]domain.Page, error) {
-	return s.repo.List(namespaceID)
+func (s *PageService) ListPages(namespaceID uuid.UUID, user *domain.User) ([]domain.Page, error) {
+	scope := domain.GetPermissionScope(user, "pages", "READ")
+	return s.repo.List(namespaceID, &scope)
 }
 
-func (s *PageService) UpdatePage(page *domain.Page) error {
+func (s *PageService) UpdatePage(page *domain.Page, user *domain.User) error {
 	// Fetch existing to handle password and expiration
-	existing, err := s.repo.GetByID(page.ID)
+	scope := domain.GetPermissionScope(user, "pages", "WRITE")
+	existing, err := s.repo.GetByID(page.ID, &scope)
 	if err != nil {
 		return err
 	}
@@ -86,7 +89,12 @@ func (s *PageService) UpdatePage(page *domain.Page) error {
 	return s.repo.Update(page)
 }
 
-func (s *PageService) DeletePage(id uuid.UUID) error {
+func (s *PageService) DeletePage(id uuid.UUID, user *domain.User) error {
+	scope := domain.GetPermissionScope(user, "pages", "DELETE")
+	_, err := s.repo.GetByID(id, &scope)
+	if err != nil {
+		return err
+	}
 	return s.repo.Delete(id)
 }
 

@@ -21,16 +21,19 @@ func (s *TagService) Create(tag *domain.Tag) error {
 	return s.repo.Create(tag)
 }
 
-func (s *TagService) GetByID(id uuid.UUID) (*domain.Tag, error) {
-	return s.repo.GetByID(id)
+func (s *TagService) GetByID(id uuid.UUID, user *domain.User) (*domain.Tag, error) {
+	scope := domain.GetPermissionScope(user, "tags", "READ")
+	return s.repo.GetByID(id, &scope)
 }
 
-func (s *TagService) ListByNamespace(namespaceID uuid.UUID) ([]domain.Tag, error) {
-	return s.repo.ListByNamespace(namespaceID)
+func (s *TagService) ListByNamespace(namespaceID uuid.UUID, user *domain.User) ([]domain.Tag, error) {
+	scope := domain.GetPermissionScope(user, "tags", "READ")
+	return s.repo.ListByNamespace(namespaceID, &scope)
 }
 
-func (s *TagService) Update(tag *domain.Tag) error {
-	existing, err := s.repo.GetByID(tag.ID)
+func (s *TagService) Update(tag *domain.Tag, user *domain.User) error {
+	scope := domain.GetPermissionScope(user, "tags", "READ") // Need read to fetch existing
+	existing, err := s.repo.GetByID(tag.ID, &scope)
 	if err != nil {
 		return err
 	}
@@ -41,6 +44,11 @@ func (s *TagService) Update(tag *domain.Tag) error {
 	return s.repo.Update(existing)
 }
 
-func (s *TagService) Delete(id uuid.UUID) error {
+func (s *TagService) Delete(id uuid.UUID, user *domain.User) error {
+	scope := domain.GetPermissionScope(user, "tags", "DELETE")
+	_, err := s.repo.GetByID(id, &scope)
+	if err != nil {
+		return err
+	}
 	return s.repo.Delete(id)
 }

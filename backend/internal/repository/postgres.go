@@ -18,17 +18,18 @@ func (r *PostgresCommandRepo) Create(cmd *domain.Command) error {
 	return r.db.Create(cmd).Error
 }
 
-func (r *PostgresCommandRepo) GetByID(id uuid.UUID) (*domain.Command, error) {
+func (r *PostgresCommandRepo) GetByID(id uuid.UUID, scope *domain.PermissionScope) (*domain.Command, error) {
 	var cmd domain.Command
-	if err := r.db.Preload("Steps").First(&cmd, "id = ?", id).Error; err != nil {
+	db := applyScope(r.db, scope, "", "")
+	if err := db.Preload("Steps").First(&cmd, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	return &cmd, nil
 }
 
-func (r *PostgresCommandRepo) List(namespaceID *uuid.UUID) ([]domain.Command, error) {
+func (r *PostgresCommandRepo) List(namespaceID *uuid.UUID, scope *domain.PermissionScope) ([]domain.Command, error) {
 	var cmds []domain.Command
-	db := r.db
+	db := applyScope(r.db, scope, "", "")
 	if namespaceID != nil {
 		db = db.Where("namespace_id = ?", namespaceID)
 	}
@@ -36,6 +37,28 @@ func (r *PostgresCommandRepo) List(namespaceID *uuid.UUID) ([]domain.Command, er
 		return nil, err
 	}
 	return cmds, nil
+}
+
+func applyScope(db *gorm.DB, scope *domain.PermissionScope, tagJoinTable, resourceIDCol string) *gorm.DB {
+	if scope == nil || scope.IsGlobal {
+		return db
+	}
+
+	// Filter logic: (Item ID matches) OR (Namespace ID matches) OR (Tag ID matches)
+	// We use strings for IDs because they come from the RBAC system which stores them as strings (UUIDs)
+
+	conds := db.Where("id IN ?", scope.AllowedItemIDs)
+
+	if len(scope.AllowedNamespaceIDs) > 0 {
+		conds = conds.Or("namespace_id IN ?", scope.AllowedNamespaceIDs)
+	}
+
+	if tagJoinTable != "" && resourceIDCol != "" && len(scope.AllowedTagIDs) > 0 {
+		subQuery := db.Table(tagJoinTable).Select(resourceIDCol).Where("tag_id IN ?", scope.AllowedTagIDs)
+		conds = conds.Or("id IN (?)", subQuery)
+	}
+
+	return db.Where(conds)
 }
 
 func (r *PostgresCommandRepo) Update(cmd *domain.Command) error {
@@ -58,17 +81,26 @@ func (r *PostgresNamespaceRepo) Create(ns *domain.Namespace) error {
 	return r.db.Create(ns).Error
 }
 
-func (r *PostgresNamespaceRepo) GetByID(id uuid.UUID) (*domain.Namespace, error) {
+func (r *PostgresNamespaceRepo) GetByID(id uuid.UUID, scope *domain.PermissionScope) (*domain.Namespace, error) {
 	var ns domain.Namespace
-	if err := r.db.First(&ns, "id = ?", id).Error; err != nil {
+	db := r.db
+	if scope != nil && !scope.IsGlobal {
+		// Namespaces only filter by their own IDs
+		db = db.Where("id IN ?", scope.AllowedItemIDs)
+	}
+	if err := db.First(&ns, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	return &ns, nil
 }
 
-func (r *PostgresNamespaceRepo) List() ([]domain.Namespace, error) {
+func (r *PostgresNamespaceRepo) List(scope *domain.PermissionScope) ([]domain.Namespace, error) {
 	var nss []domain.Namespace
-	if err := r.db.Find(&nss).Error; err != nil {
+	db := r.db
+	if scope != nil && !scope.IsGlobal {
+		db = db.Where("id IN ?", scope.AllowedItemIDs)
+	}
+	if err := db.Find(&nss).Error; err != nil {
 		return nil, err
 	}
 	return nss, nil

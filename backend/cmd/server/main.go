@@ -1,10 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/joho/godotenv"
 	"github.com/user/csm-backend/internal/domain"
 	"github.com/user/csm-backend/internal/handler"
 	"github.com/user/csm-backend/internal/middleware"
@@ -16,11 +19,26 @@ import (
 )
 
 func main() {
-	// Database connection string
-	dsn := "host=localhost user=root password=root dbname=csm_db port=5432 sslmode=disable TimeZone=UTC"
+	// Load environment variables from .env file
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found, relying on system environment variables")
+	}
+
+	// Database connection string from environment variables
+	dbHost := os.Getenv("DB_HOST")
+	dbUser := os.Getenv("DB_USER")
+	dbPassword := os.Getenv("DB_PASSWORD")
+	dbName := os.Getenv("DB_NAME")
+	dbPort := os.Getenv("DB_PORT")
+	dbSSLMode := os.Getenv("DB_SSLMODE")
+	dbTimeZone := os.Getenv("DB_TIMEZONE")
+
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=%s",
+		dbHost, dbUser, dbPassword, dbName, dbPort, dbSSLMode, dbTimeZone)
+
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Fatal("Failed to connect to database:", err)
+		log.Fatalf("Failed to connect to database (DSN: host=%s user=%s dbname=%s port=%s): %v", dbHost, dbUser, dbName, dbPort, err)
 	}
 
 	// Auto-migration
@@ -145,82 +163,83 @@ func main() {
 		protected := api.Group("")
 		protected.Use(middleware.AuthMiddleware(authService))
 		{
-			protected.GET("/namespaces", namespaceHandler.ListNamespaces)
-			protected.POST("/namespaces", namespaceHandler.CreateNamespace)
-			protected.PUT("/namespaces/:id", namespaceHandler.UpdateNamespace)
-			protected.DELETE("/namespaces/:id", namespaceHandler.DeleteNamespace)
+			// Namespaces
+			protected.GET("/namespaces", middleware.RBACMiddleware(userRepo, "namespaces", "READ"), namespaceHandler.ListNamespaces)
+			protected.POST("/namespaces", middleware.RBACMiddleware(userRepo, "namespaces", "WRITE"), namespaceHandler.CreateNamespace)
+			protected.PUT("/namespaces/:id", middleware.RBACMiddleware(userRepo, "namespaces", "WRITE"), namespaceHandler.UpdateNamespace)
+			protected.DELETE("/namespaces/:id", middleware.RBACMiddleware(userRepo, "namespaces", "DELETE"), namespaceHandler.DeleteNamespace)
 
-			protected.GET("/commands", commandHandler.ListCommands)
-			protected.POST("/commands", commandHandler.CreateCommand)
-			protected.POST("/commands/:id/execute", commandHandler.ExecuteCommand)
+			protected.GET("/commands", middleware.RBACMiddleware(userRepo, "workflows", "READ"), commandHandler.ListCommands)
+			protected.POST("/commands", middleware.RBACMiddleware(userRepo, "workflows", "WRITE"), commandHandler.CreateCommand)
+			protected.POST("/commands/:id/execute", middleware.RBACMiddleware(userRepo, "workflows", "EXECUTE"), commandHandler.ExecuteCommand)
 
 			// User & Role Management
-			protected.GET("/users", userHandler.ListUsers)
-			protected.POST("/users", userHandler.CreateUser)
-			protected.POST("/users/:id/roles", userHandler.UpdateUserRoles)
-			protected.GET("/roles", roleHandler.ListRoles)
-			protected.POST("/roles", roleHandler.CreateRole)
-			protected.POST("/roles/:id/permissions", roleHandler.UpdateRolePermissions)
-			protected.GET("/permissions", permHandler.ListPermissions)
+			protected.GET("/users", middleware.RBACMiddleware(userRepo, "users", "READ"), userHandler.ListUsers)
+			protected.POST("/users", middleware.RBACMiddleware(userRepo, "users", "WRITE"), userHandler.CreateUser)
+			protected.POST("/users/:id/roles", middleware.RBACMiddleware(userRepo, "users", "WRITE"), userHandler.UpdateUserRoles)
+			protected.GET("/roles", middleware.RBACMiddleware(userRepo, "roles", "READ"), roleHandler.ListRoles)
+			protected.POST("/roles", middleware.RBACMiddleware(userRepo, "roles", "WRITE"), roleHandler.CreateRole)
+			protected.POST("/roles/:id/permissions", middleware.RBACMiddleware(userRepo, "roles", "WRITE"), roleHandler.UpdateRolePermissions)
+			protected.GET("/permissions", middleware.RBACMiddleware(userRepo, "roles", "READ"), permHandler.ListPermissions)
 
-			protected.GET("/servers", serverHandler.ListServers)
-			protected.POST("/servers", serverHandler.CreateServer)
-			protected.PUT("/servers/:id", serverHandler.UpdateServer)
-			protected.DELETE("/servers/:id", serverHandler.DeleteServer)
-			protected.POST("/servers/:id/execute", serverHandler.ExecuteCommand)
-			protected.POST("/servers/:id/terminal", serverHandler.StartTerminalSession)
+			protected.GET("/servers", middleware.RBACMiddleware(userRepo, "servers", "READ"), serverHandler.ListServers)
+			protected.POST("/servers", middleware.RBACMiddleware(userRepo, "servers", "WRITE"), serverHandler.CreateServer)
+			protected.PUT("/servers/:id", middleware.RBACMiddleware(userRepo, "servers", "WRITE"), serverHandler.UpdateServer)
+			protected.DELETE("/servers/:id", middleware.RBACMiddleware(userRepo, "servers", "DELETE"), serverHandler.DeleteServer)
+			protected.POST("/servers/:id/execute", middleware.RBACMiddleware(userRepo, "servers", "EXECUTE"), serverHandler.ExecuteCommand)
+			protected.POST("/servers/:id/terminal", middleware.RBACMiddleware(userRepo, "servers", "EXECUTE"), serverHandler.StartTerminalSession)
 
-			protected.GET("/namespaces/:ns_id/workflows", workflowHandler.ListWorkflows)
-			protected.POST("/namespaces/:ns_id/workflows", workflowHandler.CreateWorkflow)
-			protected.GET("/namespaces/:ns_id/executions", workflowHandler.ListAllExecutions)
-			protected.GET("/workflows/:id", workflowHandler.GetWorkflow)
-			protected.PUT("/workflows/:id", workflowHandler.UpdateWorkflow)
-			protected.POST("/workflows/:id/run", workflowHandler.RunWorkflow)
-			protected.POST("/workflow-groups", workflowHandler.CreateGroup)
-			protected.POST("/workflow-steps", workflowHandler.CreateStep)
+			protected.GET("/namespaces/:ns_id/workflows", middleware.RBACMiddleware(userRepo, "workflows", "READ"), workflowHandler.ListWorkflows)
+			protected.POST("/namespaces/:ns_id/workflows", middleware.RBACMiddleware(userRepo, "workflows", "WRITE"), workflowHandler.CreateWorkflow)
+			protected.GET("/namespaces/:ns_id/executions", middleware.RBACMiddleware(userRepo, "history", "READ"), workflowHandler.ListAllExecutions)
+			protected.GET("/workflows/:id", middleware.RBACMiddleware(userRepo, "workflows", "READ"), workflowHandler.GetWorkflow)
+			protected.PUT("/workflows/:id", middleware.RBACMiddleware(userRepo, "workflows", "WRITE"), workflowHandler.UpdateWorkflow)
+			protected.POST("/workflows/:id/run", middleware.RBACMiddleware(userRepo, "workflows", "EXECUTE"), workflowHandler.RunWorkflow)
+			protected.POST("/workflow-groups", middleware.RBACMiddleware(userRepo, "workflows", "WRITE"), workflowHandler.CreateGroup)
+			protected.POST("/workflow-steps", middleware.RBACMiddleware(userRepo, "workflows", "WRITE"), workflowHandler.CreateStep)
 
-			protected.GET("/workflows/:id/files", workflowFileHandler.List)
-			protected.POST("/workflows/:id/files", workflowFileHandler.Upload)
-			protected.PUT("/workflow-files/:id", workflowFileHandler.UpdateTargetPath)
-			protected.DELETE("/workflow-files/:id", workflowFileHandler.Delete)
+			protected.GET("/workflows/:id/files", middleware.RBACMiddleware(userRepo, "workflows", "READ"), workflowFileHandler.List)
+			protected.POST("/workflows/:id/files", middleware.RBACMiddleware(userRepo, "workflows", "WRITE"), workflowFileHandler.Upload)
+			protected.PUT("/workflow-files/:id", middleware.RBACMiddleware(userRepo, "workflows", "WRITE"), workflowFileHandler.UpdateTargetPath)
+			protected.DELETE("/workflow-files/:id", middleware.RBACMiddleware(userRepo, "workflows", "DELETE"), workflowFileHandler.Delete)
 
-			protected.GET("/workflows/:id/executions", workflowHandler.ListExecutions)
-			protected.GET("/executions/:id", workflowHandler.GetExecution)
-			protected.GET("/executions/:id/logs", workflowHandler.GetExecutionLogs)
+			protected.GET("/workflows/:id/executions", middleware.RBACMiddleware(userRepo, "workflows", "READ"), workflowHandler.ListExecutions)
+			protected.GET("/executions/:id", middleware.RBACMiddleware(userRepo, "workflows", "READ"), workflowHandler.GetExecution)
+			protected.GET("/executions/:id/logs", middleware.RBACMiddleware(userRepo, "workflows", "READ"), workflowHandler.GetExecutionLogs)
 
 			// Global Variables
-			protected.GET("/namespaces/:ns_id/global-variables", globalVarHandler.List)
-			protected.POST("/namespaces/:ns_id/global-variables", globalVarHandler.Create)
-			protected.PUT("/global-variables/:id", globalVarHandler.Update)
-			protected.DELETE("/global-variables/:id", globalVarHandler.Delete)
+			protected.GET("/namespaces/:ns_id/global-variables", middleware.RBACMiddleware(userRepo, "variables", "READ"), globalVarHandler.List)
+			protected.POST("/namespaces/:ns_id/global-variables", middleware.RBACMiddleware(userRepo, "variables", "WRITE"), globalVarHandler.Create)
+			protected.PUT("/global-variables/:id", middleware.RBACMiddleware(userRepo, "variables", "WRITE"), globalVarHandler.Update)
+			protected.DELETE("/global-variables/:id", middleware.RBACMiddleware(userRepo, "variables", "DELETE"), globalVarHandler.Delete)
 
 			// Schedules
-			protected.GET("/namespaces/:ns_id/schedules", scheduleHandler.List)
-			protected.POST("/namespaces/:ns_id/schedules", scheduleHandler.Create)
-			protected.GET("/schedules/:id", scheduleHandler.GetByID)
-			protected.GET("/schedules/:id/executions", scheduleHandler.GetExecutions)
-			protected.PUT("/schedules/:id", scheduleHandler.Update)
-			protected.DELETE("/schedules/:id", scheduleHandler.Delete)
-			protected.POST("/schedules/:id/toggle", scheduleHandler.ToggleStatus)
+			protected.GET("/namespaces/:ns_id/schedules", middleware.RBACMiddleware(userRepo, "schedules", "READ"), scheduleHandler.List)
+			protected.POST("/namespaces/:ns_id/schedules", middleware.RBACMiddleware(userRepo, "schedules", "WRITE"), scheduleHandler.Create)
+			protected.GET("/schedules/:id", middleware.RBACMiddleware(userRepo, "schedules", "READ"), scheduleHandler.GetByID)
+			protected.GET("/schedules/:id/executions", middleware.RBACMiddleware(userRepo, "schedules", "READ"), scheduleHandler.GetExecutions)
+			protected.PUT("/schedules/:id", middleware.RBACMiddleware(userRepo, "schedules", "WRITE"), scheduleHandler.Update)
+			protected.DELETE("/schedules/:id", middleware.RBACMiddleware(userRepo, "schedules", "DELETE"), scheduleHandler.Delete)
+			protected.POST("/schedules/:id/toggle", middleware.RBACMiddleware(userRepo, "schedules", "WRITE"), scheduleHandler.ToggleStatus)
 
 			// Tags
-			protected.GET("/namespaces/:ns_id/tags", tagHandler.List)
-			protected.POST("/namespaces/:ns_id/tags", tagHandler.Create)
-			protected.PUT("/tags/:id", tagHandler.Update)
-			protected.DELETE("/tags/:id", tagHandler.Delete)
+			protected.GET("/namespaces/:ns_id/tags", middleware.RBACMiddleware(userRepo, "tags", "READ"), tagHandler.List)
+			protected.POST("/namespaces/:ns_id/tags", middleware.RBACMiddleware(userRepo, "tags", "WRITE"), tagHandler.Create)
+			protected.PUT("/tags/:id", middleware.RBACMiddleware(userRepo, "tags", "WRITE"), tagHandler.Update)
+			protected.DELETE("/tags/:id", middleware.RBACMiddleware(userRepo, "tags", "DELETE"), tagHandler.Delete)
 
 			// VPNs
-			protected.GET("/vpns", vpnHandler.List)
-			protected.POST("/vpns", vpnHandler.Create)
-			protected.PUT("/vpns/:id", vpnHandler.Update)
-			protected.DELETE("/vpns/:id", vpnHandler.Delete)
+			protected.GET("/vpns", middleware.RBACMiddleware(userRepo, "vpns", "READ"), vpnHandler.List)
+			protected.POST("/vpns", middleware.RBACMiddleware(userRepo, "vpns", "WRITE"), vpnHandler.Create)
+			protected.PUT("/vpns/:id", middleware.RBACMiddleware(userRepo, "vpns", "WRITE"), vpnHandler.Update)
+			protected.DELETE("/vpns/:id", middleware.RBACMiddleware(userRepo, "vpns", "DELETE"), vpnHandler.Delete)
 
 			// Pages
-			protected.GET("/namespaces/:ns_id/pages", pageHandler.ListPages)
-			protected.POST("/namespaces/:ns_id/pages", pageHandler.CreatePage)
-			protected.GET("/pages/:id", pageHandler.GetPage)
-			protected.PUT("/pages/:id", pageHandler.UpdatePage)
-			protected.DELETE("/pages/:id", pageHandler.DeletePage)
+			protected.GET("/namespaces/:ns_id/pages", middleware.RBACMiddleware(userRepo, "pages", "READ"), pageHandler.ListPages)
+			protected.POST("/namespaces/:ns_id/pages", middleware.RBACMiddleware(userRepo, "pages", "WRITE"), pageHandler.CreatePage)
+			protected.GET("/pages/:id", middleware.RBACMiddleware(userRepo, "pages", "READ"), pageHandler.GetPage)
+			protected.PUT("/pages/:id", middleware.RBACMiddleware(userRepo, "pages", "WRITE"), pageHandler.UpdatePage)
+			protected.DELETE("/pages/:id", middleware.RBACMiddleware(userRepo, "pages", "DELETE"), pageHandler.DeletePage)
 		}
 
 		// Public Page access (no auth required)
@@ -231,8 +250,13 @@ func main() {
 		api.GET("/public/pages/:slug/executions/:exec_id/logs", pageHandler.GetPublicExecutionLogs)
 	}
 
-	log.Println("Server starting on :8080")
-	if err := r.Run(":8080"); err != nil {
+	serverPort := os.Getenv("SERVER_PORT")
+	if serverPort == "" {
+		serverPort = "8080"
+	}
+
+	log.Printf("Server starting on :%s", serverPort)
+	if err := r.Run(":" + serverPort); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -246,17 +270,70 @@ func seedAdmin(db *gorm.DB) {
 		Type   string
 		Action string
 	}{
-		{Name: "Execute Commands", Type: "FUNCTION", Action: "EXECUTE"},
-		{Name: "Read Commands", Type: "RESOURCE", Action: "READ"},
-		{Name: "Manage Users", Type: "FUNCTION", Action: "WRITE"},
-		{Name: "Manage Roles", Type: "FUNCTION", Action: "WRITE"},
-		{Name: "View Dashboard", Type: "RESOURCE", Action: "READ"},
+		// Operational (Namespace-scoped)
+		{Name: "View Dashboard", Type: "dashboard", Action: "READ"},
+
+		{Name: "Read Workflows", Type: "workflows", Action: "READ"},
+		{Name: "Manage Workflows", Type: "workflows", Action: "WRITE"},
+		{Name: "Execute Workflows", Type: "workflows", Action: "EXECUTE"},
+		{Name: "Delete Workflows", Type: "workflows", Action: "DELETE"},
+
+		{Name: "Read History", Type: "history", Action: "READ"},
+
+		{Name: "Read Variables", Type: "variables", Action: "READ"},
+		{Name: "Manage Variables", Type: "variables", Action: "WRITE"},
+		{Name: "Delete Variables", Type: "variables", Action: "DELETE"},
+
+		{Name: "Read Tags", Type: "tags", Action: "READ"},
+		{Name: "Manage Tags", Type: "tags", Action: "WRITE"},
+		{Name: "Delete Tags", Type: "tags", Action: "DELETE"},
+		{Name: "Read Resources in Tag", Type: "tags", Action: "RESOURCE_READ"},
+		{Name: "Write Resources in Tag", Type: "tags", Action: "RESOURCE_WRITE"},
+		{Name: "Execute Resources in Tag", Type: "tags", Action: "RESOURCE_EXECUTE"},
+		{Name: "Delete Resources in Tag", Type: "tags", Action: "RESOURCE_DELETE"},
+
+		{Name: "Read Schedules", Type: "schedules", Action: "READ"},
+		{Name: "Manage Schedules", Type: "schedules", Action: "WRITE"},
+		{Name: "Execute Schedules", Type: "schedules", Action: "EXECUTE"},
+		{Name: "Delete Schedules", Type: "schedules", Action: "DELETE"},
+
+		{Name: "Read Pages", Type: "pages", Action: "READ"},
+		{Name: "Manage Pages", Type: "pages", Action: "WRITE"},
+		{Name: "Delete Pages", Type: "pages", Action: "DELETE"},
+
+		// Global
+		{Name: "Read Servers", Type: "servers", Action: "READ"},
+		{Name: "Manage Servers", Type: "servers", Action: "WRITE"},
+		{Name: "Execute Commands on Servers", Type: "servers", Action: "EXECUTE"},
+		{Name: "Delete Servers", Type: "servers", Action: "DELETE"},
+
+		{Name: "Read VPNs", Type: "vpns", Action: "READ"},
+		{Name: "Manage VPNs", Type: "vpns", Action: "WRITE"},
+		{Name: "Delete VPNs", Type: "vpns", Action: "DELETE"},
+
+		// Identity
+		{Name: "Read Users", Type: "users", Action: "READ"},
+		{Name: "Manage Users", Type: "users", Action: "WRITE"},
+		{Name: "Delete Users", Type: "users", Action: "DELETE"},
+
+		{Name: "Read Roles", Type: "roles", Action: "READ"},
+		{Name: "Manage Roles", Type: "roles", Action: "WRITE"},
+		{Name: "Delete Roles", Type: "roles", Action: "DELETE"},
+
+		// System
+		{Name: "Read Settings", Type: "settings", Action: "READ"},
+		{Name: "Manage Settings", Type: "settings", Action: "WRITE"},
+
+		{Name: "Read Namespaces", Type: "namespaces", Action: "READ"},
+		{Name: "Manage Namespaces", Type: "namespaces", Action: "WRITE"},
+		{Name: "Delete Namespaces", Type: "namespaces", Action: "DELETE"},
+		{Name: "Read Resources in Namespace", Type: "namespaces", Action: "RESOURCE_READ"},
+		{Name: "Write Resources in Namespace", Type: "namespaces", Action: "RESOURCE_WRITE"},
+		{Name: "Execute Resources in Namespace", Type: "namespaces", Action: "RESOURCE_EXECUTE"},
+		{Name: "Delete Resources in Namespace", Type: "namespaces", Action: "RESOURCE_DELETE"},
 	}
 
 	var perms []domain.Permission
-	var rolePerms []domain.RolePermission
-	adminRoleID := uuid.New()
-
 	for _, def := range permDefs {
 		var p domain.Permission
 		err := db.Where("name = ?", def.Name).First(&p).Error
@@ -276,57 +353,63 @@ func seedAdmin(db *gorm.DB) {
 				log.Printf("Error checking permission %s: %v", def.Name, err)
 				continue
 			}
+		} else {
+			// Update existing permission type/action just in case
+			p.Type = def.Type
+			p.Action = def.Action
+			db.Save(&p)
 		}
 		perms = append(perms, p)
-		rolePerms = append(rolePerms, domain.RolePermission{
+	}
+
+	var adminRole domain.Role
+	err := db.Where("name = ?", "admin").First(&adminRole).Error
+	if err == gorm.ErrRecordNotFound {
+		adminRole = domain.Role{
+			ID:          uuid.New(),
+			Name:        "admin",
+			Description: "Full access role",
+		}
+		db.Create(&adminRole)
+	}
+
+	// Update admin role permissions
+	// Use a clean slate for admin role permissions to ensure it always has all seeded perms
+	db.Exec("DELETE FROM role_permissions WHERE role_id = ?", adminRole.ID)
+	for _, p := range perms {
+		rp := domain.RolePermission{
 			ID:           uuid.New(),
-			RoleID:       adminRoleID,
+			RoleID:       adminRole.ID,
 			PermissionID: p.ID,
-			ResourceID:   nil, // Admin gets all resources
-		})
+			ResourceID:   nil,
+		}
+		db.Create(&rp)
 	}
 
 	var adminUser domain.User
-	err := db.Preload("Roles").Where("username = ?", "admin").First(&adminUser).Error
-
+	err = db.Where("username = ?", "admin").First(&adminUser).Error
 	if err == gorm.ErrRecordNotFound {
 		log.Println("Seeding admin user...")
-		hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
+		adminPassword := os.Getenv("ADMIN_PASSWORD")
+		if adminPassword == "" {
+			adminPassword = "admin"
+		}
+		hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(adminPassword), bcrypt.DefaultCost)
 		adminUser = domain.User{
 			ID:           uuid.New(),
 			Username:     "admin",
 			PasswordHash: string(hashedPassword),
 			Email:        "admin@example.com",
+			Roles:        []domain.Role{adminRole},
 		}
-
-		// Create admin role
-		adminRole := domain.Role{
-			ID:          adminRoleID,
-			Name:        "admin",
-			Description: "Full access role",
-			Permissions: rolePerms,
-		}
-
-		if err := db.FirstOrCreate(&adminRole, "name = ?", adminRole.Name).Error; err != nil {
-			log.Println("Failed to create admin role:", err)
-		}
-
-		adminUser.Roles = []domain.Role{adminRole}
 		if err := db.Create(&adminUser).Error; err != nil {
 			log.Println("Failed to seed admin user:", err)
 		} else {
 			log.Println("Admin user seeded successfully (admin/admin)")
 		}
 	} else if err == nil {
-		// Ensure admin role has permissions even if user exists
-		var adminRole domain.Role
-		if err := db.Where("name = ?", "admin").First(&adminRole).Error; err == nil {
-			if err := db.Model(&adminRole).Association("Permissions").Replace(perms); err != nil {
-				log.Println("Failed to update admin role permissions:", err)
-			}
-		}
-	} else {
-		log.Println("Error checking admin user:", err)
+		// Ensure admin user has admin role
+		db.Model(&adminUser).Association("Roles").Append(&adminRole)
 	}
 }
 

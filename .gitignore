@@ -17,6 +17,7 @@ backend/*.dylib
 backend/vendor/
 backend/go.work
 backend/data/
+backend/.env
 
 # Frontend (Node/React/Vite)
 frontend/node_modules/

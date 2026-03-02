@@ -18,9 +18,10 @@ func (r *PostgresWorkflowRepo) Create(wf *domain.Workflow) error {
 	return r.db.Create(wf).Error
 }
 
-func (r *PostgresWorkflowRepo) GetByID(id uuid.UUID) (*domain.Workflow, error) {
+func (r *PostgresWorkflowRepo) GetByID(id uuid.UUID, scope *domain.PermissionScope) (*domain.Workflow, error) {
 	var wf domain.Workflow
-	err := r.db.
+	db := applyScope(r.db, scope, "workflow_tags", "workflow_id")
+	err := db.
 		Preload("Inputs", func(db *gorm.DB) *gorm.DB { return db.Order("\"created_at\" ASC") }).
 		Preload("Variables", func(db *gorm.DB) *gorm.DB { return db.Order("\"created_at\" ASC") }).
 		Preload("Groups", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
@@ -35,9 +36,10 @@ func (r *PostgresWorkflowRepo) GetByID(id uuid.UUID) (*domain.Workflow, error) {
 	return &wf, nil
 }
 
-func (r *PostgresWorkflowRepo) List(namespaceID uuid.UUID) ([]domain.Workflow, error) {
+func (r *PostgresWorkflowRepo) List(namespaceID uuid.UUID, scope *domain.PermissionScope) ([]domain.Workflow, error) {
 	var wfs []domain.Workflow
-	err := r.db.
+	db := applyScope(r.db, scope, "workflow_tags", "workflow_id")
+	err := db.
 		Preload("Inputs").
 		Preload("Variables").
 		Preload("Groups", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
@@ -54,17 +56,19 @@ func (r *PostgresWorkflowRepo) List(namespaceID uuid.UUID) ([]domain.Workflow, e
 	return wfs, nil
 }
 
-func (r *PostgresWorkflowRepo) ListPaginated(namespaceID uuid.UUID, limit, offset int) ([]domain.Workflow, int64, error) {
+func (r *PostgresWorkflowRepo) ListPaginated(namespaceID uuid.UUID, limit, offset int, scope *domain.PermissionScope) ([]domain.Workflow, int64, error) {
 	var wfs []domain.Workflow
 	var total int64
 
+	db := applyScope(r.db, scope, "workflow_tags", "workflow_id")
+
 	// Count total
-	if err := r.db.Model(&domain.Workflow{}).Where("namespace_id = ?", namespaceID).Count(&total).Error; err != nil {
+	if err := db.Model(&domain.Workflow{}).Where("namespace_id = ?", namespaceID).Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
 	// Fetch paginated
-	err := r.db.
+	err := db.
 		Preload("Inputs").
 		Preload("Variables").
 		Preload("Groups", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
@@ -283,33 +287,53 @@ func (r *PostgresWorkflowExecutionRepo) Create(exec *domain.WorkflowExecution) e
 	return r.db.Create(exec).Error
 }
 
-func (r *PostgresWorkflowExecutionRepo) GetByID(id uuid.UUID) (*domain.WorkflowExecution, error) {
+func (r *PostgresWorkflowExecutionRepo) GetByID(id uuid.UUID, scope *domain.PermissionScope) (*domain.WorkflowExecution, error) {
 	var exec domain.WorkflowExecution
-	if err := r.db.Preload("Workflow.Groups.Steps").Preload("Steps").First(&exec, "id = ?", id).Error; err != nil {
+	db := r.db
+	if scope != nil && !scope.IsGlobal {
+		db = db.Joins("JOIN workflows ON workflows.id = workflow_executions.workflow_id").
+			Where("workflows.namespace_id IN ? OR workflow_executions.workflow_id IN ?", scope.AllowedNamespaceIDs, scope.AllowedItemIDs)
+	}
+	if err := db.Preload("Workflow.Groups.Steps").Preload("Steps").First(&exec, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	return &exec, nil
 }
 
-func (r *PostgresWorkflowExecutionRepo) ListByWorkflowID(workflowID uuid.UUID) ([]domain.WorkflowExecution, error) {
+func (r *PostgresWorkflowExecutionRepo) ListByWorkflowID(workflowID uuid.UUID, scope *domain.PermissionScope) ([]domain.WorkflowExecution, error) {
 	var execs []domain.WorkflowExecution
-	if err := r.db.Where("workflow_id = ?", workflowID).Order("created_at DESC").Find(&execs).Error; err != nil {
+	db := r.db
+	if scope != nil && !scope.IsGlobal {
+		// Simple filter as we already have workflowID, but we should verify access to that workflowID
+		// In a real app, applyScope or a simple check is needed.
+		// For now, let's assume the handler/service already verified access to workflowID,
+		// but redundancy doesn't hurt.
+		db = db.Joins("JOIN workflows ON workflows.id = workflow_executions.workflow_id").
+			Where("workflows.namespace_id IN ? OR workflow_executions.workflow_id IN ?", scope.AllowedNamespaceIDs, scope.AllowedItemIDs)
+	}
+	if err := db.Where("workflow_id = ?", workflowID).Order("created_at DESC").Find(&execs).Error; err != nil {
 		return nil, err
 	}
 	return execs, nil
 }
 
-func (r *PostgresWorkflowExecutionRepo) ListByWorkflowIDPaginated(workflowID uuid.UUID, limit, offset int) ([]domain.WorkflowExecution, int64, error) {
+func (r *PostgresWorkflowExecutionRepo) ListByWorkflowIDPaginated(workflowID uuid.UUID, limit, offset int, scope *domain.PermissionScope) ([]domain.WorkflowExecution, int64, error) {
 	var execs []domain.WorkflowExecution
 	var total int64
 
+	db := r.db
+	if scope != nil && !scope.IsGlobal {
+		db = db.Joins("JOIN workflows ON workflows.id = workflow_executions.workflow_id").
+			Where("workflows.namespace_id IN ? OR workflow_executions.workflow_id IN ?", scope.AllowedNamespaceIDs, scope.AllowedItemIDs)
+	}
+
 	// Separate count query
-	if err := r.db.Model(&domain.WorkflowExecution{}).Where("workflow_id = ?", workflowID).Count(&total).Error; err != nil {
+	if err := db.Model(&domain.WorkflowExecution{}).Where("workflow_id = ?", workflowID).Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
 	// Separate paginated fetch with schedule preload
-	err := r.db.
+	err := db.
 		Where("workflow_id = ?", workflowID).
 		Preload("Schedule").
 		Order("created_at DESC").
@@ -319,12 +343,17 @@ func (r *PostgresWorkflowExecutionRepo) ListByWorkflowIDPaginated(workflowID uui
 	return execs, total, err
 }
 
-func (r *PostgresWorkflowExecutionRepo) ListByNamespaceID(namespaceID uuid.UUID) ([]domain.WorkflowExecution, error) {
+func (r *PostgresWorkflowExecutionRepo) ListByNamespaceID(namespaceID uuid.UUID, scope *domain.PermissionScope) ([]domain.WorkflowExecution, error) {
 	var execs []domain.WorkflowExecution
-	err := r.db.
+	db := r.db
+	if scope != nil && !scope.IsGlobal {
+		db = db.Joins("JOIN workflows ON workflows.id = workflow_executions.workflow_id").
+			Where("workflows.namespace_id IN ? OR workflow_executions.workflow_id IN ?", scope.AllowedNamespaceIDs, scope.AllowedItemIDs)
+	}
+	err := db.
 		Preload("Workflow").
-		Joins("JOIN workflows ON workflows.id = workflow_executions.workflow_id").
-		Where("workflows.namespace_id = ?", namespaceID).
+		Joins("JOIN workflows w2 ON w2.id = workflow_executions.workflow_id").
+		Where("w2.namespace_id = ?", namespaceID).
 		Order("workflow_executions.created_at DESC").
 		Find(&execs).Error
 	if err != nil {
@@ -333,9 +362,14 @@ func (r *PostgresWorkflowExecutionRepo) ListByNamespaceID(namespaceID uuid.UUID)
 	return execs, nil
 }
 
-func (r *PostgresWorkflowExecutionRepo) ListByScheduledID(scheduledID uuid.UUID) ([]domain.WorkflowExecution, error) {
+func (r *PostgresWorkflowExecutionRepo) ListByScheduledID(scheduledID uuid.UUID, scope *domain.PermissionScope) ([]domain.WorkflowExecution, error) {
 	var execs []domain.WorkflowExecution
-	err := r.db.
+	db := r.db
+	if scope != nil && !scope.IsGlobal {
+		db = db.Joins("JOIN workflows ON workflows.id = workflow_executions.workflow_id").
+			Where("workflows.namespace_id IN ? OR workflow_executions.workflow_id IN ?", scope.AllowedNamespaceIDs, scope.AllowedItemIDs)
+	}
+	err := db.
 		Preload("Workflow").
 		Where("scheduled_id = ?", scheduledID).
 		Order("created_at DESC").

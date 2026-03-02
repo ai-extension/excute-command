@@ -84,6 +84,13 @@ type Permission struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type PermissionScope struct {
+	IsGlobal            bool
+	AllowedItemIDs      []string
+	AllowedNamespaceIDs []string
+	AllowedTagIDs       []string
+}
+
 type UserRepository interface {
 	Create(user *User) error
 	GetByID(id uuid.UUID) (*User, error)
@@ -113,16 +120,16 @@ type PermissionRepository interface {
 
 type CommandRepository interface {
 	Create(cmd *Command) error
-	GetByID(id uuid.UUID) (*Command, error)
-	List(namespaceID *uuid.UUID) ([]Command, error)
+	GetByID(id uuid.UUID, scope *PermissionScope) (*Command, error)
+	List(namespaceID *uuid.UUID, scope *PermissionScope) ([]Command, error)
 	Update(cmd *Command) error
 	Delete(id uuid.UUID) error
 }
 
 type NamespaceRepository interface {
 	Create(ns *Namespace) error
-	GetByID(id uuid.UUID) (*Namespace, error)
-	List() ([]Namespace, error)
+	GetByID(id uuid.UUID, scope *PermissionScope) (*Namespace, error)
+	List(scope *PermissionScope) ([]Namespace, error)
 	Update(ns *Namespace) error
 	Delete(id uuid.UUID) error
 }
@@ -145,8 +152,8 @@ type Server struct {
 
 type ServerRepository interface {
 	Create(server *Server) error
-	GetByID(id uuid.UUID) (*Server, error)
-	List() ([]Server, error)
+	GetByID(id uuid.UUID, scope *PermissionScope) (*Server, error)
+	List(scope *PermissionScope) ([]Server, error)
 	Update(server *Server) error
 	Delete(id uuid.UUID) error
 }
@@ -167,8 +174,8 @@ type VpnConfig struct {
 
 type VpnConfigRepository interface {
 	Create(vpn *VpnConfig) error
-	GetByID(id uuid.UUID) (*VpnConfig, error)
-	List() ([]VpnConfig, error)
+	GetByID(id uuid.UUID, scope *PermissionScope) (*VpnConfig, error)
+	List(scope *PermissionScope) ([]VpnConfig, error)
 	Update(vpn *VpnConfig) error
 	Delete(id uuid.UUID) error
 }
@@ -338,7 +345,8 @@ type WorkflowExecution struct {
 	ScheduledID *uuid.UUID              `json:"scheduled_id" gorm:"type:uuid;index"`
 	Status      Status                  `json:"status"`
 	Inputs      string                  `json:"inputs"` // JSON string
-	ExecutedBy  uuid.UUID               `json:"executed_by" gorm:"type:uuid"`
+	ExecutedBy  *uuid.UUID              `json:"executed_by" gorm:"type:uuid"`
+	User        *User                   `json:"user,omitempty" gorm:"foreignKey:ExecutedBy"`
 	LogPath     string                  `json:"log_path"`
 	StartedAt   time.Time               `json:"started_at"`
 	FinishedAt  *time.Time              `json:"finished_at,omitempty"`
@@ -364,9 +372,9 @@ type WorkflowExecutionStep struct {
 
 type WorkflowRepository interface {
 	Create(wf *Workflow) error
-	GetByID(id uuid.UUID) (*Workflow, error)
-	List(namespaceID uuid.UUID) ([]Workflow, error)
-	ListPaginated(namespaceID uuid.UUID, limit, offset int) ([]Workflow, int64, error)
+	GetByID(id uuid.UUID, scope *PermissionScope) (*Workflow, error)
+	List(namespaceID uuid.UUID, scope *PermissionScope) ([]Workflow, error)
+	ListPaginated(namespaceID uuid.UUID, limit, offset int, scope *PermissionScope) ([]Workflow, int64, error)
 	Update(wf *Workflow) error
 	Delete(id uuid.UUID) error
 }
@@ -401,27 +409,27 @@ type WorkflowVariableRepository interface {
 
 type WorkflowExecutionRepository interface {
 	Create(exec *WorkflowExecution) error
-	GetByID(id uuid.UUID) (*WorkflowExecution, error)
-	ListByWorkflowID(workflowID uuid.UUID) ([]WorkflowExecution, error)
-	ListByWorkflowIDPaginated(workflowID uuid.UUID, limit, offset int) ([]WorkflowExecution, int64, error)
-	ListByNamespaceID(namespaceID uuid.UUID) ([]WorkflowExecution, error)
-	ListByScheduledID(scheduledID uuid.UUID) ([]WorkflowExecution, error)
+	GetByID(id uuid.UUID, scope *PermissionScope) (*WorkflowExecution, error)
+	ListByWorkflowID(workflowID uuid.UUID, scope *PermissionScope) ([]WorkflowExecution, error)
+	ListByWorkflowIDPaginated(workflowID uuid.UUID, limit, offset int, scope *PermissionScope) ([]WorkflowExecution, int64, error)
+	ListByNamespaceID(namespaceID uuid.UUID, scope *PermissionScope) ([]WorkflowExecution, error)
+	ListByScheduledID(scheduledID uuid.UUID, scope *PermissionScope) ([]WorkflowExecution, error)
 	Update(exec *WorkflowExecution) error
 	CreateStepResult(stepExec *WorkflowExecutionStep) error
 }
 
 type GlobalVariableRepository interface {
 	Create(gv *GlobalVariable) error
-	GetByID(id uuid.UUID) (*GlobalVariable, error)
-	List(namespaceID uuid.UUID) ([]GlobalVariable, error)
+	GetByID(id uuid.UUID, scope *PermissionScope) (*GlobalVariable, error)
+	List(namespaceID uuid.UUID, scope *PermissionScope) ([]GlobalVariable, error)
 	Update(gv *GlobalVariable) error
 	Delete(id uuid.UUID) error
 }
 
 type ScheduleRepository interface {
 	Create(s *Schedule) error
-	GetByID(id uuid.UUID) (*Schedule, error)
-	List(namespaceID uuid.UUID) ([]Schedule, error)
+	GetByID(id uuid.UUID, scope *PermissionScope) (*Schedule, error)
+	List(namespaceID uuid.UUID, scope *PermissionScope) ([]Schedule, error)
 	Update(s *Schedule) error
 	Delete(id uuid.UUID) error
 	AddScheduledWorkflow(sw *ScheduleWorkflow) error
@@ -432,8 +440,8 @@ type ScheduleRepository interface {
 
 type WorkflowFileRepository interface {
 	Create(file *WorkflowFile) error
-	GetByID(id uuid.UUID) (*WorkflowFile, error)
-	GetByWorkflowID(workflowID uuid.UUID) ([]WorkflowFile, error)
+	GetByID(id uuid.UUID, scope *PermissionScope) (*WorkflowFile, error)
+	GetByWorkflowID(workflowID uuid.UUID, scope *PermissionScope) ([]WorkflowFile, error)
 	Update(file *WorkflowFile) error
 	Delete(id uuid.UUID) error
 }
@@ -466,17 +474,17 @@ type PageWorkflow struct {
 
 type PageRepository interface {
 	Create(page *Page) error
-	GetByID(id uuid.UUID) (*Page, error)
-	GetBySlug(slug string) (*Page, error)
-	List(namespaceID uuid.UUID) ([]Page, error)
+	GetByID(id uuid.UUID, scope *PermissionScope) (*Page, error)
+	GetBySlug(slug string) (*Page, error) // Public slug lookup doesn't need scope
+	List(namespaceID uuid.UUID, scope *PermissionScope) ([]Page, error)
 	Update(page *Page) error
 	Delete(id uuid.UUID) error
 }
 
 type TagRepository interface {
 	Create(tag *Tag) error
-	GetByID(id uuid.UUID) (*Tag, error)
-	ListByNamespace(namespaceID uuid.UUID) ([]Tag, error)
+	GetByID(id uuid.UUID, scope *PermissionScope) (*Tag, error)
+	ListByNamespace(namespaceID uuid.UUID, scope *PermissionScope) ([]Tag, error)
 	Update(tag *Tag) error
 	Delete(id uuid.UUID) error
 }

@@ -30,8 +30,12 @@ func (h *CommandHandler) ListCommands(c *gin.Context) {
 			namespaceID = &id
 		}
 	}
+	// Get user from context (set by RBACMiddleware)
+	currentUser, _ := c.Get("user")
+	user, _ := currentUser.(*domain.User)
+	scope := domain.GetPermissionScope(user, "commands", "READ")
 
-	cmds, err := h.repo.List(namespaceID)
+	cmds, err := h.repo.List(namespaceID, &scope)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -46,6 +50,14 @@ func (h *CommandHandler) CreateCommand(c *gin.Context) {
 		return
 	}
 	cmd.ID = uuid.New()
+	currentUser, _ := c.Get("user")
+	user, _ := currentUser.(*domain.User)
+	nsIDStr := cmd.NamespaceID.String()
+	if !domain.HasPermission(user, "commands", "WRITE", &nsIDStr, nil, nil) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "permission denied to create command in this namespace"})
+		return
+	}
+
 	if err := h.repo.Create(&cmd); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -61,7 +73,11 @@ func (h *CommandHandler) ExecuteCommand(c *gin.Context) {
 		return
 	}
 
-	go h.executor.ExecuteCommand(c.Request.Context(), id)
+	// Get user from context
+	currentUser, _ := c.Get("user")
+	user, _ := currentUser.(*domain.User)
+
+	go h.executor.ExecuteCommand(c.Request.Context(), id, user)
 
 	c.JSON(http.StatusAccepted, gin.H{"status": "execution started"})
 }

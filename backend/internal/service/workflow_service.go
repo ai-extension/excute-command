@@ -69,19 +69,28 @@ func (s *WorkflowService) CreateWorkflow(wf *domain.Workflow) error {
 	return s.repo.Create(wf)
 }
 
-func (s *WorkflowService) GetWorkflow(id uuid.UUID) (*domain.Workflow, error) {
-	return s.repo.GetByID(id)
+func (s *WorkflowService) GetWorkflow(id uuid.UUID, user *domain.User) (*domain.Workflow, error) {
+	scope := domain.GetPermissionScope(user, "workflows", "READ")
+	return s.repo.GetByID(id, &scope)
 }
 
-func (s *WorkflowService) ListWorkflows(namespaceID uuid.UUID) ([]domain.Workflow, error) {
-	return s.repo.List(namespaceID)
+func (s *WorkflowService) ListWorkflows(namespaceID uuid.UUID, user *domain.User) ([]domain.Workflow, error) {
+	scope := domain.GetPermissionScope(user, "workflows", "READ")
+	return s.repo.List(namespaceID, &scope)
 }
 
-func (s *WorkflowService) ListWorkflowsPaginated(namespaceID uuid.UUID, limit, offset int) ([]domain.Workflow, int64, error) {
-	return s.repo.ListPaginated(namespaceID, limit, offset)
+func (s *WorkflowService) ListWorkflowsPaginated(namespaceID uuid.UUID, limit, offset int, user *domain.User) ([]domain.Workflow, int64, error) {
+	scope := domain.GetPermissionScope(user, "workflows", "READ")
+	return s.repo.ListPaginated(namespaceID, limit, offset, &scope)
 }
 
-func (s *WorkflowService) UpdateWorkflow(wf *domain.Workflow) error {
+func (s *WorkflowService) UpdateWorkflow(wf *domain.Workflow, user *domain.User) error {
+	scope := domain.GetPermissionScope(user, "workflows", "WRITE")
+	_, err := s.repo.GetByID(wf.ID, &scope)
+	if err != nil {
+		return err
+	}
+
 	// Recursively assign IDs to new inputs, variables, groups and steps
 	for i := range wf.Inputs {
 		if wf.Inputs[i].ID == uuid.Nil {
@@ -112,24 +121,33 @@ func (s *WorkflowService) UpdateWorkflow(wf *domain.Workflow) error {
 	return s.repo.Update(wf)
 }
 
-func (s *WorkflowService) DeleteWorkflow(id uuid.UUID) error {
+func (s *WorkflowService) DeleteWorkflow(id uuid.UUID, user *domain.User) error {
+	scope := domain.GetPermissionScope(user, "workflows", "DELETE")
+	_, err := s.repo.GetByID(id, &scope)
+	if err != nil {
+		return err
+	}
 	return s.repo.Delete(id)
 }
 
-func (s *WorkflowService) ListExecutions(workflowID uuid.UUID) ([]domain.WorkflowExecution, error) {
-	return s.execRepo.ListByWorkflowID(workflowID)
+func (s *WorkflowService) ListExecutions(workflowID uuid.UUID, user *domain.User) ([]domain.WorkflowExecution, error) {
+	scope := domain.GetPermissionScope(user, "workflows", "READ")
+	return s.execRepo.ListByWorkflowID(workflowID, &scope)
 }
 
-func (s *WorkflowService) ListExecutionsPaginated(workflowID uuid.UUID, limit, offset int) ([]domain.WorkflowExecution, int64, error) {
-	return s.execRepo.ListByWorkflowIDPaginated(workflowID, limit, offset)
+func (s *WorkflowService) ListExecutionsPaginated(workflowID uuid.UUID, limit, offset int, user *domain.User) ([]domain.WorkflowExecution, int64, error) {
+	scope := domain.GetPermissionScope(user, "workflows", "READ")
+	return s.execRepo.ListByWorkflowIDPaginated(workflowID, limit, offset, &scope)
 }
 
-func (s *WorkflowService) ListNamespaceExecutions(namespaceID uuid.UUID) ([]domain.WorkflowExecution, error) {
-	return s.execRepo.ListByNamespaceID(namespaceID)
+func (s *WorkflowService) ListNamespaceExecutions(namespaceID uuid.UUID, user *domain.User) ([]domain.WorkflowExecution, error) {
+	scope := domain.GetPermissionScope(user, "workflows", "READ")
+	return s.execRepo.ListByNamespaceID(namespaceID, &scope)
 }
 
-func (s *WorkflowService) GetExecution(id uuid.UUID) (*domain.WorkflowExecution, error) {
-	return s.execRepo.GetByID(id)
+func (s *WorkflowService) GetExecution(id uuid.UUID, user *domain.User) (*domain.WorkflowExecution, error) {
+	scope := domain.GetPermissionScope(user, "workflows", "READ")
+	return s.execRepo.GetByID(id, &scope)
 }
 
 func (s *WorkflowService) CreateGroup(group *domain.WorkflowGroup) error {

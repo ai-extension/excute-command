@@ -18,9 +18,10 @@ func (r *PostgresScheduleRepo) Create(s *domain.Schedule) error {
 	return r.db.Create(s).Error
 }
 
-func (r *PostgresScheduleRepo) GetByID(id uuid.UUID) (*domain.Schedule, error) {
+func (r *PostgresScheduleRepo) GetByID(id uuid.UUID, scope *domain.PermissionScope) (*domain.Schedule, error) {
 	var s domain.Schedule
-	if err := r.db.
+	db := applyScope(r.db, scope, "schedule_tags", "schedule_id")
+	if err := db.
 		Preload("ScheduledWorkflows").
 		Preload("ScheduledWorkflows.Workflow").
 		Preload("Hooks", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
@@ -33,9 +34,10 @@ func (r *PostgresScheduleRepo) GetByID(id uuid.UUID) (*domain.Schedule, error) {
 	return &s, nil
 }
 
-func (r *PostgresScheduleRepo) List(namespaceID uuid.UUID) ([]domain.Schedule, error) {
+func (r *PostgresScheduleRepo) List(namespaceID uuid.UUID, scope *domain.PermissionScope) ([]domain.Schedule, error) {
 	var ss []domain.Schedule
-	if err := r.db.
+	db := applyScope(r.db, scope, "schedule_tags", "schedule_id")
+	if err := db.
 		Preload("ScheduledWorkflows").
 		Preload("ScheduledWorkflows.Workflow").
 		Preload("Hooks", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).

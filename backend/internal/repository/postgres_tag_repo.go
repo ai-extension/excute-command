@@ -18,15 +18,17 @@ func (r *PostgresTagRepo) Create(tag *domain.Tag) error {
 	return r.db.Create(tag).Error
 }
 
-func (r *PostgresTagRepo) GetByID(id uuid.UUID) (*domain.Tag, error) {
+func (r *PostgresTagRepo) GetByID(id uuid.UUID, scope *domain.PermissionScope) (*domain.Tag, error) {
 	var tag domain.Tag
-	err := r.db.First(&tag, "id = ?", id).Error
+	db := applyScope(r.db, scope, "", "")
+	err := db.First(&tag, "id = ?", id).Error
 	return &tag, err
 }
 
-func (r *PostgresTagRepo) ListByNamespace(namespaceID uuid.UUID) ([]domain.Tag, error) {
+func (r *PostgresTagRepo) ListByNamespace(namespaceID uuid.UUID, scope *domain.PermissionScope) ([]domain.Tag, error) {
 	var tags []domain.Tag
-	err := r.db.Where("namespace_id = ?", namespaceID).Order("created_at desc").Find(&tags).Error
+	db := applyScope(r.db, scope, "", "")
+	err := db.Where("namespace_id = ?", namespaceID).Order("created_at desc").Find(&tags).Error
 	return tags, err
 }
 

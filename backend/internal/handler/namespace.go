@@ -18,7 +18,11 @@ func NewNamespaceHandler(repo domain.NamespaceRepository) *NamespaceHandler {
 }
 
 func (h *NamespaceHandler) ListNamespaces(c *gin.Context) {
-	nss, err := h.repo.List()
+	currentUser, _ := c.Get("user")
+	user, _ := currentUser.(*domain.User)
+	scope := domain.GetPermissionScope(user, "namespaces", "READ")
+
+	nss, err := h.repo.List(&scope)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -55,7 +59,11 @@ func (h *NamespaceHandler) UpdateNamespace(c *gin.Context) {
 		return
 	}
 
-	existing, err := h.repo.GetByID(id)
+	currentUser, _ := c.Get("user")
+	user, _ := currentUser.(*domain.User)
+	scope := domain.GetPermissionScope(user, "namespaces", "READ")
+
+	existing, err := h.repo.GetByID(id, &scope)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "namespace not found"})
 		return
@@ -79,8 +87,12 @@ func (h *NamespaceHandler) DeleteNamespace(c *gin.Context) {
 		return
 	}
 
+	currentUser, _ := c.Get("user")
+	user, _ := currentUser.(*domain.User)
+	scope := domain.GetPermissionScope(user, "namespaces", "READ")
+
 	// Fetch all namespaces to check count and find the one being deleted
-	nss, err := h.repo.List()
+	nss, err := h.repo.List(&scope)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

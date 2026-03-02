@@ -18,17 +18,19 @@ func (r *PostgresGlobalVariableRepo) Create(gv *domain.GlobalVariable) error {
 	return r.db.Create(gv).Error
 }
 
-func (r *PostgresGlobalVariableRepo) GetByID(id uuid.UUID) (*domain.GlobalVariable, error) {
+func (r *PostgresGlobalVariableRepo) GetByID(id uuid.UUID, scope *domain.PermissionScope) (*domain.GlobalVariable, error) {
 	var gv domain.GlobalVariable
-	if err := r.db.First(&gv, "id = ?", id).Error; err != nil {
+	db := applyScope(r.db, scope, "", "")
+	if err := db.First(&gv, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	return &gv, nil
 }
 
-func (r *PostgresGlobalVariableRepo) List(namespaceID uuid.UUID) ([]domain.GlobalVariable, error) {
+func (r *PostgresGlobalVariableRepo) List(namespaceID uuid.UUID, scope *domain.PermissionScope) ([]domain.GlobalVariable, error) {
 	var gvs []domain.GlobalVariable
-	if err := r.db.Where("namespace_id = ?", namespaceID).Find(&gvs).Error; err != nil {
+	db := applyScope(r.db, scope, "", "")
+	if err := db.Where("namespace_id = ?", namespaceID).Find(&gvs).Error; err != nil {
 		return nil, err
 	}
 	return gvs, nil

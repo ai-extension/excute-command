@@ -38,40 +38,60 @@ func AuthMiddleware(authService *service.AuthService) gin.HandlerFunc {
 	}
 }
 
-func RBACMiddleware(requiredPermission string) gin.HandlerFunc {
+func RBACMiddleware(userRepo domain.UserRepository, permType, action string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Basic check for admin, actual fine-grained checks should use HasPermission
-		username := c.GetString("username")
-		if username == "admin" {
+		currentUser, _ := c.Get("user") // Attempt to get user object directly if set by previous middleware
+		var user *domain.User
+		var ok bool
+
+		if currentUser != nil {
+			user, ok = currentUser.(*domain.User)
+		}
+
+		if !ok {
+			// fallback to fetching by username from context
+			username := c.GetString("username")
+			if username == "" {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+				c.Abort()
+				return
+			}
+
+			var err error
+			user, err = userRepo.GetByUsername(username)
+			if err != nil {
+				c.JSON(http.StatusForbidden, gin.H{"error": "User not found"})
+				c.Abort()
+				return
+			}
+			c.Set("user", user)
+		}
+
+		// Root admin check
+		if user.Username == "admin" {
 			c.Next()
 			return
 		}
+
+		// Check for hierarchical permission
+		resourceID := c.Param("id")
+		namespaceID := c.Param("ns_id")
+
+		var resIDPtr, nsIDPtr *string
+		if resourceID != "" {
+			resIDPtr = &resourceID
+		}
+		if namespaceID != "" {
+			nsIDPtr = &namespaceID
+		}
+
+		// Tags logic skip for generic middleware
+		if domain.HasPermission(user, permType, action, nsIDPtr, resIDPtr, nil) {
+			c.Next()
+			return
+		}
+
 		c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions"})
 		c.Abort()
 	}
-}
-
-// HasPermission checks if the given user has the specified action permission for the resource.
-// If resourceID is nil or empty, it checks if the user has the permission for ALL resources of that type.
-func HasPermission(user *domain.User, permType, action string, resourceID *string) bool {
-	// Root admin check
-	if user.Username == "admin" {
-		return true
-	}
-
-	for _, role := range user.Roles {
-		for _, rp := range role.Permissions {
-			if rp.Permission != nil && rp.Permission.Type == permType && rp.Permission.Action == action {
-				// If this role permission applies to ALL resources (nil ResourceID), grant access.
-				if rp.ResourceID == nil || *rp.ResourceID == "" {
-					return true
-				}
-				// If checking a specific resource, verify it matches the grant.
-				if resourceID != nil && *rp.ResourceID == *resourceID {
-					return true
-				}
-			}
-		}
-	}
-	return false
 }

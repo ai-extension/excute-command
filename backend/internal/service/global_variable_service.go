@@ -18,18 +18,30 @@ func (s *GlobalVariableService) Create(gv *domain.GlobalVariable) error {
 	return s.repo.Create(gv)
 }
 
-func (s *GlobalVariableService) GetByID(id uuid.UUID) (*domain.GlobalVariable, error) {
-	return s.repo.GetByID(id)
+func (s *GlobalVariableService) GetByID(id uuid.UUID, user *domain.User) (*domain.GlobalVariable, error) {
+	scope := domain.GetPermissionScope(user, "namespaces", "READ") // Global vars belong to namespace
+	return s.repo.GetByID(id, &scope)
 }
 
-func (s *GlobalVariableService) List(namespaceID uuid.UUID) ([]domain.GlobalVariable, error) {
-	return s.repo.List(namespaceID)
+func (s *GlobalVariableService) List(namespaceID uuid.UUID, user *domain.User) ([]domain.GlobalVariable, error) {
+	scope := domain.GetPermissionScope(user, "namespaces", "READ")
+	return s.repo.List(namespaceID, &scope)
 }
 
-func (s *GlobalVariableService) Update(gv *domain.GlobalVariable) error {
+func (s *GlobalVariableService) Update(gv *domain.GlobalVariable, user *domain.User) error {
+	scope := domain.GetPermissionScope(user, "namespaces", "WRITE")
+	_, err := s.repo.GetByID(gv.ID, &scope)
+	if err != nil {
+		return err
+	}
 	return s.repo.Update(gv)
 }
 
-func (s *GlobalVariableService) Delete(id uuid.UUID) error {
+func (s *GlobalVariableService) Delete(id uuid.UUID, user *domain.User) error {
+	scope := domain.GetPermissionScope(user, "namespaces", "WRITE")
+	_, err := s.repo.GetByID(id, &scope)
+	if err != nil {
+		return err
+	}
 	return s.repo.Delete(id)
 }

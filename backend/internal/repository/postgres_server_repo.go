@@ -18,17 +18,19 @@ func (r *PostgresServerRepo) Create(server *domain.Server) error {
 	return r.db.Create(server).Error
 }
 
-func (r *PostgresServerRepo) GetByID(id uuid.UUID) (*domain.Server, error) {
+func (r *PostgresServerRepo) GetByID(id uuid.UUID, scope *domain.PermissionScope) (*domain.Server, error) {
 	var server domain.Server
-	if err := r.db.Preload("Vpn").First(&server, "id = ?", id).Error; err != nil {
+	db := applyScope(r.db, scope, "server_tags", "server_id")
+	if err := db.Preload("Vpn").First(&server, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	return &server, nil
 }
 
-func (r *PostgresServerRepo) List() ([]domain.Server, error) {
+func (r *PostgresServerRepo) List(scope *domain.PermissionScope) ([]domain.Server, error) {
 	var servers []domain.Server
-	if err := r.db.Preload("Vpn").Find(&servers).Error; err != nil {
+	db := applyScope(r.db, scope, "server_tags", "server_id")
+	if err := db.Preload("Vpn").Find(&servers).Error; err != nil {
 		return nil, err
 	}
 	return servers, nil

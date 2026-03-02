@@ -49,7 +49,7 @@ func (s *ScheduleService) Init() {
 	log.Printf("[ScheduleService] Initialized with %d active schedules", len(schedules))
 }
 
-func (s *ScheduleService) Create(schedule *domain.Schedule, workflowConfigs []domain.ScheduleWorkflow) error {
+func (s *ScheduleService) Create(schedule *domain.Schedule, workflowConfigs []domain.ScheduleWorkflow, user *domain.User) error {
 	schedule.ID = uuid.New()
 	if err := s.repo.Create(schedule); err != nil {
 		return err
@@ -64,7 +64,8 @@ func (s *ScheduleService) Create(schedule *domain.Schedule, workflowConfigs []do
 	}
 
 	// Reload to get preloaded workflows
-	reloaded, err := s.repo.GetByID(schedule.ID)
+	scope := domain.GetPermissionScope(user, "schedules", "READ")
+	reloaded, err := s.repo.GetByID(schedule.ID, &scope)
 	if err != nil {
 		return err
 	}
@@ -77,7 +78,7 @@ func (s *ScheduleService) Create(schedule *domain.Schedule, workflowConfigs []do
 	return nil
 }
 
-func (s *ScheduleService) Update(schedule *domain.Schedule, workflowConfigs []domain.ScheduleWorkflow) error {
+func (s *ScheduleService) Update(schedule *domain.Schedule, workflowConfigs []domain.ScheduleWorkflow, user *domain.User) error {
 	if err := s.repo.Update(schedule); err != nil {
 		return err
 	}
@@ -95,7 +96,8 @@ func (s *ScheduleService) Update(schedule *domain.Schedule, workflowConfigs []do
 	}
 
 	// Reload and sync cron
-	reloaded, err := s.repo.GetByID(schedule.ID)
+	scope := domain.GetPermissionScope(user, "schedules", "READ")
+	reloaded, err := s.repo.GetByID(schedule.ID, &scope)
 	if err != nil {
 		return err
 	}
@@ -109,7 +111,13 @@ func (s *ScheduleService) Update(schedule *domain.Schedule, workflowConfigs []do
 	return nil
 }
 
-func (s *ScheduleService) Delete(id uuid.UUID) error {
+func (s *ScheduleService) Delete(id uuid.UUID, user *domain.User) error {
+	scope := domain.GetPermissionScope(user, "schedules", "DELETE")
+	_, err := s.repo.GetByID(id, &scope)
+	if err != nil {
+		return err
+	}
+
 	s.mu.Lock()
 	s.removeScheduleFromCron(id)
 	s.mu.Unlock()
@@ -120,8 +128,9 @@ func (s *ScheduleService) Delete(id uuid.UUID) error {
 	return s.repo.Delete(id)
 }
 
-func (s *ScheduleService) ToggleStatus(id uuid.UUID) error {
-	schedule, err := s.repo.GetByID(id)
+func (s *ScheduleService) ToggleStatus(id uuid.UUID, user *domain.User) error {
+	scope := domain.GetPermissionScope(user, "schedules", "WRITE")
+	schedule, err := s.repo.GetByID(id, &scope)
 	if err != nil {
 		return err
 	}
@@ -146,12 +155,14 @@ func (s *ScheduleService) ToggleStatus(id uuid.UUID) error {
 	return nil
 }
 
-func (s *ScheduleService) List(namespaceID uuid.UUID) ([]domain.Schedule, error) {
-	return s.repo.List(namespaceID)
+func (s *ScheduleService) List(namespaceID uuid.UUID, user *domain.User) ([]domain.Schedule, error) {
+	scope := domain.GetPermissionScope(user, "schedules", "READ")
+	return s.repo.List(namespaceID, &scope)
 }
 
-func (s *ScheduleService) GetByID(id uuid.UUID) (*domain.Schedule, error) {
-	return s.repo.GetByID(id)
+func (s *ScheduleService) GetByID(id uuid.UUID, user *domain.User) (*domain.Schedule, error) {
+	scope := domain.GetPermissionScope(user, "schedules", "READ")
+	return s.repo.GetByID(id, &scope)
 }
 
 // Internal helpers
@@ -205,7 +216,8 @@ func (s *ScheduleService) removeScheduleFromCron(id uuid.UUID) {
 }
 
 func (s *ScheduleService) runScheduledWorkflows(scheduleID uuid.UUID) {
-	schedule, err := s.repo.GetByID(scheduleID)
+	// Periodic/Bg tasks use nil scope
+	schedule, err := s.repo.GetByID(scheduleID, nil)
 	if err != nil {
 		log.Printf("[ScheduleService] Failed to run schedule %s: %v", scheduleID, err)
 		return
@@ -216,7 +228,7 @@ func (s *ScheduleService) runScheduledWorkflows(scheduleID uuid.UUID) {
 	ctx := context.Background()
 
 	// 1. Run BEFORE hooks
-	if err := s.executor.RunHooks(ctx, schedule.Hooks, domain.HookTypeBefore, schedule.NamespaceID, nil, 0); err != nil {
+	if err := s.executor.RunHooks(ctx, schedule.Hooks, domain.HookTypeBefore, schedule.NamespaceID, nil, 0, nil); err != nil {
 		log.Printf("[ScheduleService] Before hook failed for schedule %s: %v", schedule.Name, err)
 		return
 	}
@@ -242,7 +254,8 @@ func (s *ScheduleService) runScheduledWorkflows(scheduleID uuid.UUID) {
 			var success bool
 			for attempt := 0; attempt <= maxRetries; attempt++ {
 				execID := uuid.New()
-				err := s.executor.Run(ctx, w.ID, execID, in, &schedule.ID)
+				// Background execution, nil user
+				err := s.executor.Run(ctx, w.ID, execID, in, &schedule.ID, nil)
 				if err == nil {
 					success = true
 					break
@@ -265,9 +278,9 @@ func (s *ScheduleService) runScheduledWorkflows(scheduleID uuid.UUID) {
 
 	// 2. Run AFTER hooks
 	if hasFailure {
-		s.executor.RunHooks(ctx, schedule.Hooks, domain.HookTypeAfterFailed, schedule.NamespaceID, nil, 0)
+		s.executor.RunHooks(ctx, schedule.Hooks, domain.HookTypeAfterFailed, schedule.NamespaceID, nil, 0, nil)
 	} else {
-		s.executor.RunHooks(ctx, schedule.Hooks, domain.HookTypeAfterSuccess, schedule.NamespaceID, nil, 0)
+		s.executor.RunHooks(ctx, schedule.Hooks, domain.HookTypeAfterSuccess, schedule.NamespaceID, nil, 0, nil)
 	}
 
 	// Update NextRunAt for recurring
@@ -283,6 +296,7 @@ func (s *ScheduleService) runScheduledWorkflows(scheduleID uuid.UUID) {
 	}
 }
 
-func (s *ScheduleService) GetScheduleExecutions(scheduleID uuid.UUID) ([]domain.WorkflowExecution, error) {
-	return s.execRepo.ListByScheduledID(scheduleID)
+func (s *ScheduleService) GetScheduleExecutions(scheduleID uuid.UUID, user *domain.User) ([]domain.WorkflowExecution, error) {
+	scope := domain.GetPermissionScope(user, "schedules", "READ")
+	return s.execRepo.ListByScheduledID(scheduleID, &scope)
 }

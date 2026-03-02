@@ -19,7 +19,8 @@ func NewServerHandler(service *service.ServerService, terminalService *service.T
 }
 
 func (h *ServerHandler) ListServers(c *gin.Context) {
-	servers, err := h.service.ListServers()
+	user, _ := c.Get("user")
+	servers, err := h.service.ListServers(user.(*domain.User))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -33,6 +34,14 @@ func (h *ServerHandler) CreateServer(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	userVal, _ := c.Get("user")
+	user := userVal.(*domain.User)
+	// But let's check if user has 'create' on 'servers'
+	if !domain.HasPermission(user, "servers", "WRITE", nil, nil, nil) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "permission denied to create server"})
+		return
+	}
+
 	if err := h.service.CreateServer(&server); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -55,7 +64,8 @@ func (h *ServerHandler) UpdateServer(c *gin.Context) {
 	}
 	server.ID = id
 
-	if err := h.service.UpdateServer(&server); err != nil {
+	user, _ := c.Get("user")
+	if err := h.service.UpdateServer(&server, user.(*domain.User)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -70,7 +80,8 @@ func (h *ServerHandler) DeleteServer(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.DeleteServer(id); err != nil {
+	user, _ := c.Get("user")
+	if err := h.service.DeleteServer(id, user.(*domain.User)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -93,7 +104,8 @@ func (h *ServerHandler) ExecuteCommand(c *gin.Context) {
 		return
 	}
 
-	output, err := h.service.ExecuteCommand(id, req.CommandText)
+	user, _ := c.Get("user")
+	output, err := h.service.ExecuteCommand(id, req.CommandText, user.(*domain.User))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "output": output})
 		return
@@ -110,7 +122,8 @@ func (h *ServerHandler) StartTerminalSession(c *gin.Context) {
 		return
 	}
 
-	sessionID, err := h.terminalService.StartSession(id)
+	user, _ := c.Get("user")
+	sessionID, err := h.terminalService.StartSession(id, user.(*domain.User))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

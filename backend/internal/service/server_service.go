@@ -29,24 +29,37 @@ func (s *ServerService) CreateServer(server *domain.Server) error {
 	return s.repo.Create(server)
 }
 
-func (s *ServerService) GetServer(id uuid.UUID) (*domain.Server, error) {
-	return s.repo.GetByID(id)
+func (s *ServerService) GetServer(id uuid.UUID, user *domain.User) (*domain.Server, error) {
+	scope := domain.GetPermissionScope(user, "servers", "READ")
+	return s.repo.GetByID(id, &scope)
 }
 
-func (s *ServerService) ListServers() ([]domain.Server, error) {
-	return s.repo.List()
+func (s *ServerService) ListServers(user *domain.User) ([]domain.Server, error) {
+	scope := domain.GetPermissionScope(user, "servers", "READ")
+	return s.repo.List(&scope)
 }
 
-func (s *ServerService) UpdateServer(server *domain.Server) error {
+func (s *ServerService) UpdateServer(server *domain.Server, user *domain.User) error {
+	scope := domain.GetPermissionScope(user, "servers", "WRITE")
+	_, err := s.repo.GetByID(server.ID, &scope)
+	if err != nil {
+		return err
+	}
 	return s.repo.Update(server)
 }
 
-func (s *ServerService) DeleteServer(id uuid.UUID) error {
+func (s *ServerService) DeleteServer(id uuid.UUID, user *domain.User) error {
+	scope := domain.GetPermissionScope(user, "servers", "DELETE")
+	_, err := s.repo.GetByID(id, &scope)
+	if err != nil {
+		return err
+	}
 	return s.repo.Delete(id)
 }
 
-func (s *ServerService) ExecuteCommand(serverID uuid.UUID, commandText string, writers ...io.Writer) (string, error) {
-	server, err := s.repo.GetByID(serverID)
+func (s *ServerService) ExecuteCommand(serverID uuid.UUID, commandText string, user *domain.User, writers ...io.Writer) (string, error) {
+	scope := domain.GetPermissionScope(user, "servers", "EXECUTE")
+	server, err := s.repo.GetByID(serverID, &scope)
 	if err != nil {
 		return "", fmt.Errorf("failed to get server: %w", err)
 	}
@@ -79,7 +92,7 @@ func (s *ServerService) ExecuteCommand(serverID uuid.UUID, commandText string, w
 	return stdout.String(), nil
 }
 
-func (s *ServerService) UploadFileToServers(ctx context.Context, serverIDs []uuid.UUID, localPath, remotePath string) error {
+func (s *ServerService) UploadFileToServers(ctx context.Context, serverIDs []uuid.UUID, localPath, remotePath string, user *domain.User) error {
 	localFile, err := os.Open(localPath)
 	if err != nil {
 		return fmt.Errorf("failed to open local file %s: %w", localPath, err)
@@ -97,7 +110,8 @@ func (s *ServerService) UploadFileToServers(ctx context.Context, serverIDs []uui
 			return err
 		}
 
-		server, err := s.repo.GetByID(serverID)
+		scope := domain.GetPermissionScope(user, "servers", "WRITE")
+		server, err := s.repo.GetByID(serverID, &scope)
 		if err != nil {
 			return fmt.Errorf("failed to get server %s: %w", serverID, err)
 		}

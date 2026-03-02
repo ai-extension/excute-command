@@ -48,7 +48,7 @@ const WorkflowDesignerPage = () => {
             try {
                 const response = await apiFetch(`${API_BASE_URL}/servers`);
                 const data = await response.json();
-                setAvailableServers(data || []);
+                setAvailableServers(Array.isArray(data) ? data : []);
             } catch (error) {
                 console.error('Failed to fetch servers:', error);
             }

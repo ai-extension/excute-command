@@ -18,7 +18,8 @@ func NewVpnConfigHandler(service *service.VpnConfigService) *VpnConfigHandler {
 }
 
 func (h *VpnConfigHandler) List(c *gin.Context) {
-	vpns, err := h.service.List()
+	user, _ := c.Get("user")
+	vpns, err := h.service.List(user.(*domain.User))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -32,6 +33,13 @@ func (h *VpnConfigHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	userVal, _ := c.Get("user")
+	user := userVal.(*domain.User)
+	if !domain.HasPermission(user, "vpns", "WRITE", nil, nil, nil) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "permission denied to create vpn"})
+		return
+	}
+
 	if err := h.service.Create(&vpn); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -54,7 +62,8 @@ func (h *VpnConfigHandler) Update(c *gin.Context) {
 	}
 	vpn.ID = id
 
-	if err := h.service.Update(&vpn); err != nil {
+	user, _ := c.Get("user")
+	if err := h.service.Update(&vpn, user.(*domain.User)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -69,7 +78,8 @@ func (h *VpnConfigHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.Delete(id); err != nil {
+	user, _ := c.Get("user")
+	if err := h.service.Delete(id, user.(*domain.User)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

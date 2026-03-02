@@ -25,7 +25,10 @@ func (h *TagHandler) List(c *gin.Context) {
 		return
 	}
 
-	tags, err := h.service.ListByNamespace(namespaceID)
+	currentUser, _ := c.Get("user")
+	user, _ := currentUser.(*domain.User)
+
+	tags, err := h.service.ListByNamespace(namespaceID, user)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -48,6 +51,14 @@ func (h *TagHandler) Create(c *gin.Context) {
 		return
 	}
 	tag.NamespaceID = namespaceID
+
+	uVal, _ := c.Get("user")
+	u := uVal.(*domain.User)
+	namespaceIDStr = namespaceID.String()
+	if !domain.HasPermission(u, "tags", "WRITE", &namespaceIDStr, nil, nil) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "permission denied to create tag in this namespace"})
+		return
+	}
 
 	if err := h.service.Create(&tag); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -72,7 +83,10 @@ func (h *TagHandler) Update(c *gin.Context) {
 	}
 	tag.ID = id
 
-	if err := h.service.Update(&tag); err != nil {
+	currentUser, _ := c.Get("user")
+	user, _ := currentUser.(*domain.User)
+
+	if err := h.service.Update(&tag, user); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -88,7 +102,8 @@ func (h *TagHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.Delete(id); err != nil {
+	user, _ := c.Get("user")
+	if err := h.service.Delete(id, user.(*domain.User)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

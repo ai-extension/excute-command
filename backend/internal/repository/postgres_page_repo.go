@@ -18,9 +18,10 @@ func (r *PostgresPageRepo) Create(page *domain.Page) error {
 	return r.db.Create(page).Error
 }
 
-func (r *PostgresPageRepo) GetByID(id uuid.UUID) (*domain.Page, error) {
+func (r *PostgresPageRepo) GetByID(id uuid.UUID, scope *domain.PermissionScope) (*domain.Page, error) {
 	var page domain.Page
-	err := r.db.
+	db := applyScope(r.db, scope, "", "")
+	err := db.
 		Preload("Workflows", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
 		Preload("Workflows.Workflow").
 		Preload("Workflows.Workflow.Inputs").
@@ -44,9 +45,10 @@ func (r *PostgresPageRepo) GetBySlug(slug string) (*domain.Page, error) {
 	return &page, nil
 }
 
-func (r *PostgresPageRepo) List(namespaceID uuid.UUID) ([]domain.Page, error) {
+func (r *PostgresPageRepo) List(namespaceID uuid.UUID, scope *domain.PermissionScope) ([]domain.Page, error) {
 	var pages []domain.Page
-	err := r.db.
+	db := applyScope(r.db, scope, "", "")
+	err := db.
 		Preload("Workflows", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
 		Preload("Workflows.Workflow").
 		Preload("Workflows.Workflow.Inputs").

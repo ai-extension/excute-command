@@ -49,8 +49,10 @@ func (h *WorkflowHandler) ListWorkflows(c *gin.Context) {
 			offset = v
 		}
 	}
+	currentUser, _ := c.Get("user")
+	user, _ := currentUser.(*domain.User)
 
-	wfs, total, err := h.service.ListWorkflowsPaginated(nsID, limit, offset)
+	wfs, total, err := h.service.ListWorkflowsPaginated(nsID, limit, offset, user)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -78,6 +80,14 @@ func (h *WorkflowHandler) CreateWorkflow(c *gin.Context) {
 	}
 	wf.NamespaceID = nsID
 
+	authUser, _ := c.Get("user")
+	userObj := authUser.(*domain.User)
+	nsIDStr = nsID.String()
+	if !domain.HasPermission(userObj, "workflows", "WRITE", &nsIDStr, nil, nil) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "permission denied to create workflow in this namespace"})
+		return
+	}
+
 	if err := h.service.CreateWorkflow(&wf); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -92,8 +102,10 @@ func (h *WorkflowHandler) GetWorkflow(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
 		return
 	}
+	currentUser, _ := c.Get("user")
+	user, _ := currentUser.(*domain.User)
 
-	wf, err := h.service.GetWorkflow(id)
+	wf, err := h.service.GetWorkflow(id, user)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "workflow not found"})
 		return
@@ -116,11 +128,32 @@ func (h *WorkflowHandler) UpdateWorkflow(c *gin.Context) {
 	}
 	wf.ID = id
 
-	if err := h.service.UpdateWorkflow(&wf); err != nil {
+	userVal, _ := c.Get("user")
+	user := userVal.(*domain.User)
+
+	if err := h.service.UpdateWorkflow(&wf, user); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, wf)
+}
+
+func (h *WorkflowHandler) DeleteWorkflow(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	userVal, _ := c.Get("user")
+	user := userVal.(*domain.User)
+
+	if err := h.service.DeleteWorkflow(id, user); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "workflow deleted"})
 }
 
 func (h *WorkflowHandler) RunWorkflow(c *gin.Context) {
@@ -139,12 +172,28 @@ func (h *WorkflowHandler) RunWorkflow(c *gin.Context) {
 		return
 	}
 
+	userVal, _ := c.Get("user")
+	user := userVal.(*domain.User)
+
+	// Immediate EXECUTE check
+	wf, err := h.service.GetWorkflow(id, user)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "workflow not found or permission denied"})
+		return
+	}
+	nsIDStr := wf.NamespaceID.String()
+	resIDStr := wf.ID.String()
+	if !domain.HasPermission(user, "workflows", "EXECUTE", &nsIDStr, &resIDStr, nil) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "permission denied to execute this workflow"})
+		return
+	}
+
 	// Generate execution ID
 	execID := uuid.New()
 
 	// Run inside a goroutine to not block the request
 	go func() {
-		err := h.executor.Run(context.Background(), id, execID, req.Inputs, nil)
+		err := h.executor.Run(context.Background(), id, execID, req.Inputs, nil, user)
 		if err != nil {
 			// Hub broadcast will handle status updates, but we can log error
 			println("Workflow execution error:", err.Error())
@@ -206,7 +255,10 @@ func (h *WorkflowHandler) ListExecutions(c *gin.Context) {
 		}
 	}
 
-	execs, total, err := h.service.ListExecutionsPaginated(id, limit, offset)
+	userVal, _ := c.Get("user")
+	user := userVal.(*domain.User)
+
+	execs, total, err := h.service.ListExecutionsPaginated(id, limit, offset, user)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -222,7 +274,10 @@ func (h *WorkflowHandler) ListAllExecutions(c *gin.Context) {
 		return
 	}
 
-	execs, err := h.service.ListNamespaceExecutions(nsID)
+	userVal, _ := c.Get("user")
+	user := userVal.(*domain.User)
+
+	execs, err := h.service.ListNamespaceExecutions(nsID, user)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -238,7 +293,10 @@ func (h *WorkflowHandler) GetExecution(c *gin.Context) {
 		return
 	}
 
-	execution, err := h.service.GetExecution(id)
+	userVal, _ := c.Get("user")
+	user := userVal.(*domain.User)
+
+	execution, err := h.service.GetExecution(id, user)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "execution not found"})
 		return
@@ -265,8 +323,11 @@ func (h *WorkflowHandler) GetExecutionLogs(c *gin.Context) {
 			return
 		}
 	} else {
+		userVal, _ := c.Get("user")
+		user := userVal.(*domain.User)
+
 		// Global Trace Merge Logic
-		execution, err := h.service.GetExecution(id)
+		execution, err := h.service.GetExecution(id, user)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "execution not found"})
 			return
@@ -282,7 +343,7 @@ func (h *WorkflowHandler) GetExecutionLogs(c *gin.Context) {
 		}
 
 		// If finished, or no workflow.log, merge step logs sequentially for a clean view
-		wf, err := h.service.GetWorkflow(execution.WorkflowID)
+		wf, err := h.service.GetWorkflow(execution.WorkflowID, user)
 		if err == nil {
 			// Set headers for streaming
 			c.Header("Content-Type", "text/plain; charset=utf-8")
