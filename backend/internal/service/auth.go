@@ -1,7 +1,11 @@
 package service
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
+	"log"
+	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -9,7 +13,23 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-var jwtKey = []byte("antigravity_secret_key")
+var jwtKey []byte
+
+func init() {
+	secret := os.Getenv("JWT_SECRET")
+	if secret != "" {
+		jwtKey = []byte(secret)
+		log.Println("JWT schema loaded from environment variable")
+	} else {
+		// Generate a strong, secure random key on startup if no secret is provided
+		bytes := make([]byte, 32)
+		if _, err := rand.Read(bytes); err != nil {
+			log.Fatalf("Failed to generate random JWT secret: %v", err)
+		}
+		jwtKey = []byte(hex.EncodeToString(bytes))
+		log.Println("WARNING: JWT_SECRET environment variable not set. Generated a random secret for this session. Tokens will invalidate on restart.")
+	}
+}
 
 type AuthService struct {
 	userRepo domain.UserRepository

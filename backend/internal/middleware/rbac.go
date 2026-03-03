@@ -11,21 +11,30 @@ import (
 
 func AuthMiddleware(authService *service.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
+		var tokenStr string
+
+		// 1. Try to get token from cookie first (preferred for web frontend)
+		cookie, err := c.Cookie("auth_token")
+		if err == nil && cookie != "" {
+			tokenStr = cookie
+		} else {
+			// 2. Fallback to Authorization header (APIs)
+			authHeader := c.GetHeader("Authorization")
+			if authHeader != "" {
+				parts := strings.Split(authHeader, " ")
+				if len(parts) == 2 && parts[0] == "Bearer" {
+					tokenStr = parts[1]
+				}
+			}
+		}
+
+		if tokenStr == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required (Missing cookie or Authorization header)"})
 			c.Abort()
 			return
 		}
 
-		parts := strings.Split(authHeader, " ")
-		if len(parts) != 2 || parts[0] != "Bearer" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header format must be Bearer {token}"})
-			c.Abort()
-			return
-		}
-
-		claims, err := authService.ValidateToken(parts[1])
+		claims, err := authService.ValidateToken(tokenStr)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			c.Abort()

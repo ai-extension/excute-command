@@ -34,9 +34,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const savedUser = localStorage.getItem('auth_user');
         return savedUser ? JSON.parse(savedUser) : null;
     });
-    const [token, setToken] = useState<string | null>(() => {
-        return localStorage.getItem('auth_token');
-    });
+    // We still keep token in state for `isAuthenticated` checks,
+    // but we don't save it to localStorage anymore.
+    const [token, setToken] = useState<string | null>(null);
+
+    // Hydrate token state on mount if user exists (optimistic)
+    // Actual validation happens via HTTPOnly cookie on API requests
+    useEffect(() => {
+        if (user && !token) {
+            // We just use a dummy value to indicate they *might* be logged in if they have a user object.
+            // The real source of truth for auth is the HttpOnly cookie.
+            setToken("cookie_managed");
+        }
+    }, [user, token]);
+
     const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
     const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -52,31 +63,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const login = useCallback((newToken: string, newUser: User) => {
+        // newToken is passed from the API response to indicate successful login.
+        // The actual token is stored in the HttpOnly cookie by the browser.
         setToken(newToken);
         setUser(newUser);
-        localStorage.setItem('auth_token', newToken);
         localStorage.setItem('auth_user', JSON.stringify(newUser));
     }, []);
 
-    const logout = useCallback(() => {
+    const logout = useCallback(async () => {
+        // Call backend to clear the HttpOnly cookie
+        try {
+            await fetch('/api/logout', { method: 'POST' });
+        } catch (e) {
+            console.error("Logout request failed", e);
+        }
+
         setToken(null);
         setUser(null);
-        localStorage.removeItem('auth_token');
         localStorage.removeItem('auth_user');
     }, []);
 
     const apiFetch = useCallback(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
         const headers = new Headers(init?.headers);
-        if (token && !headers.has('Authorization')) {
+        if (token && token !== "cookie_managed" && !headers.has('Authorization')) {
             headers.set('Authorization', `Bearer ${token}`);
         }
 
-        const response = await fetch(input, { ...init, headers });
+        const fetchInit: RequestInit = {
+            ...init,
+            headers,
+            credentials: 'include', // Ensure cookies are sent (especially auth_token)
+        };
+
+        const response = await fetch(input, fetchInit);
 
         if (!response.ok) {
             if (response.status === 401) {
                 const data = await response.clone().json().catch(() => ({}));
-                if (data.error && (data.error.includes('expired') || data.error.includes('invalid claims'))) {
+                if (data.error && (data.error.includes('expired') || data.error.includes('invalid') || data.error.includes('Authentication'))) {
                     logout();
                 }
             } else {

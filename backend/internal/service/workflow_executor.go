@@ -482,12 +482,22 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 
 	// Substitute variables in command
 	command := step.CommandText
+	securityRegex := regexp.MustCompile(`^[a-zA-Z0-9_\-\.\ \/]+$`)
+
 	// 1. Static Variables: {{variable.key}}
 	for _, v := range variables {
+		if v.Value != "" && !securityRegex.MatchString(v.Value) {
+			return fmt.Errorf("security violation: variable '%s' contains invalid characters", v.Key)
+		}
 		command = strings.ReplaceAll(command, "{{variable."+v.Key+"}}", v.Value)
 	}
 	// 2. Runtime Inputs: {{key}}
 	for k, v := range inputs {
+		// Note: inputs are already validated at the start of the workflow execution,
+		// but re-validating here doesn't hurt.
+		if v != "" && !securityRegex.MatchString(v) {
+			return fmt.Errorf("security violation: input '%s' contains invalid characters", k)
+		}
 		command = strings.ReplaceAll(command, "{{"+k+"}}", v)
 	}
 	// 3. Global Variables: {{global.key}}
@@ -495,6 +505,9 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 		scope := domain.GetPermissionScope(user, "namespaces", "READ")
 		gvs, _ := e.globalVarRepo.List(namespaceID, &scope)
 		for _, v := range gvs {
+			if v.Value != "" && !securityRegex.MatchString(v.Value) {
+				return fmt.Errorf("security violation: global variable '%s' contains invalid characters", v.Key)
+			}
 			command = strings.ReplaceAll(command, "{{global."+v.Key+"}}", v.Value)
 		}
 	}

@@ -32,6 +32,10 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	// Set HttpOnly cookie for web clients
+	// MaxAge is in seconds (24h = 86400s). SameSite Mode Strict is safer.
+	c.SetCookie("auth_token", token, 86400, "/", "", false, true) // Secure: false for local dev (should be true for HTTPS)
+
 	c.JSON(http.StatusOK, gin.H{
 		"token": token,
 		"user":  user,
@@ -39,7 +43,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {
-	// For JWT, logout is usually handled on the frontend by removing the token.
-	// We can implement a blacklist if needed, but for now just success.
+	// Clear the auth_token cookie
+	c.SetCookie("auth_token", "", -1, "/", "", false, true)
+
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
 }
