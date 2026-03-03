@@ -15,6 +15,8 @@ const (
 	StatusFailed  Status = "FAILED"
 )
 
+var LocalServerID = uuid.MustParse("00000000-0000-0000-0000-000000000001")
+
 type Namespace struct {
 	ID          uuid.UUID `json:"id"`
 	Name        string    `json:"name"`
@@ -212,18 +214,21 @@ type WorkflowFile struct {
 }
 
 type WorkflowGroup struct {
-	ID              uuid.UUID      `json:"id" gorm:"type:uuid;primaryKey"`
-	WorkflowID      uuid.UUID      `json:"workflow_id" gorm:"type:uuid;index"`
-	Name            string         `json:"name" gorm:"not null"`
-	Key             string         `json:"key" gorm:"not null;default:''"`
-	Condition       string         `json:"condition" gorm:"default:''"`
-	DefaultServerID uuid.UUID      `json:"default_server_id,omitempty" gorm:"type:uuid"`
-	Order           int            `json:"order"`
-	IsParallel      bool           `json:"is_parallel"`
-	Status          Status         `json:"status"`
-	Steps           []WorkflowStep `json:"steps,omitempty" gorm:"foreignKey:GroupID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	CreatedAt       time.Time      `json:"created_at"`
-	UpdatedAt       time.Time      `json:"updated_at"`
+	ID                 uuid.UUID      `json:"id" gorm:"type:uuid;primaryKey"`
+	WorkflowID         uuid.UUID      `json:"workflow_id" gorm:"type:uuid;index"`
+	Name               string         `json:"name" gorm:"not null"`
+	Key                string         `json:"key" gorm:"not null;default:''"`
+	Condition          string         `json:"condition" gorm:"default:''"`
+	DefaultServerID    uuid.UUID      `json:"default_server_id,omitempty" gorm:"type:uuid"`
+	Order              int            `json:"order"`
+	IsParallel         bool           `json:"is_parallel"`
+	Status             Status         `json:"status"`
+	Steps              []WorkflowStep `json:"steps,omitempty" gorm:"foreignKey:GroupID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	CopySourcePath     string         `json:"copy_source_path,omitempty" gorm:"default:''"`
+	CopyTargetServerID uuid.UUID      `json:"copy_target_server_id,omitempty" gorm:"type:uuid"`
+	CopyTargetPath     string         `json:"copy_target_path,omitempty" gorm:"default:''"`
+	CreatedAt          time.Time      `json:"created_at"`
+	UpdatedAt          time.Time      `json:"updated_at"`
 }
 
 type WorkflowStep struct {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/google/uuid"
@@ -49,6 +50,7 @@ func (s *ServerService) ListServersPaginated(limit, offset int, searchTerm strin
 }
 
 func (s *ServerService) UpdateServer(server *domain.Server, user *domain.User) error {
+
 	scope := domain.GetPermissionScope(user, "servers", "WRITE")
 	_, err := s.repo.GetByID(server.ID, &scope)
 	if err != nil {
@@ -58,6 +60,9 @@ func (s *ServerService) UpdateServer(server *domain.Server, user *domain.User) e
 }
 
 func (s *ServerService) DeleteServer(id uuid.UUID, user *domain.User) error {
+	if id == domain.LocalServerID {
+		return fmt.Errorf("cannot delete the default local server")
+	}
 	scope := domain.GetPermissionScope(user, "servers", "DELETE")
 	_, err := s.repo.GetByID(id, &scope)
 	if err != nil {
@@ -73,7 +78,12 @@ func (s *ServerService) ExecuteCommand(serverID uuid.UUID, commandText string, u
 		return "", fmt.Errorf("failed to get server: %w", err)
 	}
 
+	if server.ID == domain.LocalServerID {
+		return s.executeLocalCommand(commandText, writers...)
+	}
+
 	client, err := ConnectSSH(server)
+
 	if err != nil {
 		return "", err
 	}
@@ -101,6 +111,55 @@ func (s *ServerService) ExecuteCommand(serverID uuid.UUID, commandText string, u
 	return stdout.String(), nil
 }
 
+func (s *ServerService) DownloadFileFromServer(ctx context.Context, serverID uuid.UUID, remotePath, localPath string, user *domain.User) error {
+	scope := domain.GetPermissionScope(user, "servers", "READ")
+	server, err := s.repo.GetByID(serverID, &scope)
+	if err != nil {
+		return fmt.Errorf("failed to get server %s: %w", serverID, err)
+	}
+
+	if server.ID == domain.LocalServerID {
+		return s.copyFileLocally(remotePath, localPath)
+	}
+
+	client, err := ConnectSSH(server)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	sftpClient, err := sftp.NewClient(client)
+	if err != nil {
+		return fmt.Errorf("server %s, failed to start sftp subsystem: %w", server.Name, err)
+	}
+	defer sftpClient.Close()
+
+	remoteFile, err := sftpClient.Open(remotePath)
+	if err != nil {
+		return fmt.Errorf("server %s, failed to open remote file %s: %w", server.Name, remotePath, err)
+	}
+	defer remoteFile.Close()
+
+	// Ensure local directory exists
+	localDir := filepath.Dir(localPath)
+	if err := os.MkdirAll(localDir, 0755); err != nil {
+		return fmt.Errorf("failed to create local directory %s: %w", localDir, err)
+	}
+
+	localFile, err := os.Create(localPath)
+	if err != nil {
+		return fmt.Errorf("failed to create local file %s: %w", localPath, err)
+	}
+	defer localFile.Close()
+
+	_, err = io.Copy(localFile, remoteFile)
+	if err != nil {
+		return fmt.Errorf("server %s, failed to download data from remote file: %w", server.Name, err)
+	}
+
+	return nil
+}
+
 func (s *ServerService) UploadFileToServers(ctx context.Context, serverIDs []uuid.UUID, localPath, remotePath string, user *domain.User) error {
 	localFile, err := os.Open(localPath)
 	if err != nil {
@@ -125,7 +184,15 @@ func (s *ServerService) UploadFileToServers(ctx context.Context, serverIDs []uui
 			return fmt.Errorf("failed to get server %s: %w", serverID, err)
 		}
 
+		if server.ID == domain.LocalServerID {
+			if err := s.copyFileLocally(localPath, remotePath); err != nil {
+				return fmt.Errorf("local server, failed to copy file: %w", err)
+			}
+			continue
+		}
+
 		client, err := ConnectSSH(server)
+
 		if err != nil {
 			return err
 		}
@@ -165,6 +232,55 @@ func (s *ServerService) UploadFileToServers(ctx context.Context, serverIDs []uui
 		if err != nil {
 			return fmt.Errorf("server %s, failed to copy data to remote file: %w", server.Name, err)
 		}
+	}
+
+	return nil
+}
+
+func (s *ServerService) executeLocalCommand(commandText string, writers ...io.Writer) (string, error) {
+	cmd := exec.Command("sh", "-c", commandText)
+	var stdout, stderr bytes.Buffer
+
+	stdoutWriters := append([]io.Writer{&stdout}, writers...)
+	stderrWriters := append([]io.Writer{&stderr}, writers...)
+
+	cmd.Stdout = io.MultiWriter(stdoutWriters...)
+	cmd.Stderr = io.MultiWriter(stderrWriters...)
+
+	if err := cmd.Run(); err != nil {
+		return stdout.String() + stderr.String(), fmt.Errorf("failed to run local command: %w", err)
+	}
+
+	return stdout.String(), nil
+}
+
+func (s *ServerService) copyFileLocally(localPath, remotePath string) error {
+	sourceFile, err := os.Open(localPath)
+	if err != nil {
+		return err
+	}
+	defer sourceFile.Close()
+
+	// Ensure remote directory exists
+	remoteDir := filepath.Dir(remotePath)
+	if err := os.MkdirAll(remoteDir, 0755); err != nil {
+		return err
+	}
+
+	destFile, err := os.Create(remotePath)
+	if err != nil {
+		return err
+	}
+	defer destFile.Close()
+
+	_, err = io.Copy(destFile, sourceFile)
+	if err != nil {
+		return err
+	}
+
+	sourceInfo, err := os.Stat(localPath)
+	if err == nil {
+		os.Chmod(remotePath, sourceInfo.Mode())
 	}
 
 	return nil

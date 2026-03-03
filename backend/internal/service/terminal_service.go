@@ -41,7 +41,12 @@ func (s *TerminalService) StartSession(serverID uuid.UUID, user *domain.User) (s
 		return "", fmt.Errorf("failed to get server: %w", err)
 	}
 
+	if server.ID == domain.LocalServerID {
+		return "", fmt.Errorf("terminal session is not supported for the local server")
+	}
+
 	client, err := ConnectSSH(server)
+
 	if err != nil {
 		return "", err
 	}

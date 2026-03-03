@@ -59,6 +59,9 @@ export interface WorkflowGroup {
     is_parallel: boolean;
     status: Status;
     steps?: WorkflowStep[];
+    copy_source_path?: string;
+    copy_target_server_id?: string;
+    copy_target_path?: string;
     created_at: string;
     updated_at: string;
 }

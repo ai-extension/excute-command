@@ -16,6 +16,7 @@ import { useNamespace } from '../context/NamespaceContext';
 import { API_BASE_URL } from '../lib/api';
 import { Tag } from '../types';
 import { Pagination } from '../components/Pagination';
+import { ResourceFilters } from '../components/ResourceFilters';
 
 import {
     Dialog,
@@ -159,84 +160,73 @@ const TagsPage = () => {
                     <h1 className="text-3xl font-black tracking-tighter">Tags Management</h1>
                     <p className="text-muted-foreground text-sm font-medium">Create and manage color-coded tags to organize your workflows and schedules.</p>
                 </div>
+            </div>
 
-                <Dialog open={isCreateOpen} onOpenChange={(open) => {
-                    setIsCreateOpen(open);
-                    if (!open) setFormData({ name: '', color: '#6366f1' });
-                }}>
-                    <DialogTrigger asChild>
-                        <Button className="premium-gradient font-black uppercase tracking-widest text-[10px] h-11 px-6 shadow-premium rounded-xl gap-2">
-                            <Plus className="w-4 h-4" /> Create Tag
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
-                        <DialogHeader>
-                            <DialogTitle className="text-2xl font-black tracking-tight">Create Tag</DialogTitle>
-                            <DialogDescription className="text-[11px] font-medium text-muted-foreground">
-                                Add a new tag to the namespace. tags can be used to filter and categorize.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <form onSubmit={handleCreate} className="space-y-4 py-4">
-                            <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Tag Name</Label>
-                                <Input
-                                    placeholder="e.g. Production, High Priority"
-                                    className="h-12 bg-muted/30 border-border rounded-xl font-bold tracking-tight focus:bg-background transition-all"
-                                    value={formData.name}
-                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                    required
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Color</Label>
-                                <div className="flex items-center gap-4">
+            <ResourceFilters
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
+                onApply={handleApplyFilter}
+                searchPlaceholder="Search tags..."
+                isLoading={isLoading}
+                primaryAction={
+                    <Dialog open={isCreateOpen} onOpenChange={(open) => {
+                        setIsCreateOpen(open);
+                        if (!open) setFormData({ name: '', color: '#6366f1' });
+                    }}>
+                        <DialogTrigger asChild>
+                            <Button className="premium-gradient font-black uppercase tracking-widest text-[10px] h-11 px-6 shadow-premium rounded-xl gap-2">
+                                <Plus className="w-4 h-4" /> Create Tag
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[425px]">
+                            <DialogHeader>
+                                <DialogTitle className="text-2xl font-black tracking-tight">Create Tag</DialogTitle>
+                                <DialogDescription className="text-[11px] font-medium text-muted-foreground">
+                                    Add a new tag to the namespace. tags can be used to filter and categorize.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <form onSubmit={handleCreate} className="space-y-4 py-4">
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Tag Name</Label>
                                     <Input
-                                        type="color"
-                                        className="h-12 w-20 p-1 cursor-pointer bg-muted/30 border-border rounded-xl"
-                                        value={formData.color}
-                                        onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                                        placeholder="e.g. Production, High Priority"
+                                        className="h-12 bg-muted/30 border-border rounded-xl font-bold tracking-tight focus:bg-background transition-all"
+                                        value={formData.name}
+                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                        required
                                     />
-                                    <div
-                                        className="px-4 py-2 rounded-full text-xs font-bold border"
-                                        style={{ backgroundColor: `${formData.color}20`, color: formData.color, borderColor: `${formData.color}40` }}
-                                    >
-                                        {formData.name || 'Preview Tag'}
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Color</Label>
+                                    <div className="flex items-center gap-4">
+                                        <Input
+                                            type="color"
+                                            className="h-12 w-20 p-1 cursor-pointer bg-muted/30 border-border rounded-xl"
+                                            value={formData.color}
+                                            onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                                        />
+                                        <div
+                                            className="px-4 py-2 rounded-full text-xs font-bold border"
+                                            style={{ backgroundColor: `${formData.color}20`, color: formData.color, borderColor: `${formData.color}40` }}
+                                        >
+                                            {formData.name || 'Preview Tag'}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                            <DialogFooter className="pt-4">
-                                <Button
-                                    type="submit"
-                                    disabled={isSubmitting}
-                                    className="premium-gradient font-black uppercase tracking-widest text-[10px] h-12 w-full shadow-premium rounded-xl"
-                                >
-                                    {isSubmitting ? "Creating..." : "Save Tag"}
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    </DialogContent>
-                </Dialog>
-            </div>
-
-            <div className="flex items-center gap-4 bg-card p-3 rounded-2xl border border-border shadow-card">
-                <div className="relative flex-1 group">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-all group-focus-within:text-primary" />
-                    <Input
-                        placeholder="Search tags..."
-                        className="pl-11 h-11 bg-background border-border rounded-xl font-semibold text-sm transition-all focus:bg-muted/30"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleApplyFilter()}
-                    />
-                </div>
-                <Button
-                    onClick={handleApplyFilter}
-                    variant="outline"
-                    className="h-11 rounded-xl border-emerald-500/50 text-emerald-500 px-6 font-black uppercase tracking-tight text-[10px] bg-background gap-2 shadow-sm hover:bg-emerald-500/10 transition-all"
-                >
-                    <Search className="w-4 h-4" /> Apply Filter
-                </Button>
-            </div>
+                                <DialogFooter className="pt-4">
+                                    <Button
+                                        type="submit"
+                                        disabled={isSubmitting}
+                                        className="premium-gradient font-black uppercase tracking-widest text-[10px] h-12 w-full shadow-premium rounded-xl"
+                                    >
+                                        {isSubmitting ? "Creating..." : "Save Tag"}
+                                    </Button>
+                                </DialogFooter>
+                            </form>
+                        </DialogContent>
+                    </Dialog>
+                }
+            />
 
             <Card className="border-border bg-card shadow-premium overflow-hidden rounded-2xl">
                 <Table>

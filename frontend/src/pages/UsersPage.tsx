@@ -23,6 +23,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "../components/ui/select";
+import { ResourceFilters } from '../components/ResourceFilters';
 
 import {
     Dialog,
@@ -295,37 +296,26 @@ const UsersPage = () => {
                 </Dialog>
             </div>
 
-            <div className="flex items-center gap-4 bg-card p-3 rounded-2xl border border-border shadow-card">
-                <div className="relative flex-1 group">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-all group-focus-within:text-primary" />
-                    <Input
-                        placeholder="Search by name, email, or role..."
-                        className="pl-11 h-11 bg-background border-border rounded-xl font-semibold text-sm transition-all focus:bg-muted/30"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleApplyFilter()}
-                    />
-                </div>
-                <Button
-                    onClick={handleApplyFilter}
-                    className="h-11 px-6 rounded-xl font-black text-[11px] uppercase tracking-widest bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                >
-                    Apply Filter
-                </Button>
-                <Select value={roleFilter} onValueChange={setRoleFilter}>
-                    <SelectTrigger className="w-48 h-11 bg-card border-border rounded-xl font-bold text-[11px] uppercase tracking-widest">
-                        <SelectValue placeholder="ROLE" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border-border">
-                        <SelectItem value="ALL">ALL ROLES</SelectItem>
-                        {roles.map(role => (
-                            <SelectItem key={role.id} value={role.id}>
-                                {role.name.toUpperCase()}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
+            <ResourceFilters
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
+                onApply={handleApplyFilter}
+                filters={{ roleID: roleFilter }}
+                onFilterChange={(key: string, val: string) => setRoleFilter(val)}
+                filterConfigs={[
+                    {
+                        key: 'roleID',
+                        placeholder: 'ALL ROLES',
+                        options: [
+                            { label: 'ALL ROLES', value: 'ALL' },
+                            ...roles.map(r => ({ label: r.name.toUpperCase(), value: r.id }))
+                        ],
+                        width: 'w-48'
+                    }
+                ]}
+                searchPlaceholder="Search by name, email, or role..."
+                isLoading={isLoading}
+            />
 
             <Card className="border-border bg-card shadow-premium overflow-hidden rounded-2xl">
                 <Table>

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
+import { Textarea } from '../components/ui/textarea';
 import { Badge } from '../components/ui/badge';
 import { cn } from '../lib/utils';
 import { Workflow, WorkflowGroup, WorkflowStep, WorkflowInput, WorkflowVariable, Server as ServerType, Tag } from '../types';
@@ -829,6 +830,61 @@ const WorkflowDesignerPage = () => {
                                                                                                                     ))}
                                                                                                                 </select>
                                                                                                             </div>
+                                                                                                            {/* Copy After Execution */}
+                                                                                                            <div className="pt-4 border-t border-border/50 space-y-4">
+                                                                                                                <div className="flex items-center gap-2">
+                                                                                                                    <File className="w-3.5 h-3.5 text-emerald-500" />
+                                                                                                                    <span className="text-[8px] font-black uppercase tracking-widest text-emerald-500">Copy After Execution (Relay)</span>
+                                                                                                                </div>
+                                                                                                                <div className="grid grid-cols-1 gap-4">
+                                                                                                                    <div className="space-y-2">
+                                                                                                                        <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Source Path <span className="text-muted-foreground/50 normal-case font-medium">— file or directory on execution server</span></label>
+                                                                                                                        <Input
+                                                                                                                            value={group.copy_source_path || ''}
+                                                                                                                            onChange={(e) => {
+                                                                                                                                const ng = [...groups];
+                                                                                                                                ng[gIdx].copy_source_path = e.target.value;
+                                                                                                                                setGroups(ng);
+                                                                                                                            }}
+                                                                                                                            placeholder="/var/www/html/dist"
+                                                                                                                            className="h-9 text-[11px] font-mono"
+                                                                                                                        />
+                                                                                                                    </div>
+                                                                                                                    <div className="grid grid-cols-2 gap-4">
+                                                                                                                        <div className="space-y-2">
+                                                                                                                            <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Target Server</label>
+                                                                                                                            <select
+                                                                                                                                value={group.copy_target_server_id || ''}
+                                                                                                                                onChange={(e) => {
+                                                                                                                                    const ng = [...groups];
+                                                                                                                                    ng[gIdx].copy_target_server_id = e.target.value;
+                                                                                                                                    setGroups(ng);
+                                                                                                                                }}
+                                                                                                                                className="flex h-9 w-full rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
+                                                                                                                            >
+                                                                                                                                <option value="">— Select Target —</option>
+                                                                                                                                <option value="00000000-0000-0000-0000-000000000001">Local Engine Orchestrator</option>
+                                                                                                                                {availableServers.map(s => (
+                                                                                                                                    <option key={s.id} value={s.id}>{s.name} ({s.host})</option>
+                                                                                                                                ))}
+                                                                                                                            </select>
+                                                                                                                        </div>
+                                                                                                                        <div className="space-y-2">
+                                                                                                                            <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Target Path</label>
+                                                                                                                            <Input
+                                                                                                                                value={group.copy_target_path || ''}
+                                                                                                                                onChange={(e) => {
+                                                                                                                                    const ng = [...groups];
+                                                                                                                                    ng[gIdx].copy_target_path = e.target.value;
+                                                                                                                                    setGroups(ng);
+                                                                                                                                }}
+                                                                                                                                placeholder="/opt/app/deploy"
+                                                                                                                                className="h-9 text-[11px] font-mono"
+                                                                                                                            />
+                                                                                                                        </div>
+                                                                                                                    </div>
+                                                                                                                </div>
+                                                                                                            </div>
                                                                                                         </div>
                                                                                                         <div className="px-5 pb-4 flex justify-end">
                                                                                                             <Button
@@ -898,18 +954,16 @@ const WorkflowDesignerPage = () => {
                                                                                                                 </div>
                                                                                                                 <div className="col-span-8 space-y-1">
                                                                                                                     <label className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Execution Sequence</label>
-                                                                                                                    <div className="relative">
-                                                                                                                        <Terminal className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
-                                                                                                                        <Input
-                                                                                                                            value={step.command_text}
-                                                                                                                            onChange={(e) => {
-                                                                                                                                const ng = [...groups];
-                                                                                                                                ng[gIdx]!.steps![sIdx].command_text = e.target.value;
-                                                                                                                                setGroups(ng);
-                                                                                                                            }}
-                                                                                                                            className="bg-muted/50 border-border h-8 pl-8 text-[11px] font-mono rounded-md px-2"
-                                                                                                                        />
-                                                                                                                    </div>
+                                                                                                                    <Textarea
+                                                                                                                        value={step.command_text}
+                                                                                                                        onChange={(e) => {
+                                                                                                                            const ng = [...groups];
+                                                                                                                            ng[gIdx]!.steps![sIdx].command_text = e.target.value;
+                                                                                                                            setGroups(ng);
+                                                                                                                        }}
+                                                                                                                        className="bg-muted/50 border-border min-h-[40px] text-[11px] font-mono rounded-md px-2 py-2 resize-y"
+                                                                                                                        placeholder="Enter command sequence..."
+                                                                                                                    />
                                                                                                                 </div>
                                                                                                             </div>
                                                                                                             <Button

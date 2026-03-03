@@ -30,11 +30,15 @@ import { Textarea } from "../components/ui/textarea";
 import { Label } from "../components/ui/label";
 import TerminalLog from '../components/TerminalLog';
 import XTerminal from '../components/XTerminal';
+import { ResourceFilters } from '../components/ResourceFilters';
 import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../lib/api';
 import { Server, VpnConfig } from '../types';
 import { Pagination } from '../components/Pagination';
+
+const LOCAL_SERVER_ID = "00000000-0000-0000-0000-000000000001";
+
 
 const ServerPage = () => {
     const { apiFetch } = useAuth();
@@ -242,59 +246,49 @@ const ServerPage = () => {
             </div>
 
             {/* Header / Search */}
-            <div className="flex items-center justify-between gap-3 bg-card p-2.5 rounded-xl border border-border shadow-card">
-                <div className="relative flex-1 group">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground transition-all group-focus-within:text-primary group-focus-within:scale-110" />
-                    <Input
-                        placeholder="Filter by name, ip, or credentials..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleApplyFilter()}
-                        className="pl-11 h-9 bg-background border-border rounded-lg focus-visible:ring-primary/20 placeholder:text-muted-foreground/50 font-semibold text-xs transition-all focus:bg-muted/30"
-                    />
-                </div>
-
-                <Button
-                    onClick={handleApplyFilter}
-                    className="h-9 px-4 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-black uppercase tracking-widest text-[9px] shadow-lg shadow-emerald-500/20"
-                >
-                    Apply Filter
-                </Button>
-
-                <Select value={authTypeFilter} onValueChange={setAuthTypeFilter}>
-                    <SelectTrigger className="w-32 h-9 bg-background border-border rounded-lg text-[10px] font-black uppercase tracking-widest outline-none focus:ring-1 focus:ring-primary/20">
-                        <SelectValue placeholder="AUTH" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border-border">
-                        <SelectItem value="ALL">ALL AUTH</SelectItem>
-                        <SelectItem value="PASSWORD">PASSWORD</SelectItem>
-                        <SelectItem value="PUBLIC_KEY">PUB KEY</SelectItem>
-                    </SelectContent>
-                </Select>
-
-                <Select value={vpnFilter} onValueChange={setVpnFilter}>
-                    <SelectTrigger className="w-40 h-9 bg-background border-border rounded-lg text-[10px] font-black uppercase tracking-widest outline-none focus:ring-1 focus:ring-primary/20">
-                        <SelectValue placeholder="NETWORK" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border-border">
-                        <SelectItem value="ALL">ALL NETS</SelectItem>
-                        <SelectItem value="NONE">DIRECT</SelectItem>
-                        {vpns.map(v => (
-                            <SelectItem key={v.id} value={v.id}>{v.name.toUpperCase()}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-
-                <div className="flex gap-1.5 items-center">
+            <ResourceFilters
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
+                onApply={handleApplyFilter}
+                filters={{ authType: authTypeFilter, vpn: vpnFilter }}
+                onFilterChange={(key: string, val: string) => {
+                    if (key === 'authType') setAuthTypeFilter(val);
+                    if (key === 'vpn') setVpnFilter(val);
+                }}
+                filterConfigs={[
+                    {
+                        key: 'authType',
+                        placeholder: 'ALL AUTH',
+                        options: [
+                            { label: 'ALL AUTH', value: 'ALL' },
+                            { label: 'PASSWORD', value: 'PASSWORD' },
+                            { label: 'PUB KEY', value: 'PUBLIC_KEY' }
+                        ],
+                        width: 'w-32'
+                    },
+                    {
+                        key: 'vpn',
+                        placeholder: 'ALL NETS',
+                        options: [
+                            { label: 'ALL NETS', value: 'ALL' },
+                            { label: 'DIRECT', value: 'NONE' },
+                            ...vpns.map(v => ({ label: v.name.toUpperCase(), value: v.id }))
+                        ],
+                        width: 'w-40'
+                    }
+                ]}
+                searchPlaceholder="Filter by name, ip, or credentials..."
+                isLoading={isLoading}
+                primaryAction={
                     <Button
                         onClick={() => handleOpenForm()}
-                        className="h-9 px-5 rounded-lg premium-gradient font-black uppercase tracking-widest text-[9px] shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
+                        className="h-11 px-6 rounded-xl premium-gradient font-black uppercase tracking-widest text-[10px] shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
                     >
                         <Plus className="w-3.5 h-3.5" />
                         Deploy Host
                     </Button>
-                </div>
-            </div>
+                }
+            />
 
             {/* Error State */}
             {error && (
@@ -337,11 +331,17 @@ const ServerPage = () => {
                                             <ServerIcon className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
                                         </div>
                                         <div>
-                                            <p className="text-[13px] font-black tracking-tight">{server.name}</p>
+                                            <div className="flex items-center gap-2">
+                                                <p className="text-[13px] font-black tracking-tight">{server.name}</p>
+                                                {server.id === LOCAL_SERVER_ID && (
+                                                    <Badge className="bg-primary/10 text-primary border-primary/20 text-[8px] h-4 font-black uppercase tracking-widest px-1.5">System</Badge>
+                                                )}
+                                            </div>
                                             <p className="text-[9px] text-muted-foreground font-black uppercase tracking-tighter opacity-70">
                                                 {server.description || 'No description provided'}
                                             </p>
                                         </div>
+
                                     </div>
                                 </TableCell>
                                 <TableCell>
@@ -391,19 +391,22 @@ const ServerPage = () => {
                                         <Button
                                             variant="ghost"
                                             size="icon"
+                                            disabled={server.id === LOCAL_SERVER_ID}
                                             onClick={() => handleOpenForm(server)}
-                                            className="h-8 w-8 rounded-lg hover:bg-muted"
+                                            className="h-8 w-8 rounded-lg hover:bg-muted disabled:opacity-30"
                                         >
                                             <Edit2 className="w-3.5 h-3.5" />
                                         </Button>
                                         <Button
                                             variant="ghost"
                                             size="icon"
+                                            disabled={server.id === LOCAL_SERVER_ID}
                                             onClick={() => handleDeleteServer(server.id)}
-                                            className="h-8 w-8 rounded-lg hover:bg-destructive/10 hover:text-destructive"
+                                            className="h-8 w-8 rounded-lg hover:bg-destructive/10 hover:text-destructive disabled:opacity-30"
                                         >
                                             <Trash2 className="w-3.5 h-3.5" />
                                         </Button>
+
                                     </div>
                                 </TableCell>
                             </TableRow>

@@ -31,6 +31,8 @@ import {
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
 
+import { ResourceFilters } from '../components/ResourceFilters';
+
 const GlobalVariablesPage = () => {
     const { apiFetch } = useAuth();
     const { activeNamespace } = useNamespace();
@@ -160,86 +162,75 @@ const GlobalVariablesPage = () => {
                     <h1 className="text-3xl font-black tracking-tighter">Global Variables</h1>
                     <p className="text-muted-foreground text-sm font-medium">Define variables accessible across all workflows in this namespace.</p>
                 </div>
-
-                <Dialog open={isCreateOpen} onOpenChange={(open) => {
-                    setIsCreateOpen(open);
-                    if (!open) setFormData({ key: '', value: '', description: '' });
-                }}>
-                    <DialogTrigger asChild>
-                        <Button className="premium-gradient font-black uppercase tracking-widest text-[10px] h-11 px-6 shadow-premium rounded-xl gap-2">
-                            <Plus className="w-4 h-4" /> Add Global Variable
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
-                        <DialogHeader>
-                            <DialogTitle className="text-2xl font-black tracking-tight">Create Variable</DialogTitle>
-                            <DialogDescription className="text-[11px] font-medium text-muted-foreground">
-                                Define a new key-value pair for this namespace.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <form onSubmit={handleCreate} className="space-y-4 py-4">
-                            <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Key Name</Label>
-                                <Input
-                                    placeholder="e.g. API_ENDPOINT"
-                                    className="h-12 bg-muted/30 border-border rounded-xl font-bold uppercase tracking-tight focus:bg-background transition-all"
-                                    value={formData.key}
-                                    onChange={(e) => setFormData({ ...formData, key: e.target.value })}
-                                    required
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Value</Label>
-                                <Input
-                                    placeholder="e.g. https://api.example.com"
-                                    className="h-12 bg-muted/30 border-border rounded-xl font-medium"
-                                    value={formData.value}
-                                    onChange={(e) => setFormData({ ...formData, value: e.target.value })}
-                                    required
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Description</Label>
-                                <Textarea
-                                    placeholder="What is this variable used for?"
-                                    className="min-h-[100px] bg-muted/30 border-border rounded-xl font-medium resize-none"
-                                    value={formData.description}
-                                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                />
-                            </div>
-                            <DialogFooter className="pt-4">
-                                <Button
-                                    type="submit"
-                                    disabled={isSubmitting}
-                                    className="premium-gradient font-black uppercase tracking-widest text-[10px] h-12 w-full shadow-premium rounded-xl"
-                                >
-                                    {isSubmitting ? "Creating..." : "Save Variable"}
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    </DialogContent>
-                </Dialog>
             </div>
 
-            <div className="flex items-center gap-4 bg-card p-3 rounded-2xl border border-border shadow-card">
-                <div className="relative flex-1 group">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-all group-focus-within:text-primary" />
-                    <Input
-                        placeholder="Search by key or description..."
-                        className="pl-11 h-11 bg-background border-border rounded-xl font-semibold text-sm transition-all focus:bg-muted/30"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleApplyFilter()}
-                    />
-                </div>
-                <Button
-                    onClick={handleApplyFilter}
-                    variant="outline"
-                    className="h-11 rounded-xl border-emerald-500/50 text-emerald-500 px-6 font-black uppercase tracking-tight text-[10px] bg-background gap-2 shadow-sm hover:bg-emerald-500/10 transition-all"
-                >
-                    <Search className="w-4 h-4" /> Apply Filter
-                </Button>
-            </div>
+            <ResourceFilters
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
+                onApply={handleApplyFilter}
+                searchPlaceholder="Search by key or description..."
+                isLoading={isLoading}
+                primaryAction={
+                    <Dialog open={isCreateOpen} onOpenChange={(open) => {
+                        setIsCreateOpen(open);
+                        if (!open) setFormData({ key: '', value: '', description: '' });
+                    }}>
+                        <DialogTrigger asChild>
+                            <Button className="premium-gradient font-black uppercase tracking-widest text-[10px] h-11 px-6 shadow-premium rounded-xl gap-2">
+                                <Plus className="w-4 h-4" /> Add Global Variable
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[425px]">
+                            <DialogHeader>
+                                <DialogTitle className="text-2xl font-black tracking-tight">Create Variable</DialogTitle>
+                                <DialogDescription className="text-[11px] font-medium text-muted-foreground">
+                                    Define a new key-value pair for this namespace.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <form onSubmit={handleCreate} className="space-y-4 py-4">
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Key Name</Label>
+                                    <Input
+                                        placeholder="e.g. API_ENDPOINT"
+                                        className="h-12 bg-muted/30 border-border rounded-xl font-bold uppercase tracking-tight focus:bg-background transition-all"
+                                        value={formData.key}
+                                        onChange={(e) => setFormData({ ...formData, key: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Value</Label>
+                                    <Input
+                                        placeholder="e.g. https://api.example.com"
+                                        className="h-12 bg-muted/30 border-border rounded-xl font-medium"
+                                        value={formData.value}
+                                        onChange={(e) => setFormData({ ...formData, value: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Description</Label>
+                                    <Textarea
+                                        placeholder="What is this variable used for?"
+                                        className="min-h-[100px] bg-muted/30 border-border rounded-xl font-medium resize-none"
+                                        value={formData.description}
+                                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                    />
+                                </div>
+                                <DialogFooter className="pt-4">
+                                    <Button
+                                        type="submit"
+                                        disabled={isSubmitting}
+                                        className="premium-gradient font-black uppercase tracking-widest text-[10px] h-12 w-full shadow-premium rounded-xl"
+                                    >
+                                        {isSubmitting ? "Creating..." : "Save Variable"}
+                                    </Button>
+                                </DialogFooter>
+                            </form>
+                        </DialogContent>
+                    </Dialog>
+                }
+            />
 
             <Card className="border-border bg-card shadow-premium overflow-hidden rounded-2xl">
                 <Table>

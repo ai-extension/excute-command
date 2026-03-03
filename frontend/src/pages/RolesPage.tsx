@@ -6,6 +6,7 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { useAuth } from '../context/AuthContext';
+import { ResourceFilters } from '../components/ResourceFilters';
 import { cn } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
 
@@ -95,75 +96,64 @@ const RolesPage = () => {
                     <h1 className="text-3xl font-black tracking-tighter">Access Roles</h1>
                     <p className="text-muted-foreground text-sm font-medium">Define permission groups and security policies.</p>
                 </div>
-
-                <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-                    <DialogTrigger asChild>
-                        <Button className="premium-gradient font-black uppercase tracking-widest text-[10px] h-11 px-6 shadow-premium rounded-xl gap-2">
-                            <Plus className="w-4 h-4" /> Create Role
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
-                        <DialogHeader>
-                            <DialogTitle className="text-2xl">Define New Role</DialogTitle>
-                            <DialogDescription>
-                                Create a new authorization group with a descriptive title.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <form onSubmit={handleCreateRole} className="space-y-4 py-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="name" className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Role Name</Label>
-                                <Input
-                                    id="name"
-                                    placeholder="e.g. Developer"
-                                    className="h-12 bg-muted/30 border-border rounded-xl font-semibold"
-                                    value={newRoleData.name}
-                                    onChange={(e) => setNewRoleData({ ...newRoleData, name: e.target.value })}
-                                    required
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="description" className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Description</Label>
-                                <Input
-                                    id="description"
-                                    placeholder="Brief explanation of this role's purpose"
-                                    className="h-12 bg-muted/30 border-border rounded-xl font-semibold"
-                                    value={newRoleData.description}
-                                    onChange={(e) => setNewRoleData({ ...newRoleData, description: e.target.value })}
-                                />
-                            </div>
-                            <DialogFooter className="pt-4">
-                                <Button
-                                    type="submit"
-                                    disabled={isSubmitting}
-                                    className="premium-gradient font-black uppercase tracking-widest text-[10px] h-12 w-full shadow-premium rounded-xl"
-                                >
-                                    {isSubmitting ? "Defining..." : "Save Role"}
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    </DialogContent>
-                </Dialog>
             </div>
 
-            <div className="flex items-center gap-4 bg-card p-3 rounded-2xl border border-border shadow-card mb-6">
-                <div className="relative flex-1 group">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-all group-focus-within:text-primary" />
-                    <Input
-                        placeholder="Search roles by name or description..."
-                        className="pl-11 h-11 bg-background border-border rounded-xl font-semibold text-sm transition-all focus:bg-muted/30"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleApplyFilter()}
-                    />
-                </div>
-                <Button
-                    onClick={handleApplyFilter}
-                    variant="outline"
-                    className="h-11 rounded-xl border-emerald-500/50 text-emerald-500 px-6 font-black uppercase tracking-tight text-[10px] bg-background gap-2 shadow-sm hover:bg-emerald-500/10 transition-all"
-                >
-                    <ArrowRight className="w-4 h-4" /> Apply Filter
-                </Button>
-            </div>
+            <ResourceFilters
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
+                onApply={handleApplyFilter}
+                searchPlaceholder="Search roles by name or description..."
+                isLoading={isLoading}
+                primaryAction={
+                    <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+                        <DialogTrigger asChild>
+                            <Button className="premium-gradient font-black uppercase tracking-widest text-[10px] h-11 px-6 shadow-premium rounded-xl gap-2">
+                                <Plus className="w-4 h-4" /> Create Role
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[425px]">
+                            <DialogHeader>
+                                <DialogTitle className="text-2xl">Define New Role</DialogTitle>
+                                <DialogDescription>
+                                    Create a new authorization group with a descriptive title.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <form onSubmit={handleCreateRole} className="space-y-4 py-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="name" className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Role Name</Label>
+                                    <Input
+                                        id="name"
+                                        placeholder="e.g. Developer"
+                                        className="h-12 bg-muted/30 border-border rounded-xl font-semibold"
+                                        value={newRoleData.name}
+                                        onChange={(e) => setNewRoleData({ ...newRoleData, name: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="description" className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Description</Label>
+                                    <Input
+                                        id="description"
+                                        placeholder="Brief explanation of this role's purpose"
+                                        className="h-12 bg-muted/30 border-border rounded-xl font-semibold"
+                                        value={newRoleData.description}
+                                        onChange={(e) => setNewRoleData({ ...newRoleData, description: e.target.value })}
+                                    />
+                                </div>
+                                <DialogFooter className="pt-4">
+                                    <Button
+                                        type="submit"
+                                        disabled={isSubmitting}
+                                        className="premium-gradient font-black uppercase tracking-widest text-[10px] h-12 w-full shadow-premium rounded-xl"
+                                    >
+                                        {isSubmitting ? "Defining..." : "Save Role"}
+                                    </Button>
+                                </DialogFooter>
+                            </form>
+                        </DialogContent>
+                    </Dialog>
+                }
+            />
 
             <div className="space-y-6 flex flex-col">
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 flex-1">

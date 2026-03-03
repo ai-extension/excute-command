@@ -93,6 +93,7 @@ func main() {
 	// Seed Admin User and Default Namespace
 	seedAdmin(db)
 	seedDefaultNamespace(db)
+	seedLocalServer(db)
 
 	// Initialize Hub
 	hub := service.NewHub()
@@ -430,6 +431,29 @@ func seedDefaultNamespace(db *gorm.DB) {
 			log.Println("Failed to seed default namespace:", err)
 		} else {
 			log.Println("Default namespace seeded successfully.")
+		}
+	}
+}
+
+func seedLocalServer(db *gorm.DB) {
+	var count int64
+	db.Model(&domain.Server{}).Where("id = ?", domain.LocalServerID).Count(&count)
+	if count == 0 {
+		log.Println("Seeding local server...")
+		localServer := domain.Server{
+			ID: domain.LocalServerID,
+
+			Name:        "Local",
+			Description: "The local host machine where the application is running.",
+			Host:        "localhost",
+			Port:        0,
+			User:        "system",
+			AuthType:    "NONE",
+		}
+		if err := db.Create(&localServer).Error; err != nil {
+			log.Println("Failed to seed local server:", err)
+		} else {
+			log.Println("Local server seeded successfully.")
 		}
 	}
 }

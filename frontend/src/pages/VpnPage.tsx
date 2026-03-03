@@ -10,6 +10,7 @@ import {
 } from '../components/ui/table';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
+import { ResourceFilters } from '../components/ResourceFilters';
 import {
     Dialog,
     DialogContent,
@@ -174,47 +175,38 @@ const VpnPage = () => {
                 </div>
             </div>
 
-            {/* Header / Search */}
-            <div className="flex items-center justify-between gap-4 bg-card p-2.5 rounded-xl border border-border shadow-card">
-                <div className="relative flex-1 group">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground transition-all group-focus-within:text-primary group-focus-within:scale-110" />
-                    <Input
-                        placeholder="Filter by name, ip..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleApplyFilter()}
-                        className="pl-11 h-9 bg-background border-border rounded-lg focus-visible:ring-primary/20 placeholder:text-muted-foreground/50 font-semibold text-xs transition-all focus:bg-muted/30"
-                    />
-                </div>
-
-                <Button
-                    onClick={handleApplyFilter}
-                    className="h-9 px-4 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-black uppercase tracking-widest text-[9px] shadow-lg shadow-emerald-500/20"
-                >
-                    Apply Filter
-                </Button>
-
-                <Select value={authTypeFilter} onValueChange={setAuthTypeFilter}>
-                    <SelectTrigger className="w-40 h-9 bg-background border-border rounded-lg text-[10px] font-black uppercase tracking-widest outline-none focus:ring-1 focus:ring-primary/20">
-                        <SelectValue placeholder="AUTH TYPE" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border-border">
-                        <SelectItem value="ALL">ALL AUTH TYPES</SelectItem>
-                        <SelectItem value="PASSWORD">SSH PASSWORD</SelectItem>
-                        <SelectItem value="PUBLIC_KEY">PUBLIC KEY</SelectItem>
-                    </SelectContent>
-                </Select>
-
-                <div className="flex gap-1.5 items-center">
+            <ResourceFilters
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
+                onApply={handleApplyFilter}
+                filters={{ authType: authTypeFilter }}
+                onFilterChange={(key: string, val: string) => {
+                    if (key === 'authType') setAuthTypeFilter(val);
+                }}
+                filterConfigs={[
+                    {
+                        key: 'authType',
+                        placeholder: 'AUTH TYPE',
+                        options: [
+                            { label: 'ALL AUTH TYPES', value: 'ALL' },
+                            { label: 'SSH PASSWORD', value: 'PASSWORD' },
+                            { label: 'PUBLIC KEY', value: 'PUBLIC_KEY' }
+                        ],
+                        width: 'w-48'
+                    }
+                ]}
+                searchPlaceholder="Filter by name, ip..."
+                isLoading={isLoading}
+                primaryAction={
                     <Button
                         onClick={() => handleOpenForm()}
-                        className="h-9 px-5 rounded-lg premium-gradient font-black uppercase tracking-widest text-[9px] shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
+                        className="h-11 px-6 rounded-xl premium-gradient font-black uppercase tracking-widest text-[10px] shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
                     >
                         <Plus className="w-3.5 h-3.5" />
                         Add VPN
                     </Button>
-                </div>
-            </div>
+                }
+            />
 
             {/* Error State */}
             {error && (

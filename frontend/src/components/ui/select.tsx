@@ -1,12 +1,20 @@
 import * as React from "react"
 import { cn } from "../../lib/utils"
+import { ChevronDown } from "lucide-react"
 
 const Select = ({ children, value, onValueChange }: any) => {
+    const [isOpen, setIsOpen] = React.useState(false);
+
     return (
-        <div className="relative w-full">
+        <div className="relative w-full group">
             {React.Children.map(children, child => {
                 if (React.isValidElement(child)) {
-                    return React.cloneElement(child as React.ReactElement<any>, { value, onValueChange });
+                    return React.cloneElement(child as React.ReactElement<any>, {
+                        value,
+                        onValueChange,
+                        isOpen,
+                        setIsOpen
+                    });
                 }
                 return child;
             })}
@@ -14,13 +22,30 @@ const Select = ({ children, value, onValueChange }: any) => {
     )
 }
 
-const SelectTrigger = ({ children, className }: any) => <div className={className}>{children}</div>
-const SelectValue = ({ placeholder, value }: any) => null
+const SelectTrigger = ({ children, className, value, onValueChange }: any) => {
+    // We find the SelectValue child to get the placeholder
+    return (
+        <div className={cn(
+            "flex items-center justify-between w-full transition-all duration-200",
+            className
+        )}>
+            {children}
+            <ChevronDown className="w-3 h-3 ml-2 opacity-50 group-hover:opacity-100 transition-opacity" />
+        </div>
+    )
+}
 
-const SelectContent = ({ children, value, onValueChange }: any) => {
+const SelectValue = ({ placeholder, value, children }: any) => {
+    return <span className="truncate">{value || placeholder}</span>
+}
+
+const SelectContent = ({ children, value, onValueChange, className }: any) => {
     return (
         <select
-            className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            className={cn(
+                "absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10",
+                className
+            )}
             value={value}
             onChange={(e) => onValueChange(e.target.value)}
         >
@@ -30,7 +55,7 @@ const SelectContent = ({ children, value, onValueChange }: any) => {
 }
 
 const SelectItem = ({ children, value }: any) => (
-    <option value={value}>
+    <option value={value} className="bg-card text-foreground">
         {children}
     </option>
 )

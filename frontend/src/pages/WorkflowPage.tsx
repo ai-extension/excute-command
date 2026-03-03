@@ -29,6 +29,8 @@ import WorkflowRunner from '../components/WorkflowRunner';
 import { TagFilter } from '../components/TagFilter';
 import { Pagination } from '../components/Pagination';
 
+import { ResourceFilters } from '../components/ResourceFilters';
+
 const WorkflowPage = () => {
     const navigate = useNavigate();
     const { activeNamespace } = useNamespace();
@@ -127,34 +129,73 @@ const WorkflowPage = () => {
                         </div>
                     </div>
 
-                    <div className="flex items-center justify-between gap-4 bg-card p-2.5 rounded-xl border border-border shadow-card">
-                        <div className="relative flex-1 max-w-md group">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground transition-all group-focus-within:text-primary group-focus-within:scale-110" />
-                            <Input
-                                placeholder="Search workflows by name or description..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleApplyFilter()}
-                                className="pl-11 h-9 bg-background border-border rounded-lg focus-visible:ring-primary/20 placeholder:text-muted-foreground/50 font-semibold text-xs transition-all focus:bg-muted/30"
-                            />
-                        </div>
-                        <div className="flex gap-1.5 items-center">
-                            <Button
-                                onClick={handleApplyFilter}
-                                variant="outline"
-                                className="h-9 rounded-lg border-emerald-500/50 text-emerald-500 px-3.5 font-black uppercase tracking-tight text-[8.5px] bg-background gap-1 shadow-sm hover:bg-emerald-500/10 transition-all"
-                            >
-                                <Filter className="w-3 h-3" /> Apply Filter
-                            </Button>
-                            <Button
-                                onClick={() => setIsCreateDialogOpen(true)}
-                                className="h-9 px-5 rounded-lg premium-gradient font-black uppercase tracking-widest text-[9px] shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
-                            >
-                                <Plus className="w-3.5 h-3.5" />
-                                New Workflow
-                            </Button>
-                        </div>
-                    </div>
+                    <ResourceFilters
+                        searchTerm={searchTerm}
+                        onSearchChange={setSearchTerm}
+                        onApply={handleApplyFilter}
+                        searchPlaceholder="Search workflows by name or description..."
+                        isLoading={isLoading}
+                        primaryAction={
+                            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                                <Button
+                                    onClick={() => setIsCreateDialogOpen(true)}
+                                    className="h-11 px-6 rounded-xl premium-gradient font-black uppercase tracking-widest text-[10px] shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
+                                >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    New Workflow
+                                </Button>
+                                <DialogContent className="sm:max-w-md">
+                                    <DialogHeader>
+                                        <DialogTitle className="flex items-center gap-2">
+                                            <Zap className="w-5 h-5 text-primary" />
+                                            Create New Workflow
+                                        </DialogTitle>
+                                        <DialogDescription>
+                                            Define the core identification for your new automation pipeline.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <form onSubmit={handleCreateWorkflow} className="space-y-4 py-4">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold uppercase tracking-widest text-primary">Workflow Name</label>
+                                            <Input
+                                                value={newWorkflowName}
+                                                onChange={(e) => setNewWorkflowName(e.target.value)}
+                                                placeholder="e.g. Daily Data Backup"
+                                                autoFocus
+                                                className="h-10 text-sm font-medium focus:ring-1 focus:ring-primary/30"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Description</label>
+                                            <Input
+                                                value={newWorkflowDescription}
+                                                onChange={(e) => setNewWorkflowDescription(e.target.value)}
+                                                placeholder="What does this workflow automate?"
+                                                className="h-10 text-sm font-medium"
+                                            />
+                                        </div>
+                                        <DialogFooter className="pt-4">
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                onClick={() => setIsCreateDialogOpen(false)}
+                                                className="h-9 text-[10px] font-bold uppercase tracking-widest px-6"
+                                            >
+                                                Cancel
+                                            </Button>
+                                            <Button
+                                                type="submit"
+                                                disabled={!newWorkflowName.trim() || isCreating}
+                                                className="h-9 text-[10px] font-bold uppercase tracking-widest px-6 premium-gradient"
+                                            >
+                                                {isCreating ? 'Creating...' : 'Initialize Pipeline'}
+                                            </Button>
+                                        </DialogFooter>
+                                    </form>
+                                </DialogContent>
+                            </Dialog>
+                        }
+                    />
 
                     <TagFilter
                         selectedTagIds={selectedTagIds}
