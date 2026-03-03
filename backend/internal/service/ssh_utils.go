@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"net"
 	"time"
 
 	"github.com/user/csm-backend/internal/domain"
@@ -27,10 +28,22 @@ func ConnectSSH(server *domain.Server) (*ssh.Client, error) {
 		return nil, fmt.Errorf("target server %s: %w", server.Name, err)
 	}
 
+	// Custom HostKeyCallback
+	targetHostKeyCallback := ssh.InsecureIgnoreHostKey()
+	if server.HostKeyFingerprint != "" {
+		targetHostKeyCallback = func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+			fingerprint := ssh.FingerprintSHA256(key)
+			if fingerprint != server.HostKeyFingerprint {
+				return fmt.Errorf("ssh: host key fingerprint mismatch for %s", hostname)
+			}
+			return nil
+		}
+	}
+
 	targetConfig := &ssh.ClientConfig{
 		User:            server.User,
 		Auth:            []ssh.AuthMethod{targetAuth},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: targetHostKeyCallback,
 		Timeout:         10 * time.Second,
 	}
 	targetAddr := fmt.Sprintf("%s:%d", server.Host, server.Port)
@@ -50,15 +63,27 @@ func ConnectSSH(server *domain.Server) (*ssh.Client, error) {
 		return nil, fmt.Errorf("vpn %s: %w", server.Vpn.Name, err)
 	}
 
+	vpnHostKeyCallback := ssh.InsecureIgnoreHostKey()
+	if server.Vpn.HostKeyFingerprint != "" {
+		vpnHostKeyCallback = func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+			fingerprint := ssh.FingerprintSHA256(key)
+			if fingerprint != server.Vpn.HostKeyFingerprint {
+				return fmt.Errorf("ssh: host key fingerprint mismatch for VPN %s", hostname)
+			}
+			return nil
+		}
+	}
+
 	vpnConfig := &ssh.ClientConfig{
 		User:            server.Vpn.User,
 		Auth:            []ssh.AuthMethod{vpnAuth},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: vpnHostKeyCallback,
 		Timeout:         10 * time.Second,
 	}
 	vpnAddr := fmt.Sprintf("%s:%d", server.Vpn.Host, server.Vpn.Port)
 
 	vpnClient, err := ssh.Dial("tcp", vpnAddr, vpnConfig)
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial vpn jump host: %w", err)
 	}

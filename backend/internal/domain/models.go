@@ -103,19 +103,20 @@ type NamespaceRepository interface {
 }
 
 type Server struct {
-	ID          uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey"`
-	Name        string     `json:"name" gorm:"not null"`
-	Description string     `json:"description"`
-	Host        string     `json:"host" gorm:"not null"`
-	Port        int        `json:"port" gorm:"default:22"`
-	User        string     `json:"user" gorm:"not null"`
-	AuthType    string     `json:"auth_type" gorm:"not null"` // PASSWORD or PUBLIC_KEY
-	Password    string     `json:"password,omitempty"`
-	PrivateKey  string     `json:"private_key,omitempty"`
-	VpnID       *uuid.UUID `json:"vpn_id,omitempty" gorm:"type:uuid"`
-	Vpn         *VpnConfig `json:"vpn,omitempty" gorm:"foreignKey:VpnID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
+	ID                 uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey"`
+	Name               string     `json:"name" gorm:"not null"`
+	Description        string     `json:"description"`
+	Host               string     `json:"host" gorm:"not null"`
+	Port               int        `json:"port" gorm:"default:22"`
+	User               string     `json:"user" gorm:"not null"`
+	AuthType           string     `json:"auth_type" gorm:"not null"` // PASSWORD or PUBLIC_KEY
+	Password           string     `json:"password,omitempty"`
+	PrivateKey         string     `json:"private_key,omitempty"`
+	VpnID              *uuid.UUID `json:"vpn_id,omitempty" gorm:"type:uuid"`
+	Vpn                *VpnConfig `json:"vpn,omitempty" gorm:"foreignKey:VpnID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
+	HostKeyFingerprint string     `json:"host_key_fingerprint,omitempty"` // For strict host key checking (TOFU or manual)
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
 }
 
 type ServerRepository interface {
@@ -127,17 +128,18 @@ type ServerRepository interface {
 }
 
 type VpnConfig struct {
-	ID          uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
-	Name        string    `json:"name" gorm:"not null"`
-	Description string    `json:"description"`
-	Host        string    `json:"host" gorm:"not null"`
-	Port        int       `json:"port" gorm:"default:22"`
-	User        string    `json:"user" gorm:"not null"`
-	AuthType    string    `json:"auth_type" gorm:"not null"` // PASSWORD or PUBLIC_KEY
-	Password    string    `json:"password,omitempty"`
-	PrivateKey  string    `json:"private_key,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID                 uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
+	Name               string    `json:"name" gorm:"not null"`
+	Description        string    `json:"description"`
+	Host               string    `json:"host" gorm:"not null"`
+	Port               int       `json:"port" gorm:"default:22"`
+	User               string    `json:"user" gorm:"not null"`
+	AuthType           string    `json:"auth_type" gorm:"not null"` // PASSWORD or PUBLIC_KEY
+	Password           string    `json:"password,omitempty"`
+	PrivateKey         string    `json:"private_key,omitempty"`
+	HostKeyFingerprint string    `json:"host_key_fingerprint,omitempty"` // For strict host key checking (TOFU or manual)
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 type VpnConfigRepository interface {

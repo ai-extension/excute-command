@@ -3,6 +3,7 @@ package repository
 import (
 	"github.com/google/uuid"
 	"github.com/user/csm-backend/internal/domain"
+	"github.com/user/csm-backend/pkg/crypto"
 	"gorm.io/gorm"
 )
 
@@ -15,6 +16,16 @@ func NewPostgresVpnConfigRepo(db *gorm.DB) *PostgresVpnConfigRepo {
 }
 
 func (r *PostgresVpnConfigRepo) Create(vpn *domain.VpnConfig) error {
+	if vpn.Password != "" {
+		if enc, err := crypto.Encrypt(vpn.Password); err == nil {
+			vpn.Password = enc
+		}
+	}
+	if vpn.PrivateKey != "" {
+		if enc, err := crypto.Encrypt(vpn.PrivateKey); err == nil {
+			vpn.PrivateKey = enc
+		}
+	}
 	return r.db.Create(vpn).Error
 }
 
@@ -24,6 +35,18 @@ func (r *PostgresVpnConfigRepo) GetByID(id uuid.UUID, scope *domain.PermissionSc
 	if err := db.First(&vpn, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
+
+	if vpn.Password != "" {
+		if dec, err := crypto.Decrypt(vpn.Password); err == nil {
+			vpn.Password = dec
+		}
+	}
+	if vpn.PrivateKey != "" {
+		if dec, err := crypto.Decrypt(vpn.PrivateKey); err == nil {
+			vpn.PrivateKey = dec
+		}
+	}
+
 	return &vpn, nil
 }
 
@@ -33,10 +56,34 @@ func (r *PostgresVpnConfigRepo) List(scope *domain.PermissionScope) ([]domain.Vp
 	if err := db.Find(&vpns).Error; err != nil {
 		return nil, err
 	}
+
+	for i := range vpns {
+		if vpns[i].Password != "" {
+			if dec, err := crypto.Decrypt(vpns[i].Password); err == nil {
+				vpns[i].Password = dec
+			}
+		}
+		if vpns[i].PrivateKey != "" {
+			if dec, err := crypto.Decrypt(vpns[i].PrivateKey); err == nil {
+				vpns[i].PrivateKey = dec
+			}
+		}
+	}
+
 	return vpns, nil
 }
 
 func (r *PostgresVpnConfigRepo) Update(vpn *domain.VpnConfig) error {
+	if vpn.Password != "" {
+		if enc, err := crypto.Encrypt(vpn.Password); err == nil {
+			vpn.Password = enc
+		}
+	}
+	if vpn.PrivateKey != "" {
+		if enc, err := crypto.Encrypt(vpn.PrivateKey); err == nil {
+			vpn.PrivateKey = enc
+		}
+	}
 	return r.db.Save(vpn).Error
 }
 
