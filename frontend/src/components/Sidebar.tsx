@@ -97,14 +97,9 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
                 {namespaceNavItems.length > 0 && (
                     <div className="w-full">
                         {!isCollapsed && (
-                            <div className="flex items-center justify-between px-4 mb-2">
-                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-50">Operational</p>
-                            </div>
-                        )}
-                        {!isCollapsed && (
                             <div className="flex items-center gap-1.5 px-4 mb-2 mt-1">
                                 <div className="h-px flex-1 bg-border/50" />
-                                <span className="text-[8px] font-black uppercase tracking-[0.2em] text-primary/50">Contextual Namespace</span>
+                                <span className="text-[8px] font-black uppercase tracking-[0.2em] text-primary/50">Operational</span>
                                 <div className="h-px flex-1 bg-border/50" />
                             </div>
                         )}
@@ -134,7 +129,11 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
                 {identityItems.length > 0 && (
                     <div className="w-full">
                         {!isCollapsed && (
-                            <p className="px-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-4 opacity-50 animate-in fade-in duration-500">Identity</p>
+                            <div className="flex items-center gap-1.5 px-4 mb-2">
+                                <div className="h-px flex-1 bg-border/50" />
+                                <span className="text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">Identity</span>
+                                <div className="h-px flex-1 bg-border/50" />
+                            </div>
                         )}
                         <nav className="flex flex-col gap-1.5 w-full">
                             {identityItems.map((item) => renderNavLink(item))}
@@ -146,7 +145,11 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
                 {systemItems.length > 0 && (
                     <div className="w-full">
                         {!isCollapsed && (
-                            <p className="px-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-4 opacity-50 animate-in fade-in duration-500">System</p>
+                            <div className="flex items-center gap-1.5 px-4 mb-2">
+                                <div className="h-px flex-1 bg-border/50" />
+                                <span className="text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">System</span>
+                                <div className="h-px flex-1 bg-border/50" />
+                            </div>
                         )}
                         <nav className="flex flex-col gap-1.5 w-full">
                             {systemItems.map((item) => renderNavLink(item))}

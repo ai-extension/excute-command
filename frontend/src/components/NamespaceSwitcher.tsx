@@ -20,7 +20,7 @@ interface NamespaceSwitcherProps {
 
 const NamespaceSwitcher = ({ isCollapsed }: NamespaceSwitcherProps) => {
     const { namespaces, activeNamespace, setActiveNamespace, refreshNamespaces } = useNamespace();
-    const { token } = useAuth();
+    const { token, hasPermission } = useAuth();
     const [isCreating, setIsCreating] = useState(false);
     const [newName, setNewName] = useState('');
 
@@ -117,13 +117,15 @@ const NamespaceSwitcher = ({ isCollapsed }: NamespaceSwitcherProps) => {
                             </div>
                         </form>
                     ) : (
-                        <DropdownMenuItem
-                            onClick={(e) => { e.preventDefault(); setIsCreating(true); }}
-                            className="px-2.5 py-2 rounded-lg cursor-pointer flex items-center gap-2.5 text-primary hover:bg-primary/10 font-bold transition-all duration-200"
-                        >
-                            <Plus className="w-4 h-4" />
-                            <span className="text-[12px] font-black uppercase tracking-tighter">Add Namespace</span>
-                        </DropdownMenuItem>
+                        hasPermission('namespaces', 'WRITE') && (
+                            <DropdownMenuItem
+                                onClick={(e) => { e.preventDefault(); setIsCreating(true); }}
+                                className="px-2.5 py-2 rounded-lg cursor-pointer flex items-center gap-2.5 text-primary hover:bg-primary/10 font-bold transition-all duration-200"
+                            >
+                                <Plus className="w-4 h-4" />
+                                <span className="text-[12px] font-black uppercase tracking-tighter">Add Namespace</span>
+                            </DropdownMenuItem>
+                        )
                     )}
                 </DropdownMenuContent>
             </DropdownMenu>

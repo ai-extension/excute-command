@@ -129,9 +129,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
                 // 3. Hierarchical match via Tag
                 if (perm.type === 'tags' && perm.action === `RESOURCE_${action}`) {
-                    // Any tag permission allows the menu to show globally, 
-                    // or if we knew which tags belong to which namespace, we'd check that here.
-                    return true;
+                    // Only allow tag permissions to reveal menu items for resources that actually support tags
+                    // Prevent tag permissions from exposing global resources like servers, vpns, users, etc.
+                    const taggableResources = ['workflows', 'schedules'];
+                    if (taggableResources.includes(type)) {
+                        return true;
+                    }
                 }
 
                 return false;
