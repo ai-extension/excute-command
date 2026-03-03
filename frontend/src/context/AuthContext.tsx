@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { AlertCircle, CheckCircle, XCircle, Info, X } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { TAGGABLE_RESOURCES } from '../config/permissions';
 
 interface User {
     id: string;
@@ -131,8 +132,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 if (perm.type === 'tags' && perm.action === `RESOURCE_${action}`) {
                     // Only allow tag permissions to reveal menu items for resources that actually support tags
                     // Prevent tag permissions from exposing global resources like servers, vpns, users, etc.
-                    const taggableResources = ['workflows', 'schedules'];
-                    if (taggableResources.includes(type)) {
+                    // TAGGABLE_RESOURCES is configured in src/config/permissions.ts
+                    if (TAGGABLE_RESOURCES.includes(type)) {
                         return true;
                     }
                 }
