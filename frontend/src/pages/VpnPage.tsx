@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, ChevronRight, Network, Shield, Key, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Search, ChevronRight, Network, Shield, Key, Edit2, Trash2, XCircle } from 'lucide-react';
 import {
     Table,
     TableBody,
@@ -36,6 +36,7 @@ const VpnPage = () => {
     const { apiFetch } = useAuth();
     const [vpns, setVpns] = useState<VpnConfig[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingVpn, setEditingVpn] = useState<VpnConfig | null>(null);
@@ -55,12 +56,18 @@ const VpnPage = () => {
 
     const fetchVpns = async () => {
         setIsLoading(true);
+        setError(null);
         try {
             const response = await apiFetch(`${API_BASE_URL}/vpns`);
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || `Server error: ${response.status}`);
+            }
             const data = await response.json();
             setVpns(data || []);
         } catch (error) {
             console.error('Failed to fetch VPN configs:', error);
+            setError(error instanceof Error ? error.message : 'Failed to retrieve VPN configurations');
         } finally {
             setIsLoading(false);
         }
@@ -166,6 +173,26 @@ const VpnPage = () => {
                     </Button>
                 </div>
             </div>
+
+            {/* Error State */}
+            {error && (
+                <div className="bg-destructive/10 border border-destructive/20 rounded-2xl p-8 text-center animate-in fade-in zoom-in-95 duration-300">
+                    <div className="inline-flex p-4 rounded-2xl bg-destructive/10 text-destructive mb-4">
+                        <XCircle className="w-8 h-8" />
+                    </div>
+                    <h3 className="text-lg font-black uppercase tracking-tight text-destructive mb-2">VPN Synchronization Failed</h3>
+                    <p className="text-sm font-medium text-muted-foreground mb-6 max-w-md mx-auto">
+                        {error}
+                    </p>
+                    <Button
+                        onClick={() => fetchVpns()}
+                        variant="outline"
+                        className="h-10 px-8 rounded-xl border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive font-bold uppercase tracking-widest text-[10px]"
+                    >
+                        Retry Uplink
+                    </Button>
+                </div>
+            )}
 
             {/* Table */}
             <div className="rounded-2xl border border-border bg-card shadow-card overflow-hidden">

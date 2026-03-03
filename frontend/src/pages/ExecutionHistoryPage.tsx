@@ -38,6 +38,7 @@ const ExecutionHistoryPage = () => {
     const { activeNamespace } = useNamespace();
     const [executions, setExecutions] = useState<WorkflowExecution[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [selectedExec, setSelectedExec] = useState<WorkflowExecution | null>(null);
     const [loadingDetail, setLoadingDetail] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -52,15 +53,20 @@ const ExecutionHistoryPage = () => {
     }, [activeNamespace]);
 
     const fetchHistory = async () => {
+        if (!activeNamespace) return;
         try {
             setLoading(true);
-            const response = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace?.id}/executions`);
-            if (response.ok) {
-                const data = await response.json();
-                setExecutions(data || []);
+            setError(null);
+            const response = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/executions`);
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || `Server error: ${response.status}`);
             }
+            const data = await response.json();
+            setExecutions(data || []);
         } catch (error) {
             console.error('Failed to fetch history:', error);
+            setError(error instanceof Error ? error.message : 'Failed to retrieve execution records');
         } finally {
             setLoading(false);
         }
@@ -70,12 +76,17 @@ const ExecutionHistoryPage = () => {
         try {
             setLoadingDetail(true);
             const response = await apiFetch(`${API_BASE_URL}/executions/${exec.id}`);
-            if (response.ok) {
-                const data = await response.json();
-                setSelectedExec(data);
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || 'Failed to fetch execution detail');
             }
+            const data = await response.json();
+            setSelectedExec(data);
         } catch (error) {
             console.error('Failed to fetch execution detail:', error);
+            // We can show a toast here since it's a detail view, but for now we'll just log
+            // and maybe set selectedExec to null to close the modal if it failed
+            setSelectedExec(null);
         } finally {
             setLoadingDetail(false);
         }
@@ -159,7 +170,24 @@ const ExecutionHistoryPage = () => {
                     <div className="bg-card/30 backdrop-blur-sm rounded-3xl border border-border p-6 shadow-premium relative overflow-hidden flex-1 flex flex-col min-h-0">
                         <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
 
-                        {loading && executions.length === 0 ? (
+                        {error ? (
+                            <div className="flex-1 flex flex-col items-center justify-center gap-6 py-20 bg-destructive/5 rounded-2xl border border-dashed border-destructive/20 animate-in fade-in zoom-in-95 duration-300">
+                                <div className="w-20 h-20 rounded-full bg-destructive/10 flex items-center justify-center">
+                                    <XCircle className="w-10 h-10 text-destructive" />
+                                </div>
+                                <div className="text-center space-y-1">
+                                    <p className="text-sm font-bold text-destructive uppercase tracking-widest">Audit Log Synchronization Failure</p>
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium max-w-sm mx-auto">{error}</p>
+                                </div>
+                                <Button
+                                    onClick={fetchHistory}
+                                    variant="outline"
+                                    className="h-10 px-8 rounded-xl border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive font-bold uppercase tracking-widest text-[10px]"
+                                >
+                                    Retry Synchronization
+                                </Button>
+                            </div>
+                        ) : loading && executions.length === 0 ? (
                             <div className="flex-1 flex flex-col items-center justify-center gap-4">
                                 <Loader2 className="w-10 h-10 animate-spin text-primary opacity-50" />
                                 <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground animate-pulse">Initializing Historical Data...</p>

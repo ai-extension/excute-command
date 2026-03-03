@@ -128,7 +128,9 @@ export default function RolePermissionsPage() {
                 const resourcesToFetch = allResourceItems.map(async rt => {
                     try {
                         let path = rt.path;
-                        if (path === '/') return { id: rt.id, data: [] }; // Dashboard doesn't have sub-items
+                        // Skip fetching for dashboard (root path) and settings (singleton)
+                        if (path === '/' || rt.id === 'settings') return { id: rt.id, data: [] };
+
                         if (path.includes('%ns%')) {
                             if (!activeNsId) return { id: rt.id, data: [] };
                             path = path.replace('%ns%', activeNsId);

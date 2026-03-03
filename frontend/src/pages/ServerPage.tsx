@@ -41,6 +41,7 @@ const ServerPage = () => {
     const [servers, setServers] = useState<Server[]>([]);
     const [vpns, setVpns] = useState<VpnConfig[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingServer, setEditingServer] = useState<Server | null>(null);
@@ -66,12 +67,18 @@ const ServerPage = () => {
 
     const fetchServers = async () => {
         setIsLoading(true);
+        setError(null);
         try {
             const response = await apiFetch(`${API_BASE_URL}/servers`);
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || `Server error: ${response.status}`);
+            }
             const data = await response.json();
             setServers(data || []);
         } catch (error) {
             console.error('Failed to fetch servers:', error);
+            setError(error instanceof Error ? error.message : 'Failed to connect to the fleet orchestrator');
         } finally {
             setIsLoading(false);
         }
@@ -80,6 +87,10 @@ const ServerPage = () => {
     const fetchVpns = async () => {
         try {
             const response = await apiFetch(`${API_BASE_URL}/vpns`);
+            if (!response.ok) {
+                console.error(`Failed to fetch vpns: ${response.status}`);
+                return;
+            }
             const data = await response.json();
             setVpns(data || []);
         } catch (error) {
@@ -216,6 +227,26 @@ const ServerPage = () => {
                     </Button>
                 </div>
             </div>
+
+            {/* Error State */}
+            {error && (
+                <div className="bg-destructive/10 border border-destructive/20 rounded-2xl p-8 text-center animate-in fade-in zoom-in-95 duration-300">
+                    <div className="inline-flex p-4 rounded-2xl bg-destructive/10 text-destructive mb-4">
+                        <XCircle className="w-8 h-8" />
+                    </div>
+                    <h3 className="text-lg font-black uppercase tracking-tight text-destructive mb-2">Fleet Synchronization Failed</h3>
+                    <p className="text-sm font-medium text-muted-foreground mb-6 max-w-md mx-auto">
+                        {error}
+                    </p>
+                    <Button
+                        onClick={() => fetchServers()}
+                        variant="outline"
+                        className="h-10 px-8 rounded-xl border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive font-bold uppercase tracking-widest text-[10px]"
+                    >
+                        Retry Uplink
+                    </Button>
+                </div>
+            )}
 
             {/* Server Grid/Table */}
             <div className="rounded-2xl border border-border bg-card shadow-card overflow-hidden">

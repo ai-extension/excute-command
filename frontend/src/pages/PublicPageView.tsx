@@ -57,22 +57,26 @@ const PublicPageView = () => {
                 })
             });
 
-            const data = await response.json();
-
             if (response.status === 410) {
                 setError('This link has expired and is no longer accessible.');
-            } else if (response.status === 401 || data.requires_password) {
+                setIsLoading(false);
+                return;
+            }
+
+            const data = await response.json();
+
+            if (response.status === 401 || data.requires_password) {
                 setRequiresPassword(true);
                 setPage(data); // Partial data (title, desc)
             } else if (!response.ok) {
-                setError(data.error || 'Failed to load page');
+                setError(data.error || `Server responded with ${response.status}: ${response.statusText}`);
             } else {
                 setPage(data);
                 setIsAuthorized(true);
                 setRequiresPassword(false);
             }
         } catch (err) {
-            setError('Could not connect to the server.');
+            setError('The secure uplink could not be established. Please check your network connection.');
         } finally {
             setIsLoading(false);
         }

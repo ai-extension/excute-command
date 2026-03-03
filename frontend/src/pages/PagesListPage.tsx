@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Layout, Plus, Search, MoreVertical, Edit2, Trash2, Globe, Lock, ChevronRight, ExternalLink, Copy } from 'lucide-react';
+import { Layout, Plus, Search, MoreVertical, Edit2, Trash2, Globe, Lock, ChevronRight, ExternalLink, Copy, AlertTriangle } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
@@ -17,18 +17,24 @@ const PagesListPage = () => {
 
     const [pages, setPages] = useState<Page[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
         const fetchPages = async () => {
             if (!activeNamespace) return;
             setIsLoading(true);
+            setError(null);
             try {
                 const response = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/pages`);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch pages: ${response.statusText}`);
+                }
                 const data = await response.json();
                 setPages(data || []);
             } catch (error) {
                 console.error('Failed to fetch pages:', error);
+                setError(error instanceof Error ? error.message : 'Failed to load pages');
             } finally {
                 setIsLoading(false);
             }
@@ -117,6 +123,25 @@ const PagesListPage = () => {
             {isLoading ? (
                 <div className="flex-1 flex items-center justify-center italic text-muted-foreground opacity-50">
                     Loading your interfaces...
+                </div>
+            ) : error ? (
+                <div className="flex-1 flex flex-col items-center justify-center gap-6 p-12 border-2 border-dashed border-destructive/20 rounded-3xl bg-destructive/5 animate-in fade-in zoom-in-95 duration-500">
+                    <div className="p-4 rounded-2xl bg-destructive/10 text-destructive">
+                        <AlertTriangle className="w-10 h-10" />
+                    </div>
+                    <div className="text-center space-y-2">
+                        <h3 className="text-xl font-black tracking-tight uppercase">Connection Interrupted</h3>
+                        <p className="text-sm text-muted-foreground font-medium max-w-xs mx-auto">
+                            {error}
+                        </p>
+                    </div>
+                    <Button
+                        onClick={() => window.location.reload()}
+                        variant="outline"
+                        className="rounded-xl px-8 h-12 font-bold uppercase tracking-widest text-[11px] border-destructive/20 hover:bg-destructive/10"
+                    >
+                        Retry Connection
+                    </Button>
                 </div>
             ) : filteredPages.length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center gap-4 opacity-50 border-2 border-dashed border-border rounded-2xl bg-card">
