@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Database, Plus, Search, MoreHorizontal, Trash2, Edit3, Globe, Code } from 'lucide-react';
+import { Database, Plus, Search, MoreHorizontal, Trash2, Edit3, Globe, Code, ChevronRight } from 'lucide-react';
+
 import {
     Table,
     TableBody,
@@ -54,12 +55,13 @@ const GlobalVariablesPage = () => {
         description: ''
     });
 
-    const fetchVariables = async () => {
+    const fetchVariables = async (searchOverride?: string) => {
         if (!activeNamespace) return;
         setIsLoading(true);
         try {
+            const currentSearch = searchOverride !== undefined ? searchOverride : searchTerm;
             let url = `${API_BASE_URL}/namespaces/${activeNamespace.id}/global-variables?limit=${limit}&offset=${offset}`;
-            if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
+            if (currentSearch) url += `&search=${encodeURIComponent(currentSearch)}`;
             const response = await apiFetch(url);
             const data = await response.json();
             setVariables(data.items || []);
@@ -75,9 +77,10 @@ const GlobalVariablesPage = () => {
         fetchVariables();
     }, [activeNamespace, offset, limit]);
 
-    const handleApplyFilter = () => {
+    const handleApplyFilter = (search: string) => {
+        setSearchTerm(search);
         setOffset(0);
-        fetchVariables();
+        fetchVariables(search);
     };
 
     const handleCreate = async (e: React.FormEvent) => {
@@ -152,15 +155,14 @@ const GlobalVariablesPage = () => {
 
 
     return (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <div className="flex flex-row justify-between items-end">
-                <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-2 mb-1">
-                        <Globe className="w-4 h-4 text-primary" />
-                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Namespace Settings</span>
-                    </div>
-                    <h1 className="text-3xl font-black tracking-tighter">Global Variables</h1>
-                    <p className="text-muted-foreground text-sm font-medium">Define variables accessible across all workflows in this namespace.</p>
+        <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            {/* Breadcrumb */}
+            <div className="flex items-center gap-2 px-1">
+                <Globe className="w-3.5 h-3.5 text-primary" />
+                <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em]">
+                    <span className="text-primary">Settings</span>
+                    <ChevronRight className="w-2.5 h-2.5 text-muted-foreground/30" />
+                    <span className="text-muted-foreground font-black">Global Variables</span>
                 </div>
             </div>
 
@@ -176,7 +178,7 @@ const GlobalVariablesPage = () => {
                         if (!open) setFormData({ key: '', value: '', description: '' });
                     }}>
                         <DialogTrigger asChild>
-                            <Button className="premium-gradient font-black uppercase tracking-widest text-[10px] h-11 px-6 shadow-premium rounded-xl gap-2">
+                            <Button className="premium-gradient font-black uppercase tracking-widest text-[10px] px-4 shadow-premium rounded-xl gap-2">
                                 <Plus className="w-4 h-4" /> Add Global Variable
                             </Button>
                         </DialogTrigger>
@@ -300,7 +302,7 @@ const GlobalVariablesPage = () => {
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            className="h-10 w-10 rounded-xl hover:bg-indigo-500/10 hover:text-indigo-500 transition-colors"
+                                            className="rounded-xl hover:bg-indigo-500/10 hover:text-indigo-500 transition-colors"
                                             onClick={() => openEditDialog(v)}
                                         >
                                             <Edit3 className="w-4 h-4" />
@@ -308,7 +310,7 @@ const GlobalVariablesPage = () => {
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            className="h-10 w-10 rounded-xl hover:bg-destructive/10 hover:text-destructive transition-colors"
+                                            className="rounded-xl hover:bg-destructive/10 hover:text-destructive transition-colors"
                                             onClick={() => handleDelete(v.id)}
                                         >
                                             <Trash2 className="w-4 h-4" />

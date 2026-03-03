@@ -17,6 +17,7 @@ import { useNamespace } from '../context/NamespaceContext';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../lib/api';
 import { Pagination } from '../components/Pagination';
+import { ResourceFilters } from '../components/ResourceFilters';
 
 const PagesListPage = () => {
     const navigate = useNavigate();
@@ -63,7 +64,7 @@ const PagesListPage = () => {
 
     useEffect(() => {
         fetchPages();
-    }, [activeNamespace, apiFetch, offset, limit, visibilityFilter]);
+    }, [activeNamespace, offset, limit]);
 
     const handleApplyFilter = () => {
         setOffset(0);
@@ -122,51 +123,44 @@ const PagesListPage = () => {
     });
 
     return (
-        <div className="flex flex-col h-full space-y-6 animate-in fade-in duration-500">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-black tracking-tight flex items-center gap-3">
-                        <div className="p-2 rounded-xl bg-primary/10 text-primary">
-                            <Layout className="w-6 h-6" />
-                        </div>
-                        PAGES
-                    </h1>
-                    <p className="text-muted-foreground text-sm font-medium mt-1">Design and share interactive workflow dashboards.</p>
+        <div className="flex flex-col h-full space-y-5 animate-in fade-in duration-500">
+            {/* Breadcrumb */}
+            <div className="flex items-center gap-2 px-1">
+                <Layout className="w-3.5 h-3.5 text-primary" />
+                <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em]">
+                    <span className="text-primary">Automations</span>
+                    <ChevronRight className="w-2.5 h-2.5 text-muted-foreground/30" />
+                    <span className="text-muted-foreground font-black">Pages</span>
                 </div>
-                <Button onClick={handleCreatePage} className="premium-gradient text-white shadow-premium gap-2 h-11 px-6 rounded-xl font-bold uppercase tracking-widest text-[11px]">
-                    <Plus className="w-4 h-4" />
-                    Create New Page
-                </Button>
             </div>
 
-            <div className="flex gap-4">
-                <div className="flex-1 relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                        placeholder="Search pages by title or slug..."
-                        className="pl-10 h-11 bg-card border-border focus:ring-primary/20 rounded-xl"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleApplyFilter()}
-                    />
-                </div>
-                <Button
-                    onClick={handleApplyFilter}
-                    className="h-11 px-6 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black uppercase tracking-widest text-[11px] shadow-lg shadow-emerald-500/20"
-                >
-                    Apply Filter
-                </Button>
-                <Select value={visibilityFilter} onValueChange={setVisibilityFilter}>
-                    <SelectTrigger className="w-40 h-11 bg-card border-border rounded-xl">
-                        <SelectValue placeholder="VISIBILITY" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border-border">
-                        <SelectItem value="ALL">ALL VISIBILITY</SelectItem>
-                        <SelectItem value="PUBLIC">PUBLIC ONLY</SelectItem>
-                        <SelectItem value="PRIVATE">PRIVATE ONLY</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
+            <ResourceFilters
+                searchTerm={searchQuery}
+                onSearchChange={setSearchQuery}
+                onApply={(search: string, filters: { [key: string]: string }) => {
+                    setSearchQuery(search);
+                    setVisibilityFilter(filters.visibility || 'ALL');
+                    setOffset(0);
+                    // fetchPages will be triggered by useEffect because of offset or visibility change
+                    // but we call it explicitly here for completeness if needed after state updates
+                    setTimeout(() => fetchPages(), 10);
+                }}
+                filters={{ visibility: visibilityFilter }}
+                filterConfigs={[
+                    {
+                        key: 'visibility',
+                        placeholder: 'VISIBILITY',
+                        options: [
+                            { label: 'ALL VISIBILITY', value: 'ALL' },
+                            { label: 'PUBLIC ONLY', value: 'PUBLIC' },
+                            { label: 'PRIVATE ONLY', value: 'PRIVATE' }
+                        ],
+                        width: 'w-40'
+                    }
+                ]}
+                searchPlaceholder="Search pages by title or slug..."
+                isLoading={isLoading}
+            />
 
             {isLoading ? (
                 <div className="flex-1 flex items-center justify-center italic text-muted-foreground opacity-50">
@@ -250,7 +244,7 @@ const PagesListPage = () => {
                                             </Button>
                                         )}
                                         <Button
-                                            className="h-8 px-4 text-[10px] font-bold uppercase tracking-widest rounded-lg premium-gradient text-white"
+                                            className="px-4 text-[10px] font-bold uppercase tracking-widest rounded-lg premium-gradient text-white"
                                             onClick={() => navigate(`/pages/${page.id}/edit`)}
                                         >
                                             Design <ChevronRight className="w-3 h-3 ml-1" />

@@ -281,7 +281,7 @@ const WorkflowDesignerPage = () => {
                             <Button
                                 onClick={() => window.location.reload()}
                                 variant="outline"
-                                className="h-10 px-8 rounded-xl border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive font-black uppercase tracking-widest text-[9px]"
+                                className="px-8 rounded-xl border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive font-black uppercase tracking-widest text-[9px]"
                             >
                                 Retry Handshake
                             </Button>

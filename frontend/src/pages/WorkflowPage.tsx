@@ -49,12 +49,13 @@ const WorkflowPage = () => {
     const [newWorkflowDescription, setNewWorkflowDescription] = useState('');
     const [isCreating, setIsCreating] = useState(false);
 
-    const fetchWorkflows = async () => {
+    const fetchWorkflows = async (searchOverride?: string) => {
         if (!activeNamespace) return;
         setIsLoading(true);
         try {
+            const currentSearch = searchOverride !== undefined ? searchOverride : searchTerm;
             let url = `${API_BASE_URL}/namespaces/${activeNamespace.id}/workflows?limit=${limit}&offset=${offset}`;
-            if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
+            if (currentSearch) url += `&search=${encodeURIComponent(currentSearch)}`;
             if (selectedTagIds.length > 0) {
                 selectedTagIds.forEach(id => {
                     url += `&tag_ids=${id}`;
@@ -109,11 +110,12 @@ const WorkflowPage = () => {
 
     useEffect(() => {
         fetchWorkflows();
-    }, [activeNamespace, offset, limit, selectedTagIds]);
+    }, [activeNamespace, offset, limit]);
 
-    const handleApplyFilter = () => {
+    const handleApplyFilter = (search: string) => {
+        setSearchTerm(search);
         setOffset(0);
-        fetchWorkflows();
+        fetchWorkflows(search);
     };
 
     return (
@@ -139,7 +141,7 @@ const WorkflowPage = () => {
                             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
                                 <Button
                                     onClick={() => setIsCreateDialogOpen(true)}
-                                    className="h-11 px-6 rounded-xl premium-gradient font-black uppercase tracking-widest text-[10px] shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
+                                    className="px-4 rounded-xl premium-gradient font-black uppercase tracking-widest text-[10px] shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
                                 >
                                     <Plus className="w-3.5 h-3.5" />
                                     New Workflow
@@ -162,7 +164,7 @@ const WorkflowPage = () => {
                                                 onChange={(e) => setNewWorkflowName(e.target.value)}
                                                 placeholder="e.g. Daily Data Backup"
                                                 autoFocus
-                                                className="h-10 text-sm font-medium focus:ring-1 focus:ring-primary/30"
+                                                className="text-sm font-medium focus:ring-1 focus:ring-primary/30"
                                             />
                                         </div>
                                         <div className="space-y-2">
@@ -171,7 +173,7 @@ const WorkflowPage = () => {
                                                 value={newWorkflowDescription}
                                                 onChange={(e) => setNewWorkflowDescription(e.target.value)}
                                                 placeholder="What does this workflow automate?"
-                                                className="h-10 text-sm font-medium"
+                                                className="text-sm font-medium"
                                             />
                                         </div>
                                         <DialogFooter className="pt-4">
@@ -299,7 +301,7 @@ const WorkflowPage = () => {
                                                     variant="ghost"
                                                     size="icon"
                                                     onClick={() => runWorkflow(wf)}
-                                                    className="h-10 w-10 rounded-xl hover:bg-emerald-500/10 hover:text-emerald-500 transition-colors"
+                                                    className="w-10 rounded-xl hover:bg-emerald-500/10 hover:text-emerald-500 transition-colors"
                                                 >
                                                     <Play className="w-4 h-4 fill-current" />
                                                 </Button>
@@ -307,7 +309,7 @@ const WorkflowPage = () => {
                                                     variant="ghost"
                                                     size="icon"
                                                     onClick={() => navigate(`/workflows/${wf.id}/edit`)}
-                                                    className="h-10 w-10 rounded-xl hover:bg-muted"
+                                                    className="w-10 rounded-xl hover:bg-muted"
                                                 >
                                                     <Settings className="w-4 h-4" />
                                                 </Button>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Users, UserPlus, Shield, Mail, MoreHorizontal, Search, ShieldCheck } from 'lucide-react';
+import { Users, UserPlus, Shield, Mail, MoreHorizontal, Search, ShieldCheck, ChevronRight } from 'lucide-react';
+
 import {
     Table,
     TableBody,
@@ -54,12 +55,15 @@ const UsersPage = () => {
     const [limit, setLimit] = useState(20);
     const [offset, setOffset] = useState(0);
 
-    const fetchUsers = async () => {
+    const fetchUsers = async (searchOverride?: string, filtersOverride?: { [key: string]: string }) => {
         try {
             setIsLoading(true);
+            const currentSearch = searchOverride !== undefined ? searchOverride : searchTerm;
+            const currentRole = filtersOverride?.roleID !== undefined ? filtersOverride.roleID : roleFilter;
+
             let url = `${API_BASE_URL}/users?limit=${limit}&offset=${offset}`;
-            if (roleFilter !== 'ALL') url += `&role_id=${roleFilter}`;
-            if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
+            if (currentRole !== 'ALL') url += `&role_id=${currentRole}`;
+            if (currentSearch) url += `&search=${encodeURIComponent(currentSearch)}`;
 
             const response = await apiFetch(url);
             const data = await response.json();
@@ -89,11 +93,13 @@ const UsersPage = () => {
 
     useEffect(() => {
         fetchUsers();
-    }, [offset, limit, roleFilter]);
+    }, [offset, limit]);
 
-    const handleApplyFilter = () => {
+    const handleApplyFilter = (search: string, filters: { [key: string]: string }) => {
+        setSearchTerm(search);
+        if (filters.roleID) setRoleFilter(filters.roleID);
         setOffset(0);
-        fetchUsers();
+        fetchUsers(search, filters);
     };
 
     const handleCreateUser = async (e: React.FormEvent) => {
@@ -225,76 +231,70 @@ const UsersPage = () => {
                 </DialogContent>
             </Dialog>
 
-            <div className="flex flex-row justify-between items-end">
-                <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-2 mb-1">
-                        <Users className="w-4 h-4 text-primary" />
-                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Identity & Access</span>
-                    </div>
-                    <h1 className="text-3xl font-black tracking-tighter">User Directory</h1>
-                    <p className="text-muted-foreground text-sm font-medium">Manage system access and account security.</p>
+            {/* Breadcrumb */}
+            <div className="flex items-center gap-2 px-1">
+                <Users className="w-3.5 h-3.5 text-primary" />
+                <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em]">
+                    <span className="text-primary">Identity & Access</span>
+                    <ChevronRight className="w-2.5 h-2.5 text-muted-foreground/30" />
+                    <span className="text-muted-foreground font-black">User Directory</span>
                 </div>
-
-                <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-                    <DialogTrigger asChild>
-                        <Button className="premium-gradient font-black uppercase tracking-widest text-[10px] h-11 px-6 shadow-premium rounded-xl gap-2">
-                            <UserPlus className="w-4 h-4" /> Add New User
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
-                        <DialogHeader>
-                            <DialogTitle className="text-2xl">Create New Identity</DialogTitle>
-                            <DialogDescription>
-                                Establish a new system user with secure credentials.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <form onSubmit={handleCreateUser} className="space-y-4 py-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="username" className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Username</Label>
-                                <Input
-                                    id="username"
-                                    placeholder="e.g. jdoe"
-                                    className="h-12 bg-muted/30 border-border rounded-xl font-semibold"
-                                    value={newUserData.username}
-                                    onChange={(e) => setNewUserData({ ...newUserData, username: e.target.value })}
-                                    required
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="email" className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Email Address</Label>
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    placeholder="jdoe@example.com"
-                                    className="h-12 bg-muted/30 border-border rounded-xl font-semibold"
-                                    value={newUserData.email}
-                                    onChange={(e) => setNewUserData({ ...newUserData, email: e.target.value })}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="password" className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Password</Label>
-                                <Input
-                                    id="password"
-                                    type="password"
-                                    className="h-12 bg-muted/30 border-border rounded-xl font-semibold"
-                                    value={newUserData.password}
-                                    onChange={(e) => setNewUserData({ ...newUserData, password: e.target.value })}
-                                    required
-                                />
-                            </div>
-                            <DialogFooter className="pt-4">
-                                <Button
-                                    type="submit"
-                                    disabled={isSubmitting}
-                                    className="premium-gradient font-black uppercase tracking-widest text-[10px] h-12 w-full shadow-premium rounded-xl"
-                                >
-                                    {isSubmitting ? "Provisioning..." : "Create Identity"}
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    </DialogContent>
-                </Dialog>
             </div>
+
+            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle className="text-2xl">Create New Identity</DialogTitle>
+                        <DialogDescription>
+                            Establish a new system user with secure credentials.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleCreateUser} className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="username" className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Username</Label>
+                            <Input
+                                id="username"
+                                placeholder="e.g. jdoe"
+                                className="h-12 bg-muted/30 border-border rounded-xl font-semibold"
+                                value={newUserData.username}
+                                onChange={(e) => setNewUserData({ ...newUserData, username: e.target.value })}
+                                required
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="email" className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Email Address</Label>
+                            <Input
+                                id="email"
+                                type="email"
+                                placeholder="jdoe@example.com"
+                                className="h-12 bg-muted/30 border-border rounded-xl font-semibold"
+                                value={newUserData.email}
+                                onChange={(e) => setNewUserData({ ...newUserData, email: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="password" className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Password</Label>
+                            <Input
+                                id="password"
+                                type="password"
+                                className="h-12 bg-muted/30 border-border rounded-xl font-semibold"
+                                value={newUserData.password}
+                                onChange={(e) => setNewUserData({ ...newUserData, password: e.target.value })}
+                                required
+                            />
+                        </div>
+                        <DialogFooter className="pt-4">
+                            <Button
+                                type="submit"
+                                disabled={isSubmitting}
+                                className="premium-gradient font-black uppercase tracking-widest text-[10px] h-12 w-full shadow-premium rounded-xl"
+                            >
+                                {isSubmitting ? "Provisioning..." : "Create Identity"}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
 
             <ResourceFilters
                 searchTerm={searchTerm}
@@ -370,12 +370,12 @@ const UsersPage = () => {
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            className="h-10 w-10 rounded-xl hover:bg-primary/10 hover:text-primary transition-colors"
+                                            className="w-10 rounded-xl hover:bg-primary/10 hover:text-primary transition-colors"
                                             onClick={() => openRolesDialog(u)}
                                         >
                                             <Shield className="w-4 h-4" />
                                         </Button>
-                                        <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl hover:bg-muted text-muted-foreground">
+                                        <Button variant="ghost" size="icon" className="w-10 rounded-xl hover:bg-muted text-muted-foreground">
                                             <MoreHorizontal className="w-4 h-4" />
                                         </Button>
                                     </div>
@@ -402,7 +402,7 @@ const UsersPage = () => {
                     onPageChange={setOffset}
                 />
             </Card>
-        </div>
+        </div >
     );
 };
 

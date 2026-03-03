@@ -10,8 +10,10 @@ import {
     ChevronRight,
     Search,
     Filter,
-    Zap
+    Zap,
+    Plus
 } from 'lucide-react';
+import { ResourceFilters } from '../components/ResourceFilters';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
@@ -62,7 +64,7 @@ const ExecutionHistoryPage = () => {
             fetchHistory();
             fetchWorkflows();
         }
-    }, [activeNamespace, offset, limit, statusFilter, workflowFilter]);
+    }, [activeNamespace, offset, limit]);
 
     const fetchWorkflows = async () => {
         if (!activeNamespace) return;
@@ -75,16 +77,20 @@ const ExecutionHistoryPage = () => {
         }
     };
 
-    const fetchHistory = async () => {
+    const fetchHistory = async (searchOverride?: string, statusOverride?: string, workflowOverride?: string) => {
         if (!activeNamespace) return;
         try {
             setLoading(true);
             setError(null);
 
+            const search = searchOverride !== undefined ? searchOverride : searchQuery;
+            const status = statusOverride !== undefined ? statusOverride : statusFilter;
+            const workflowId = workflowOverride !== undefined ? workflowOverride : workflowFilter;
+
             let url = `${API_BASE_URL}/namespaces/${activeNamespace.id}/executions?limit=${limit}&offset=${offset}`;
-            if (statusFilter !== 'ALL') url += `&status=${statusFilter}`;
-            if (workflowFilter !== 'ALL') url += `&workflow_id=${workflowFilter}`;
-            if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
+            if (status !== 'ALL') url += `&status=${status}`;
+            if (workflowId !== 'ALL') url += `&workflow_id=${workflowId}`;
+            if (search) url += `&search=${encodeURIComponent(search)}`;
 
             const response = await apiFetch(url);
             if (!response.ok) {
@@ -144,76 +150,62 @@ const ExecutionHistoryPage = () => {
         return `${mins}m ${secs}s`;
     };
 
-    const handleApplyFilter = () => {
+    const handleApplyFilter = (search: string, filters: { [key: string]: string }) => {
+        setSearchQuery(search);
+        setStatusFilter(filters.status || 'ALL');
+        setWorkflowFilter(filters.workflowId || 'ALL');
         setOffset(0);
-        fetchHistory();
+        fetchHistory(search, filters.status, filters.workflowId);
     };
 
     return (
         <WorkflowRunner>
             {(runWorkflow) => (
                 <div className="flex flex-col gap-8 h-full animate-in fade-in slide-in-from-bottom-4 duration-700">
-                    {/* Page Header */}
-                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-                        <div className="space-y-1.5">
-                            <div className="flex items-center gap-2">
-                                <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 shadow-emerald-500/5 shadow-inner">
-                                    <History className="w-5 h-5" />
-                                </div>
-                                <h1 className="text-2xl font-black tracking-tight text-foreground uppercase">Global Audit Log</h1>
-                            </div>
-                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] flex items-center gap-2">
-                                Comprehensive execution monitoring across {activeNamespace?.name} workspace
-                                <span className="w-1 h-1 bg-muted rounded-full" />
-                                Persistent history active
-                            </p>
+                    {/* Breadcrumb */}
+                    <div className="flex items-center gap-2 px-1">
+                        <History className="w-3.5 h-3.5 text-primary" />
+                        <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em]">
+                            <span className="text-primary">Automations</span>
+                            <ChevronRight className="w-2.5 h-2.5 text-muted-foreground/30" />
+                            <span className="text-muted-foreground font-black">Execution History</span>
                         </div>
+                    </div>
 
-                        <div className="flex items-center gap-3">
-                            <div className="relative group/search">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground group-focus-within/search:text-primary transition-colors" />
-                                <Input
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleApplyFilter()}
-                                    placeholder="SEARCH BY WORKFLOW OR ID..."
-                                    className="w-64 h-10 pl-9 bg-card/50 border-border text-[11px] font-black tracking-widest uppercase focus:ring-1 focus:ring-primary/30 transition-all rounded-xl"
-                                />
-                            </div>
-
-                            <Button
-                                onClick={handleApplyFilter}
-                                className="h-10 px-4 rounded-xl font-black text-[10px] uppercase tracking-widest bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                            >
-                                Apply Filter
-                            </Button>
-
-                            <Select value={statusFilter} onValueChange={setStatusFilter}>
-                                <SelectTrigger className="w-32 h-10 bg-card/50 border-border text-[10px] font-black tracking-widest uppercase rounded-xl">
-                                    <SelectValue placeholder="STATUS" />
-                                </SelectTrigger>
-                                <SelectContent className="bg-card border-border">
-                                    <SelectItem value="ALL">ALL STATUS</SelectItem>
-                                    <SelectItem value="SUCCESS">SUCCESS</SelectItem>
-                                    <SelectItem value="FAILED">FAILED</SelectItem>
-                                    <SelectItem value="RUNNING">RUNNING</SelectItem>
-                                </SelectContent>
-                            </Select>
-
-                            <Select value={workflowFilter} onValueChange={setWorkflowFilter}>
-                                <SelectTrigger className="w-48 h-10 bg-card/50 border-border text-[10px] font-black tracking-widest uppercase rounded-xl">
-                                    <SelectValue placeholder="WORKFLOW" />
-                                </SelectTrigger>
-                                <SelectContent className="bg-card border-border max-h-[300px]">
-                                    <SelectItem value="ALL">ALL WORKFLOWS</SelectItem>
-                                    {workflows.map(wf => (
-                                        <SelectItem key={wf.id} value={wf.id}>
-                                            {wf.name.toUpperCase()}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-
+                    <ResourceFilters
+                        searchTerm={searchQuery}
+                        onSearchChange={setSearchQuery}
+                        onApply={handleApplyFilter}
+                        filters={{ status: statusFilter, workflowId: workflowFilter }}
+                        onFilterChange={(key, val) => {
+                            if (key === 'status') setStatusFilter(val);
+                            if (key === 'workflowId') setWorkflowFilter(val);
+                        }}
+                        filterConfigs={[
+                            {
+                                key: 'status',
+                                placeholder: 'STATUS',
+                                options: [
+                                    { label: 'ALL STATUS', value: 'ALL' },
+                                    { label: 'SUCCESS', value: 'SUCCESS' },
+                                    { label: 'FAILED', value: 'FAILED' },
+                                    { label: 'RUNNING', value: 'RUNNING' }
+                                ],
+                                width: 'w-32'
+                            },
+                            {
+                                key: 'workflowId',
+                                placeholder: 'WORKFLOW',
+                                options: [
+                                    { label: 'ALL WORKFLOWS', value: 'ALL' },
+                                    ...workflows.map(wf => ({ label: wf.name.toUpperCase(), value: wf.id }))
+                                ],
+                                width: 'w-48'
+                            }
+                        ]}
+                        searchPlaceholder="SEARCH BY WORKFLOW OR ID..."
+                        isLoading={loading}
+                        primaryAction={
                             <Button
                                 variant="outline"
                                 size="sm"
@@ -222,16 +214,18 @@ const ExecutionHistoryPage = () => {
                                     setStatusFilter('ALL');
                                     setWorkflowFilter('ALL');
                                     setOffset(0);
-                                    // useEffect will trigger fetchHistory
+                                    // fetchHistory will be triggered by useEffect because some state might change
+                                    // but actually we should just call it to be sure
+                                    fetchHistory('', 'ALL', 'ALL');
                                 }}
                                 disabled={loading}
-                                className="h-10 px-4 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 bg-card hover:bg-muted"
+                                className="h-9 px-4 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 bg-card hover:bg-muted"
                             >
                                 {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Filter className="w-3.5 h-3.5" />}
                                 Reset
                             </Button>
-                        </div>
-                    </div>
+                        }
+                    />
 
                     {/* Main Content */}
                     <div className="bg-card/30 backdrop-blur-sm rounded-3xl border border-border p-6 shadow-premium relative overflow-hidden flex-1 flex flex-col min-h-0">
@@ -247,9 +241,9 @@ const ExecutionHistoryPage = () => {
                                     <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium max-w-sm mx-auto">{error}</p>
                                 </div>
                                 <Button
-                                    onClick={fetchHistory}
+                                    onClick={() => fetchHistory()}
                                     variant="outline"
-                                    className="h-10 px-8 rounded-xl border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive font-bold uppercase tracking-widest text-[10px]"
+                                    className="px-8 rounded-xl border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive font-bold uppercase tracking-widest text-[10px]"
                                 >
                                     Retry Synchronization
                                 </Button>
@@ -372,8 +366,9 @@ const ExecutionHistoryPage = () => {
                         </DialogContent>
                     </Dialog>
                 </div>
-            )}
-        </WorkflowRunner>
+            )
+            }
+        </WorkflowRunner >
     );
 };
 

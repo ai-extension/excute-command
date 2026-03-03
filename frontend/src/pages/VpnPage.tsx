@@ -57,13 +57,16 @@ const VpnPage = () => {
     const [limit, setLimit] = useState(20);
     const [offset, setOffset] = useState(0);
 
-    const fetchVpns = async () => {
+    const fetchVpns = async (searchOverride?: string, filtersOverride?: { [key: string]: string }) => {
         setIsLoading(true);
         setError(null);
         try {
+            const currentSearch = searchOverride !== undefined ? searchOverride : searchTerm;
+            const currentAuthType = filtersOverride?.authType !== undefined ? filtersOverride.authType : authTypeFilter;
+
             let url = `${API_BASE_URL}/vpns?limit=${limit}&offset=${offset}`;
-            if (authTypeFilter !== 'ALL') url += `&auth_type=${authTypeFilter}`;
-            if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
+            if (currentAuthType !== 'ALL') url += `&auth_type=${currentAuthType}`;
+            if (currentSearch) url += `&search=${encodeURIComponent(currentSearch)}`;
 
             const response = await apiFetch(url);
             if (!response.ok) {
@@ -91,11 +94,13 @@ const VpnPage = () => {
 
     useEffect(() => {
         fetchVpns();
-    }, [offset, limit, authTypeFilter]);
+    }, [offset, limit]);
 
-    const handleApplyFilter = () => {
+    const handleApplyFilter = (search: string, filters: { [key: string]: string }) => {
+        setSearchTerm(search);
+        if (filters.authType) setAuthTypeFilter(filters.authType);
         setOffset(0);
-        fetchVpns();
+        fetchVpns(search, filters);
     };
 
     const handleOpenForm = (vpn?: VpnConfig) => {
@@ -200,7 +205,7 @@ const VpnPage = () => {
                 primaryAction={
                     <Button
                         onClick={() => handleOpenForm()}
-                        className="h-11 px-6 rounded-xl premium-gradient font-black uppercase tracking-widest text-[10px] shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
+                        className="px-4 rounded-xl premium-gradient font-black uppercase tracking-widest text-[10px] shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
                     >
                         <Plus className="w-3.5 h-3.5" />
                         Add VPN
@@ -221,7 +226,7 @@ const VpnPage = () => {
                     <Button
                         onClick={() => fetchVpns()}
                         variant="outline"
-                        className="h-10 px-8 rounded-xl border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive font-bold uppercase tracking-widest text-[10px]"
+                        className="px-8 rounded-xl border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive font-bold uppercase tracking-widest text-[10px]"
                     >
                         Retry Uplink
                     </Button>

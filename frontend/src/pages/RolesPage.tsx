@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, ShieldAlert, Plus, Lock, Settings, Trash2, ArrowRight, Check, Search } from 'lucide-react';
+import { Shield, ShieldAlert, Plus, Lock, Settings, Trash2, ArrowRight, Check, Search, ChevronRight } from 'lucide-react';
+
 import { API_BASE_URL } from '../lib/api';
 import { Pagination } from '../components/Pagination';
 import { Button } from '../components/ui/button';
@@ -36,11 +37,12 @@ const RolesPage = () => {
     const [limit, setLimit] = useState(21);
     const [offset, setOffset] = useState(0);
 
-    const fetchRoles = async () => {
+    const fetchRoles = async (searchOverride?: string) => {
         setIsLoading(true);
         try {
+            const currentSearch = searchOverride !== undefined ? searchOverride : searchTerm;
             let url = `${API_BASE_URL}/roles?limit=${limit}&offset=${offset}`;
-            if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
+            if (currentSearch) url += `&search=${encodeURIComponent(currentSearch)}`;
             const response = await apiFetch(url);
             const data = await response.json();
             setRoles(data.items || []);
@@ -56,9 +58,10 @@ const RolesPage = () => {
         fetchRoles();
     }, [offset, limit]);
 
-    const handleApplyFilter = () => {
+    const handleApplyFilter = (search: string) => {
+        setSearchTerm(search);
         setOffset(0);
-        fetchRoles();
+        fetchRoles(search);
     };
 
     const handleCreateRole = async (e: React.FormEvent) => {
@@ -85,16 +88,14 @@ const RolesPage = () => {
     };
 
     return (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-
-            <div className="flex flex-row justify-between items-end">
-                <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-2 mb-1">
-                        <Lock className="w-4 h-4 text-primary" />
-                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Authorization</span>
-                    </div>
-                    <h1 className="text-3xl font-black tracking-tighter">Access Roles</h1>
-                    <p className="text-muted-foreground text-sm font-medium">Define permission groups and security policies.</p>
+        <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            {/* Breadcrumb */}
+            <div className="flex items-center gap-2 px-1">
+                <Lock className="w-3.5 h-3.5 text-primary" />
+                <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em]">
+                    <span className="text-primary">Authorization</span>
+                    <ChevronRight className="w-2.5 h-2.5 text-muted-foreground/30" />
+                    <span className="text-muted-foreground font-black">Access Roles</span>
                 </div>
             </div>
 
@@ -107,7 +108,7 @@ const RolesPage = () => {
                 primaryAction={
                     <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                         <DialogTrigger asChild>
-                            <Button className="premium-gradient font-black uppercase tracking-widest text-[10px] h-11 px-6 shadow-premium rounded-xl gap-2">
+                            <Button className="premium-gradient font-black uppercase tracking-widest text-[10px] px-4 shadow-premium rounded-xl gap-2">
                                 <Plus className="w-4 h-4" /> Create Role
                             </Button>
                         </DialogTrigger>

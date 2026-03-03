@@ -71,20 +71,24 @@ const ServerPage = () => {
     const [terminalSessionID, setTerminalSessionID] = useState<string | null>(null);
     const [isMaximized, setIsMaximized] = useState(false);
 
-    const fetchServers = async () => {
+    const fetchServers = async (searchOverride?: string, filtersOverride?: { [key: string]: string }) => {
         setIsLoading(true);
         setError(null);
         try {
+            const currentSearch = searchOverride !== undefined ? searchOverride : searchTerm;
+            const currentAuthType = filtersOverride?.authType !== undefined ? filtersOverride.authType : authTypeFilter;
+            const currentVpn = filtersOverride?.vpn !== undefined ? filtersOverride.vpn : vpnFilter;
+
             let url = `${API_BASE_URL}/servers?limit=${limit}&offset=${offset}`;
-            if (authTypeFilter !== 'ALL') url += `&auth_type=${authTypeFilter}`;
-            if (vpnFilter !== 'ALL') {
-                if (vpnFilter === 'NONE') {
+            if (currentAuthType !== 'ALL') url += `&auth_type=${currentAuthType}`;
+            if (currentVpn !== 'ALL') {
+                if (currentVpn === 'NONE') {
                     url += `&vpn_id=00000000-0000-0000-0000-000000000000`;
                 } else {
-                    url += `&vpn_id=${vpnFilter}`;
+                    url += `&vpn_id=${currentVpn}`;
                 }
             }
-            if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
+            if (currentSearch) url += `&search=${encodeURIComponent(currentSearch)}`;
 
             const response = await apiFetch(url);
             if (!response.ok) {
@@ -129,11 +133,14 @@ const ServerPage = () => {
 
     useEffect(() => {
         fetchServers();
-    }, [offset, limit, authTypeFilter, vpnFilter]);
+    }, [offset, limit]);
 
-    const handleApplyFilter = () => {
+    const handleApplyFilter = (search: string, filters: { [key: string]: string }) => {
+        setSearchTerm(search);
+        if (filters.authType) setAuthTypeFilter(filters.authType);
+        if (filters.vpn) setVpnFilter(filters.vpn);
         setOffset(0);
-        fetchServers();
+        fetchServers(search, filters);
     };
 
     const handleOpenForm = (server?: Server) => {
@@ -282,7 +289,7 @@ const ServerPage = () => {
                 primaryAction={
                     <Button
                         onClick={() => handleOpenForm()}
-                        className="h-11 px-6 rounded-xl premium-gradient font-black uppercase tracking-widest text-[10px] shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
+                        className="px-4 rounded-xl premium-gradient font-black uppercase tracking-widest text-[10px] shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
                     >
                         <Plus className="w-3.5 h-3.5" />
                         Deploy Host
@@ -303,7 +310,7 @@ const ServerPage = () => {
                     <Button
                         onClick={() => fetchServers()}
                         variant="outline"
-                        className="h-10 px-8 rounded-xl border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive font-bold uppercase tracking-widest text-[10px]"
+                        className="px-8 rounded-xl border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive font-bold uppercase tracking-widest text-[10px]"
                     >
                         Retry Uplink
                     </Button>

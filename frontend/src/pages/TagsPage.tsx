@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Tag as TagIcon, Plus, Search, Trash2, Edit3, Paintbrush } from 'lucide-react';
+import { Tag as TagIcon, Plus, Search, Trash2, Edit3, Paintbrush, ChevronRight } from 'lucide-react';
+
 import {
     Table,
     TableBody,
@@ -49,12 +50,13 @@ const TagsPage = () => {
         color: '#6366f1' // default indigo-500
     });
 
-    const fetchTags = async () => {
+    const fetchTags = async (searchOverride?: string) => {
         if (!activeNamespace) return;
         setIsLoading(true);
         try {
+            const currentSearch = searchOverride !== undefined ? searchOverride : searchTerm;
             let url = `${API_BASE_URL}/namespaces/${activeNamespace.id}/tags?limit=${limit}&offset=${offset}`;
-            if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
+            if (currentSearch) url += `&search=${encodeURIComponent(currentSearch)}`;
             const response = await apiFetch(url);
             const data = await response.json();
             setTags(data.items || []);
@@ -70,9 +72,10 @@ const TagsPage = () => {
         fetchTags();
     }, [activeNamespace, offset, limit]);
 
-    const handleApplyFilter = () => {
+    const handleApplyFilter = (search: string) => {
+        setSearchTerm(search);
         setOffset(0);
-        fetchTags();
+        fetchTags(search);
     };
 
     const handleCreate = async (e: React.FormEvent) => {
@@ -150,15 +153,14 @@ const TagsPage = () => {
     const paginatedTags = filteredTags.slice(offset, offset + limit);
 
     return (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <div className="flex flex-row justify-between items-end">
-                <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-2 mb-1">
-                        <TagIcon className="w-4 h-4 text-primary" />
-                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Namespace Settings</span>
-                    </div>
-                    <h1 className="text-3xl font-black tracking-tighter">Tags Management</h1>
-                    <p className="text-muted-foreground text-sm font-medium">Create and manage color-coded tags to organize your workflows and schedules.</p>
+        <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            {/* Breadcrumb */}
+            <div className="flex items-center gap-2 px-1">
+                <TagIcon className="w-3.5 h-3.5 text-primary" />
+                <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em]">
+                    <span className="text-primary">Settings</span>
+                    <ChevronRight className="w-2.5 h-2.5 text-muted-foreground/30" />
+                    <span className="text-muted-foreground font-black">Tags</span>
                 </div>
             </div>
 
@@ -174,7 +176,7 @@ const TagsPage = () => {
                         if (!open) setFormData({ name: '', color: '#6366f1' });
                     }}>
                         <DialogTrigger asChild>
-                            <Button className="premium-gradient font-black uppercase tracking-widest text-[10px] h-11 px-6 shadow-premium rounded-xl gap-2">
+                            <Button className="premium-gradient font-black uppercase tracking-widest text-[10px] px-4 shadow-premium rounded-xl gap-2">
                                 <Plus className="w-4 h-4" /> Create Tag
                             </Button>
                         </DialogTrigger>
