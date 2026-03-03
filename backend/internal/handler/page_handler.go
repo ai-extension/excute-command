@@ -165,6 +165,7 @@ func (h *PageHandler) GetPublicPage(c *gin.Context) {
 		return
 	}
 
+	h.sanitizePage(page)
 	c.JSON(http.StatusOK, page)
 }
 
@@ -189,6 +190,7 @@ func (h *PageHandler) VerifyPublicPage(c *gin.Context) {
 		return
 	}
 
+	h.sanitizePage(page)
 	c.JSON(http.StatusOK, page)
 }
 
@@ -313,6 +315,8 @@ func (h *PageHandler) GetPublicExecutionStatus(c *gin.Context) {
 		return
 	}
 
+	h.sanitizeExecution(execution)
+	h.sanitizePage(page)
 	c.JSON(http.StatusOK, execution)
 }
 
@@ -363,6 +367,7 @@ func (h *PageHandler) GetPublicExecutionLogs(c *gin.Context) {
 		return
 	}
 
+	h.sanitizeExecution(execution)
 	// Reuse log logic or implement similar
 	// For simplicity, I'll use the same logic as in WorkflowHandler
 	h.serveLogs(c, execution)
@@ -423,4 +428,29 @@ func (h *PageHandler) serveLogs(c *gin.Context, execution *domain.WorkflowExecut
 	}
 
 	c.JSON(http.StatusNotFound, gin.H{"error": "log file not found"})
+}
+
+func (h *PageHandler) sanitizePage(page *domain.Page) {
+	if page == nil {
+		return
+	}
+	page.Password = "" // Never return the hash to public users
+	for i := range page.Workflows {
+		if page.Workflows[i].Workflow != nil {
+			page.Workflows[i].Workflow.DefaultServerID = uuid.Nil // Hide internal server IDs
+		}
+	}
+}
+
+func (h *PageHandler) sanitizeExecution(execution *domain.WorkflowExecution) {
+	if execution == nil {
+		return
+	}
+	if execution.Workflow != nil {
+		execution.Workflow.DefaultServerID = uuid.Nil
+	}
+	if execution.User != nil {
+		execution.User.PasswordHash = ""
+		execution.User.Email = "" // Protect PII
+	}
 }

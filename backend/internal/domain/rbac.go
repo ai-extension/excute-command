@@ -6,6 +6,9 @@ import (
 
 // HasPermission checks if a user has a specific permission, considering hierarchy.
 func HasPermission(user *User, permType, action string, namespaceID *string, resourceID *string, tagIDs []string) bool {
+	if user == nil {
+		return false
+	}
 	if user.Username == "admin" {
 		return true
 	}
@@ -85,7 +88,11 @@ func GetPermissionScope(user *User, permType, action string) PermissionScope {
 		AllowedTagIDs:       []string{},
 	}
 
-	if user == nil || user.Username == "admin" {
+	if user == nil {
+		return scope
+	}
+
+	if user.Username == "admin" {
 		scope.IsGlobal = true
 		return scope
 	}

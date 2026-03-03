@@ -247,10 +247,10 @@ func main() {
 
 		// Public Page access (no auth required)
 		api.GET("/public/pages/:slug", pageHandler.GetPublicPage)
-		api.POST("/public/pages/:slug/verify", pageHandler.VerifyPublicPage)
-		api.POST("/public/pages/:slug/run/:workflow_id", pageHandler.RunPublicWorkflow)
-		api.GET("/public/pages/:slug/executions/:exec_id", pageHandler.GetPublicExecutionStatus)
-		api.GET("/public/pages/:slug/executions/:exec_id/logs", pageHandler.GetPublicExecutionLogs)
+		api.POST("/public/pages/:slug/verify", middleware.LoginRateLimiter(), pageHandler.VerifyPublicPage)
+		api.POST("/public/pages/:slug/run/:workflow_id", middleware.LoginRateLimiter(), pageHandler.RunPublicWorkflow)
+		api.GET("/public/pages/:slug/executions/:exec_id", middleware.LoginRateLimiter(), pageHandler.GetPublicExecutionStatus)
+		api.GET("/public/pages/:slug/executions/:exec_id/logs", middleware.LoginRateLimiter(), pageHandler.GetPublicExecutionLogs)
 	}
 
 	serverPort := os.Getenv("SERVER_PORT")
