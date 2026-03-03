@@ -39,6 +39,7 @@ import { Pagination } from '../components/Pagination';
 const ServerPage = () => {
     const { apiFetch } = useAuth();
     const [servers, setServers] = useState<Server[]>([]);
+    const [total, setTotal] = useState(0);
     const [vpns, setVpns] = useState<VpnConfig[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -54,8 +55,9 @@ const ServerPage = () => {
         auth_type: 'PASSWORD',
         password: '',
         private_key: '',
-        vpn_id: 'none'
     });
+    const [authTypeFilter, setAuthTypeFilter] = useState<string>('ALL');
+    const [vpnFilter, setVpnFilter] = useState<string>('ALL');
 
     const [limit, setLimit] = useState(20);
     const [offset, setOffset] = useState(0);
@@ -69,13 +71,25 @@ const ServerPage = () => {
         setIsLoading(true);
         setError(null);
         try {
-            const response = await apiFetch(`${API_BASE_URL}/servers`);
+            let url = `${API_BASE_URL}/servers?limit=${limit}&offset=${offset}`;
+            if (authTypeFilter !== 'ALL') url += `&auth_type=${authTypeFilter}`;
+            if (vpnFilter !== 'ALL') {
+                if (vpnFilter === 'NONE') {
+                    url += `&vpn_id=00000000-0000-0000-0000-000000000000`;
+                } else {
+                    url += `&vpn_id=${vpnFilter}`;
+                }
+            }
+            if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
+
+            const response = await apiFetch(url);
             if (!response.ok) {
                 const data = await response.json().catch(() => ({}));
                 throw new Error(data.error || `Server error: ${response.status}`);
             }
             const data = await response.json();
-            setServers(data || []);
+            setServers(data.items || []);
+            setTotal(data.total || 0);
         } catch (error) {
             console.error('Failed to fetch servers:', error);
             setError(error instanceof Error ? error.message : 'Failed to connect to the fleet orchestrator');
@@ -99,9 +113,17 @@ const ServerPage = () => {
     };
 
     useEffect(() => {
-        fetchServers();
         fetchVpns();
     }, []);
+
+    useEffect(() => {
+        fetchServers();
+    }, [offset, limit, authTypeFilter, vpnFilter]);
+
+    const handleApplyFilter = () => {
+        setOffset(0);
+        fetchServers();
+    };
 
     const handleOpenForm = (server?: Server) => {
         if (server) {
@@ -187,10 +209,16 @@ const ServerPage = () => {
 
 
 
-    const filteredServers = servers.filter(s =>
-        s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.host.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredServers = servers.filter(s => {
+        const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            s.host.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (s.user && s.user.toLowerCase().includes(searchTerm.toLowerCase()));
+        const matchesAuth = authTypeFilter === 'ALL' || s.auth_type === authTypeFilter;
+        const matchesVpn = vpnFilter === 'ALL' ||
+            (vpnFilter === 'NONE' && !s.vpn_id) ||
+            (s.vpn_id === vpnFilter);
+        return matchesSearch && matchesAuth && matchesVpn;
+    });
 
     const paginatedServers = filteredServers.slice(offset, offset + limit);
 
@@ -207,16 +235,49 @@ const ServerPage = () => {
             </div>
 
             {/* Header / Search */}
-            <div className="flex items-center justify-between gap-4 bg-card p-2.5 rounded-xl border border-border shadow-card">
-                <div className="relative flex-1 max-w-md group">
+            <div className="flex items-center justify-between gap-3 bg-card p-2.5 rounded-xl border border-border shadow-card">
+                <div className="relative flex-1 group">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground transition-all group-focus-within:text-primary group-focus-within:scale-110" />
                     <Input
                         placeholder="Filter by name, ip, or credentials..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleApplyFilter()}
                         className="pl-11 h-9 bg-background border-border rounded-lg focus-visible:ring-primary/20 placeholder:text-muted-foreground/50 font-semibold text-xs transition-all focus:bg-muted/30"
                     />
                 </div>
+
+                <Button
+                    onClick={handleApplyFilter}
+                    className="h-9 px-4 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-black uppercase tracking-widest text-[9px] shadow-lg shadow-emerald-500/20"
+                >
+                    Apply Filter
+                </Button>
+
+                <Select value={authTypeFilter} onValueChange={setAuthTypeFilter}>
+                    <SelectTrigger className="w-32 h-9 bg-background border-border rounded-lg text-[10px] font-black uppercase tracking-widest outline-none focus:ring-1 focus:ring-primary/20">
+                        <SelectValue placeholder="AUTH" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-border">
+                        <SelectItem value="ALL">ALL AUTH</SelectItem>
+                        <SelectItem value="PASSWORD">PASSWORD</SelectItem>
+                        <SelectItem value="PUBLIC_KEY">PUB KEY</SelectItem>
+                    </SelectContent>
+                </Select>
+
+                <Select value={vpnFilter} onValueChange={setVpnFilter}>
+                    <SelectTrigger className="w-40 h-9 bg-background border-border rounded-lg text-[10px] font-black uppercase tracking-widest outline-none focus:ring-1 focus:ring-primary/20">
+                        <SelectValue placeholder="NETWORK" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-border">
+                        <SelectItem value="ALL">ALL NETS</SelectItem>
+                        <SelectItem value="NONE">DIRECT</SelectItem>
+                        {vpns.map(v => (
+                            <SelectItem key={v.id} value={v.id}>{v.name.toUpperCase()}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+
                 <div className="flex gap-1.5 items-center">
                     <Button
                         onClick={() => handleOpenForm()}
@@ -260,7 +321,7 @@ const ServerPage = () => {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {filteredServers.length > 0 ? filteredServers.map((server) => (
+                        {servers.length > 0 ? servers.map((server) => (
                             <TableRow key={server.id} className="group border-border hover:bg-muted/40 transition-colors">
                                 <TableCell className="px-6 py-4">
                                     <div className="flex items-center gap-3">
@@ -335,6 +396,14 @@ const ServerPage = () => {
                         )}
                     </TableBody>
                 </Table>
+
+                <Pagination
+                    total={total}
+                    offset={offset}
+                    limit={limit}
+                    itemName="Servers"
+                    onPageChange={setOffset}
+                />
             </div>
 
             {/* Add/Edit Dialog */}

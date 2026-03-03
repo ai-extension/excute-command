@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -24,14 +25,33 @@ func (h *GlobalVariableHandler) List(c *gin.Context) {
 		return
 	}
 
+	limit := 20
+	offset := 0
+	if l := c.Query("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 {
+			limit = v
+		}
+	}
+	if o := c.Query("offset"); o != "" {
+		if v, err := strconv.Atoi(o); err == nil && v >= 0 {
+			offset = v
+		}
+	}
+	searchTerm := c.Query("search")
+
 	user, _ := c.Get("user")
-	gvs, err := h.service.List(nsID, user.(*domain.User))
+	gvs, total, err := h.service.ListPaginated(nsID, limit, offset, searchTerm, user.(*domain.User))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gvs)
+	c.JSON(http.StatusOK, gin.H{
+		"items":  gvs,
+		"total":  total,
+		"limit":  limit,
+		"offset": offset,
+	})
 }
 
 func (h *GlobalVariableHandler) Create(c *gin.Context) {

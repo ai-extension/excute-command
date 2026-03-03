@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -38,13 +39,38 @@ func (h *PageHandler) ListPages(c *gin.Context) {
 		return
 	}
 
+	limit := 20
+	offset := 0
+	if l := c.Query("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 {
+			limit = v
+		}
+	}
+	if o := c.Query("offset"); o != "" {
+		if v, err := strconv.Atoi(o); err == nil && v >= 0 {
+			offset = v
+		}
+	}
+
+	searchTerm := c.Query("search")
+	var isPublic *bool
+	if pStr := c.Query("is_public"); pStr != "" {
+		p := pStr == "true"
+		isPublic = &p
+	}
+
 	user, _ := c.Get("user")
-	pages, err := h.service.ListPages(nsID, user.(*domain.User))
+	pages, total, err := h.service.ListPagesPaginated(nsID, limit, offset, searchTerm, isPublic, user.(*domain.User))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, pages)
+	c.JSON(http.StatusOK, gin.H{
+		"items":  pages,
+		"total":  total,
+		"limit":  limit,
+		"offset": offset,
+	})
 }
 
 func (h *PageHandler) CreatePage(c *gin.Context) {

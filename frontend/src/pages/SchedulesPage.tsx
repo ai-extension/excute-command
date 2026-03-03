@@ -75,13 +75,23 @@ const SchedulesPage = () => {
     const [pendingWorkflow, setPendingWorkflow] = useState<Workflow | null>(null);
     const [workflowSearch, setWorkflowSearch] = useState('');
 
+    const [total, setTotal] = useState(0);
+
     const fetchSchedules = async () => {
         if (!activeNamespace) return;
         setIsLoading(true);
         try {
-            const response = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/schedules`);
+            let url = `${API_BASE_URL}/namespaces/${activeNamespace.id}/schedules?limit=${limit}&offset=${offset}`;
+            if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
+            if (selectedTagIds.length > 0) {
+                selectedTagIds.forEach(id => {
+                    url += `&tag_ids=${id}`;
+                });
+            }
+            const response = await apiFetch(url);
             const data = await response.json();
-            setSchedules(Array.isArray(data) ? data : []);
+            setSchedules(data.items || []);
+            setTotal(data.total || 0);
         } catch (error) {
             console.error('Failed to fetch schedules:', error);
         } finally {
@@ -103,7 +113,12 @@ const SchedulesPage = () => {
     useEffect(() => {
         fetchSchedules();
         fetchWorkflows();
-    }, [activeNamespace]);
+    }, [activeNamespace, offset, limit, selectedTagIds]);
+
+    const handleApplyFilter = () => {
+        setOffset(0);
+        fetchSchedules();
+    };
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -494,9 +509,15 @@ const SchedulesPage = () => {
                             className="pl-11 h-11 bg-background border-border rounded-xl font-semibold text-sm transition-all focus:bg-muted/30"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleApplyFilter()}
                         />
                     </div>
-                    {/* View toggle */}
+                    <Button
+                        onClick={handleApplyFilter}
+                        className="h-11 px-6 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black uppercase tracking-widest text-[11px] shadow-lg shadow-emerald-500/20"
+                    >
+                        Apply Filter
+                    </Button>
                     <div className="flex items-center gap-1 bg-muted/40 rounded-xl p-1 border border-border">
                         <Button
                             variant="ghost"
@@ -531,7 +552,7 @@ const SchedulesPage = () => {
 
                 {viewMode === 'calendar' ? (
                     <ScheduleCalendar
-                        schedules={filteredSchedules}
+                        schedules={schedules}
                         onEdit={handleEdit}
                         onToggleStatus={handleToggleStatus}
                         onCreate={handleCreateFromCalendar}
@@ -558,7 +579,7 @@ const SchedulesPage = () => {
                                             </div>
                                         </TableCell>
                                     </TableRow>
-                                ) : filteredSchedules.length > 0 ? paginatedSchedules.map((s) => (
+                                ) : schedules.length > 0 ? schedules.map((s) => (
                                     <TableRow key={s.id} className="group border-border hover:bg-muted/30 transition-all duration-200">
                                         <TableCell className="px-8 py-5">
                                             <div className="flex items-center gap-4">
@@ -712,7 +733,7 @@ const SchedulesPage = () => {
                         </Table>
 
                         <Pagination
-                            total={filteredSchedules.length}
+                            total={total}
                             offset={offset}
                             limit={limit}
                             itemName="Schedules"

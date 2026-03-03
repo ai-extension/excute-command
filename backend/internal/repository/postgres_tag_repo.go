@@ -32,6 +32,25 @@ func (r *PostgresTagRepo) ListByNamespace(namespaceID uuid.UUID, scope *domain.P
 	return tags, err
 }
 
+func (r *PostgresTagRepo) ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, scope *domain.PermissionScope) ([]domain.Tag, int64, error) {
+	var tags []domain.Tag
+	var total int64
+
+	db := applyScope(r.db, scope, "", "")
+	db = db.Model(&domain.Tag{}).Where("namespace_id = ?", namespaceID)
+
+	if searchTerm != "" {
+		db = db.Where("name ILIKE ?", "%"+searchTerm+"%")
+	}
+
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	err := db.Limit(limit).Offset(offset).Order("created_at desc").Find(&tags).Error
+	return tags, total, err
+}
+
 func (r *PostgresTagRepo) Update(tag *domain.Tag) error {
 	return r.db.Save(tag).Error
 }

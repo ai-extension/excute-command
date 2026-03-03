@@ -42,6 +42,7 @@ const GlobalVariablesPage = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    const [total, setTotal] = useState(0);
     const [limit, setLimit] = useState(20);
     const [offset, setOffset] = useState(0);
 
@@ -55,9 +56,12 @@ const GlobalVariablesPage = () => {
         if (!activeNamespace) return;
         setIsLoading(true);
         try {
-            const response = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/global-variables`);
+            let url = `${API_BASE_URL}/namespaces/${activeNamespace.id}/global-variables?limit=${limit}&offset=${offset}`;
+            if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
+            const response = await apiFetch(url);
             const data = await response.json();
-            setVariables(Array.isArray(data) ? data : []);
+            setVariables(data.items || []);
+            setTotal(data.total || 0);
         } catch (error) {
             console.error('Failed to fetch global variables:', error);
         } finally {
@@ -67,7 +71,12 @@ const GlobalVariablesPage = () => {
 
     useEffect(() => {
         fetchVariables();
-    }, [activeNamespace]);
+    }, [activeNamespace, offset, limit]);
+
+    const handleApplyFilter = () => {
+        setOffset(0);
+        fetchVariables();
+    };
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -138,12 +147,7 @@ const GlobalVariablesPage = () => {
         setIsEditOpen(true);
     };
 
-    const filteredVariables = variables.filter(v =>
-        v.key.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        v.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
 
-    const paginatedVariables = filteredVariables.slice(offset, offset + limit);
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -225,8 +229,16 @@ const GlobalVariablesPage = () => {
                         className="pl-11 h-11 bg-background border-border rounded-xl font-semibold text-sm transition-all focus:bg-muted/30"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleApplyFilter()}
                     />
                 </div>
+                <Button
+                    onClick={handleApplyFilter}
+                    variant="outline"
+                    className="h-11 rounded-xl border-emerald-500/50 text-emerald-500 px-6 font-black uppercase tracking-tight text-[10px] bg-background gap-2 shadow-sm hover:bg-emerald-500/10 transition-all"
+                >
+                    <Search className="w-4 h-4" /> Apply Filter
+                </Button>
             </div>
 
             <Card className="border-border bg-card shadow-premium overflow-hidden rounded-2xl">
@@ -249,7 +261,7 @@ const GlobalVariablesPage = () => {
                                     </div>
                                 </TableCell>
                             </TableRow>
-                        ) : filteredVariables.length > 0 ? paginatedVariables.map((v) => (
+                        ) : variables.length > 0 ? variables.map((v) => (
                             <TableRow key={v.id} className="group border-border hover:bg-muted/30 transition-all duration-200">
                                 <TableCell className="px-8 py-5">
                                     <div className="flex items-center gap-4">
@@ -325,7 +337,7 @@ const GlobalVariablesPage = () => {
                 </Table>
 
                 <Pagination
-                    total={filteredVariables.length}
+                    total={total}
                     offset={offset}
                     limit={limit}
                     itemName="Global Variables"

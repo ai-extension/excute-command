@@ -16,6 +16,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../lib/api';
 import { Pagination } from '../components/Pagination';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "../components/ui/select";
 
 import {
     Dialog,
@@ -31,6 +38,7 @@ import { Label } from "../components/ui/label";
 const UsersPage = () => {
     const { apiFetch } = useAuth();
     const [users, setUsers] = useState<any[]>([]);
+    const [total, setTotal] = useState(0);
     const [roles, setRoles] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -40,15 +48,22 @@ const UsersPage = () => {
     const [newUserData, setNewUserData] = useState({ username: '', password: '', email: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [roleFilter, setRoleFilter] = useState<string>('ALL');
 
     const [limit, setLimit] = useState(20);
     const [offset, setOffset] = useState(0);
 
     const fetchUsers = async () => {
         try {
-            const response = await apiFetch(`${API_BASE_URL}/users`);
+            setIsLoading(true);
+            let url = `${API_BASE_URL}/users?limit=${limit}&offset=${offset}`;
+            if (roleFilter !== 'ALL') url += `&role_id=${roleFilter}`;
+            if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
+
+            const response = await apiFetch(url);
             const data = await response.json();
-            setUsers(Array.isArray(data) ? data : []);
+            setUsers(data.items || []);
+            setTotal(data.total || 0);
         } catch (error) {
             console.error('Failed to fetch users:', error);
         } finally {
@@ -67,9 +82,17 @@ const UsersPage = () => {
     };
 
     useEffect(() => {
-        fetchUsers();
         fetchRoles();
     }, []);
+
+    useEffect(() => {
+        fetchUsers();
+    }, [offset, limit, roleFilter]);
+
+    const handleApplyFilter = () => {
+        setOffset(0);
+        fetchUsers();
+    };
 
     const handleCreateUser = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -130,11 +153,14 @@ const UsersPage = () => {
         );
     };
 
-    const filteredUsers = users.filter(u =>
-        u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (u.email && u.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (u.roles && u.roles.some((r: any) => r.name.toLowerCase().includes(searchTerm.toLowerCase())))
-    );
+    const filteredUsers = users.filter(u => {
+        const matchesSearch = u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (u.email && u.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (u.roles && u.roles.some((r: any) => r.name.toLowerCase().includes(searchTerm.toLowerCase())));
+        const matchesRole = roleFilter === 'ALL' ||
+            (u.roles && u.roles.some((r: any) => r.id === roleFilter));
+        return matchesSearch && matchesRole;
+    });
 
     const paginatedUsers = filteredUsers.slice(offset, offset + limit);
 
@@ -276,8 +302,28 @@ const UsersPage = () => {
                         className="pl-11 h-11 bg-background border-border rounded-xl font-semibold text-sm transition-all focus:bg-muted/30"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleApplyFilter()}
                     />
                 </div>
+                <Button
+                    onClick={handleApplyFilter}
+                    className="h-11 px-6 rounded-xl font-black text-[11px] uppercase tracking-widest bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                >
+                    Apply Filter
+                </Button>
+                <Select value={roleFilter} onValueChange={setRoleFilter}>
+                    <SelectTrigger className="w-48 h-11 bg-card border-border rounded-xl font-bold text-[11px] uppercase tracking-widest">
+                        <SelectValue placeholder="ROLE" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-border">
+                        <SelectItem value="ALL">ALL ROLES</SelectItem>
+                        {roles.map(role => (
+                            <SelectItem key={role.id} value={role.id}>
+                                {role.name.toUpperCase()}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
             </div>
 
             <Card className="border-border bg-card shadow-premium overflow-hidden rounded-2xl">
@@ -292,7 +338,7 @@ const UsersPage = () => {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {filteredUsers.length > 0 ? paginatedUsers.map((u) => (
+                        {users.length > 0 ? users.map((u) => (
                             <TableRow key={u.id} className="group border-border hover:bg-muted/30 transition-all duration-200">
                                 <TableCell className="px-8 py-5">
                                     <div className="flex items-center gap-4">
@@ -349,7 +395,7 @@ const UsersPage = () => {
                                 <TableCell colSpan={5} className="h-32 text-center">
                                     <div className="flex flex-col items-center gap-3 opacity-40">
                                         <Users className="w-8 h-8" />
-                                        <p className="text-[10px] font-black uppercase tracking-[0.2em]">Synchronizing user registry...</p>
+                                        <p className="text-[10px] font-black uppercase tracking-[0.2em]">{isLoading ? "Synchronizing user registry..." : "No users found matching your criteria"}</p>
                                     </div>
                                 </TableCell>
                             </TableRow>
@@ -358,7 +404,7 @@ const UsersPage = () => {
                 </Table>
 
                 <Pagination
-                    total={filteredUsers.length}
+                    total={total}
                     offset={offset}
                     limit={limit}
                     itemName="Users"

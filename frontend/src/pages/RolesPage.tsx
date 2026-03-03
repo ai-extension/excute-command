@@ -31,14 +31,19 @@ const RolesPage = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
 
-    const [limit, setLimit] = useState(21); // Roles are in 3 columns, 21 is nice
+    const [total, setTotal] = useState(0);
+    const [limit, setLimit] = useState(21);
     const [offset, setOffset] = useState(0);
 
     const fetchRoles = async () => {
+        setIsLoading(true);
         try {
-            const response = await apiFetch(`${API_BASE_URL}/roles`);
+            let url = `${API_BASE_URL}/roles?limit=${limit}&offset=${offset}`;
+            if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
+            const response = await apiFetch(url);
             const data = await response.json();
-            setRoles(Array.isArray(data) ? data : []);
+            setRoles(data.items || []);
+            setTotal(data.total || 0);
         } catch (error) {
             console.error('Failed to fetch roles:', error);
         } finally {
@@ -48,7 +53,12 @@ const RolesPage = () => {
 
     useEffect(() => {
         fetchRoles();
-    }, []);
+    }, [offset, limit]);
+
+    const handleApplyFilter = () => {
+        setOffset(0);
+        fetchRoles();
+    };
 
     const handleCreateRole = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -143,60 +153,70 @@ const RolesPage = () => {
                         className="pl-11 h-11 bg-background border-border rounded-xl font-semibold text-sm transition-all focus:bg-muted/30"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleApplyFilter()}
                     />
                 </div>
+                <Button
+                    onClick={handleApplyFilter}
+                    variant="outline"
+                    className="h-11 rounded-xl border-emerald-500/50 text-emerald-500 px-6 font-black uppercase tracking-tight text-[10px] bg-background gap-2 shadow-sm hover:bg-emerald-500/10 transition-all"
+                >
+                    <ArrowRight className="w-4 h-4" /> Apply Filter
+                </Button>
             </div>
 
             <div className="space-y-6 flex flex-col">
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 flex-1">
-                    {roles.length > 0 ? roles
-                        .filter(r => r.name.toLowerCase().includes(searchTerm.toLowerCase()) || (r.description && r.description.toLowerCase().includes(searchTerm.toLowerCase())))
-                        .slice(offset, offset + limit)
-                        .map((role) => (
-                            <Card key={role.id} className="bg-card border-border hover:border-primary/30 transition-all duration-500 group shadow-card hover:shadow-premium overflow-hidden relative">
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 blur-3xl rounded-full -mr-16 -mt-16 group-hover:bg-primary/10 transition-colors" />
-                                <CardHeader className="p-6 relative z-10">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <div className="p-2 rounded-xl bg-primary/10 text-primary border border-primary/5 transition-transform group-hover:scale-110 group-hover:rotate-3">
-                                            <Shield className="w-5 h-5" />
-                                        </div>
-                                        <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 border-border">
-                                            {(role.permissions || []).length} PERMISSIONS
+                    {isLoading ? (
+                        <div className="col-span-full py-20 flex flex-col items-center justify-center gap-4 opacity-50">
+                            <div className="w-10 h-10 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em]">Retrieving Secure Roles...</p>
+                        </div>
+                    ) : roles.length > 0 ? roles.map((role) => (
+                        <Card key={role.id} className="bg-card border-border hover:border-primary/30 transition-all duration-500 group shadow-card hover:shadow-premium overflow-hidden relative">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 blur-3xl rounded-full -mr-16 -mt-16 group-hover:bg-primary/10 transition-colors" />
+                            <CardHeader className="p-6 relative z-10">
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="p-2 rounded-xl bg-primary/10 text-primary border border-primary/5 transition-transform group-hover:scale-110 group-hover:rotate-3">
+                                        <Shield className="w-5 h-5" />
+                                    </div>
+                                    <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 border-border">
+                                        {(role.permissions || []).length} PERMISSIONS
+                                    </Badge>
+                                </div>
+                                <CardTitle className="text-xl font-black tracking-tight group-hover:text-primary transition-colors">{role.name}</CardTitle>
+                                <CardDescription className="text-xs font-medium leading-relaxed mt-2 italic opacity-70">
+                                    {role.description || 'Global access controls for system entities.'}
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="p-6 pt-0 relative z-10">
+                                <div className="flex flex-wrap gap-1.5 mt-4 min-h-[60px]">
+                                    {(role.permissions || []).slice(0, 5).map((p: any) => (
+                                        <Badge key={p.id} className="bg-muted text-muted-foreground font-black text-[8px] uppercase tracking-tighter px-2 rounded-md">
+                                            {p.name}
                                         </Badge>
-                                    </div>
-                                    <CardTitle className="text-xl font-black tracking-tight group-hover:text-primary transition-colors">{role.name}</CardTitle>
-                                    <CardDescription className="text-xs font-medium leading-relaxed mt-2 italic opacity-70">
-                                        {role.description || 'Global access controls for system entities.'}
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="p-6 pt-0 relative z-10">
-                                    <div className="flex flex-wrap gap-1.5 mt-4 min-h-[60px]">
-                                        {(role.permissions || []).slice(0, 5).map((p: any) => (
-                                            <Badge key={p.id} className="bg-muted text-muted-foreground font-black text-[8px] uppercase tracking-tighter px-2 rounded-md">
-                                                {p.name}
-                                            </Badge>
-                                        ))}
-                                        {(role.permissions || []).length > 5 && (
-                                            <span className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-widest align-middle pt-1 ml-1">
-                                                + {(role.permissions || []).length - 5} more
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div className="flex gap-2 mt-6 pt-6 border-t border-border/50">
-                                        <Button
-                                            variant="outline"
-                                            className="flex-1 h-9 rounded-xl border-border bg-background text-[9px] font-black uppercase tracking-widest shadow-sm hover:bg-muted transition-all"
-                                            onClick={() => navigate(`/roles/${role.id}/permissions`)}
-                                        >
-                                            <Settings className="w-3 h-3 mr-2" /> Permissions
-                                        </Button>
-                                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all">
-                                            <Trash2 className="w-4 h-4" />
-                                        </Button>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )) : (
+                                    ))}
+                                    {(role.permissions || []).length > 5 && (
+                                        <span className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-widest align-middle pt-1 ml-1">
+                                            + {(role.permissions || []).length - 5} more
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="flex gap-2 mt-6 pt-6 border-t border-border/50">
+                                    <Button
+                                        variant="outline"
+                                        className="flex-1 h-9 rounded-xl border-border bg-background text-[9px] font-black uppercase tracking-widest shadow-sm hover:bg-muted transition-all"
+                                        onClick={() => navigate(`/roles/${role.id}/permissions`)}
+                                    >
+                                        <Settings className="w-3 h-3 mr-2" /> Permissions
+                                    </Button>
+                                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all">
+                                        <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )) : (
                         <div className="col-span-full py-20 bg-card border border-dashed border-border rounded-3xl flex flex-col items-center gap-4 text-center">
                             <div className="p-4 rounded-full bg-muted/50 border border-border">
                                 <ShieldAlert className="w-8 h-8 text-muted-foreground" />
@@ -209,10 +229,10 @@ const RolesPage = () => {
                     )}
                 </div>
 
-                {roles.length > 0 && (
+                {total > 0 && (
                     <div className="mt-8 border-t border-border pt-6">
                         <Pagination
-                            total={roles.filter(r => r.name.toLowerCase().includes(searchTerm.toLowerCase()) || (r.description && r.description.toLowerCase().includes(searchTerm.toLowerCase()))).length}
+                            total={total}
                             offset={offset}
                             limit={limit}
                             itemName="Roles"

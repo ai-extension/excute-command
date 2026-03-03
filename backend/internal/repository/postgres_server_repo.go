@@ -73,6 +73,49 @@ func (r *PostgresServerRepo) List(scope *domain.PermissionScope) ([]domain.Serve
 	return servers, nil
 }
 
+func (r *PostgresServerRepo) ListPaginated(limit, offset int, searchTerm string, authType string, vpnID *uuid.UUID, scope *domain.PermissionScope) ([]domain.Server, int64, error) {
+	var servers []domain.Server
+	var total int64
+	db := applyScope(r.db, scope, "server_tags", "server_id")
+
+	if searchTerm != "" {
+		s := "%" + searchTerm + "%"
+		db = db.Where("name ILIKE ? OR host ILIKE ? OR \"user\" ILIKE ?", s, s, s)
+	}
+
+	if authType != "" && authType != "ALL" {
+		db = db.Where("auth_type = ?", authType)
+	}
+
+	if vpnID != nil {
+		db = db.Where("vpn_id = ?", vpnID)
+	}
+
+	if err := db.Model(&domain.Server{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	err := db.Preload("Vpn").Limit(limit).Offset(offset).Order("created_at DESC").Find(&servers).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	for i := range servers {
+		if servers[i].Password != "" {
+			if dec, err := crypto.Decrypt(servers[i].Password); err == nil {
+				servers[i].Password = dec
+			}
+		}
+		if servers[i].PrivateKey != "" {
+			if dec, err := crypto.Decrypt(servers[i].PrivateKey); err == nil {
+				servers[i].PrivateKey = dec
+			}
+		}
+	}
+
+	return servers, total, nil
+}
+
 func (r *PostgresServerRepo) Update(server *domain.Server) error {
 	if server.Password != "" {
 		if enc, err := crypto.Encrypt(server.Password); err == nil {

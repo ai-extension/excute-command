@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -19,13 +20,40 @@ func NewServerHandler(service *service.ServerService, terminalService *service.T
 }
 
 func (h *ServerHandler) ListServers(c *gin.Context) {
-	user, _ := c.Get("user")
-	servers, err := h.service.ListServers(user.(*domain.User))
+	limit := 20
+	offset := 0
+	if l := c.Query("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 {
+			limit = v
+		}
+	}
+	if o := c.Query("offset"); o != "" {
+		if v, err := strconv.Atoi(o); err == nil && v >= 0 {
+			offset = v
+		}
+	}
+
+	searchTerm := c.Query("search")
+	authType := c.Query("auth_type")
+	var vpnID *uuid.UUID
+	if vIDStr := c.Query("vpn_id"); vIDStr != "" {
+		if id, err := uuid.Parse(vIDStr); err == nil {
+			vpnID = &id
+		}
+	}
+
+	userVal, _ := c.Get("user")
+	servers, total, err := h.service.ListServersPaginated(limit, offset, searchTerm, authType, vpnID, userVal.(*domain.User))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, servers)
+	c.JSON(http.StatusOK, gin.H{
+		"items":  servers,
+		"total":  total,
+		"limit":  limit,
+		"offset": offset,
+	})
 }
 
 func (h *ServerHandler) CreateServer(c *gin.Context) {

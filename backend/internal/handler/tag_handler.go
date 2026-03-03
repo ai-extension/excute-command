@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -25,16 +26,35 @@ func (h *TagHandler) List(c *gin.Context) {
 		return
 	}
 
+	limit := 20
+	offset := 0
+	if l := c.Query("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 {
+			limit = v
+		}
+	}
+	if o := c.Query("offset"); o != "" {
+		if v, err := strconv.Atoi(o); err == nil && v >= 0 {
+			offset = v
+		}
+	}
+	searchTerm := c.Query("search")
+
 	currentUser, _ := c.Get("user")
 	user, _ := currentUser.(*domain.User)
 
-	tags, err := h.service.ListByNamespace(namespaceID, user)
+	tags, total, err := h.service.ListPaginated(namespaceID, limit, offset, searchTerm, user)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, tags)
+	c.JSON(http.StatusOK, gin.H{
+		"items":  tags,
+		"total":  total,
+		"limit":  limit,
+		"offset": offset,
+	})
 }
 
 func (h *TagHandler) Create(c *gin.Context) {

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -18,13 +19,34 @@ func NewVpnConfigHandler(service *service.VpnConfigService) *VpnConfigHandler {
 }
 
 func (h *VpnConfigHandler) List(c *gin.Context) {
-	user, _ := c.Get("user")
-	vpns, err := h.service.List(user.(*domain.User))
+	limit := 20
+	offset := 0
+	if l := c.Query("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 {
+			limit = v
+		}
+	}
+	if o := c.Query("offset"); o != "" {
+		if v, err := strconv.Atoi(o); err == nil && v >= 0 {
+			offset = v
+		}
+	}
+
+	searchTerm := c.Query("search")
+	authType := c.Query("auth_type")
+
+	userVal, _ := c.Get("user")
+	vpns, total, err := h.service.ListPaginated(limit, offset, searchTerm, authType, userVal.(*domain.User))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, vpns)
+	c.JSON(http.StatusOK, gin.H{
+		"items":  vpns,
+		"total":  total,
+		"limit":  limit,
+		"offset": offset,
+	})
 }
 
 func (h *VpnConfigHandler) Create(c *gin.Context) {

@@ -47,19 +47,21 @@ const WorkflowPage = () => {
     const [newWorkflowDescription, setNewWorkflowDescription] = useState('');
     const [isCreating, setIsCreating] = useState(false);
 
-    const fetchWorkflows = async (pageOffset = offset) => {
+    const fetchWorkflows = async () => {
         if (!activeNamespace) return;
         setIsLoading(true);
         try {
-            const response = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/workflows?limit=${limit}&offset=${pageOffset}`);
-            const data = await response.json();
-            if (data && data.items) {
-                setWorkflows(data.items);
-                setTotal(data.total);
-            } else {
-                setWorkflows(Array.isArray(data) ? data : []);
-                setTotal(Array.isArray(data) ? data.length : 0);
+            let url = `${API_BASE_URL}/namespaces/${activeNamespace.id}/workflows?limit=${limit}&offset=${offset}`;
+            if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
+            if (selectedTagIds.length > 0) {
+                selectedTagIds.forEach(id => {
+                    url += `&tag_ids=${id}`;
+                });
             }
+            const response = await apiFetch(url);
+            const data = await response.json();
+            setWorkflows(data.items || []);
+            setTotal(data.total || 0);
         } catch (error) {
             console.error('Failed to fetch workflows:', error);
         } finally {
@@ -105,19 +107,11 @@ const WorkflowPage = () => {
 
     useEffect(() => {
         fetchWorkflows();
-    }, [activeNamespace]);
+    }, [activeNamespace, offset, limit, selectedTagIds]);
 
-    const filteredWorkflows = workflows.filter(wf => {
-        const matchesSearch = wf.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            wf.description?.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesTags = selectedTagIds.length === 0 ||
-            selectedTagIds.every(tagId => wf.tags?.some(wt => wt.id === tagId));
-        return matchesSearch && matchesTags;
-    });
-
-    const handlePageChange = (newOffset: number) => {
-        setOffset(newOffset);
-        fetchWorkflows(newOffset);
+    const handleApplyFilter = () => {
+        setOffset(0);
+        fetchWorkflows();
     };
 
     return (
@@ -140,12 +134,17 @@ const WorkflowPage = () => {
                                 placeholder="Search workflows by name or description..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleApplyFilter()}
                                 className="pl-11 h-9 bg-background border-border rounded-lg focus-visible:ring-primary/20 placeholder:text-muted-foreground/50 font-semibold text-xs transition-all focus:bg-muted/30"
                             />
                         </div>
                         <div className="flex gap-1.5 items-center">
-                            <Button variant="outline" className="h-9 rounded-lg border-border px-3.5 font-black uppercase tracking-tight text-[8.5px] bg-background gap-1 shadow-sm hover:bg-muted transition-all">
-                                <Filter className="w-3 h-3" /> Filter
+                            <Button
+                                onClick={handleApplyFilter}
+                                variant="outline"
+                                className="h-9 rounded-lg border-emerald-500/50 text-emerald-500 px-3.5 font-black uppercase tracking-tight text-[8.5px] bg-background gap-1 shadow-sm hover:bg-emerald-500/10 transition-all"
+                            >
+                                <Filter className="w-3 h-3" /> Apply Filter
                             </Button>
                             <Button
                                 onClick={() => setIsCreateDialogOpen(true)}
@@ -184,7 +183,7 @@ const WorkflowPage = () => {
                                             </div>
                                         </TableCell>
                                     </TableRow>
-                                ) : filteredWorkflows.length > 0 ? filteredWorkflows.map((wf) => (
+                                ) : workflows.length > 0 ? workflows.map((wf) => (
                                     <TableRow key={wf.id} className="group border-border hover:bg-muted/40 transition-colors duration-200">
                                         <TableCell className="px-6 py-4">
                                             <div className="flex items-center gap-3">
@@ -288,7 +287,7 @@ const WorkflowPage = () => {
                         offset={offset}
                         limit={limit}
                         itemName="Workflows"
-                        onPageChange={handlePageChange}
+                        onPageChange={setOffset}
                     />
 
                     <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>

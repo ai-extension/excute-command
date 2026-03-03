@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -27,14 +28,40 @@ func (h *ScheduleHandler) List(c *gin.Context) {
 		return
 	}
 
+	limit := 20
+	offset := 0
+	if l := c.Query("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 {
+			limit = v
+		}
+	}
+	if o := c.Query("offset"); o != "" {
+		if v, err := strconv.Atoi(o); err == nil && v >= 0 {
+			offset = v
+		}
+	}
+
+	searchTerm := c.Query("search")
+	var tagIDs []uuid.UUID
+	for _, idStr := range c.QueryArray("tag_ids") {
+		if id, err := uuid.Parse(idStr); err == nil {
+			tagIDs = append(tagIDs, id)
+		}
+	}
+
 	user, _ := c.Get("user")
-	schedules, err := h.service.List(nsID, user.(*domain.User))
+	schedules, total, err := h.service.ListPaginated(nsID, limit, offset, searchTerm, tagIDs, user.(*domain.User))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, schedules)
+	c.JSON(http.StatusOK, gin.H{
+		"items":  schedules,
+		"total":  total,
+		"limit":  limit,
+		"offset": offset,
+	})
 }
 
 func (h *ScheduleHandler) GetByID(c *gin.Context) {

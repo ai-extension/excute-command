@@ -24,7 +24,14 @@ import {
     DialogTitle,
     DialogDescription
 } from '../components/ui/dialog';
-import { WorkflowExecution } from '../types';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "../components/ui/select";
+import { WorkflowExecution, Workflow } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useNamespace } from '../context/NamespaceContext';
 import { format } from 'date-fns';
@@ -37,11 +44,15 @@ const ExecutionHistoryPage = () => {
     const { apiFetch } = useAuth();
     const { activeNamespace } = useNamespace();
     const [executions, setExecutions] = useState<WorkflowExecution[]>([]);
+    const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedExec, setSelectedExec] = useState<WorkflowExecution | null>(null);
     const [loadingDetail, setLoadingDetail] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState<string>('ALL');
+    const [workflowFilter, setWorkflowFilter] = useState<string>('ALL');
+    const [workflows, setWorkflows] = useState<Workflow[]>([]);
 
     const [limit, setLimit] = useState(20);
     const [offset, setOffset] = useState(0);
@@ -49,21 +60,40 @@ const ExecutionHistoryPage = () => {
     useEffect(() => {
         if (activeNamespace) {
             fetchHistory();
+            fetchWorkflows();
         }
-    }, [activeNamespace]);
+    }, [activeNamespace, offset, limit, statusFilter, workflowFilter]);
+
+    const fetchWorkflows = async () => {
+        if (!activeNamespace) return;
+        try {
+            const response = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/workflows?limit=1000`);
+            const data = await response.json();
+            setWorkflows(data.items || (Array.isArray(data) ? data : []));
+        } catch (error) {
+            console.error('Failed to fetch workflows:', error);
+        }
+    };
 
     const fetchHistory = async () => {
         if (!activeNamespace) return;
         try {
             setLoading(true);
             setError(null);
-            const response = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/executions`);
+
+            let url = `${API_BASE_URL}/namespaces/${activeNamespace.id}/executions?limit=${limit}&offset=${offset}`;
+            if (statusFilter !== 'ALL') url += `&status=${statusFilter}`;
+            if (workflowFilter !== 'ALL') url += `&workflow_id=${workflowFilter}`;
+            if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
+
+            const response = await apiFetch(url);
             if (!response.ok) {
                 const data = await response.json().catch(() => ({}));
                 throw new Error(data.error || `Server error: ${response.status}`);
             }
             const data = await response.json();
-            setExecutions(data || []);
+            setExecutions(data.items || []);
+            setTotal(data.total || 0);
         } catch (error) {
             console.error('Failed to fetch history:', error);
             setError(error instanceof Error ? error.message : 'Failed to retrieve execution records');
@@ -84,8 +114,6 @@ const ExecutionHistoryPage = () => {
             setSelectedExec(data);
         } catch (error) {
             console.error('Failed to fetch execution detail:', error);
-            // We can show a toast here since it's a detail view, but for now we'll just log
-            // and maybe set selectedExec to null to close the modal if it failed
             setSelectedExec(null);
         } finally {
             setLoadingDetail(false);
@@ -116,12 +144,10 @@ const ExecutionHistoryPage = () => {
         return `${mins}m ${secs}s`;
     };
 
-    const filteredExecutions = executions.filter(exec =>
-        exec.workflow?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        exec.id.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-    const paginatedExecutions = filteredExecutions.slice(offset, offset + limit);
+    const handleApplyFilter = () => {
+        setOffset(0);
+        fetchHistory();
+    };
 
     return (
         <WorkflowRunner>
@@ -149,19 +175,60 @@ const ExecutionHistoryPage = () => {
                                 <Input
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleApplyFilter()}
                                     placeholder="SEARCH BY WORKFLOW OR ID..."
-                                    className="w-72 h-10 pl-9 bg-card/50 border-border text-[11px] font-black tracking-widest uppercase focus:ring-1 focus:ring-primary/30 transition-all rounded-xl"
+                                    className="w-64 h-10 pl-9 bg-card/50 border-border text-[11px] font-black tracking-widest uppercase focus:ring-1 focus:ring-primary/30 transition-all rounded-xl"
                                 />
                             </div>
+
+                            <Button
+                                onClick={handleApplyFilter}
+                                className="h-10 px-4 rounded-xl font-black text-[10px] uppercase tracking-widest bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                            >
+                                Apply Filter
+                            </Button>
+
+                            <Select value={statusFilter} onValueChange={setStatusFilter}>
+                                <SelectTrigger className="w-32 h-10 bg-card/50 border-border text-[10px] font-black tracking-widest uppercase rounded-xl">
+                                    <SelectValue placeholder="STATUS" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-card border-border">
+                                    <SelectItem value="ALL">ALL STATUS</SelectItem>
+                                    <SelectItem value="SUCCESS">SUCCESS</SelectItem>
+                                    <SelectItem value="FAILED">FAILED</SelectItem>
+                                    <SelectItem value="RUNNING">RUNNING</SelectItem>
+                                </SelectContent>
+                            </Select>
+
+                            <Select value={workflowFilter} onValueChange={setWorkflowFilter}>
+                                <SelectTrigger className="w-48 h-10 bg-card/50 border-border text-[10px] font-black tracking-widest uppercase rounded-xl">
+                                    <SelectValue placeholder="WORKFLOW" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-card border-border max-h-[300px]">
+                                    <SelectItem value="ALL">ALL WORKFLOWS</SelectItem>
+                                    {workflows.map(wf => (
+                                        <SelectItem key={wf.id} value={wf.id}>
+                                            {wf.name.toUpperCase()}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+
                             <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={fetchHistory}
+                                onClick={() => {
+                                    setSearchQuery('');
+                                    setStatusFilter('ALL');
+                                    setWorkflowFilter('ALL');
+                                    setOffset(0);
+                                    // useEffect will trigger fetchHistory
+                                }}
                                 disabled={loading}
                                 className="h-10 px-4 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 bg-card hover:bg-muted"
                             >
                                 {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Filter className="w-3.5 h-3.5" />}
-                                Refresh Flow
+                                Reset
                             </Button>
                         </div>
                     </div>
@@ -192,7 +259,7 @@ const ExecutionHistoryPage = () => {
                                 <Loader2 className="w-10 h-10 animate-spin text-primary opacity-50" />
                                 <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground animate-pulse">Initializing Historical Data...</p>
                             </div>
-                        ) : filteredExecutions.length === 0 ? (
+                        ) : executions.length === 0 ? (
                             <div className="flex-1 flex flex-col items-center justify-center gap-6 py-20 bg-background/5 rounded-2xl border border-dashed border-border/50">
                                 <div className="w-20 h-20 rounded-full bg-muted/30 flex items-center justify-center animate-hover">
                                     <History className="w-10 h-10 text-muted-foreground/30" />
@@ -208,7 +275,7 @@ const ExecutionHistoryPage = () => {
                         ) : (
                             <div className="overflow-y-auto flex-1 pr-2 custom-scrollbar flex flex-col">
                                 <div className="space-y-3 flex-1">
-                                    {paginatedExecutions.map((exec) => (
+                                    {executions.map((exec: WorkflowExecution) => (
                                         <Card
                                             key={exec.id}
                                             className="bg-card hover:bg-muted/50 border-border/50 hover:border-primary/20 transition-all duration-300 cursor-pointer group shadow-sm hover:translate-x-1"
@@ -268,7 +335,7 @@ const ExecutionHistoryPage = () => {
                                 </div>
                                 <div className="mt-6 border-t border-border pt-4">
                                     <Pagination
-                                        total={filteredExecutions.length}
+                                        total={total}
                                         offset={offset}
                                         limit={limit}
                                         itemName="Executions"

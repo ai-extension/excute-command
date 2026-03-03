@@ -56,6 +56,11 @@ func (s *PageService) ListPages(namespaceID uuid.UUID, user *domain.User) ([]dom
 	return s.repo.List(namespaceID, &scope)
 }
 
+func (s *PageService) ListPagesPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, isPublic *bool, user *domain.User) ([]domain.Page, int64, error) {
+	scope := domain.GetPermissionScope(user, "pages", "READ")
+	return s.repo.ListPaginated(namespaceID, limit, offset, searchTerm, isPublic, &scope)
+}
+
 func (s *PageService) UpdatePage(page *domain.Page, user *domain.User) error {
 	// Fetch existing to handle password and expiration
 	scope := domain.GetPermissionScope(user, "pages", "WRITE")

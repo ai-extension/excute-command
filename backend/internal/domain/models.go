@@ -72,6 +72,7 @@ type UserRepository interface {
 	GetByID(id uuid.UUID) (*User, error)
 	GetByUsername(username string) (*User, error)
 	List() ([]User, error)
+	ListPaginated(limit, offset int, searchTerm string, roleID *uuid.UUID) ([]User, int64, error)
 	Update(user *User) error
 	Delete(id uuid.UUID) error
 	SetRoles(userID uuid.UUID, roles []Role) error
@@ -81,6 +82,7 @@ type RoleRepository interface {
 	Create(role *Role) error
 	GetByID(id uuid.UUID) (*Role, error)
 	List() ([]Role, error)
+	ListPaginated(limit, offset int, searchTerm string) ([]Role, int64, error)
 	Update(role *Role) error
 	Delete(id uuid.UUID) error
 	GetByIDs(ids []uuid.UUID) ([]Role, error)
@@ -123,6 +125,7 @@ type ServerRepository interface {
 	Create(server *Server) error
 	GetByID(id uuid.UUID, scope *PermissionScope) (*Server, error)
 	List(scope *PermissionScope) ([]Server, error)
+	ListPaginated(limit, offset int, searchTerm string, authType string, vpnID *uuid.UUID, scope *PermissionScope) ([]Server, int64, error)
 	Update(server *Server) error
 	Delete(id uuid.UUID) error
 }
@@ -146,6 +149,7 @@ type VpnConfigRepository interface {
 	Create(vpn *VpnConfig) error
 	GetByID(id uuid.UUID, scope *PermissionScope) (*VpnConfig, error)
 	List(scope *PermissionScope) ([]VpnConfig, error)
+	ListPaginated(limit, offset int, searchTerm string, authType string, scope *PermissionScope) ([]VpnConfig, int64, error)
 	Update(vpn *VpnConfig) error
 	Delete(id uuid.UUID) error
 }
@@ -337,7 +341,7 @@ type WorkflowRepository interface {
 	Create(wf *Workflow) error
 	GetByID(id uuid.UUID, scope *PermissionScope) (*Workflow, error)
 	List(namespaceID uuid.UUID, scope *PermissionScope) ([]Workflow, error)
-	ListPaginated(namespaceID uuid.UUID, limit, offset int, scope *PermissionScope) ([]Workflow, int64, error)
+	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, tagIDs []uuid.UUID, scope *PermissionScope) ([]Workflow, int64, error)
 	Update(wf *Workflow) error
 	Delete(id uuid.UUID) error
 }
@@ -376,6 +380,7 @@ type WorkflowExecutionRepository interface {
 	ListByWorkflowID(workflowID uuid.UUID, scope *PermissionScope) ([]WorkflowExecution, error)
 	ListByWorkflowIDPaginated(workflowID uuid.UUID, limit, offset int, scope *PermissionScope) ([]WorkflowExecution, int64, error)
 	ListByNamespaceID(namespaceID uuid.UUID, scope *PermissionScope) ([]WorkflowExecution, error)
+	ListByNamespaceIDPaginated(namespaceID uuid.UUID, limit, offset int, status string, workflowID *uuid.UUID, scope *PermissionScope) ([]WorkflowExecution, int64, error)
 	ListByScheduledID(scheduledID uuid.UUID, scope *PermissionScope) ([]WorkflowExecution, error)
 	Update(exec *WorkflowExecution) error
 	CreateStepResult(stepExec *WorkflowExecutionStep) error
@@ -385,6 +390,7 @@ type GlobalVariableRepository interface {
 	Create(gv *GlobalVariable) error
 	GetByID(id uuid.UUID, scope *PermissionScope) (*GlobalVariable, error)
 	List(namespaceID uuid.UUID, scope *PermissionScope) ([]GlobalVariable, error)
+	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, scope *PermissionScope) ([]GlobalVariable, int64, error)
 	Update(gv *GlobalVariable) error
 	Delete(id uuid.UUID) error
 }
@@ -393,6 +399,7 @@ type ScheduleRepository interface {
 	Create(s *Schedule) error
 	GetByID(id uuid.UUID, scope *PermissionScope) (*Schedule, error)
 	List(namespaceID uuid.UUID, scope *PermissionScope) ([]Schedule, error)
+	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, tagIDs []uuid.UUID, scope *PermissionScope) ([]Schedule, int64, error)
 	Update(s *Schedule) error
 	Delete(id uuid.UUID) error
 	AddScheduledWorkflow(sw *ScheduleWorkflow) error
@@ -440,6 +447,7 @@ type PageRepository interface {
 	GetByID(id uuid.UUID, scope *PermissionScope) (*Page, error)
 	GetBySlug(slug string) (*Page, error) // Public slug lookup doesn't need scope
 	List(namespaceID uuid.UUID, scope *PermissionScope) ([]Page, error)
+	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, isPublic *bool, scope *PermissionScope) ([]Page, int64, error)
 	Update(page *Page) error
 	Delete(id uuid.UUID) error
 }
@@ -448,6 +456,7 @@ type TagRepository interface {
 	Create(tag *Tag) error
 	GetByID(id uuid.UUID, scope *PermissionScope) (*Tag, error)
 	ListByNamespace(namespaceID uuid.UUID, scope *PermissionScope) ([]Tag, error)
+	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, scope *PermissionScope) ([]Tag, int64, error)
 	Update(tag *Tag) error
 	Delete(id uuid.UUID) error
 }

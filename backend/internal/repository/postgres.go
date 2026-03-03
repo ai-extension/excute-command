@@ -106,6 +106,28 @@ func (r *PostgresUserRepo) List() ([]domain.User, error) {
 	return users, nil
 }
 
+func (r *PostgresUserRepo) ListPaginated(limit, offset int, searchTerm string, roleID *uuid.UUID) ([]domain.User, int64, error) {
+	var users []domain.User
+	var total int64
+	db := r.db.Model(&domain.User{})
+
+	if searchTerm != "" {
+		s := "%" + searchTerm + "%"
+		db = db.Where("username ILIKE ? OR email ILIKE ?", s, s)
+	}
+
+	if roleID != nil {
+		db = db.Joins("JOIN user_roles ON user_roles.user_id = users.id").Where("user_roles.role_id = ?", roleID)
+	}
+
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	err := db.Preload("Roles").Limit(limit).Offset(offset).Order("created_at DESC").Find(&users).Error
+	return users, total, err
+}
+
 func (r *PostgresUserRepo) Update(user *domain.User) error {
 	return r.db.Save(user).Error
 }
@@ -144,6 +166,24 @@ func (r *PostgresRoleRepo) List() ([]domain.Role, error) {
 		return nil, err
 	}
 	return roles, nil
+}
+
+func (r *PostgresRoleRepo) ListPaginated(limit, offset int, searchTerm string) ([]domain.Role, int64, error) {
+	var roles []domain.Role
+	var total int64
+	db := r.db.Model(&domain.Role{})
+
+	if searchTerm != "" {
+		s := "%" + searchTerm + "%"
+		db = db.Where("name ILIKE ? OR description ILIKE ?", s, s)
+	}
+
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	err := db.Preload("Permissions.Permission").Limit(limit).Offset(offset).Order("name ASC").Find(&roles).Error
+	return roles, total, err
 }
 
 func (r *PostgresRoleRepo) Update(role *domain.Role) error {

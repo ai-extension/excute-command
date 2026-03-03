@@ -79,9 +79,9 @@ func (s *WorkflowService) ListWorkflows(namespaceID uuid.UUID, user *domain.User
 	return s.repo.List(namespaceID, &scope)
 }
 
-func (s *WorkflowService) ListWorkflowsPaginated(namespaceID uuid.UUID, limit, offset int, user *domain.User) ([]domain.Workflow, int64, error) {
+func (s *WorkflowService) ListWorkflowsPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, tagIDs []uuid.UUID, user *domain.User) ([]domain.Workflow, int64, error) {
 	scope := domain.GetPermissionScope(user, "workflows", "READ")
-	return s.repo.ListPaginated(namespaceID, limit, offset, &scope)
+	return s.repo.ListPaginated(namespaceID, limit, offset, searchTerm, tagIDs, &scope)
 }
 
 func (s *WorkflowService) UpdateWorkflow(wf *domain.Workflow, user *domain.User) error {
@@ -143,6 +143,11 @@ func (s *WorkflowService) ListExecutionsPaginated(workflowID uuid.UUID, limit, o
 func (s *WorkflowService) ListNamespaceExecutions(namespaceID uuid.UUID, user *domain.User) ([]domain.WorkflowExecution, error) {
 	scope := domain.GetPermissionScope(user, "workflows", "READ")
 	return s.execRepo.ListByNamespaceID(namespaceID, &scope)
+}
+
+func (s *WorkflowService) ListNamespaceExecutionsPaginated(namespaceID uuid.UUID, limit, offset int, status string, workflowID *uuid.UUID, user *domain.User) ([]domain.WorkflowExecution, int64, error) {
+	scope := domain.GetPermissionScope(user, "workflows", "READ")
+	return s.execRepo.ListByNamespaceIDPaginated(namespaceID, limit, offset, status, workflowID, &scope)
 }
 
 func (s *WorkflowService) GetExecution(id uuid.UUID, user *domain.User) (*domain.WorkflowExecution, error) {

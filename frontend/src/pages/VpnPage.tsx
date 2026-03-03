@@ -35,9 +35,11 @@ import { Pagination } from '../components/Pagination';
 const VpnPage = () => {
     const { apiFetch } = useAuth();
     const [vpns, setVpns] = useState<VpnConfig[]>([]);
+    const [total, setTotal] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [authTypeFilter, setAuthTypeFilter] = useState<string>('ALL');
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingVpn, setEditingVpn] = useState<VpnConfig | null>(null);
     const [formData, setFormData] = useState<Partial<VpnConfig>>({
@@ -58,13 +60,18 @@ const VpnPage = () => {
         setIsLoading(true);
         setError(null);
         try {
-            const response = await apiFetch(`${API_BASE_URL}/vpns`);
+            let url = `${API_BASE_URL}/vpns?limit=${limit}&offset=${offset}`;
+            if (authTypeFilter !== 'ALL') url += `&auth_type=${authTypeFilter}`;
+            if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
+
+            const response = await apiFetch(url);
             if (!response.ok) {
                 const data = await response.json().catch(() => ({}));
                 throw new Error(data.error || `Server error: ${response.status}`);
             }
             const data = await response.json();
-            setVpns(data || []);
+            setVpns(data.items || []);
+            setTotal(data.total || 0);
         } catch (error) {
             console.error('Failed to fetch VPN configs:', error);
             setError(error instanceof Error ? error.message : 'Failed to retrieve VPN configurations');
@@ -75,7 +82,12 @@ const VpnPage = () => {
 
     useEffect(() => {
         fetchVpns();
-    }, []);
+    }, [offset, limit, authTypeFilter]);
+
+    const handleApplyFilter = () => {
+        setOffset(0);
+        fetchVpns();
+    };
 
     const handleOpenForm = (vpn?: VpnConfig) => {
         if (vpn) {
@@ -133,10 +145,12 @@ const VpnPage = () => {
         }
     };
 
-    const filteredVpns = vpns.filter(v =>
-        v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        v.host.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredVpns = vpns.filter(v => {
+        const matchesSearch = v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            v.host.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesAuth = authTypeFilter === 'ALL' || v.auth_type === authTypeFilter;
+        return matchesSearch && matchesAuth;
+    });
 
     const paginatedVpns = filteredVpns.slice(offset, offset + limit);
 
@@ -154,15 +168,35 @@ const VpnPage = () => {
 
             {/* Header / Search */}
             <div className="flex items-center justify-between gap-4 bg-card p-2.5 rounded-xl border border-border shadow-card">
-                <div className="relative flex-1 max-w-md group">
+                <div className="relative flex-1 group">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground transition-all group-focus-within:text-primary group-focus-within:scale-110" />
                     <Input
                         placeholder="Filter by name, ip..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleApplyFilter()}
                         className="pl-11 h-9 bg-background border-border rounded-lg focus-visible:ring-primary/20 placeholder:text-muted-foreground/50 font-semibold text-xs transition-all focus:bg-muted/30"
                     />
                 </div>
+
+                <Button
+                    onClick={handleApplyFilter}
+                    className="h-9 px-4 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-black uppercase tracking-widest text-[9px] shadow-lg shadow-emerald-500/20"
+                >
+                    Apply Filter
+                </Button>
+
+                <Select value={authTypeFilter} onValueChange={setAuthTypeFilter}>
+                    <SelectTrigger className="w-40 h-9 bg-background border-border rounded-lg text-[10px] font-black uppercase tracking-widest outline-none focus:ring-1 focus:ring-primary/20">
+                        <SelectValue placeholder="AUTH TYPE" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-border">
+                        <SelectItem value="ALL">ALL AUTH TYPES</SelectItem>
+                        <SelectItem value="PASSWORD">SSH PASSWORD</SelectItem>
+                        <SelectItem value="PUBLIC_KEY">PUBLIC KEY</SelectItem>
+                    </SelectContent>
+                </Select>
+
                 <div className="flex gap-1.5 items-center">
                     <Button
                         onClick={() => handleOpenForm()}
@@ -206,7 +240,7 @@ const VpnPage = () => {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {filteredVpns.length > 0 ? paginatedVpns.map((vpn) => (
+                        {vpns.length > 0 ? vpns.map((vpn) => (
                             <TableRow key={vpn.id} className="group border-border hover:bg-muted/40 transition-colors">
                                 <TableCell className="px-6 py-4">
                                     <div className="flex items-center gap-3">
@@ -269,7 +303,7 @@ const VpnPage = () => {
             </div>
 
             <Pagination
-                total={filteredVpns.length}
+                total={total}
                 offset={offset}
                 limit={limit}
                 itemName="VPN Configs"

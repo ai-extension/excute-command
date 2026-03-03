@@ -49,10 +49,18 @@ func (h *WorkflowHandler) ListWorkflows(c *gin.Context) {
 			offset = v
 		}
 	}
+	searchTerm := c.Query("search")
+	var tagIDs []uuid.UUID
+	for _, idStr := range c.QueryArray("tag_ids") {
+		if id, err := uuid.Parse(idStr); err == nil {
+			tagIDs = append(tagIDs, id)
+		}
+	}
+
 	currentUser, _ := c.Get("user")
 	user, _ := currentUser.(*domain.User)
 
-	wfs, total, err := h.service.ListWorkflowsPaginated(nsID, limit, offset, user)
+	wfs, total, err := h.service.ListWorkflowsPaginated(nsID, limit, offset, searchTerm, tagIDs, user)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -274,15 +282,41 @@ func (h *WorkflowHandler) ListAllExecutions(c *gin.Context) {
 		return
 	}
 
+	limit := 20
+	offset := 0
+	if l := c.Query("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 {
+			limit = v
+		}
+	}
+	if o := c.Query("offset"); o != "" {
+		if v, err := strconv.Atoi(o); err == nil && v >= 0 {
+			offset = v
+		}
+	}
+
+	status := c.Query("status")
+	var workflowID *uuid.UUID
+	if wfIDStr := c.Query("workflow_id"); wfIDStr != "" {
+		if id, err := uuid.Parse(wfIDStr); err == nil {
+			workflowID = &id
+		}
+	}
+
 	userVal, _ := c.Get("user")
 	user := userVal.(*domain.User)
 
-	execs, err := h.service.ListNamespaceExecutions(nsID, user)
+	execs, total, err := h.service.ListNamespaceExecutionsPaginated(nsID, limit, offset, status, workflowID, user)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, execs)
+	c.JSON(http.StatusOK, gin.H{
+		"items":  execs,
+		"total":  total,
+		"limit":  limit,
+		"offset": offset,
+	})
 }
 
 func (h *WorkflowHandler) GetExecution(c *gin.Context) {

@@ -73,6 +73,45 @@ func (r *PostgresVpnConfigRepo) List(scope *domain.PermissionScope) ([]domain.Vp
 	return vpns, nil
 }
 
+func (r *PostgresVpnConfigRepo) ListPaginated(limit, offset int, searchTerm string, authType string, scope *domain.PermissionScope) ([]domain.VpnConfig, int64, error) {
+	var vpns []domain.VpnConfig
+	var total int64
+	db := applyScope(r.db, scope, "", "")
+
+	if searchTerm != "" {
+		s := "%" + searchTerm + "%"
+		db = db.Where("name ILIKE ? OR host ILIKE ? OR \"user\" ILIKE ?", s, s, s)
+	}
+
+	if authType != "" && authType != "ALL" {
+		db = db.Where("auth_type = ?", authType)
+	}
+
+	if err := db.Model(&domain.VpnConfig{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	err := db.Limit(limit).Offset(offset).Order("created_at DESC").Find(&vpns).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	for i := range vpns {
+		if vpns[i].Password != "" {
+			if dec, err := crypto.Decrypt(vpns[i].Password); err == nil {
+				vpns[i].Password = dec
+			}
+		}
+		if vpns[i].PrivateKey != "" {
+			if dec, err := crypto.Decrypt(vpns[i].PrivateKey); err == nil {
+				vpns[i].PrivateKey = dec
+			}
+		}
+	}
+
+	return vpns, total, nil
+}
+
 func (r *PostgresVpnConfigRepo) Update(vpn *domain.VpnConfig) error {
 	if vpn.Password != "" {
 		if enc, err := crypto.Encrypt(vpn.Password); err == nil {
