@@ -7,11 +7,9 @@ import { NamespaceProvider } from './context/NamespaceContext'
 import { AuthProvider } from './context/AuthContext'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-    <React.StrictMode>
-        <AuthProvider>
-            <NamespaceProvider>
-                <App />
-            </NamespaceProvider>
-        </AuthProvider>
-    </React.StrictMode>,
+    <AuthProvider>
+        <NamespaceProvider>
+            <App />
+        </NamespaceProvider>
+    </AuthProvider>,
 )

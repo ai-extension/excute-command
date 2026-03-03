@@ -6,6 +6,7 @@ import { Button } from './ui/button';
 import { useAuth } from '../context/AuthContext';
 
 import NamespaceSwitcher from './NamespaceSwitcher';
+import { useNamespace } from '../context/NamespaceContext';
 
 interface SidebarProps {
     isCollapsed: boolean;
@@ -14,6 +15,7 @@ interface SidebarProps {
 
 const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
     const { logout, user, hasPermission } = useAuth();
+    const { activeNamespace } = useNamespace();
     const navigate = useNavigate();
 
     const globalNavItems = [
@@ -29,7 +31,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
         { name: 'Tags', path: '/tags', icon: Tag, type: 'tags' },
         { name: 'Schedules', path: '/schedules', icon: Calendar, type: 'schedules' },
         { name: 'Pages', path: '/pages', icon: Layout, type: 'pages' },
-    ].filter(item => hasPermission(item.type, 'READ'));
+    ].filter(item => hasPermission(item.type, 'READ', null, activeNamespace?.id));
 
     const identityItems = [
         { name: 'Users', path: '/users', icon: Users, type: 'users' },
@@ -92,57 +94,65 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
             <div className="flex-1 flex flex-col gap-6 w-full overflow-y-auto py-4">
 
                 {/* Namespace-scoped items */}
-                <div className="w-full">
-                    {!isCollapsed && (
-                        <div className="flex items-center justify-between px-4 mb-2">
-                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-50">Operational</p>
-                        </div>
-                    )}
-                    {!isCollapsed && (
-                        <div className="flex items-center gap-1.5 px-4 mb-2 mt-1">
-                            <div className="h-px flex-1 bg-border/50" />
-                            <span className="text-[8px] font-black uppercase tracking-[0.2em] text-primary/50">Contextual Namespace</span>
-                            <div className="h-px flex-1 bg-border/50" />
-                        </div>
-                    )}
-                    <nav className="flex flex-col gap-1.5 w-full pl-0">
-                        {namespaceNavItems.map((item) => renderNavLink(item, { indent: false }))}
-                    </nav>
-                </div>
+                {namespaceNavItems.length > 0 && (
+                    <div className="w-full">
+                        {!isCollapsed && (
+                            <div className="flex items-center justify-between px-4 mb-2">
+                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-50">Operational</p>
+                            </div>
+                        )}
+                        {!isCollapsed && (
+                            <div className="flex items-center gap-1.5 px-4 mb-2 mt-1">
+                                <div className="h-px flex-1 bg-border/50" />
+                                <span className="text-[8px] font-black uppercase tracking-[0.2em] text-primary/50">Contextual Namespace</span>
+                                <div className="h-px flex-1 bg-border/50" />
+                            </div>
+                        )}
+                        <nav className="flex flex-col gap-1.5 w-full pl-0">
+                            {namespaceNavItems.map((item) => renderNavLink(item, { indent: false }))}
+                        </nav>
+                    </div>
+                )}
 
                 {/* Global items */}
-                <div className="w-full">
-                    {!isCollapsed && (
-                        <div className="flex items-center gap-1.5 px-4 mb-2">
-                            <div className="h-px flex-1 bg-border/50" />
-                            <span className="text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">Global</span>
-                            <div className="h-px flex-1 bg-border/50" />
-                        </div>
-                    )}
-                    <nav className="flex flex-col gap-1.5 w-full">
-                        {globalNavItems.map((item) => renderNavLink(item))}
-                    </nav>
-                </div>
+                {globalNavItems.length > 0 && (
+                    <div className="w-full">
+                        {!isCollapsed && (
+                            <div className="flex items-center gap-1.5 px-4 mb-2">
+                                <div className="h-px flex-1 bg-border/50" />
+                                <span className="text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">Global</span>
+                                <div className="h-px flex-1 bg-border/50" />
+                            </div>
+                        )}
+                        <nav className="flex flex-col gap-1.5 w-full">
+                            {globalNavItems.map((item) => renderNavLink(item))}
+                        </nav>
+                    </div>
+                )}
 
                 {/* Identity items */}
-                <div className="w-full">
-                    {!isCollapsed && (
-                        <p className="px-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-4 opacity-50 animate-in fade-in duration-500">Identity</p>
-                    )}
-                    <nav className="flex flex-col gap-1.5 w-full">
-                        {identityItems.map((item) => renderNavLink(item))}
-                    </nav>
-                </div>
+                {identityItems.length > 0 && (
+                    <div className="w-full">
+                        {!isCollapsed && (
+                            <p className="px-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-4 opacity-50 animate-in fade-in duration-500">Identity</p>
+                        )}
+                        <nav className="flex flex-col gap-1.5 w-full">
+                            {identityItems.map((item) => renderNavLink(item))}
+                        </nav>
+                    </div>
+                )}
 
                 {/* System items */}
-                <div className="w-full">
-                    {!isCollapsed && (
-                        <p className="px-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-4 opacity-50 animate-in fade-in duration-500">System</p>
-                    )}
-                    <nav className="flex flex-col gap-1.5 w-full">
-                        {systemItems.map((item) => renderNavLink(item))}
-                    </nav>
-                </div>
+                {systemItems.length > 0 && (
+                    <div className="w-full">
+                        {!isCollapsed && (
+                            <p className="px-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-4 opacity-50 animate-in fade-in duration-500">System</p>
+                        )}
+                        <nav className="flex flex-col gap-1.5 w-full">
+                            {systemItems.map((item) => renderNavLink(item))}
+                        </nav>
+                    </div>
+                )}
             </div>
 
             <div className="flex flex-col gap-2 w-full mt-auto pt-4 border-t border-border">

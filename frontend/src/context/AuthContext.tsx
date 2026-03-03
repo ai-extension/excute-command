@@ -16,7 +16,7 @@ interface AuthContextType {
     logout: () => void;
     isAuthenticated: boolean;
     apiFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
-    hasPermission: (type: string, action: string, resourceId?: string | null) => boolean;
+    hasPermission: (type: string, action: string, resourceId?: string | null, namespaceId?: string | null, tagIds?: string[]) => boolean;
     showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
 
@@ -88,29 +88,76 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return response;
     }, [token, logout, showToast]);
 
-    const hasPermission = useCallback((type: string, action: string, resourceId: string | null = null): boolean => {
+    const hasPermission = useCallback((type: string, action: string, resourceId: string | null = null, namespaceId: string | null = null, tagIds: string[] = []): boolean => {
         if (!user || !user.username) return false;
         if (user.username === 'admin') return true;
 
-        // Flatten permissions from all roles
         const allPerms = user.roles?.flatMap(role => role.permissions || []) || [];
 
-        return allPerms.some((rp: any) => {
+        // 1. Item Level: Direct permission on this specific resource ID
+        if (resourceId) {
+            const hasItemPerm = allPerms.some((rp: any) => {
+                const perm = rp.permission;
+                return perm && perm.type === type && perm.action === action && rp.resource_id === resourceId;
+            });
+            if (hasItemPerm) return true;
+        }
+
+        // 2. Resource Level (Global): Permission on the resource type without a specific ID
+        const hasGlobalPerm = allPerms.some((rp: any) => {
             const perm = rp.permission;
-            if (!perm) return false;
-
-            if (perm.type === type && perm.action === action) {
-                // If checking for generic access (no resourceId provided), 
-                // any permission entry for this type/action is sufficient.
-                if (!resourceId) return true;
-
-                // If checking for a specific resource:
-                // 1. It matches if the permission is global (no rp.resource_id)
-                // 2. It matches if the permission is for this specific resource
-                if (!rp.resource_id || rp.resource_id === resourceId) return true;
-            }
-            return false;
+            return perm && perm.type === type && perm.action === action && !rp.resource_id;
         });
+        if (hasGlobalPerm) return true;
+
+        // If generic check (no resourceId), and we haven't found a global match, 
+        // we still return true if ANY matching permission exists.
+        // If namespaceId is provided, we prioritize matches within that namespace.
+        if (!resourceId) {
+            const hasAnyMatch = allPerms.some((rp: any) => {
+                const perm = rp.permission;
+                if (!perm) return false;
+
+                // 1. Direct type/action match (Global or any specific item)
+                if (perm.type === type && perm.action === action) return true;
+
+                // 2. Hierarchical match via Namespace
+                if (perm.type === 'namespaces' && perm.action === `RESOURCE_${action}`) {
+                    // Global namespace permission or specifically for the active namespace
+                    if (!rp.resource_id || (namespaceId && rp.resource_id === namespaceId)) return true;
+                }
+
+                // 3. Hierarchical match via Tag
+                if (perm.type === 'tags' && perm.action === `RESOURCE_${action}`) {
+                    // Any tag permission allows the menu to show globally, 
+                    // or if we knew which tags belong to which namespace, we'd check that here.
+                    return true;
+                }
+
+                return false;
+            });
+            if (hasAnyMatch) return true;
+        }
+
+        // 3. Tag Level: Permission via RESOURCE_* on associated tags
+        if (tagIds.length > 0) {
+            const hasTagPerm = allPerms.some((rp: any) => {
+                const perm = rp.permission;
+                return perm && perm.type === 'tags' && perm.action === `RESOURCE_${action}` && rp.resource_id && tagIds.includes(rp.resource_id);
+            });
+            if (hasTagPerm) return true;
+        }
+
+        // 4. Namespace Level: Permission via RESOURCE_* on the parent namespace
+        if (namespaceId) {
+            const hasNamespacePerm = allPerms.some((rp: any) => {
+                const perm = rp.permission;
+                return perm && perm.type === 'namespaces' && perm.action === `RESOURCE_${action}` && rp.resource_id === namespaceId;
+            });
+            if (hasNamespacePerm) return true;
+        }
+
+        return false;
     }, [user]);
 
     return (

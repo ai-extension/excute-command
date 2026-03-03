@@ -45,10 +45,15 @@ export const NamespaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             if (data && data.length > 0) {
                 const storedId = localStorage.getItem('activeNamespaceId');
                 const savedNs = data.find((n: Namespace) => n.id === storedId);
-                if (savedNs) {
-                    setActiveNamespaceState(savedNs);
-                } else {
-                    setActiveNamespaceState(data[0]);
+                const nextNs = savedNs || data[0];
+
+                // Only update state if the object content (ID) is actually different
+                setActiveNamespaceState(prev => {
+                    if (prev?.id === nextNs.id) return prev;
+                    return nextNs;
+                });
+
+                if (!savedNs) {
                     localStorage.setItem('activeNamespaceId', data[0].id);
                 }
             }
@@ -60,7 +65,10 @@ export const NamespaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }, [isAuthenticated, token]);
 
     const setActiveNamespace = useCallback((ns: Namespace) => {
-        setActiveNamespaceState(ns);
+        setActiveNamespaceState(prev => {
+            if (prev?.id === ns.id) return prev;
+            return ns;
+        });
         localStorage.setItem('activeNamespaceId', ns.id);
     }, []);
 

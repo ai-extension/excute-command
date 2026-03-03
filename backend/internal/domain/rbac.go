@@ -10,14 +10,19 @@ func HasPermission(user *User, permType, action string, namespaceID *string, res
 		return true
 	}
 
-	// 1. Check Namespace level: If user has RESOURCE_* permission on this namespace, grant access.
-	if namespaceID != nil && *namespaceID != "" {
-		if checkLevel(user, "namespaces", "RESOURCE_"+action, namespaceID) {
+	// 1. Check specific Item level: If user has direct permission on this item.
+	if resourceID != nil && *resourceID != "" {
+		if checkLevel(user, permType, action, resourceID) {
 			return true
 		}
 	}
 
-	// 2. Check Tag level: If user has RESOURCE_* permission on any of the tags, grant access.
+	// 2. Check Resource Type level: If user has global access to this resource type.
+	if checkLevel(user, permType, action, nil) {
+		return true
+	}
+
+	// 3. Check Tag level: If user has RESOURCE_* permission on any of the tags, grant access.
 	for _, tagID := range tagIDs {
 		if tagID != "" {
 			if checkLevel(user, "tags", "RESOURCE_"+action, &tagID) {
@@ -26,16 +31,11 @@ func HasPermission(user *User, permType, action string, namespaceID *string, res
 		}
 	}
 
-	// 3. Check specific Item level: If user has direct permission on this item.
-	if resourceID != nil && *resourceID != "" {
-		if checkLevel(user, permType, action, resourceID) {
+	// 4. Check Namespace level: If user has RESOURCE_* permission on this namespace, grant access.
+	if namespaceID != nil && *namespaceID != "" {
+		if checkLevel(user, "namespaces", "RESOURCE_"+action, namespaceID) {
 			return true
 		}
-	}
-
-	// 4. Check Resource Type level: If user has global access to this resource type.
-	if checkLevel(user, permType, action, nil) {
-		return true
 	}
 
 	// 5. Fallback for List operations (no specific resource ID)
@@ -46,8 +46,8 @@ func HasPermission(user *User, permType, action string, namespaceID *string, res
 		}
 	}
 
-	fmt.Printf("DEBUG HasPermission: Failed. user=%s, permType=%s, action=%s, resourceID=%v, roles_count=%d, direct_perms_count=%d\n",
-		user.Username, permType, action, resourceID, len(user.Roles), len(user.Permissions))
+	fmt.Printf("DEBUG HasPermission: Failed. user=%s, permType=%s, action=%s, resourceID=%v, roles_count=%d\n",
+		user.Username, permType, action, resourceID, len(user.Roles))
 	return false
 }
 
