@@ -224,6 +224,7 @@ type WorkflowGroup struct {
 	IsParallel         bool           `json:"is_parallel"`
 	Status             Status         `json:"status"`
 	Steps              []WorkflowStep `json:"steps,omitempty" gorm:"foreignKey:GroupID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	IsCopyEnabled      bool           `json:"is_copy_enabled" gorm:"default:false"`
 	CopySourcePath     string         `json:"copy_source_path,omitempty" gorm:"default:''"`
 	CopyTargetServerID uuid.UUID      `json:"copy_target_server_id,omitempty" gorm:"type:uuid"`
 	CopyTargetPath     string         `json:"copy_target_path,omitempty" gorm:"default:''"`

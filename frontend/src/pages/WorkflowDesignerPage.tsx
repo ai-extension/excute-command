@@ -9,6 +9,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
 import { Badge } from '../components/ui/badge';
+import { Switch } from '../components/ui/switch';
 import { cn } from '../lib/utils';
 import { Workflow, WorkflowGroup, WorkflowStep, WorkflowInput, WorkflowVariable, Server as ServerType, Tag } from '../types';
 import WorkflowHistory from '../components/WorkflowHistory';
@@ -153,6 +154,7 @@ const WorkflowDesignerPage = () => {
                 groups: groups.map((g, gIdx) => ({
                     ...g,
                     default_server_id: g.default_server_id || undefined,
+                    copy_target_server_id: g.copy_target_server_id || '00000000-0000-0000-0000-000000000000',
                     order: gIdx,
                     steps: g.steps?.map((s, sIdx) => ({
                         ...s,
@@ -832,58 +834,79 @@ const WorkflowDesignerPage = () => {
                                                                                                             </div>
                                                                                                             {/* Copy After Execution */}
                                                                                                             <div className="pt-4 border-t border-border/50 space-y-4">
-                                                                                                                <div className="flex items-center gap-2">
-                                                                                                                    <File className="w-3.5 h-3.5 text-emerald-500" />
-                                                                                                                    <span className="text-[8px] font-black uppercase tracking-widest text-emerald-500">Copy After Execution (Relay)</span>
-                                                                                                                </div>
-                                                                                                                <div className="grid grid-cols-1 gap-4">
-                                                                                                                    <div className="space-y-2">
-                                                                                                                        <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Source Path <span className="text-muted-foreground/50 normal-case font-medium">— file or directory on execution server</span></label>
-                                                                                                                        <Input
-                                                                                                                            value={group.copy_source_path || ''}
-                                                                                                                            onChange={(e) => {
-                                                                                                                                const ng = [...groups];
-                                                                                                                                ng[gIdx].copy_source_path = e.target.value;
-                                                                                                                                setGroups(ng);
-                                                                                                                            }}
-                                                                                                                            placeholder="/var/www/html/dist"
-                                                                                                                            className="h-9 text-[11px] font-mono"
-                                                                                                                        />
+                                                                                                                <div className="flex items-center justify-between gap-2">
+                                                                                                                    <div className="flex items-center gap-2">
+                                                                                                                        <File className="w-3.5 h-3.5 text-emerald-500" />
+                                                                                                                        <span className="text-[8px] font-black uppercase tracking-widest text-emerald-500">Copy After Execution (Relay)</span>
                                                                                                                     </div>
-                                                                                                                    <div className="grid grid-cols-2 gap-4">
+                                                                                                                    <Switch
+                                                                                                                        checked={group.is_copy_enabled}
+                                                                                                                        onCheckedChange={(checked) => {
+                                                                                                                            const ng = [...groups];
+                                                                                                                            ng[gIdx].is_copy_enabled = checked;
+                                                                                                                            if (checked) {
+                                                                                                                                if (!ng[gIdx].copy_target_server_id) {
+                                                                                                                                    ng[gIdx].copy_target_server_id = '00000000-0000-0000-0000-000000000001';
+                                                                                                                                }
+                                                                                                                            } else {
+                                                                                                                                ng[gIdx].copy_source_path = '';
+                                                                                                                                ng[gIdx].copy_target_server_id = undefined;
+                                                                                                                                ng[gIdx].copy_target_path = '';
+                                                                                                                            }
+                                                                                                                            setGroups(ng);
+                                                                                                                        }}
+                                                                                                                    />
+                                                                                                                </div>
+
+                                                                                                                {group.is_copy_enabled && (
+                                                                                                                    <div className="grid grid-cols-1 gap-4 animate-in fade-in slide-in-from-top-1 duration-200">
                                                                                                                         <div className="space-y-2">
-                                                                                                                            <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Target Server</label>
-                                                                                                                            <select
-                                                                                                                                value={group.copy_target_server_id || ''}
-                                                                                                                                onChange={(e) => {
-                                                                                                                                    const ng = [...groups];
-                                                                                                                                    ng[gIdx].copy_target_server_id = e.target.value;
-                                                                                                                                    setGroups(ng);
-                                                                                                                                }}
-                                                                                                                                className="flex h-9 w-full rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
-                                                                                                                            >
-                                                                                                                                <option value="">— Select Target —</option>
-                                                                                                                                <option value="00000000-0000-0000-0000-000000000001">Local Engine Orchestrator</option>
-                                                                                                                                {availableServers.map(s => (
-                                                                                                                                    <option key={s.id} value={s.id}>{s.name} ({s.host})</option>
-                                                                                                                                ))}
-                                                                                                                            </select>
-                                                                                                                        </div>
-                                                                                                                        <div className="space-y-2">
-                                                                                                                            <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Target Path</label>
+                                                                                                                            <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Source Path <span className="text-muted-foreground/50 normal-case font-medium">— file or directory on execution server</span></label>
                                                                                                                             <Input
-                                                                                                                                value={group.copy_target_path || ''}
+                                                                                                                                value={group.copy_source_path || ''}
                                                                                                                                 onChange={(e) => {
                                                                                                                                     const ng = [...groups];
-                                                                                                                                    ng[gIdx].copy_target_path = e.target.value;
+                                                                                                                                    ng[gIdx].copy_source_path = e.target.value;
                                                                                                                                     setGroups(ng);
                                                                                                                                 }}
-                                                                                                                                placeholder="/opt/app/deploy"
+                                                                                                                                placeholder="/var/www/html/dist"
                                                                                                                                 className="h-9 text-[11px] font-mono"
                                                                                                                             />
                                                                                                                         </div>
+                                                                                                                        <div className="grid grid-cols-2 gap-4">
+                                                                                                                            <div className="space-y-2">
+                                                                                                                                <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Target Server</label>
+                                                                                                                                <select
+                                                                                                                                    value={group.copy_target_server_id || ''}
+                                                                                                                                    onChange={(e) => {
+                                                                                                                                        const ng = [...groups];
+                                                                                                                                        ng[gIdx].copy_target_server_id = e.target.value;
+                                                                                                                                        setGroups(ng);
+                                                                                                                                    }}
+                                                                                                                                    className="flex h-9 w-full rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
+                                                                                                                                >
+                                                                                                                                    <option value="00000000-0000-0000-0000-000000000001">Local Engine Orchestrator</option>
+                                                                                                                                    {availableServers.map(s => (
+                                                                                                                                        <option key={s.id} value={s.id}>{s.name} ({s.host})</option>
+                                                                                                                                    ))}
+                                                                                                                                </select>
+                                                                                                                            </div>
+                                                                                                                            <div className="space-y-2">
+                                                                                                                                <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Target Path</label>
+                                                                                                                                <Input
+                                                                                                                                    value={group.copy_target_path || ''}
+                                                                                                                                    onChange={(e) => {
+                                                                                                                                        const ng = [...groups];
+                                                                                                                                        ng[gIdx].copy_target_path = e.target.value;
+                                                                                                                                        setGroups(ng);
+                                                                                                                                    }}
+                                                                                                                                    placeholder="/opt/app/deploy"
+                                                                                                                                    className="h-9 text-[11px] font-mono"
+                                                                                                                                />
+                                                                                                                            </div>
+                                                                                                                        </div>
                                                                                                                     </div>
-                                                                                                                </div>
+                                                                                                                )}
                                                                                                             </div>
                                                                                                         </div>
                                                                                                         <div className="px-5 pb-4 flex justify-end">

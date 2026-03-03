@@ -72,14 +72,14 @@ func (s *ServerService) DeleteServer(id uuid.UUID, user *domain.User) error {
 }
 
 func (s *ServerService) ExecuteCommand(serverID uuid.UUID, commandText string, user *domain.User, writers ...io.Writer) (string, error) {
+	if serverID == domain.LocalServerID || serverID == uuid.Nil {
+		return s.executeLocalCommand(commandText, writers...)
+	}
+
 	scope := domain.GetPermissionScope(user, "servers", "EXECUTE")
 	server, err := s.repo.GetByID(serverID, &scope)
 	if err != nil {
 		return "", fmt.Errorf("failed to get server: %w", err)
-	}
-
-	if server.ID == domain.LocalServerID {
-		return s.executeLocalCommand(commandText, writers...)
 	}
 
 	client, err := ConnectSSH(server)
@@ -112,14 +112,14 @@ func (s *ServerService) ExecuteCommand(serverID uuid.UUID, commandText string, u
 }
 
 func (s *ServerService) DownloadFileFromServer(ctx context.Context, serverID uuid.UUID, remotePath, localPath string, user *domain.User) error {
+	if serverID == domain.LocalServerID || serverID == uuid.Nil {
+		return s.copyFileLocally(remotePath, localPath)
+	}
+
 	scope := domain.GetPermissionScope(user, "servers", "READ")
 	server, err := s.repo.GetByID(serverID, &scope)
 	if err != nil {
 		return fmt.Errorf("failed to get server %s: %w", serverID, err)
-	}
-
-	if server.ID == domain.LocalServerID {
-		return s.copyFileLocally(remotePath, localPath)
 	}
 
 	client, err := ConnectSSH(server)
@@ -178,7 +178,7 @@ func (s *ServerService) UploadFileToServers(ctx context.Context, serverIDs []uui
 			return err
 		}
 
-		if serverID == domain.LocalServerID {
+		if serverID == domain.LocalServerID || serverID == uuid.Nil {
 			if err := s.copyFileLocally(localPath, remotePath); err != nil {
 				return fmt.Errorf("local server, failed to copy file: %w", err)
 			}

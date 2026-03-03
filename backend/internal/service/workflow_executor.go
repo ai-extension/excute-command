@@ -472,18 +472,33 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 				e.hub.BroadcastStatus(group.ID.String(), "group", string(domain.StatusFailed))
 				return err
 			}
+			// Sequential Step Delay: 200ms gap between steps to prevent race conditions
+			// or overwhelming the target server.
+			if i < len(group.Steps)-1 {
+				time.Sleep(200 * time.Millisecond)
+			}
 		}
 	}
 	// Perform relay copy if configured before marking group as SUCCESS
-	if group.CopySourcePath != "" && group.CopyTargetServerID != uuid.Nil && group.CopyTargetPath != "" {
-		if err := e.relayCopy(ctx, group, effectiveServerID, logFile, workflowID, user); err != nil {
-			fmt.Fprintf(logFile, "Relay copy failed: %v\n", err)
-			e.hub.BroadcastLog(workflowID.String(), fmt.Sprintf("Relay copy failed: %v", err))
-			group.Status = domain.StatusFailed
-			e.groupRepo.Update(group)
-			e.hub.BroadcastStatus(group.ID.String(), "group", string(domain.StatusFailed))
-			return fmt.Errorf("relay copy failed: %w", err)
+	if group.IsCopyEnabled {
+		fmt.Fprintf(logFile, "[DEBUG] Relay copy enabled for group %q (ID: %s)\n", group.Name, group.ID)
+
+		if group.CopySourcePath != "" && group.CopyTargetPath != "" {
+			if err := e.relayCopy(ctx, group, inputs, variables, groupResults, namespaceID, effectiveServerID, logFile, workflowID, user); err != nil {
+				fmt.Fprintf(logFile, "Relay copy failed: %v\n", err)
+				e.hub.BroadcastLog(workflowID.String(), fmt.Sprintf("Relay copy failed: %v\n", err))
+				group.Status = domain.StatusFailed
+				e.groupRepo.Update(group)
+				e.hub.BroadcastStatus(group.ID.String(), "group", string(domain.StatusFailed))
+				return fmt.Errorf("relay copy failed: %w", err)
+			}
+		} else {
+			msg := fmt.Sprintf("[DEBUG] Relay copy skipped for group %q: missing SourcePath or TargetPath\n", group.Name)
+			fmt.Fprint(logFile, msg)
+			e.hub.BroadcastLog(workflowID.String(), msg)
 		}
+	} else {
+		fmt.Fprintf(logFile, "[DEBUG] Relay copy disabled for group %q\n", group.Name)
 	}
 
 	group.Status = domain.StatusSuccess
@@ -497,18 +512,70 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 	return e.groupRepo.Update(group)
 }
 
-func (e *WorkflowExecutor) relayCopy(ctx context.Context, group *domain.WorkflowGroup, sourceServerID uuid.UUID, logFile *os.File, workflowID uuid.UUID, user *domain.User) error {
-	fmt.Fprintf(logFile, "\n--- RELAY COPY: %s -> Server(%s):%s ---\n", group.CopySourcePath, group.CopyTargetServerID, group.CopyTargetPath)
-	e.hub.BroadcastLog(workflowID.String(), "Starting relay copy...")
+func (e *WorkflowExecutor) relayCopy(ctx context.Context, group *domain.WorkflowGroup, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, namespaceID uuid.UUID, sourceServerID uuid.UUID, logFile *os.File, workflowID uuid.UUID, user *domain.User) error {
+	sourcePath := filepath.Clean(group.CopySourcePath)
+	targetPath := filepath.Clean(group.CopyTargetPath)
+
+	// Perform variable substitution
+	securityRegex := regexp.MustCompile(`^[a-zA-Z0-9_\-\.\ \/]+$`)
+
+	substitute := func(val string) (string, error) {
+		// 1. Static Variables: {{variable.key}}
+		for _, v := range variables {
+			if v.Value != "" && !securityRegex.MatchString(v.Value) {
+				return "", fmt.Errorf("security violation: variable '%s' contains invalid characters", v.Key)
+			}
+			val = strings.ReplaceAll(val, "{{variable."+v.Key+"}}", v.Value)
+		}
+		// 2. Runtime Inputs: {{key}}
+		for k, v := range inputs {
+			if v != "" && !securityRegex.MatchString(v) {
+				return "", fmt.Errorf("security violation: input '%s' contains invalid characters", k)
+			}
+			val = strings.ReplaceAll(val, "{{"+k+"}}", v)
+		}
+		// 3. Group Results: {{group_name.result}}
+		for k, v := range groupResults {
+			if v != "" && !securityRegex.MatchString(v) {
+				return "", fmt.Errorf("security violation: group result '%s' contains invalid characters", k)
+			}
+			val = strings.ReplaceAll(val, "{{"+k+"}}", v)
+		}
+		// 4. Global Variables: {{global.key}}
+		if e.globalVarRepo != nil {
+			scope := domain.GetPermissionScope(user, "namespaces", "READ")
+			gvs, _ := e.globalVarRepo.List(namespaceID, &scope)
+			for _, v := range gvs {
+				if v.Value != "" && !securityRegex.MatchString(v.Value) {
+					return "", fmt.Errorf("security violation: global variable '%s' contains invalid characters", v.Key)
+				}
+				val = strings.ReplaceAll(val, "{{global."+v.Key+"}}", v.Value)
+			}
+		}
+		return val, nil
+	}
+
+	var err error
+	sourcePath, err = substitute(sourcePath)
+	if err != nil {
+		return err
+	}
+	targetPath, err = substitute(targetPath)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(logFile, "\n--- RELAY COPY: %s -> Server(%s):%s ---\n", sourcePath, group.CopyTargetServerID, targetPath)
+	e.hub.BroadcastLog(workflowID.String(), "Starting relay copy...\n")
 
 	// 1. Create tarball on source server
 	tmpTarName := fmt.Sprintf("relay_%s.tar.gz", uuid.New().String())
-	sourceDir := filepath.Dir(group.CopySourcePath)
-	sourceBase := filepath.Base(group.CopySourcePath)
+	sourceDir := filepath.Dir(sourcePath)
+	sourceBase := filepath.Base(sourcePath)
 
 	// Use tar -czf to create a compressed archive. Use -C to change directory so the path in tar is relative.
-	tarCmd := fmt.Sprintf("tar -czf /tmp/%s -C %s %s", tmpTarName, sourceDir, sourceBase)
-	_, err := e.serverService.ExecuteCommand(sourceServerID, tarCmd, user)
+	tarCmd := fmt.Sprintf("tar -czf /tmp/%s -C %s %s", tmpTarName, strconv.Quote(sourceDir), strconv.Quote(sourceBase))
+	_, err = e.serverService.ExecuteCommand(sourceServerID, tarCmd, user)
 	if err != nil {
 		return fmt.Errorf("failed to create tarball on source: %w", err)
 	}
@@ -516,7 +583,9 @@ func (e *WorkflowExecutor) relayCopy(ctx context.Context, group *domain.Workflow
 
 	// 2. Download tarball to backend
 	localTmpDir := filepath.Join("data", "tmp", "relay")
-	os.MkdirAll(localTmpDir, 0755)
+	if err := os.MkdirAll(localTmpDir, 0755); err != nil {
+		return fmt.Errorf("failed to create local relay directory: %w", err)
+	}
 	localTarPath := filepath.Join(localTmpDir, tmpTarName)
 	err = e.serverService.DownloadFileFromServer(ctx, sourceServerID, "/tmp/"+tmpTarName, localTarPath, user)
 	if err != nil {
@@ -532,20 +601,17 @@ func (e *WorkflowExecutor) relayCopy(ctx context.Context, group *domain.Workflow
 	defer e.serverService.ExecuteCommand(group.CopyTargetServerID, fmt.Sprintf("rm -f /tmp/%s", tmpTarName), user)
 
 	// 4. Extract tarball on target server
-	// Ensure target directory exists and extract. -xovf: extract, overwrite, verbose, file. --strip-components=0 or just extract.
-	// We want to overwrite, so we use --overwrite (or it's default in many tar versions).
-	// We also ensure the target path exists.
-	mkdirCmd := fmt.Sprintf("mkdir -p %s", group.CopyTargetPath)
+	mkdirCmd := fmt.Sprintf("mkdir -p %s", strconv.Quote(targetPath))
 	e.serverService.ExecuteCommand(group.CopyTargetServerID, mkdirCmd, user)
 
-	extractCmd := fmt.Sprintf("tar -xzf /tmp/%s -C %s", tmpTarName, group.CopyTargetPath)
+	extractCmd := fmt.Sprintf("tar -xzf /tmp/%s -C %s", tmpTarName, strconv.Quote(targetPath))
 	_, err = e.serverService.ExecuteCommand(group.CopyTargetServerID, extractCmd, user)
 	if err != nil {
 		return fmt.Errorf("failed to extract tarball on target: %w", err)
 	}
 
 	fmt.Fprintf(logFile, "--- RELAY COPY SUCCESS ---\n")
-	e.hub.BroadcastLog(workflowID.String(), "Relay copy completed successfully.")
+	e.hub.BroadcastLog(workflowID.String(), "Relay copy completed successfully.\n")
 	return nil
 }
 
