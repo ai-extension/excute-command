@@ -11,6 +11,8 @@ export interface VpnConfig {
     auth_type: 'PASSWORD' | 'PUBLIC_KEY';
     password?: string;
     private_key?: string;
+    created_by?: string;
+    created_by_username?: string;
     created_at: string;
     updated_at: string;
 }
@@ -27,6 +29,8 @@ export interface Server {
     private_key?: string;
     vpn_id?: string;
     vpn?: VpnConfig;
+    created_by?: string;
+    created_by_username?: string;
     created_at: string;
     updated_at: string;
 }
@@ -64,6 +68,8 @@ export interface Tag {
     namespace_id: string;
     name: string;
     color: string;
+    created_by?: string;
+    created_by_username?: string;
     created_at: string;
     updated_at: string;
 }
@@ -96,6 +102,8 @@ export interface Workflow {
     target_folder?: string;
     cleanup_files?: boolean;
     hooks?: WorkflowHook[];
+    created_by?: string;
+    created_by_username?: string;
     created_at?: string;
     updated_at?: string;
 }
@@ -117,6 +125,8 @@ export interface WorkflowExecution {
     scheduled_id?: string;
     status: Status;
     inputs: string;
+    executed_by?: string;
+    user?: { id: string; username: string };
     log_path: string;
     started_at: string;
     finished_at?: string;
@@ -163,6 +173,8 @@ export interface GlobalVariable {
     key: string;
     value: string;
     description: string;
+    created_by?: string;
+    created_by_username?: string;
     created_at: string;
     updated_at: string;
 }
@@ -186,6 +198,8 @@ export interface Schedule {
     next_run_at?: string;
     status: 'ACTIVE' | 'PAUSED';
     retries: number;
+    created_by?: string;
+    created_by_username?: string;
     created_at: string;
     updated_at: string;
     workflows?: Workflow[]; // Legacy many-to-many

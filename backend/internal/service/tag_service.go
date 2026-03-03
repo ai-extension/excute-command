@@ -13,10 +13,14 @@ func NewTagService(repo domain.TagRepository) *TagService {
 	return &TagService{repo: repo}
 }
 
-func (s *TagService) Create(tag *domain.Tag) error {
+func (s *TagService) Create(tag *domain.Tag, user *domain.User) error {
 	tag.ID = uuid.New()
 	if tag.Color == "" {
 		tag.Color = "#6366f1"
+	}
+	if user != nil {
+		tag.CreatedBy = &user.ID
+		tag.CreatedByUsername = user.Username
 	}
 	return s.repo.Create(tag)
 }

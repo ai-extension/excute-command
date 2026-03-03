@@ -248,6 +248,7 @@ const GlobalVariablesPage = () => {
                             <TableHead className="w-[300px] h-14 font-black uppercase tracking-widest text-[9px] px-8">Variable Key</TableHead>
                             <TableHead className="font-black uppercase tracking-widest text-[9px]">Resolved Value</TableHead>
                             <TableHead className="font-black uppercase tracking-widest text-[9px]">Reference Code</TableHead>
+                            <TableHead className="font-black uppercase tracking-widest text-[9px]">Created By</TableHead>
                             <TableHead className="text-right h-14 px-8 font-black uppercase tracking-widest text-[9px]">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -290,6 +291,18 @@ const GlobalVariablesPage = () => {
                                             {"{{"}global.{v.key}{"}}"}
                                         </span>
                                     </div>
+                                </TableCell>
+                                <TableCell>
+                                    {v.created_by_username ? (
+                                        <div className="flex items-center gap-1.5">
+                                            <div className="h-5 w-5 rounded-full bg-primary/20 flex items-center justify-center text-[8px] font-black text-primary uppercase shrink-0">
+                                                {v.created_by_username[0]}
+                                            </div>
+                                            <span className="text-[10px] font-semibold text-muted-foreground">{v.created_by_username}</span>
+                                        </div>
+                                    ) : (
+                                        <span className="text-[10px] text-muted-foreground/40 italic">—</span>
+                                    )}
                                 </TableCell>
                                 <TableCell className="text-right px-8">
                                     <div className="flex justify-end gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all duration-300">

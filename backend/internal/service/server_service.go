@@ -22,9 +22,13 @@ func NewServerService(repo domain.ServerRepository, hub *Hub) *ServerService {
 	return &ServerService{repo: repo, hub: hub}
 }
 
-func (s *ServerService) CreateServer(server *domain.Server) error {
+func (s *ServerService) CreateServer(server *domain.Server, user *domain.User) error {
 	if server.ID == uuid.Nil {
 		server.ID = uuid.New()
+	}
+	if user != nil {
+		server.CreatedBy = &user.ID
+		server.CreatedByUsername = user.Username
 	}
 	return s.repo.Create(server)
 }

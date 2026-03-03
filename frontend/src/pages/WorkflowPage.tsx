@@ -169,6 +169,7 @@ const WorkflowPage = () => {
                                     <TableHead className="w-[350px] h-12 font-black uppercase tracking-[0.15em] text-[9px] px-6 text-muted-foreground">Workflow Information</TableHead>
                                     <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Status</TableHead>
                                     <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Orchestration</TableHead>
+                                    <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Created By</TableHead>
                                     <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Last Updated</TableHead>
                                     <TableHead className="text-right h-12 px-6 font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Actions</TableHead>
                                 </TableRow>
@@ -235,6 +236,18 @@ const WorkflowPage = () => {
                                                     {wf.groups?.reduce((acc, g) => acc + (g.steps?.length || 0), 0) || 0} Steps
                                                 </div>
                                             </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            {(wf as any).created_by_username ? (
+                                                <div className="flex items-center gap-1.5">
+                                                    <div className="h-5 w-5 rounded-full bg-primary/20 flex items-center justify-center text-[8px] font-black text-primary uppercase shrink-0">
+                                                        {(wf as any).created_by_username[0]}
+                                                    </div>
+                                                    <span className="text-[10px] font-semibold text-muted-foreground">{(wf as any).created_by_username}</span>
+                                                </div>
+                                            ) : (
+                                                <span className="text-[10px] text-muted-foreground/40 italic">—</span>
+                                            )}
                                         </TableCell>
                                         <TableCell className="text-[11px] font-semibold text-muted-foreground/60 tracking-tight">
                                             {wf.updated_at ? new Date(wf.updated_at).toLocaleString() : 'Never'}

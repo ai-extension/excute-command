@@ -566,6 +566,7 @@ const SchedulesPage = () => {
                                     <TableHead className="font-black uppercase tracking-widest text-[9px]">Timing & Pattern</TableHead>
                                     <TableHead className="font-black uppercase tracking-widest text-[9px]">Performance</TableHead>
                                     <TableHead className="font-black uppercase tracking-widest text-[9px]">Workflows</TableHead>
+                                    <TableHead className="font-black uppercase tracking-widest text-[9px]">Created By</TableHead>
                                     <TableHead className="text-right h-14 px-8 font-black uppercase tracking-widest text-[9px]">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -685,6 +686,18 @@ const SchedulesPage = () => {
                                                     </Badge>
                                                 ))}
                                             </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            {s.created_by_username ? (
+                                                <div className="flex items-center gap-1.5">
+                                                    <div className="h-5 w-5 rounded-full bg-primary/20 flex items-center justify-center text-[8px] font-black text-primary uppercase shrink-0">
+                                                        {s.created_by_username[0]}
+                                                    </div>
+                                                    <span className="text-[10px] font-semibold text-muted-foreground">{s.created_by_username}</span>
+                                                </div>
+                                            ) : (
+                                                <span className="text-[10px] text-muted-foreground/40 italic">—</span>
+                                            )}
                                         </TableCell>
                                         <TableCell className="text-right px-8">
                                             <div className="flex items-center justify-end gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all duration-300">

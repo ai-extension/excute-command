@@ -96,7 +96,7 @@ func (h *WorkflowHandler) CreateWorkflow(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.CreateWorkflow(&wf); err != nil {
+	if err := h.service.CreateWorkflow(&wf, userObj); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

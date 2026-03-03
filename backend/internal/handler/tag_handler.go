@@ -80,7 +80,7 @@ func (h *TagHandler) Create(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.Create(&tag); err != nil {
+	if err := h.service.Create(&tag, u); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

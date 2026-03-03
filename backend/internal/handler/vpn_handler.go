@@ -62,7 +62,7 @@ func (h *VpnConfigHandler) Create(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.Create(&vpn); err != nil {
+	if err := h.service.Create(&vpn, user); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

@@ -32,11 +32,15 @@ func NewWorkflowService(
 	}
 }
 
-func (s *WorkflowService) CreateWorkflow(wf *domain.Workflow) error {
+func (s *WorkflowService) CreateWorkflow(wf *domain.Workflow, user *domain.User) error {
 	if wf.ID == uuid.Nil {
 		wf.ID = uuid.New()
 	}
 	wf.Status = domain.StatusPending
+	if user != nil {
+		wf.CreatedBy = &user.ID
+		wf.CreatedByUsername = user.Username
+	}
 
 	// Recursively assign IDs to inputs, groups and steps
 	for i := range wf.Inputs {

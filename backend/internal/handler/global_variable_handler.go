@@ -76,7 +76,7 @@ func (h *GlobalVariableHandler) Create(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.Create(&gv); err != nil {
+	if err := h.service.Create(&gv, user); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

@@ -317,6 +317,7 @@ const ServerPage = () => {
                             <TableHead className="px-6 h-12 font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Managed Host</TableHead>
                             <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Authentication</TableHead>
                             <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Endpoint</TableHead>
+                            <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Created By</TableHead>
                             <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground text-right px-6">Operations</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -357,6 +358,18 @@ const ServerPage = () => {
                                             </span>
                                         )}
                                     </div>
+                                </TableCell>
+                                <TableCell>
+                                    {server.created_by_username ? (
+                                        <div className="flex items-center gap-1.5">
+                                            <div className="h-5 w-5 rounded-full bg-primary/20 flex items-center justify-center text-[8px] font-black text-primary uppercase shrink-0">
+                                                {server.created_by_username[0]}
+                                            </div>
+                                            <span className="text-[10px] font-semibold text-muted-foreground">{server.created_by_username}</span>
+                                        </div>
+                                    ) : (
+                                        <span className="text-[10px] text-muted-foreground/40 italic">—</span>
+                                    )}
                                 </TableCell>
                                 <TableCell className="text-right px-6">
                                     <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0">

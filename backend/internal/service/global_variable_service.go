@@ -13,8 +13,12 @@ func NewGlobalVariableService(repo domain.GlobalVariableRepository) *GlobalVaria
 	return &GlobalVariableService{repo: repo}
 }
 
-func (s *GlobalVariableService) Create(gv *domain.GlobalVariable) error {
+func (s *GlobalVariableService) Create(gv *domain.GlobalVariable, user *domain.User) error {
 	gv.ID = uuid.New()
+	if user != nil {
+		gv.CreatedBy = &user.ID
+		gv.CreatedByUsername = user.Username
+	}
 	return s.repo.Create(gv)
 }
 

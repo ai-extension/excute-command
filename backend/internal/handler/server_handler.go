@@ -70,7 +70,7 @@ func (h *ServerHandler) CreateServer(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.CreateServer(&server); err != nil {
+	if err := h.service.CreateServer(&server, user); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

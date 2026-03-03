@@ -317,6 +317,14 @@ const ExecutionHistoryPage = () => {
                                                                 <Clock className="w-3 h-3" />
                                                                 {getDuration(exec.started_at, exec.finished_at)}
                                                             </span>
+                                                            {exec.user?.username && (
+                                                                <span className="flex items-center gap-1.5 text-indigo-400/70 normal-case">
+                                                                    <div className="h-3.5 w-3.5 rounded-full bg-indigo-500/20 flex items-center justify-center text-[7px] font-black text-indigo-400 uppercase">
+                                                                        {exec.user.username[0]}
+                                                                    </div>
+                                                                    {exec.user.username}
+                                                                </span>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </div>

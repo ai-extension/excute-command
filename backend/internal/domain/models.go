@@ -117,6 +117,8 @@ type Server struct {
 	VpnID              *uuid.UUID `json:"vpn_id,omitempty" gorm:"type:uuid"`
 	Vpn                *VpnConfig `json:"vpn,omitempty" gorm:"foreignKey:VpnID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
 	HostKeyFingerprint string     `json:"host_key_fingerprint,omitempty"` // For strict host key checking (TOFU or manual)
+	CreatedBy          *uuid.UUID `json:"created_by,omitempty" gorm:"type:uuid"`
+	CreatedByUsername  string     `json:"created_by_username,omitempty"`
 	CreatedAt          time.Time  `json:"created_at"`
 	UpdatedAt          time.Time  `json:"updated_at"`
 }
@@ -131,18 +133,20 @@ type ServerRepository interface {
 }
 
 type VpnConfig struct {
-	ID                 uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
-	Name               string    `json:"name" gorm:"not null"`
-	Description        string    `json:"description"`
-	Host               string    `json:"host" gorm:"not null"`
-	Port               int       `json:"port" gorm:"default:22"`
-	User               string    `json:"user" gorm:"not null"`
-	AuthType           string    `json:"auth_type" gorm:"not null"` // PASSWORD or PUBLIC_KEY
-	Password           string    `json:"password,omitempty"`
-	PrivateKey         string    `json:"private_key,omitempty"`
-	HostKeyFingerprint string    `json:"host_key_fingerprint,omitempty"` // For strict host key checking (TOFU or manual)
-	CreatedAt          time.Time `json:"created_at"`
-	UpdatedAt          time.Time `json:"updated_at"`
+	ID                 uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey"`
+	Name               string     `json:"name" gorm:"not null"`
+	Description        string     `json:"description"`
+	Host               string     `json:"host" gorm:"not null"`
+	Port               int        `json:"port" gorm:"default:22"`
+	User               string     `json:"user" gorm:"not null"`
+	AuthType           string     `json:"auth_type" gorm:"not null"` // PASSWORD or PUBLIC_KEY
+	Password           string     `json:"password,omitempty"`
+	PrivateKey         string     `json:"private_key,omitempty"`
+	HostKeyFingerprint string     `json:"host_key_fingerprint,omitempty"` // For strict host key checking (TOFU or manual)
+	CreatedBy          *uuid.UUID `json:"created_by,omitempty" gorm:"type:uuid"`
+	CreatedByUsername  string     `json:"created_by_username,omitempty"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
 }
 
 type VpnConfigRepository interface {
@@ -176,22 +180,24 @@ type WorkflowHook struct {
 }
 
 type Workflow struct {
-	ID              uuid.UUID          `json:"id" gorm:"type:uuid;primaryKey"`
-	NamespaceID     uuid.UUID          `json:"namespace_id" gorm:"type:uuid;index"`
-	Name            string             `json:"name" gorm:"not null"`
-	Description     string             `json:"description"`
-	DefaultServerID uuid.UUID          `json:"default_server_id,omitempty" gorm:"type:uuid"`
-	Status          Status             `json:"status"`
-	Inputs          []WorkflowInput    `json:"inputs,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Variables       []WorkflowVariable `json:"variables,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Groups          []WorkflowGroup    `json:"groups,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Tags            []Tag              `json:"tags,omitempty" gorm:"many2many:workflow_tags;"`
-	Files           []WorkflowFile     `json:"files,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	TargetFolder    string             `json:"target_folder,omitempty" gorm:"default:''"`
-	CleanupFiles    bool               `json:"cleanup_files,omitempty" gorm:"default:false"`
-	Hooks           []WorkflowHook     `json:"hooks,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	CreatedAt       time.Time          `json:"created_at"`
-	UpdatedAt       time.Time          `json:"updated_at"`
+	ID                uuid.UUID          `json:"id" gorm:"type:uuid;primaryKey"`
+	NamespaceID       uuid.UUID          `json:"namespace_id" gorm:"type:uuid;index"`
+	Name              string             `json:"name" gorm:"not null"`
+	Description       string             `json:"description"`
+	DefaultServerID   uuid.UUID          `json:"default_server_id,omitempty" gorm:"type:uuid"`
+	Status            Status             `json:"status"`
+	Inputs            []WorkflowInput    `json:"inputs,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Variables         []WorkflowVariable `json:"variables,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Groups            []WorkflowGroup    `json:"groups,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Tags              []Tag              `json:"tags,omitempty" gorm:"many2many:workflow_tags;"`
+	Files             []WorkflowFile     `json:"files,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	TargetFolder      string             `json:"target_folder,omitempty" gorm:"default:''"`
+	CleanupFiles      bool               `json:"cleanup_files,omitempty" gorm:"default:false"`
+	Hooks             []WorkflowHook     `json:"hooks,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	CreatedBy         *uuid.UUID         `json:"created_by,omitempty" gorm:"type:uuid"`
+	CreatedByUsername string             `json:"created_by_username,omitempty"`
+	CreatedAt         time.Time          `json:"created_at"`
+	UpdatedAt         time.Time          `json:"updated_at"`
 }
 
 type WorkflowFile struct {
@@ -254,22 +260,26 @@ type WorkflowVariable struct {
 }
 
 type GlobalVariable struct {
-	ID          uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
-	NamespaceID uuid.UUID `json:"namespace_id" gorm:"type:uuid;index"`
-	Key         string    `json:"key" gorm:"not null"`
-	Value       string    `json:"value"`
-	Description string    `json:"description"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID                uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey"`
+	NamespaceID       uuid.UUID  `json:"namespace_id" gorm:"type:uuid;index"`
+	Key               string     `json:"key" gorm:"not null"`
+	Value             string     `json:"value"`
+	Description       string     `json:"description"`
+	CreatedBy         *uuid.UUID `json:"created_by,omitempty" gorm:"type:uuid"`
+	CreatedByUsername string     `json:"created_by_username,omitempty"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
 }
 
 type Tag struct {
-	ID          uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
-	NamespaceID uuid.UUID `json:"namespace_id" gorm:"type:uuid;index"`
-	Name        string    `json:"name" gorm:"not null"`
-	Color       string    `json:"color" gorm:"not null;default:'#6366f1'"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID                uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey"`
+	NamespaceID       uuid.UUID  `json:"namespace_id" gorm:"type:uuid;index"`
+	Name              string     `json:"name" gorm:"not null"`
+	Color             string     `json:"color" gorm:"not null;default:'#6366f1'"`
+	CreatedBy         *uuid.UUID `json:"created_by,omitempty" gorm:"type:uuid"`
+	CreatedByUsername string     `json:"created_by_username,omitempty"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
 }
 
 type ScheduleType string
@@ -288,6 +298,8 @@ type Schedule struct {
 	NextRunAt          *time.Time         `json:"next_run_at"`
 	Status             string             `json:"status" gorm:"default:'ACTIVE'"` // ACTIVE, PAUSED
 	Retries            int                `json:"retries" gorm:"default:0"`
+	CreatedBy          *uuid.UUID         `json:"created_by,omitempty" gorm:"type:uuid"`
+	CreatedByUsername  string             `json:"created_by_username,omitempty"`
 	CreatedAt          time.Time          `json:"created_at"`
 	UpdatedAt          time.Time          `json:"updated_at"`
 	ScheduledWorkflows []ScheduleWorkflow `json:"scheduled_workflows" gorm:"foreignKey:ScheduleID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`

@@ -13,9 +13,13 @@ func NewVpnConfigService(repo domain.VpnConfigRepository) *VpnConfigService {
 	return &VpnConfigService{repo: repo}
 }
 
-func (s *VpnConfigService) Create(vpn *domain.VpnConfig) error {
+func (s *VpnConfigService) Create(vpn *domain.VpnConfig, user *domain.User) error {
 	if vpn.ID == uuid.Nil {
 		vpn.ID = uuid.New()
+	}
+	if user != nil {
+		vpn.CreatedBy = &user.ID
+		vpn.CreatedByUsername = user.Username
 	}
 	return s.repo.Create(vpn)
 }
