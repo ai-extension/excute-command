@@ -1,126 +1,480 @@
-import React, { useState, useEffect } from 'react';
-import { PlayCircle, CheckCircle, XCircle, Clock, ArrowUpRight, Zap, Target, BarChart3, Activity } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { Button } from '../components/ui/button';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+    Zap, Server, Calendar, CheckCircle2, XCircle, Clock, Play, Loader2,
+    Activity, Users, TrendingUp, Shield, Globe, Tag, Network, ChevronRight,
+    LayoutDashboard, ArrowUpRight, RefreshCw, Circle
+} from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
+import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
-import { useNamespace } from '../context/NamespaceContext';
 import { useAuth } from '../context/AuthContext';
+import { useNamespace } from '../context/NamespaceContext';
 import { API_BASE_URL } from '../lib/api';
 
-const MetricCard = ({ title, value, label, icon: Icon, color }: any) => (
-    <Card className="group hover:shadow-premium transition-all duration-500 border border-border bg-card overflow-hidden relative shadow-card">
-        <div className={cn("absolute top-0 right-0 w-24 h-24 blur-3xl opacity-5 rounded-full -mr-8 -mt-8 transition-opacity group-hover:opacity-10", color)} />
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative z-10 p-4">
-            <CardTitle className="text-[10px] font-black text-muted-foreground/70 uppercase tracking-[0.15em] shrink-0">{title}</CardTitle>
-            <div className={cn("p-2 rounded-lg transition-all duration-500 group-hover:scale-110 group-hover:rotate-3 shadow-md", color.replace('bg-', 'bg-opacity-10 text-'))}>
-                <Icon className="h-4 w-4" />
+// ─────────── TYPES ───────────
+interface DashboardStats {
+    workflows: { total: number; items: any[] };
+    executions: { total: number; success: number; failed: number; running: number; items: any[] };
+    schedules: { total: number; active: number; items: any[] };
+    servers: { total: number; items: any[] };
+    vpns: { total: number; items: any[] };
+    users: { total: number; items: any[] };
+}
+
+// ─────────── MINI COMPONENTS ───────────
+const StatCard = ({ icon: Icon, label, value, sub, color, onClick }: any) => (
+    <Card
+        onClick={onClick}
+        className={cn(
+            "relative overflow-hidden border border-border bg-card cursor-pointer group transition-all duration-300 hover:scale-[1.02] hover:shadow-premium hover:border-primary/30",
+        )}
+    >
+        <div className={cn("absolute inset-0 opacity-0 group-hover:opacity-5 transition-opacity duration-500", color)} />
+        <CardContent className="p-5">
+            <div className="flex items-start justify-between mb-3">
+                <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3", `${color}/10`)}>
+                    <Icon className={cn("w-4.5 h-4.5", color.replace('bg-', 'text-'))} />
+                </div>
+                <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground/30 group-hover:text-primary/60 transition-colors" />
             </div>
-        </CardHeader>
-        <CardContent className="relative z-10 px-4 pb-4 pt-0">
-            <div className="text-2xl font-black tracking-tighter mb-1">{value}</div>
-            <div className="flex items-center gap-1.5">
-                <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-500 border-none text-[9px] font-black px-1.5 py-0 rounded-md">
-                    {label}
-                </Badge>
-                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest opacity-40">vs prev week</span>
-            </div>
+            <div className="text-2xl font-black tracking-tighter mb-0.5">{value ?? '—'}</div>
+            <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">{label}</div>
+            {sub && <div className="text-[10px] font-medium text-muted-foreground/40 mt-1">{sub}</div>}
         </CardContent>
     </Card>
 );
 
-const Dashboard = () => {
-    const { activeNamespace } = useNamespace();
-    const { apiFetch } = useAuth();
+const statusColor = (status: string) => {
+    switch (status?.toUpperCase()) {
+        case 'SUCCESS': return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
+        case 'FAILED': return 'text-red-400 bg-red-500/10 border-red-500/20';
+        case 'RUNNING': return 'text-blue-400 bg-blue-500/10 border-blue-500/20';
+        case 'ACTIVE': return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
+        case 'PAUSED': return 'text-slate-400 bg-slate-500/10 border-slate-500/20';
+        default: return 'text-muted-foreground bg-muted/50 border-border';
+    }
+};
 
+const StatusDot = ({ status }: { status: string }) => {
+    const isRunning = status?.toUpperCase() === 'RUNNING';
+    return (
+        <span className={cn(
+            "inline-block w-1.5 h-1.5 rounded-full shrink-0",
+            status?.toUpperCase() === 'SUCCESS' || status?.toUpperCase() === 'ACTIVE' ? 'bg-emerald-400' :
+                status?.toUpperCase() === 'FAILED' ? 'bg-red-400' :
+                    status?.toUpperCase() === 'RUNNING' ? 'bg-blue-400 animate-pulse' :
+                        'bg-slate-400'
+        )} />
+    );
+};
+
+const formatTime = (ts: string) => {
+    if (!ts) return '—';
+    const d = new Date(ts);
+    const now = new Date();
+    const diff = Math.floor((now.getTime() - d.getTime()) / 1000);
+    if (diff < 60) return `${diff}s ago`;
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return d.toLocaleDateString();
+};
+
+// ─────────── MAIN DASHBOARD ───────────
+const Dashboard = () => {
+    const navigate = useNavigate();
+    const { apiFetch } = useAuth();
+    const { activeNamespace } = useNamespace();
+    const [stats, setStats] = useState<DashboardStats | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [lastRefresh, setLastRefresh] = useState(new Date());
+
+    const fetchAll = useCallback(async () => {
+        if (!activeNamespace?.id) return;
+        setLoading(true);
+        try {
+            const nsId = activeNamespace.id;
+            const [wfRes, execRes, schRes, srvRes, vpnRes, userRes] = await Promise.allSettled([
+                apiFetch(`${API_BASE_URL}/namespaces/${nsId}/workflows?limit=100`),
+                apiFetch(`${API_BASE_URL}/namespaces/${nsId}/executions?limit=20`),
+                apiFetch(`${API_BASE_URL}/namespaces/${nsId}/schedules?limit=100`),
+                apiFetch(`${API_BASE_URL}/servers?limit=100`),
+                apiFetch(`${API_BASE_URL}/vpns?limit=100`),
+                apiFetch(`${API_BASE_URL}/users?limit=100`),
+            ]);
+
+            const parse = async (r: PromiseSettledResult<Response>) => {
+                if (r.status === 'fulfilled' && r.value.ok) {
+                    return await r.value.json();
+                }
+                return { items: [], total: 0 };
+            };
+
+            const [wf, exec, sch, srv, vpn, usr] = await Promise.all([
+                parse(wfRes), parse(execRes), parse(schRes), parse(srvRes), parse(vpnRes), parse(userRes)
+            ]);
+
+            const execItems: any[] = exec?.items || [];
+            setStats({
+                workflows: { total: wf?.total || 0, items: wf?.items || [] },
+                executions: {
+                    total: exec?.total || 0,
+                    success: execItems.filter((e: any) => e.status === 'SUCCESS').length,
+                    failed: execItems.filter((e: any) => e.status === 'FAILED').length,
+                    running: execItems.filter((e: any) => e.status === 'RUNNING').length,
+                    items: execItems,
+                },
+                schedules: {
+                    total: sch?.total || 0,
+                    active: (sch?.items || []).filter((s: any) => s.status === 'ACTIVE').length,
+                    items: (sch?.items || []).slice(0, 5),
+                },
+                servers: { total: srv?.total || 0, items: (srv?.items || []).slice(0, 5) },
+                vpns: { total: vpn?.total || 0, items: vpn?.items || [] },
+                users: { total: usr?.total || 0, items: usr?.items || [] },
+            });
+            setLastRefresh(new Date());
+        } catch (err) {
+            console.error('Dashboard fetch error:', err);
+        } finally {
+            setLoading(false);
+        }
+    }, [activeNamespace?.id]);
+
+    useEffect(() => {
+        fetchAll();
+    }, [fetchAll]);
+
+    const successRate = stats && stats.executions.total > 0
+        ? Math.round((stats.executions.success / (stats.executions.success + stats.executions.failed || 1)) * 100)
+        : null;
 
     return (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
-            <div className="flex flex-row justify-between items-center bg-card p-6 rounded-xl border border-border shadow-card relative overflow-hidden group">
-                <div className="absolute top-0 right-0 w-96 h-96 premium-gradient blur-[120px] opacity-10 rounded-full -mr-32 -mt-32 transition-opacity group-hover:opacity-15" />
-                <div className="flex flex-col gap-0.5 relative z-10">
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                        <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
-                        <span className="text-[8.5px] font-black text-emerald-500 tracking-widest uppercase">System: Operational • {activeNamespace?.name || 'Global'}</span>
+        <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-10">
+            {/* Breadcrumb */}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 px-1">
+                    <LayoutDashboard className="w-3.5 h-3.5 text-primary" />
+                    <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em]">
+                        <span className="text-primary">{activeNamespace?.name || 'Global'}</span>
+                        <ChevronRight className="w-2.5 h-2.5 text-muted-foreground/30" />
+                        <span className="text-muted-foreground font-black">Command Center</span>
                     </div>
-                    <h1 className="text-2xl font-black tracking-tighter">Command Center</h1>
-                    <p className="text-muted-foreground font-medium text-[11px]">Monitoring infrastructure health in {activeNamespace?.name || 'global'} context.</p>
                 </div>
-                <div className="flex gap-1.5 relative z-10">
-                    <Button variant="outline" className="h-8 rounded-md border-border bg-card px-3.5 font-bold uppercase tracking-tight text-[9px] hover:bg-muted transition-all shadow-sm">
-                        Export Logs
-                    </Button>
-                    <Button className="h-8 rounded-md premium-gradient px-3.5 font-bold uppercase tracking-tight text-[9px] shadow-premium hover:premium-gradient-hover transition-all">
-                        <Zap className="w-3 h-3 mr-1" /> New Pipeline
+                <div className="flex items-center gap-3">
+                    <span className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-widest">
+                        {loading ? 'Syncing...' : `Updated ${formatTime(lastRefresh.toISOString())}`}
+                    </span>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={fetchAll}
+                        disabled={loading}
+                        className="h-8 px-3 rounded-lg gap-1.5 text-[9px] font-black uppercase tracking-widest text-muted-foreground hover:text-foreground"
+                    >
+                        <RefreshCw className={cn("w-3 h-3", loading && "animate-spin")} />
+                        Refresh
                     </Button>
                 </div>
             </div>
 
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                <MetricCard title="Success Rate" value="99.4%" label="+2.4%" icon={CheckCircle} color="bg-emerald-500" />
-                <MetricCard title="Active Sockets" value="142" label="+4" icon={Zap} color="bg-amber-500" />
-                <MetricCard title="Peak Latency" value="12ms" label="-4ms" icon={BarChart3} color="bg-violet-500" />
+            {/* ── Hero Banner ── */}
+            <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-premium">
+                <div className="absolute inset-0 premium-gradient opacity-5" />
+                <div className="absolute top-0 right-0 w-80 h-80 premium-gradient blur-[100px] opacity-10 rounded-full -mr-20 -mt-20" />
+                <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <div className="flex items-center gap-2 mb-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400">System Operational</span>
+                        </div>
+                        <h1 className="text-2xl font-black tracking-tighter mb-1">Command Center</h1>
+                        <p className="text-muted-foreground text-[11px] font-medium">
+                            Full overview of <span className="text-primary font-black">{activeNamespace?.name}</span> workspace — workflows, infrastructure & executions.
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                        <Button onClick={() => navigate('/workflows')} className="premium-gradient font-black uppercase tracking-widest text-[10px] px-4 rounded-xl shadow-premium gap-1.5">
+                            <Zap className="w-3.5 h-3.5" /> New Workflow
+                        </Button>
+                    </div>
+                </div>
             </div>
 
-            <div className="grid gap-6 lg:grid-cols-7">
-                <Card className="col-span-4 bg-card border border-border group transition-all duration-500 overflow-hidden relative shadow-card">
-                    <CardHeader className="p-6 pb-2">
+            {/* ── Stat Grid ── */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                <StatCard icon={Zap} label="Workflows" value={stats?.workflows.total} color="bg-indigo-500" onClick={() => navigate('/workflows')} />
+                <StatCard icon={Activity} label="Executions" value={stats?.executions.total} sub="Last 20 fetched" color="bg-violet-500" onClick={() => navigate('/history')} />
+                <StatCard icon={CheckCircle2} label="Success Rate" value={successRate !== null ? `${successRate}%` : '—'} color="bg-emerald-500" />
+                <StatCard icon={Calendar} label="Schedules" value={stats?.schedules.total} sub={`${stats?.schedules.active || 0} active`} color="bg-amber-500" onClick={() => navigate('/schedules')} />
+                <StatCard icon={Server} label="Servers" value={stats?.servers.total} color="bg-cyan-500" onClick={() => navigate('/servers')} />
+                <StatCard icon={Users} label="Users" value={stats?.users.total} color="bg-pink-500" onClick={() => navigate('/users')} />
+            </div>
+
+            {/* ── Execution Status Bar ── */}
+            {stats && stats.executions.total > 0 && (
+                <Card className="border-border bg-card shadow-card overflow-hidden">
+                    <CardHeader className="px-5 pt-4 pb-2">
                         <div className="flex items-center justify-between">
-                            <div>
-                                <CardTitle className="text-lg font-black tracking-tight">System Events</CardTitle>
-                                <CardDescription className="text-[10px] font-bold uppercase tracking-wider opacity-60">Real-time status monitor</CardDescription>
-                            </div>
+                            <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Execution Health (last 20)</CardTitle>
+                            <Button variant="ghost" size="sm" onClick={() => navigate('/history')} className="h-7 px-2 text-[9px] font-black uppercase tracking-widest gap-1 text-muted-foreground hover:text-foreground">
+                                View All <ArrowUpRight className="w-3 h-3" />
+                            </Button>
                         </div>
                     </CardHeader>
-                    <CardContent className="p-8 pt-0">
-                        <div className="text-center py-20 opacity-40">
-                            <Activity className="h-10 w-10 mx-auto mb-4 animate-pulse text-primary" />
-                            <p className="text-[10px] font-black uppercase tracking-widest">Awaiting system events...</p>
+                    <CardContent className="px-5 pb-4">
+                        <div className="flex gap-4 mb-3">
+                            {[
+                                { label: 'Success', count: stats.executions.success, color: 'text-emerald-400' },
+                                { label: 'Failed', count: stats.executions.failed, color: 'text-red-400' },
+                                { label: 'Running', count: stats.executions.running, color: 'text-blue-400' },
+                            ].map(s => (
+                                <div key={s.label} className="flex items-center gap-1.5">
+                                    <span className={cn("text-lg font-black tracking-tighter", s.color)}>{s.count}</span>
+                                    <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/50">{s.label}</span>
+                                </div>
+                            ))}
+                        </div>
+                        {/* Visual bar */}
+                        <div className="h-2 w-full bg-muted/50 rounded-full overflow-hidden flex">
+                            {stats.executions.success > 0 && (
+                                <div className="h-full bg-emerald-500 rounded-l-full transition-all duration-700"
+                                    style={{ width: `${(stats.executions.success / stats.executions.total) * 100}%` }} />
+                            )}
+                            {stats.executions.running > 0 && (
+                                <div className="h-full bg-blue-500 animate-pulse transition-all duration-700"
+                                    style={{ width: `${(stats.executions.running / stats.executions.total) * 100}%` }} />
+                            )}
+                            {stats.executions.failed > 0 && (
+                                <div className="h-full bg-red-500 rounded-r-full transition-all duration-700"
+                                    style={{ width: `${(stats.executions.failed / stats.executions.total) * 100}%` }} />
+                            )}
                         </div>
                     </CardContent>
                 </Card>
+            )}
 
-                <div className="col-span-3 space-y-6">
-                    <Card className="premium-gradient border-none shadow-2xl relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-white/20 blur-[80px] rounded-full -mr-20 -mt-20 group-hover:scale-110 transition-transform duration-700" />
-                        <CardHeader className="p-6 pb-2 relative z-10">
-                            <CardTitle className="text-lg font-black text-white tracking-tight">System Health</CardTitle>
-                            <CardDescription className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Nodes & Latency Tracker</CardDescription>
-                        </CardHeader>
-                        <CardContent className="p-6 pt-0 relative z-10">
-                            <div className="flex items-baseline gap-2 mb-4">
-                                <span className="text-4xl font-black text-white tracking-tighter">99.9%</span>
-                                <span className="text-white/60 text-[10px] font-black uppercase tracking-widest">Uptime</span>
+            {/* ── Two Column: Recent Executions + Schedules ── */}
+            <div className="grid lg:grid-cols-5 gap-4">
+                {/* Recent Executions */}
+                <Card className="lg:col-span-3 border-border bg-card shadow-card overflow-hidden">
+                    <CardHeader className="px-5 pt-4 pb-3 border-b border-border/30">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle className="text-sm font-black tracking-tight">Recent Executions</CardTitle>
+                                <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/40 mt-0.5">Latest workflow runs</p>
                             </div>
-                            <div className="space-y-4">
-                                {[1, 2, 3].map(i => (
-                                    <div key={i} className="flex flex-col gap-1.5">
-                                        <div className="flex justify-between text-[10px] font-black text-white uppercase tracking-widest opacity-80">
-                                            <span>Node 0{i}</span>
-                                            <span>{80 + i * 5}%</span>
+                            <Button variant="ghost" size="sm" onClick={() => navigate('/history')} className="h-7 px-2 text-[9px] font-black uppercase tracking-widest gap-1 text-muted-foreground hover:text-foreground">
+                                View All <ArrowUpRight className="w-3 h-3" />
+                            </Button>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        {loading ? (
+                            <div className="flex items-center justify-center py-12 gap-2 text-muted-foreground/40">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span className="text-[10px] font-black uppercase tracking-widest">Loading...</span>
+                            </div>
+                        ) : stats?.executions.items.length ? (
+                            <div className="divide-y divide-border/30">
+                                {stats.executions.items.slice(0, 8).map((exec: any) => (
+                                    <div key={exec.id} className="flex items-center gap-3 px-5 py-3 hover:bg-muted/20 transition-colors group">
+                                        <StatusDot status={exec.status} />
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[11px] font-black tracking-tight truncate text-foreground/80">{exec.workflow?.name || exec.workflow_id?.substring(0, 8) || 'Unknown'}</p>
+                                            <p className="text-[9px] text-muted-foreground/40 font-medium">{formatTime(exec.started_at)}</p>
                                         </div>
-                                        <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
-                                            <div className="h-full bg-white rounded-full transition-all duration-1000" style={{ width: `${80 + i * 5}%` }} />
-                                        </div>
+                                        <Badge className={cn("text-[8px] font-black uppercase tracking-wider px-1.5 py-0 border rounded", statusColor(exec.status))}>
+                                            {exec.status}
+                                        </Badge>
                                     </div>
                                 ))}
                             </div>
-                        </CardContent>
-                    </Card>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center py-12 gap-2 opacity-30">
+                                <Activity className="w-8 h-8" />
+                                <p className="text-[10px] font-black uppercase tracking-widest">No executions yet</p>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
 
-                    <Card className="bg-card border border-border shadow-card overflow-hidden transition-all duration-300 hover:shadow-premium">
-                        <CardHeader className="p-6 pb-2">
-                            <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Quick Tools</CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-6 pt-0 flex flex-wrap gap-1.5">
-                            <Badge variant="outline" className="cursor-pointer hover:bg-primary hover:text-white transition-all border-border bg-background font-black uppercase tracking-widest text-[8px] px-2.5 py-1 rounded-lg">SSH ACCESS</Badge>
-                            <Badge variant="outline" className="cursor-pointer hover:bg-primary hover:text-white transition-all border-border bg-background font-black uppercase tracking-widest text-[8px] px-2.5 py-1 rounded-lg">REDIS FLUSH</Badge>
-                            <Badge variant="outline" className="cursor-pointer hover:bg-primary hover:text-white transition-all border-border bg-background font-black uppercase tracking-widest text-[8px] px-2.5 py-1 rounded-lg">RESTART DOCKER</Badge>
-                            <Badge variant="outline" className="cursor-pointer hover:bg-primary hover:text-white transition-all border-border bg-background font-black uppercase tracking-widest text-[8px] px-2.5 py-1 rounded-lg">LOGS AGGREGATOR</Badge>
-                        </CardContent>
-                    </Card>
-                </div>
+                {/* Schedules */}
+                <Card className="lg:col-span-2 border-border bg-card shadow-card overflow-hidden">
+                    <CardHeader className="px-5 pt-4 pb-3 border-b border-border/30">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle className="text-sm font-black tracking-tight">Active Schedules</CardTitle>
+                                <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/40 mt-0.5">
+                                    {stats?.schedules.active || 0} of {stats?.schedules.total || 0} running
+                                </p>
+                            </div>
+                            <Button variant="ghost" size="sm" onClick={() => navigate('/schedules')} className="h-7 px-2 text-[9px] font-black uppercase tracking-widest gap-1 text-muted-foreground hover:text-foreground">
+                                View All <ArrowUpRight className="w-3 h-3" />
+                            </Button>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        {loading ? (
+                            <div className="flex items-center justify-center py-12 gap-2 text-muted-foreground/40">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            </div>
+                        ) : stats?.schedules.items.length ? (
+                            <div className="divide-y divide-border/30">
+                                {stats.schedules.items.map((s: any) => (
+                                    <div key={s.id} className="flex items-center gap-3 px-5 py-3 hover:bg-muted/20 transition-colors">
+                                        <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0", s.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-muted text-muted-foreground/40')}>
+                                            <Calendar className="w-3.5 h-3.5" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[11px] font-black tracking-tight truncate">{s.name}</p>
+                                            <p className="text-[9px] text-muted-foreground/40 font-medium uppercase tracking-widest">
+                                                {s.type === 'RECURRING' ? s.cron_expression || 'Recurring' : 'One-time'}
+                                            </p>
+                                        </div>
+                                        <StatusDot status={s.status} />
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center py-12 gap-2 opacity-30">
+                                <Calendar className="w-8 h-8" />
+                                <p className="text-[10px] font-black uppercase tracking-widest">No schedules</p>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
             </div>
+
+            {/* ── Bottom Row: Servers + Quick Links ── */}
+            <div className="grid lg:grid-cols-5 gap-4">
+                {/* Servers */}
+                <Card className="lg:col-span-3 border-border bg-card shadow-card overflow-hidden">
+                    <CardHeader className="px-5 pt-4 pb-3 border-b border-border/30">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle className="text-sm font-black tracking-tight">Node Fleet</CardTitle>
+                                <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/40 mt-0.5">{stats?.servers.total || 0} registered servers</p>
+                            </div>
+                            <Button variant="ghost" size="sm" onClick={() => navigate('/servers')} className="h-7 px-2 text-[9px] font-black uppercase tracking-widest gap-1 text-muted-foreground hover:text-foreground">
+                                View All <ArrowUpRight className="w-3 h-3" />
+                            </Button>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        {loading ? (
+                            <div className="flex items-center justify-center py-12 gap-2 text-muted-foreground/40">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            </div>
+                        ) : stats?.servers.items.length ? (
+                            <div className="divide-y divide-border/30">
+                                {stats.servers.items.slice(0, 5).map((srv: any) => (
+                                    <div key={srv.id} className="flex items-center gap-3 px-5 py-3 hover:bg-muted/20 transition-colors">
+                                        <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center shrink-0 text-cyan-400">
+                                            <Server className="w-3.5 h-3.5" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[11px] font-black tracking-tight truncate">{srv.name}</p>
+                                            <p className="text-[9px] text-muted-foreground/40 font-medium">{srv.ip_address || srv.host}</p>
+                                        </div>
+                                        <Badge variant="outline" className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0 border-border bg-background">
+                                            {srv.auth_type || 'SSH'}
+                                        </Badge>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center py-12 gap-2 opacity-30">
+                                <Server className="w-8 h-8" />
+                                <p className="text-[10px] font-black uppercase tracking-widest">No servers</p>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                {/* Quick Navigation */}
+                <Card className="lg:col-span-2 border-border bg-card shadow-card overflow-hidden">
+                    <CardHeader className="px-5 pt-4 pb-3 border-b border-border/30">
+                        <CardTitle className="text-sm font-black tracking-tight">Quick Access</CardTitle>
+                        <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/40 mt-0.5">Navigate to sections</p>
+                    </CardHeader>
+                    <CardContent className="p-3">
+                        <div className="grid grid-cols-2 gap-2">
+                            {[
+                                { icon: Zap, label: 'Workflows', path: '/workflows', color: 'bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20' },
+                                { icon: Activity, label: 'History', path: '/history', color: 'bg-violet-500/10 text-violet-400 hover:bg-violet-500/20' },
+                                { icon: Calendar, label: 'Schedules', path: '/schedules', color: 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/20' },
+                                { icon: Server, label: 'Servers', path: '/servers', color: 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20' },
+                                { icon: Network, label: 'VPNs', path: '/vpns', color: 'bg-teal-500/10 text-teal-400 hover:bg-teal-500/20' },
+                                { icon: Users, label: 'Users', path: '/users', color: 'bg-pink-500/10 text-pink-400 hover:bg-pink-500/20' },
+                                { icon: Shield, label: 'Roles', path: '/roles', color: 'bg-orange-500/10 text-orange-400 hover:bg-orange-500/20' },
+                                { icon: Globe, label: 'Variables', path: '/global-variables', color: 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20' },
+                            ].map(item => (
+                                <button
+                                    key={item.path}
+                                    onClick={() => navigate(item.path)}
+                                    className={cn(
+                                        "flex items-center gap-2 p-2.5 rounded-xl font-black uppercase tracking-wider text-[9px] transition-all duration-200 group",
+                                        item.color
+                                    )}
+                                >
+                                    <item.icon className="w-3.5 h-3.5 shrink-0" />
+                                    {item.label}
+                                </button>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* ── Workflow List ── */}
+            <Card className="border-border bg-card shadow-card overflow-hidden">
+                <CardHeader className="px-5 pt-4 pb-3 border-b border-border/30">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <CardTitle className="text-sm font-black tracking-tight">Workflows</CardTitle>
+                            <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/40 mt-0.5">
+                                {stats?.workflows.total || 0} automations in {activeNamespace?.name}
+                            </p>
+                        </div>
+                        <Button variant="ghost" size="sm" onClick={() => navigate('/workflows')} className="h-7 px-2 text-[9px] font-black uppercase tracking-widest gap-1 text-muted-foreground hover:text-foreground">
+                            View All <ArrowUpRight className="w-3 h-3" />
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                    {loading ? (
+                        <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground/40">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                        </div>
+                    ) : stats?.workflows.items.length ? (
+                        <div className="grid sm:grid-cols-2 lg:grid-cols-3 divide-x divide-y divide-border/30">
+                            {stats.workflows.items.slice(0, 6).map((wf: any) => (
+                                <div
+                                    key={wf.id}
+                                    onClick={() => navigate(`/workflows/${wf.id}`)}
+                                    className="flex items-center gap-3 px-5 py-4 hover:bg-muted/20 transition-colors cursor-pointer group"
+                                >
+                                    <div className="w-8 h-8 rounded-xl bg-indigo-500/10 flex items-center justify-center shrink-0 text-indigo-400 group-hover:bg-indigo-500/20 transition-colors">
+                                        <Zap className="w-3.5 h-3.5" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="text-[11px] font-black tracking-tight truncate">{wf.name}</p>
+                                        <p className="text-[9px] text-muted-foreground/40 font-medium">{wf.groups?.length || 0} groups</p>
+                                    </div>
+                                    <ArrowUpRight className="w-3 h-3 text-muted-foreground/20 group-hover:text-primary/60 ml-auto shrink-0 transition-colors" />
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center py-12 gap-2 opacity-30">
+                            <Zap className="w-8 h-8" />
+                            <p className="text-[10px] font-black uppercase tracking-widest">No workflows</p>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
         </div>
     );
 };
