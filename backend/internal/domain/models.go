@@ -23,30 +23,6 @@ type Namespace struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
-type Command struct {
-	ID          uuid.UUID  `json:"id"`
-	NamespaceID uuid.UUID  `json:"namespace_id" gorm:"type:uuid;index"`
-	Name        string     `json:"name"`
-	Description string     `json:"description"`
-	Status      Status     `json:"status"`
-	LastRun     *time.Time `json:"last_run,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
-	Steps       []Step     `json:"steps,omitempty"`
-}
-
-type Step struct {
-	ID          uuid.UUID `json:"id"`
-	CommandID   uuid.UUID `json:"command_id"`
-	Order       int       `json:"order"`
-	Name        string    `json:"name"`
-	CommandText string    `json:"command_text"`
-	Status      Status    `json:"status"`
-	Output      string    `json:"output"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
-}
-
 type User struct {
 	ID           uuid.UUID    `json:"id" gorm:"type:uuid;primaryKey"`
 	Username     string       `json:"username" gorm:"uniqueIndex;not null"`
@@ -118,14 +94,6 @@ type PermissionRepository interface {
 	Delete(id uuid.UUID) error
 }
 
-type CommandRepository interface {
-	Create(cmd *Command) error
-	GetByID(id uuid.UUID, scope *PermissionScope) (*Command, error)
-	List(namespaceID *uuid.UUID, scope *PermissionScope) ([]Command, error)
-	Update(cmd *Command) error
-	Delete(id uuid.UUID) error
-}
-
 type NamespaceRepository interface {
 	Create(ns *Namespace) error
 	GetByID(id uuid.UUID, scope *PermissionScope) (*Namespace, error)
@@ -177,13 +145,6 @@ type VpnConfigRepository interface {
 	GetByID(id uuid.UUID, scope *PermissionScope) (*VpnConfig, error)
 	List(scope *PermissionScope) ([]VpnConfig, error)
 	Update(vpn *VpnConfig) error
-	Delete(id uuid.UUID) error
-}
-
-type StepRepository interface {
-	Create(step *Step) error
-	GetByCommandID(commandID uuid.UUID) ([]Step, error)
-	Update(step *Step) error
 	Delete(id uuid.UUID) error
 }
 

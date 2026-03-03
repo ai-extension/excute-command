@@ -32,21 +32,7 @@ const MetricCard = ({ title, value, label, icon: Icon, color }: any) => (
 const Dashboard = () => {
     const { activeNamespace } = useNamespace();
     const { apiFetch } = useAuth();
-    const [recentCommands, setRecentCommands] = useState<any[]>([]);
 
-    useEffect(() => {
-        const fetchRecent = async () => {
-            if (!activeNamespace) return;
-            try {
-                const response = await apiFetch(`${API_BASE_URL}/commands?namespace_id=${activeNamespace.id}`);
-                const data = await response.json();
-                setRecentCommands((data || []).slice(0, 4));
-            } catch (error) {
-                console.error('Failed to fetch recent:', error);
-            }
-        };
-        fetchRecent();
-    }, [activeNamespace]);
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
@@ -71,7 +57,6 @@ const Dashboard = () => {
             </div>
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                <MetricCard title="Total Commands" value="2,482" label="+12%" icon={Activity} color="bg-indigo-500" />
                 <MetricCard title="Success Rate" value="99.4%" label="+2.4%" icon={CheckCircle} color="bg-emerald-500" />
                 <MetricCard title="Active Sockets" value="142" label="+4" icon={Zap} color="bg-amber-500" />
                 <MetricCard title="Peak Latency" value="12ms" label="-4ms" icon={BarChart3} color="bg-violet-500" />
@@ -82,40 +67,15 @@ const Dashboard = () => {
                     <CardHeader className="p-6 pb-2">
                         <div className="flex items-center justify-between">
                             <div>
-                                <CardTitle className="text-lg font-black tracking-tight">Recent Executions</CardTitle>
-                                <CardDescription className="text-[10px] font-bold uppercase tracking-wider opacity-60">System-wide event logs</CardDescription>
+                                <CardTitle className="text-lg font-black tracking-tight">System Events</CardTitle>
+                                <CardDescription className="text-[10px] font-bold uppercase tracking-wider opacity-60">Real-time status monitor</CardDescription>
                             </div>
-                            <Button variant="ghost" size="sm" className="h-8 text-primary font-black text-[9px] uppercase tracking-widest hover:bg-primary/5">View All</Button>
                         </div>
                     </CardHeader>
                     <CardContent className="p-8 pt-0">
-                        <div className="space-y-6 mt-6">
-                            {recentCommands.length > 0 ? recentCommands.map((cmd) => (
-                                <div key={cmd.id} className="flex items-center gap-6 p-4 rounded-2xl hover:bg-muted/50 transition-all duration-300 group/item cursor-pointer border border-transparent hover:border-border/50">
-                                    <div className={cn(
-                                        "h-12 w-12 rounded-2xl flex items-center justify-center transition-all duration-500 group-hover/item:scale-110 group-hover/item:rotate-3 shadow-sm",
-                                        cmd.status === 'SUCCESS' ? "bg-emerald-500/10 text-emerald-500" : "bg-indigo-500/10 text-indigo-500"
-                                    )}>
-                                        {cmd.status === 'SUCCESS' ? <CheckCircle className="h-5 w-5" /> : <Activity className="h-5 w-5" />}
-                                    </div>
-                                    <div className="flex-1 space-y-1">
-                                        <p className="text-sm font-bold tracking-tight">{cmd.name}</p>
-                                        <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide opacity-60">
-                                            {cmd.status} • {cmd.last_run ? new Date(cmd.last_run).toLocaleString() : 'Never'}
-                                        </p>
-                                    </div>
-                                    <Badge variant="secondary" className={cn(
-                                        "font-black text-[9px] uppercase tracking-widest px-3 py-1 rounded-lg border-none",
-                                        cmd.status === 'SUCCESS' ? "bg-green-500/10 text-green-600" : "bg-amber-500/10 text-amber-600"
-                                    )}>
-                                        {cmd.status}
-                                    </Badge>
-                                </div>
-                            )) : (
-                                <div className="text-center py-12">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40">No recent executions in this namespace</p>
-                                </div>
-                            )}
+                        <div className="text-center py-20 opacity-40">
+                            <Activity className="h-10 w-10 mx-auto mb-4 animate-pulse text-primary" />
+                            <p className="text-[10px] font-black uppercase tracking-widest">Awaiting system events...</p>
                         </div>
                     </CardContent>
                 </Card>

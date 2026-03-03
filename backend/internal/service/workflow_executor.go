@@ -564,3 +564,15 @@ type fileWriter struct {
 func (w *fileWriter) Write(p []byte) (n int, err error) {
 	return w.file.Write(p)
 }
+
+type wsWriter struct {
+	hub      *Hub
+	targetID string
+	buffer   io.Writer
+}
+
+func (w *wsWriter) Write(p []byte) (n int, err error) {
+	n, err = w.buffer.Write(p)
+	w.hub.BroadcastLog(w.targetID, string(p))
+	return n, err
+}

@@ -434,7 +434,7 @@ const WorkflowDesignerPage = () => {
                                                 <div className="py-6 text-center opacity-40 select-none">
                                                     <Terminal className="w-8 h-8 mx-auto mb-3" />
                                                     <p className="text-[10px] font-bold uppercase tracking-widest">No runtime variables defined</p>
-                                                    <p className="text-[9px] mt-1 font-medium italic">Use runtime variables in your commands via {"{{key}}"}</p>
+                                                    <p className="text-[9px] mt-1 font-medium italic">Use runtime variables in your steps via {"{{key}}"}</p>
                                                 </div>
                                             ) : (
                                                 <div className="space-y-4">
@@ -553,7 +553,7 @@ const WorkflowDesignerPage = () => {
                                                 <div className="py-6 text-center opacity-40 select-none">
                                                     <Database className="w-8 h-8 mx-auto mb-3" />
                                                     <p className="text-[10px] font-bold uppercase tracking-widest">No static variables defined</p>
-                                                    <p className="text-[9px] mt-1 font-medium italic">Reference via {'{{'}{"variable.key"}{'}}'} in commands</p>
+                                                    <p className="text-[9px] mt-1 font-medium italic">Reference via {'{{'}{"variable.key"}{'}}'} in steps</p>
                                                 </div>
                                             ) : (
                                                 <div className="space-y-3">
@@ -849,7 +849,7 @@ const WorkflowDesignerPage = () => {
                                                                                                             />
                                                                                                         </div>
                                                                                                         <div className="col-span-8 space-y-1">
-                                                                                                            <label className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Command Sequence</label>
+                                                                                                            <label className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Execution Sequence</label>
                                                                                                             <div className="relative">
                                                                                                                 <Terminal className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
                                                                                                                 <Input

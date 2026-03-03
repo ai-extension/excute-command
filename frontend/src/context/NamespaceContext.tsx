@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 import { API_BASE_URL } from '../lib/api';
 
@@ -24,7 +24,7 @@ export const NamespaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const [activeNamespace, setActiveNamespaceState] = useState<Namespace | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
-    const refreshNamespaces = async () => {
+    const refreshNamespaces = useCallback(async () => {
         if (!isAuthenticated) {
             setIsLoading(false);
             return;
@@ -57,12 +57,12 @@ export const NamespaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [isAuthenticated, token]);
 
-    const setActiveNamespace = (ns: Namespace) => {
+    const setActiveNamespace = useCallback((ns: Namespace) => {
         setActiveNamespaceState(ns);
         localStorage.setItem('activeNamespaceId', ns.id);
-    };
+    }, []);
 
     useEffect(() => {
         if (isAuthenticated) {

@@ -42,14 +42,15 @@ func main() {
 	}
 
 	// Auto-migration
+
 	if err := db.AutoMigrate(
 		&domain.Namespace{},
-		&domain.Command{},
-		&domain.Step{},
 		&domain.User{},
 		&domain.Role{},
 		&domain.Permission{},
+		&domain.RolePermission{},
 		&domain.Server{},
+
 		&domain.Workflow{},
 		&domain.WorkflowGroup{},
 		&domain.WorkflowStep{},
@@ -72,8 +73,6 @@ func main() {
 
 	// Initialize Repositories
 	namespaceRepo := repository.NewPostgresNamespaceRepo(db)
-	commandRepo := repository.NewPostgresCommandRepo(db)
-	stepRepo := repository.NewPostgresStepRepo(db)
 	userRepo := repository.NewPostgresUserRepo(db)
 	roleRepo := repository.NewPostgresRoleRepo(db)
 	permRepo := repository.NewPostgresPermissionRepo(db)
@@ -100,7 +99,6 @@ func main() {
 	go hub.Run()
 
 	// Initialize Services
-	executorService := service.NewExecutorService(commandRepo, stepRepo, hub)
 	authService := service.NewAuthService(userRepo)
 	serverService := service.NewServerService(serverRepo, hub)
 	terminalService := service.NewTerminalService(serverRepo, hub)
@@ -117,7 +115,6 @@ func main() {
 
 	// Initialize Handlers
 	namespaceHandler := handler.NewNamespaceHandler(namespaceRepo)
-	commandHandler := handler.NewCommandHandler(commandRepo, executorService)
 	authHandler := handler.NewAuthHandler(authService)
 	userHandler := handler.NewUserHandler(userRepo, roleRepo)
 	roleHandler := handler.NewRoleHandler(roleRepo, permRepo)
@@ -168,10 +165,6 @@ func main() {
 			protected.POST("/namespaces", middleware.RBACMiddleware(userRepo, "namespaces", "WRITE"), namespaceHandler.CreateNamespace)
 			protected.PUT("/namespaces/:id", middleware.RBACMiddleware(userRepo, "namespaces", "WRITE"), namespaceHandler.UpdateNamespace)
 			protected.DELETE("/namespaces/:id", middleware.RBACMiddleware(userRepo, "namespaces", "DELETE"), namespaceHandler.DeleteNamespace)
-
-			protected.GET("/commands", middleware.RBACMiddleware(userRepo, "workflows", "READ"), commandHandler.ListCommands)
-			protected.POST("/commands", middleware.RBACMiddleware(userRepo, "workflows", "WRITE"), commandHandler.CreateCommand)
-			protected.POST("/commands/:id/execute", middleware.RBACMiddleware(userRepo, "workflows", "EXECUTE"), commandHandler.ExecuteCommand)
 
 			// User & Role Management
 			protected.GET("/users", middleware.RBACMiddleware(userRepo, "users", "READ"), userHandler.ListUsers)

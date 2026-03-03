@@ -39,34 +39,38 @@ func HasPermission(user *User, permType, action string, namespaceID *string, res
 	}
 
 	// 5. Fallback for List operations (no specific resource ID)
-	// If the user has access to *some* items, we let them pass the middleware.
-	// The DB repository layer will then filter the results using AllowedItemIDs.
 	if resourceID == nil && (action == "READ" || action == "EXECUTE") {
 		scope := GetPermissionScope(user, permType, action)
-		fmt.Printf("DEBUG HasPermission: test user=%s, permType=%s, action=%s, scope=%+v\n", user.Username, permType, action, scope)
 		if scope.IsGlobal || len(scope.AllowedItemIDs) > 0 || len(scope.AllowedNamespaceIDs) > 0 || len(scope.AllowedTagIDs) > 0 {
 			return true
 		}
 	}
 
-	fmt.Printf("DEBUG HasPermission: Failed. user=%s, permType=%s, action=%s, resourceID=%v\n", user.Username, permType, action, resourceID)
+	fmt.Printf("DEBUG HasPermission: Failed. user=%s, permType=%s, action=%s, resourceID=%v, roles_count=%d, direct_perms_count=%d\n",
+		user.Username, permType, action, resourceID, len(user.Roles), len(user.Permissions))
 	return false
 }
 
 // checkLevel is a helper to check permission at a specific scope
 func checkLevel(user *User, permType, action string, resourceID *string) bool {
+	// Check Role-based permissions
 	for _, role := range user.Roles {
 		for _, rp := range role.Permissions {
 			if rp.Permission != nil && rp.Permission.Type == permType && rp.Permission.Action == action {
-				// If this role permission applies to ALL resources (nil ResourceID), grant access.
 				if rp.ResourceID == nil || *rp.ResourceID == "" {
 					return true
 				}
-				// If checking a specific resource, verify it matches the grant.
 				if resourceID != nil && *rp.ResourceID == *resourceID {
 					return true
 				}
 			}
+		}
+	}
+
+	// Check Direct User permissions (if any)
+	for _, p := range user.Permissions {
+		if p.Type == permType && p.Action == action {
+			return true // For now, direct perms are always global scope or item scope is not handled here
 		}
 	}
 	return false
@@ -95,7 +99,7 @@ func GetPermissionScope(user *User, permType, action string) PermissionScope {
 			// 1. Check for hierarchy: Namespace RESOURCE_* permissions
 			if rp.Permission.Type == "namespaces" && rp.Permission.Action == "RESOURCE_"+action {
 				if rp.ResourceID == nil || *rp.ResourceID == "" {
-					scope.IsGlobal = true // Has resource access across ALL namespaces
+					scope.IsGlobal = true
 				} else {
 					scope.AllowedNamespaceIDs = append(scope.AllowedNamespaceIDs, *rp.ResourceID)
 				}
@@ -104,7 +108,7 @@ func GetPermissionScope(user *User, permType, action string) PermissionScope {
 			// 2. Check for hierarchy: Tag RESOURCE_* permissions
 			if rp.Permission.Type == "tags" && rp.Permission.Action == "RESOURCE_"+action {
 				if rp.ResourceID == nil || *rp.ResourceID == "" {
-					scope.IsGlobal = true // Has resource access across ALL tags
+					scope.IsGlobal = true
 				} else {
 					scope.AllowedTagIDs = append(scope.AllowedTagIDs, *rp.ResourceID)
 				}
@@ -113,13 +117,24 @@ func GetPermissionScope(user *User, permType, action string) PermissionScope {
 			// 3. Check for specific Item permissions
 			if rp.Permission.Type == permType && rp.Permission.Action == action {
 				if rp.ResourceID == nil || *rp.ResourceID == "" {
-					scope.IsGlobal = true // Has global access to this resource type
+					scope.IsGlobal = true
 				} else {
 					scope.AllowedItemIDs = append(scope.AllowedItemIDs, *rp.ResourceID)
 				}
 			}
 		}
 	}
+
+	// 4. Check Direct User permissions
+	for _, p := range user.Permissions {
+		if p.Type == permType && p.Action == action {
+			scope.IsGlobal = true // Direct user perms currently assumed global
+		}
+		// Direct hierarchical perms could be added here
+	}
+
+	fmt.Printf("DEBUG GetPermissionScope: user=%s, permType=%s, action=%s, roles=%d, scope=%+v\n",
+		user.Username, permType, action, len(user.Roles), scope)
 
 	return scope
 }

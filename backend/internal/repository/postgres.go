@@ -6,46 +6,18 @@ import (
 	"gorm.io/gorm"
 )
 
-type PostgresCommandRepo struct {
+type PostgresNamespaceRepo struct {
 	db *gorm.DB
 }
 
-func NewPostgresCommandRepo(db *gorm.DB) *PostgresCommandRepo {
-	return &PostgresCommandRepo{db: db}
-}
-
-func (r *PostgresCommandRepo) Create(cmd *domain.Command) error {
-	return r.db.Create(cmd).Error
-}
-
-func (r *PostgresCommandRepo) GetByID(id uuid.UUID, scope *domain.PermissionScope) (*domain.Command, error) {
-	var cmd domain.Command
-	db := applyScope(r.db, scope, "", "")
-	if err := db.Preload("Steps").First(&cmd, "id = ?", id).Error; err != nil {
-		return nil, err
-	}
-	return &cmd, nil
-}
-
-func (r *PostgresCommandRepo) List(namespaceID *uuid.UUID, scope *domain.PermissionScope) ([]domain.Command, error) {
-	var cmds []domain.Command
-	db := applyScope(r.db, scope, "", "")
-	if namespaceID != nil {
-		db = db.Where("namespace_id = ?", namespaceID)
-	}
-	if err := db.Find(&cmds).Error; err != nil {
-		return nil, err
-	}
-	return cmds, nil
+func NewPostgresNamespaceRepo(db *gorm.DB) *PostgresNamespaceRepo {
+	return &PostgresNamespaceRepo{db: db}
 }
 
 func applyScope(db *gorm.DB, scope *domain.PermissionScope, tagJoinTable, resourceIDCol string) *gorm.DB {
 	if scope == nil || scope.IsGlobal {
 		return db
 	}
-
-	// Filter logic: (Item ID matches) OR (Namespace ID matches) OR (Tag ID matches)
-	// We use strings for IDs because they come from the RBAC system which stores them as strings (UUIDs)
 
 	conds := db.Where("id IN ?", scope.AllowedItemIDs)
 
@@ -59,22 +31,6 @@ func applyScope(db *gorm.DB, scope *domain.PermissionScope, tagJoinTable, resour
 	}
 
 	return db.Where(conds)
-}
-
-func (r *PostgresCommandRepo) Update(cmd *domain.Command) error {
-	return r.db.Save(cmd).Error
-}
-
-func (r *PostgresCommandRepo) Delete(id uuid.UUID) error {
-	return r.db.Delete(&domain.Command{}, "id = ?", id).Error
-}
-
-type PostgresNamespaceRepo struct {
-	db *gorm.DB
-}
-
-func NewPostgresNamespaceRepo(db *gorm.DB) *PostgresNamespaceRepo {
-	return &PostgresNamespaceRepo{db: db}
 }
 
 func (r *PostgresNamespaceRepo) Create(ns *domain.Namespace) error {
@@ -114,34 +70,6 @@ func (r *PostgresNamespaceRepo) Delete(id uuid.UUID) error {
 	return r.db.Delete(&domain.Namespace{}, "id = ?", id).Error
 }
 
-type PostgresStepRepo struct {
-	db *gorm.DB
-}
-
-func NewPostgresStepRepo(db *gorm.DB) *PostgresStepRepo {
-	return &PostgresStepRepo{db: db}
-}
-
-func (r *PostgresStepRepo) Create(step *domain.Step) error {
-	return r.db.Create(step).Error
-}
-
-func (r *PostgresStepRepo) GetByCommandID(commandID uuid.UUID) ([]domain.Step, error) {
-	var steps []domain.Step
-	if err := r.db.Find(&steps, "command_id = ?", commandID).Order("\"order\" asc").Error; err != nil {
-		return nil, err
-	}
-	return steps, nil
-}
-
-func (r *PostgresStepRepo) Update(step *domain.Step) error {
-	return r.db.Save(step).Error
-}
-
-func (r *PostgresStepRepo) Delete(id uuid.UUID) error {
-	return r.db.Delete(&domain.Step{}, "id = ?", id).Error
-}
-
 type PostgresUserRepo struct {
 	db *gorm.DB
 }
@@ -156,7 +84,7 @@ func (r *PostgresUserRepo) Create(user *domain.User) error {
 
 func (r *PostgresUserRepo) GetByID(id uuid.UUID) (*domain.User, error) {
 	var user domain.User
-	if err := r.db.Preload("Roles.Permissions").Preload("Permissions").First(&user, "id = ?", id).Error; err != nil {
+	if err := r.db.Preload("Roles.Permissions.Permission").Preload("Permissions").First(&user, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil
@@ -164,7 +92,7 @@ func (r *PostgresUserRepo) GetByID(id uuid.UUID) (*domain.User, error) {
 
 func (r *PostgresUserRepo) GetByUsername(username string) (*domain.User, error) {
 	var user domain.User
-	if err := r.db.Preload("Roles.Permissions").Preload("Permissions").First(&user, "username = ?", username).Error; err != nil {
+	if err := r.db.Preload("Roles.Permissions.Permission").Preload("Permissions").First(&user, "username = ?", username).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil
@@ -204,7 +132,7 @@ func (r *PostgresRoleRepo) Create(role *domain.Role) error {
 
 func (r *PostgresRoleRepo) GetByID(id uuid.UUID) (*domain.Role, error) {
 	var role domain.Role
-	if err := r.db.Preload("Permissions").First(&role, "id = ?", id).Error; err != nil {
+	if err := r.db.Preload("Permissions.Permission").First(&role, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	return &role, nil
@@ -212,7 +140,7 @@ func (r *PostgresRoleRepo) GetByID(id uuid.UUID) (*domain.Role, error) {
 
 func (r *PostgresRoleRepo) List() ([]domain.Role, error) {
 	var roles []domain.Role
-	if err := r.db.Preload("Permissions").Find(&roles).Error; err != nil {
+	if err := r.db.Preload("Permissions.Permission").Find(&roles).Error; err != nil {
 		return nil, err
 	}
 	return roles, nil

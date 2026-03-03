@@ -1,4 +1,5 @@
-.PHONY: help install-be install-fe install db-up db-down run-be run-fe dev
+.PHONY: help install-be install-fe install db-up db-down db-init run-be run-fe dev
+
 
 help: ## Display this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -17,10 +18,23 @@ db-up: ## Start PostgreSQL database in Docker
 db-down: ## Stop PostgreSQL database
 	cd docker && docker-compose down
 
+db-init: ## Re-initialize database (clear all data)
+	@CONTAINER=$$(docker ps --filter "publish=5432" --format "{{.Names}}" | head -n 1); \
+	if [ -z "$$CONTAINER" ]; then \
+		echo "No running container found on port 5432. Using csm-db as fallback."; \
+		CONTAINER="csm-db"; \
+	fi; \
+	echo "Initializing database in container: $$CONTAINER"; \
+	docker exec -i $$CONTAINER psql -U root -d csm_db -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+
+
+
 run-be: ## Run backend server
-	kill -9 $(lsof -t -i:8080) || true && cd backend && go run cmd/server/main.go
+	@PID=$$(lsof -t -i:8080); if [ -n "$$PID" ]; then kill -9 $$PID; fi
+	cd backend && go run cmd/server/main.go
 
 run-fe: ## Run frontend development server
+	@PID=$$(lsof -t -i:5173); if [ -n "$$PID" ]; then kill -9 $$PID; fi
 	cd frontend && npm run dev
 
 dev: ## Run both BE and FE (requires manual control or background execution)
