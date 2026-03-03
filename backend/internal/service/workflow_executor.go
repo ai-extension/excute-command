@@ -178,6 +178,21 @@ func (e *WorkflowExecutor) RunWithDepth(ctx context.Context, workflowID uuid.UUI
 	if runErr == nil {
 		groupResults := make(map[string]string) // key -> status string
 		workingDirs := &sync.Map{}
+
+		// Initialize baseline directories to prevent parallel race conditions in the first group
+		// Baseline for local server (Nil UUID)
+		if gwd, err := os.Getwd(); err == nil {
+			workingDirs.Store(uuid.Nil, gwd)
+		}
+		// Baseline for remote servers
+		for id := range serverSet {
+			// Get initial physical directory (resolving symlinks) on remote server without logging it
+			out, err := e.serverService.ExecuteCommand(id, "pwd -P", execution.User)
+			if err == nil {
+				workingDirs.Store(id, filepath.Clean(strings.TrimSpace(out)))
+			}
+		}
+
 		for i := range wf.Groups {
 			err := e.runGroup(ctx, &wf.Groups[i], inputs, wf.Variables, groupResults, wf.DefaultServerID, logFile, workflowID, execID, wf.NamespaceID, execution.User, workingDirs)
 			groupResults[wf.Groups[i].Key] = string(wf.Groups[i].Status)
@@ -185,6 +200,9 @@ func (e *WorkflowExecutor) RunWithDepth(ctx context.Context, workflowID uuid.UUI
 				runErr = err
 				break
 			}
+			// Strict Group Boundary: Small gap to let SSH connections and buffers settle,
+			// and ensures clear log separation.
+			time.Sleep(500 * time.Millisecond)
 		}
 	}
 
@@ -467,6 +485,11 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 	group.Status = domain.StatusSuccess
 	e.hub.BroadcastStatus(group.ID.String(), "group", string(domain.StatusSuccess))
 
+	// Explicit completion marker for logs
+	compMsg := fmt.Sprintf("\n%s\n--- GROUP COMPLETE: %s ---\n%s\n", strings.Repeat("-", 20), group.Name, strings.Repeat("-", 20))
+	fmt.Fprint(logFile, compMsg)
+	e.hub.BroadcastLog(workflowID.String(), compMsg)
+
 	return e.groupRepo.Update(group)
 }
 
@@ -594,16 +617,18 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 
 	// Persist CWD: Prepend directory restoration and append directory capture
 	cwdMarker := "::CWD::"
+	var startingDir string // Track where this step started
 	if targetServerID != uuid.Nil {
 		if val, ok := workingDirs.Load(targetServerID); ok {
-			lastDir := val.(string)
-			if lastDir != "" {
+			startingDir = val.(string)
+			if startingDir != "" {
 				// Use curly braces for grouping in the same shell context.
 				// Note: Semicolon after the command is required before the closing brace.
-				command = fmt.Sprintf("cd %s && { %s; }", strconv.Quote(lastDir), command)
+				command = fmt.Sprintf("cd %s && { %s; }", strconv.Quote(startingDir), command)
 			}
 		}
-		command = fmt.Sprintf("%s; printf '%s' && pwd", command, cwdMarker)
+		// Use -P to resolve physical path (essential for Mac/Unix symlink consistency)
+		command = fmt.Sprintf("%s; printf '%s' && pwd -P", command, cwdMarker)
 	}
 
 	if targetServerID != uuid.Nil {
@@ -627,7 +652,12 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 		filter.Finalize()
 		output = out.String()
 		if filter.found {
-			workingDirs.Store(targetServerID, strings.TrimSpace(filter.cwdBuffer.String()))
+			newDir := filepath.Clean(strings.TrimSpace(filter.cwdBuffer.String()))
+			// Heuristic: only update the shared state if the directory actually changed.
+			// This prevents parallel "passive" steps from overwriting intentional directory changes.
+			if newDir != "" && newDir != filepath.Clean(startingDir) {
+				workingDirs.Store(targetServerID, newDir)
+			}
 		}
 	} else {
 		// Run locally
@@ -659,14 +689,16 @@ func (e *WorkflowExecutor) runLocalStep(ctx context.Context, step *domain.Workfl
 	// Persist CWD for local execution
 	localID := uuid.Nil // Use Nil UUID as key for local server
 	cwdMarker := "::CWD::"
+	var startingDir string
 	if val, ok := workingDirs.Load(localID); ok {
-		lastDir := val.(string)
-		if lastDir != "" {
+		startingDir = val.(string)
+		if startingDir != "" {
 			// Use curly braces for grouping in the same shell context
-			command = fmt.Sprintf("cd %s && { %s; }", strconv.Quote(lastDir), command)
+			command = fmt.Sprintf("cd %s && { %s; }", strconv.Quote(startingDir), command)
 		}
 	}
-	command = fmt.Sprintf("%s; printf '%s' && pwd", command, cwdMarker)
+	// Use -P for local consistency as well
+	command = fmt.Sprintf("%s; printf '%s' && pwd -P", command, cwdMarker)
 
 	c := exec.CommandContext(ctx, "sh", "-c", command)
 	var out bytes.Buffer
@@ -690,7 +722,11 @@ func (e *WorkflowExecutor) runLocalStep(ctx context.Context, step *domain.Workfl
 	err := c.Run()
 	filter.Finalize()
 	if filter.found {
-		workingDirs.Store(localID, strings.TrimSpace(filter.cwdBuffer.String()))
+		newDir := filepath.Clean(strings.TrimSpace(filter.cwdBuffer.String()))
+		// Heuristic: only update the shared state if the directory actually changed.
+		if newDir != "" && newDir != filepath.Clean(startingDir) {
+			workingDirs.Store(localID, newDir)
+		}
 	}
 	return out.String(), err
 }
@@ -722,9 +758,13 @@ type cwdFilteredWriter struct {
 	buffer     bytes.Buffer
 	found      bool
 	cwdBuffer  strings.Builder
+	mu         sync.Mutex
 }
 
 func (w *cwdFilteredWriter) Write(p []byte) (n int, err error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
 	if w.found {
 		w.cwdBuffer.Write(p)
 		return len(p), nil
@@ -764,6 +804,9 @@ func (w *cwdFilteredWriter) Write(p []byte) (n int, err error) {
 }
 
 func (w *cwdFilteredWriter) Finalize() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
 	if !w.found && w.buffer.Len() > 0 {
 		w.underlying.Write(w.buffer.Bytes())
 		w.buffer.Reset()
