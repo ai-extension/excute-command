@@ -135,6 +135,14 @@ func (r *PostgresWorkflowRepo) Update(wf *domain.Workflow) error {
 
 		// Step 2: Now that all groups exist, sync their steps.
 		for i := range wf.Groups {
+			// Explicitly save each step to ensure fields like CommandText are updated
+			for j := range wf.Groups[i].Steps {
+				wf.Groups[i].Steps[j].GroupID = wf.Groups[i].ID
+				if err := tx.Save(&wf.Groups[i].Steps[j]).Error; err != nil {
+					return err
+				}
+			}
+
 			if err := tx.Model(&wf.Groups[i]).Association("Steps").Replace(wf.Groups[i].Steps); err != nil {
 				return err
 			}

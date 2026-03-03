@@ -72,29 +72,36 @@ func (e *WorkflowExecutor) RunWithDepth(ctx context.Context, workflowID uuid.UUI
 		return err
 	}
 
-	// Create execution record
+	// Setup log directory
 	baseDir, _ := os.Getwd()
 	execLogDir := filepath.Join(baseDir, "data", "logs", "executions", execID.String())
 	if err := os.MkdirAll(execLogDir, 0755); err != nil {
 		return fmt.Errorf("failed to create log directory: %w", err)
 	}
-
 	mainLogPath := filepath.Join(execLogDir, "workflow.log")
-	inputsJSON, _ := json.Marshal(inputs)
-	execution := &domain.WorkflowExecution{
-		ID:          execID,
-		WorkflowID:  workflowID,
-		ScheduledID: scheduledID,
-		Status:      domain.StatusRunning,
-		Inputs:      string(inputsJSON),
-		LogPath:     mainLogPath,
-		StartedAt:   time.Now(),
+
+	// Get existing execution record (created by handler to avoid race condition)
+	execution, err := e.execRepo.GetByID(execID, nil)
+	if err != nil {
+		// Fallback if not found
+		inputsJSON, _ := json.Marshal(inputs)
+		execution = &domain.WorkflowExecution{
+			ID:         execID,
+			WorkflowID: workflowID,
+			Status:     domain.StatusRunning,
+			Inputs:     string(inputsJSON),
+			StartedAt:  time.Now(),
+		}
+		if user != nil {
+			execution.ExecutedBy = &user.ID
+			execution.User = user
+		}
+		e.execRepo.Create(execution)
 	}
-	if user != nil {
-		execution.ExecutedBy = &user.ID
-		execution.User = user
-	}
-	e.execRepo.Create(execution)
+
+	// Update with log path
+	execution.LogPath = mainLogPath
+	e.execRepo.Update(execution)
 
 	logFile, _ := os.OpenFile(mainLogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	defer logFile.Close()
@@ -170,8 +177,9 @@ func (e *WorkflowExecutor) RunWithDepth(ctx context.Context, workflowID uuid.UUI
 	// 2. Execute workflow groups
 	if runErr == nil {
 		groupResults := make(map[string]string) // key -> status string
+		workingDirs := &sync.Map{}
 		for i := range wf.Groups {
-			err := e.runGroup(ctx, &wf.Groups[i], inputs, wf.Variables, groupResults, wf.DefaultServerID, logFile, workflowID, execID, wf.NamespaceID, execution.User)
+			err := e.runGroup(ctx, &wf.Groups[i], inputs, wf.Variables, groupResults, wf.DefaultServerID, logFile, workflowID, execID, wf.NamespaceID, execution.User, workingDirs)
 			groupResults[wf.Groups[i].Key] = string(wf.Groups[i].Status)
 			if err != nil {
 				runErr = err
@@ -379,9 +387,12 @@ func (e *WorkflowExecutor) evalAtom(expr, original string) (bool, error) {
 	return false, fmt.Errorf("unsupported condition syntax: %q — use ==, !=, && or ||", original)
 }
 
-func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowGroup, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, defaultServerID uuid.UUID, logFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, namespaceID uuid.UUID, user *domain.User) error {
+func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowGroup, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, defaultServerID uuid.UUID, logFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, namespaceID uuid.UUID, user *domain.User, workingDirs *sync.Map) error {
 	// Evaluate condition before running
 	if shouldRun, err := e.evaluateCondition(group.Condition, inputs, variables, groupResults, namespaceID, user); err != nil {
+		errStr := fmt.Sprintf("\n%s\n[GROUP CONDITION ERROR] %s\nCondition: %s\nError: %v\n%s\n", strings.Repeat("!", 80), group.Name, group.Condition, err, strings.Repeat("!", 80))
+		fmt.Fprint(logFile, errStr)
+		e.hub.BroadcastLog(workflowID.String(), errStr)
 		return fmt.Errorf("group %q condition error: %w", group.Name, err)
 	} else if !shouldRun {
 		msg := fmt.Sprintf("\n%s\n[GROUP SKIPPED] %s\nCondition: %s\n%s\n", strings.Repeat("-", 80), group.Name, group.Condition, strings.Repeat("-", 80))
@@ -414,7 +425,7 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 			wg.Add(1)
 			go func(step *domain.WorkflowStep) {
 				defer wg.Done()
-				if err := e.runStep(ctx, step, inputs, variables, effectiveServerID, logFile, workflowID, executionID, namespaceID, user); err != nil {
+				if err := e.runStep(ctx, step, inputs, variables, effectiveServerID, logFile, workflowID, executionID, namespaceID, user, workingDirs); err != nil {
 					errs <- err
 				}
 			}(&group.Steps[i])
@@ -433,7 +444,7 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 		}
 	} else {
 		for i := range group.Steps {
-			if err := e.runStep(ctx, &group.Steps[i], inputs, variables, effectiveServerID, logFile, workflowID, executionID, namespaceID, user); err != nil {
+			if err := e.runStep(ctx, &group.Steps[i], inputs, variables, effectiveServerID, logFile, workflowID, executionID, namespaceID, user, workingDirs); err != nil {
 				group.Status = domain.StatusFailed
 				e.groupRepo.Update(group)
 				e.hub.BroadcastStatus(group.ID.String(), "group", string(domain.StatusFailed))
@@ -511,7 +522,7 @@ func (e *WorkflowExecutor) relayCopy(ctx context.Context, group *domain.Workflow
 	return nil
 }
 
-func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowStep, inputs map[string]string, variables []domain.WorkflowVariable, defaultServerID uuid.UUID, mainLogFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, namespaceID uuid.UUID, user *domain.User) error {
+func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowStep, inputs map[string]string, variables []domain.WorkflowVariable, defaultServerID uuid.UUID, mainLogFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, namespaceID uuid.UUID, user *domain.User, workingDirs *sync.Map) error {
 	step.Status = domain.StatusRunning
 	e.stepRepo.Update(step)
 	e.hub.BroadcastStatus(step.ID.String(), "step", string(domain.StatusRunning))
@@ -581,17 +592,46 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 		targetServerID = defaultServerID
 	}
 
+	// Persist CWD: Prepend directory restoration and append directory capture
+	cwdMarker := "::CWD::"
+	if targetServerID != uuid.Nil {
+		if val, ok := workingDirs.Load(targetServerID); ok {
+			lastDir := val.(string)
+			if lastDir != "" {
+				// Use curly braces for grouping in the same shell context.
+				// Note: Semicolon after the command is required before the closing brace.
+				command = fmt.Sprintf("cd %s && { %s; }", strconv.Quote(lastDir), command)
+			}
+		}
+		command = fmt.Sprintf("%s; printf '%s' && pwd", command, cwdMarker)
+	}
+
 	if targetServerID != uuid.Nil {
 		// Run on remote server via ServerService with real-time streaming
 		var out bytes.Buffer
-		w1 := &wsWriter{hub: e.hub, targetID: step.ID.String(), buffer: &out}
-		w2 := &wsWriter{hub: e.hub, targetID: workflowID.String(), buffer: mainLogFile}
-		w3 := &fileWriter{file: stepLogFile}
 
-		output, err = e.serverService.ExecuteCommand(targetServerID, command, user, w1, w2, w3)
+		// Multi-writer for all destinations we want cleaned
+		mw := io.MultiWriter(
+			&wsWriter{hub: e.hub, targetID: step.ID.String(), buffer: &out},
+			&wsWriter{hub: e.hub, targetID: workflowID.String(), buffer: mainLogFile},
+			&fileWriter{file: stepLogFile},
+		)
+
+		// Filter out the CWD marker and capture the directory
+		filter := &cwdFilteredWriter{
+			underlying: mw,
+			marker:     cwdMarker,
+		}
+
+		_, err = e.serverService.ExecuteCommand(targetServerID, command, user, filter)
+		filter.Finalize()
+		output = out.String()
+		if filter.found {
+			workingDirs.Store(targetServerID, strings.TrimSpace(filter.cwdBuffer.String()))
+		}
 	} else {
 		// Run locally
-		output, err = e.runLocalStep(ctx, step, command, mainLogFile, stepLogFile, workflowID)
+		output, err = e.runLocalStep(ctx, step, command, mainLogFile, stepLogFile, workflowID, workingDirs)
 	}
 
 	step.Output = output
@@ -615,21 +655,43 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 	return e.stepRepo.Update(step)
 }
 
-func (e *WorkflowExecutor) runLocalStep(ctx context.Context, step *domain.WorkflowStep, command string, mainLogFile *os.File, stepLogFile *os.File, workflowID uuid.UUID) (string, error) {
+func (e *WorkflowExecutor) runLocalStep(ctx context.Context, step *domain.WorkflowStep, command string, mainLogFile *os.File, stepLogFile *os.File, workflowID uuid.UUID, workingDirs *sync.Map) (string, error) {
+	// Persist CWD for local execution
+	localID := uuid.Nil // Use Nil UUID as key for local server
+	cwdMarker := "::CWD::"
+	if val, ok := workingDirs.Load(localID); ok {
+		lastDir := val.(string)
+		if lastDir != "" {
+			// Use curly braces for grouping in the same shell context
+			command = fmt.Sprintf("cd %s && { %s; }", strconv.Quote(lastDir), command)
+		}
+	}
+	command = fmt.Sprintf("%s; printf '%s' && pwd", command, cwdMarker)
+
 	c := exec.CommandContext(ctx, "sh", "-c", command)
 	var out bytes.Buffer
 
-	// Multi-broadcast writer
-	// Send to step console, main log file, and specific step log file
-	w1 := &wsWriter{hub: e.hub, targetID: step.ID.String(), buffer: &out}
-	w2 := &wsWriter{hub: e.hub, targetID: workflowID.String(), buffer: mainLogFile}
-	w3 := &fileWriter{file: stepLogFile} // We need a simple writer for the step log file
-	mw := io.MultiWriter(w1, w2, w3)
+	// Multi-writer for all destinations we want cleaned
+	mw := io.MultiWriter(
+		&wsWriter{hub: e.hub, targetID: step.ID.String(), buffer: &out},
+		&wsWriter{hub: e.hub, targetID: workflowID.String(), buffer: mainLogFile},
+		&fileWriter{file: stepLogFile},
+	)
 
-	c.Stdout = mw
-	c.Stderr = mw
+	// Filter out the CWD marker and capture the directory
+	filter := &cwdFilteredWriter{
+		underlying: mw,
+		marker:     cwdMarker,
+	}
+
+	c.Stdout = filter
+	c.Stderr = filter
 
 	err := c.Run()
+	filter.Finalize()
+	if filter.found {
+		workingDirs.Store(localID, strings.TrimSpace(filter.cwdBuffer.String()))
+	}
 	return out.String(), err
 }
 
@@ -652,4 +714,58 @@ func (w *wsWriter) Write(p []byte) (n int, err error) {
 	n, err = w.buffer.Write(p)
 	w.hub.BroadcastLog(w.targetID, string(p))
 	return n, err
+}
+
+type cwdFilteredWriter struct {
+	underlying io.Writer
+	marker     string
+	buffer     bytes.Buffer
+	found      bool
+	cwdBuffer  strings.Builder
+}
+
+func (w *cwdFilteredWriter) Write(p []byte) (n int, err error) {
+	if w.found {
+		w.cwdBuffer.Write(p)
+		return len(p), nil
+	}
+
+	w.buffer.Write(p)
+	content := w.buffer.Bytes()
+	idx := bytes.Index(content, []byte(w.marker))
+
+	if idx != -1 {
+		// Output everything before the marker
+		if _, err := w.underlying.Write(content[:idx]); err != nil {
+			return 0, err
+		}
+		w.found = true
+		// Capture anything after the marker in this chunk
+		w.cwdBuffer.Write(content[idx+len(w.marker):])
+		w.buffer.Reset()
+		return len(p), nil
+	}
+
+	// Line buffering: Only flush when we see a newline,
+	// unless the buffer is getting very large.
+	for {
+		curr := w.buffer.Bytes()
+		nlIdx := bytes.IndexByte(curr, '\n')
+		if nlIdx == -1 {
+			break
+		}
+		// Flush one line
+		if _, err := w.underlying.Write(w.buffer.Next(nlIdx + 1)); err != nil {
+			return 0, err
+		}
+	}
+
+	return len(p), nil
+}
+
+func (w *cwdFilteredWriter) Finalize() {
+	if !w.found && w.buffer.Len() > 0 {
+		w.underlying.Write(w.buffer.Bytes())
+		w.buffer.Reset()
+	}
 }

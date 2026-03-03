@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -198,6 +199,24 @@ func (h *WorkflowHandler) RunWorkflow(c *gin.Context) {
 
 	// Generate execution ID
 	execID := uuid.New()
+
+	// Initial execution record creation to avoid race conditions with log fetching
+	execution := &domain.WorkflowExecution{
+		ID:         execID,
+		WorkflowID: id,
+		Status:     domain.StatusRunning,
+		StartedAt:  time.Now(),
+		ExecutedBy: &user.ID,
+	}
+	if req.Inputs != nil {
+		inputsByes, _ := json.Marshal(req.Inputs)
+		execution.Inputs = string(inputsByes)
+	}
+
+	if err := h.service.CreateExecution(execution); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create execution record"})
+		return
+	}
 
 	// Run inside a goroutine to not block the request
 	go func() {

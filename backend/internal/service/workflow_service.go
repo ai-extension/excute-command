@@ -174,3 +174,7 @@ func (s *WorkflowService) CreateStep(step *domain.WorkflowStep) error {
 	step.Status = domain.StatusPending
 	return s.stepRepo.Create(step)
 }
+
+func (s *WorkflowService) CreateExecution(exec *domain.WorkflowExecution) error {
+	return s.execRepo.Create(exec)
+}
