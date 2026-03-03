@@ -28,6 +28,7 @@ func (r *PostgresWorkflowRepo) GetByID(id uuid.UUID, scope *domain.PermissionSco
 		Preload("Groups.Steps", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
 		Preload("Hooks", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
 		Preload("Hooks.TargetWorkflow").
+		Preload("Files").
 		Preload("Tags").
 		First(&wf, "id = ?", id).Error
 	if err != nil {
@@ -46,6 +47,7 @@ func (r *PostgresWorkflowRepo) List(namespaceID uuid.UUID, scope *domain.Permiss
 		Preload("Groups.Steps", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
 		Preload("Hooks", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
 		Preload("Hooks.TargetWorkflow").
+		Preload("Files").
 		Preload("Tags").
 		Where("namespace_id = ?", namespaceID).
 		Order("created_at DESC").
@@ -84,6 +86,7 @@ func (r *PostgresWorkflowRepo) ListPaginated(namespaceID uuid.UUID, limit, offse
 		Preload("Groups.Steps", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
 		Preload("Hooks", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
 		Preload("Hooks.TargetWorkflow").
+		Preload("Files").
 		Preload("Tags").
 		Order("created_at DESC").
 		Limit(limit).

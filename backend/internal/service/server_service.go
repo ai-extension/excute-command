@@ -178,17 +178,17 @@ func (s *ServerService) UploadFileToServers(ctx context.Context, serverIDs []uui
 			return err
 		}
 
-		scope := domain.GetPermissionScope(user, "servers", "WRITE")
-		server, err := s.repo.GetByID(serverID, &scope)
-		if err != nil {
-			return fmt.Errorf("failed to get server %s: %w", serverID, err)
-		}
-
-		if server.ID == domain.LocalServerID {
+		if serverID == domain.LocalServerID {
 			if err := s.copyFileLocally(localPath, remotePath); err != nil {
 				return fmt.Errorf("local server, failed to copy file: %w", err)
 			}
 			continue
+		}
+
+		scope := domain.GetPermissionScope(user, "servers", "WRITE")
+		server, err := s.repo.GetByID(serverID, &scope)
+		if err != nil {
+			return fmt.Errorf("failed to get server %s: %w", serverID, err)
 		}
 
 		client, err := ConnectSSH(server)

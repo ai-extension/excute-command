@@ -132,6 +132,8 @@ func (e *WorkflowExecutor) RunWithDepth(ctx context.Context, workflowID uuid.UUI
 	// Get all unique servers in this workflow
 	if wf.DefaultServerID != uuid.Nil {
 		serverSet[wf.DefaultServerID] = true
+	} else {
+		serverSet[domain.LocalServerID] = true
 	}
 	for _, g := range wf.Groups {
 		if g.DefaultServerID != uuid.Nil {
@@ -140,6 +142,8 @@ func (e *WorkflowExecutor) RunWithDepth(ctx context.Context, workflowID uuid.UUI
 		for _, s := range g.Steps {
 			if s.ServerID != uuid.Nil {
 				serverSet[s.ServerID] = true
+			} else {
+				serverSet[domain.LocalServerID] = true
 			}
 		}
 	}
@@ -202,7 +206,7 @@ func (e *WorkflowExecutor) RunWithDepth(ctx context.Context, workflowID uuid.UUI
 			}
 			// Strict Group Boundary: Small gap to let SSH connections and buffers settle,
 			// and ensures clear log separation.
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(300 * time.Millisecond)
 		}
 	}
 
