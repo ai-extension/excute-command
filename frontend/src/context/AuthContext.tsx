@@ -1,7 +1,14 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { AlertCircle, CheckCircle, XCircle, Info, X } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { TAGGABLE_RESOURCES } from '../config/permissions';
+import { TAGGABLE_RESOURCES, NAMESPACE_SCOPED_RESOURCES } from '../config/permissions';
+
+function getCookie(name: string) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
+    return null;
+}
 
 interface User {
     id: string;
@@ -34,19 +41,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const savedUser = localStorage.getItem('auth_user');
         return savedUser ? JSON.parse(savedUser) : null;
     });
-    // We still keep token in state for `isAuthenticated` checks,
-    // but we don't save it to localStorage anymore.
-    const [token, setToken] = useState<string | null>(null);
+    const [token, setToken] = useState<string | null>(() => {
+        return getCookie('auth_token');
+    });
 
-    // Hydrate token state on mount if user exists (optimistic)
-    // Actual validation happens via HTTPOnly cookie on API requests
+    // Hydrate token state on mount
     useEffect(() => {
-        if (user && !token) {
-            // We just use a dummy value to indicate they *might* be logged in if they have a user object.
-            // The real source of truth for auth is the HttpOnly cookie.
-            setToken("cookie_managed");
+        const cookieToken = getCookie('auth_token');
+        if (cookieToken && token !== cookieToken) {
+            setToken(cookieToken);
         }
-    }, [user, token]);
+    }, [token]);
 
     const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
@@ -85,8 +90,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const apiFetch = useCallback(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
         const headers = new Headers(init?.headers);
-        if (token && token !== "cookie_managed" && !headers.has('Authorization')) {
-            headers.set('Authorization', `Bearer ${token}`);
+        const currentToken = getCookie('auth_token') || token;
+
+        if (currentToken && currentToken !== "cookie_managed" && !headers.has('Authorization')) {
+            headers.set('Authorization', `Bearer ${currentToken}`);
         }
 
         const fetchInit: RequestInit = {
@@ -149,7 +156,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 // 2. Hierarchical match via Namespace
                 if (perm.type === 'namespaces' && perm.action === `RESOURCE_${action}`) {
                     // Global namespace permission or specifically for the active namespace
-                    if (!rp.resource_id || (namespaceId && rp.resource_id === namespaceId)) return true;
+                    if (!rp.resource_id || (namespaceId && rp.resource_id === namespaceId)) {
+                        if (NAMESPACE_SCOPED_RESOURCES.includes(type)) {
+                            return true;
+                        }
+                    }
                 }
 
                 // 3. Hierarchical match via Tag
@@ -182,7 +193,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 const perm = rp.permission;
                 return perm && perm.type === 'namespaces' && perm.action === `RESOURCE_${action}` && rp.resource_id === namespaceId;
             });
-            if (hasNamespacePerm) return true;
+            if (hasNamespacePerm && NAMESPACE_SCOPED_RESOURCES.includes(type)) return true;
         }
 
         return false;

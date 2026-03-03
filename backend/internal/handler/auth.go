@@ -32,9 +32,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	// Set HttpOnly cookie for web clients
 	// MaxAge is in seconds (24h = 86400s). SameSite Mode Strict is safer.
-	c.SetCookie("auth_token", token, 86400, "/", "", false, true) // Secure: false for local dev (should be true for HTTPS)
+	c.SetCookie("auth_token", token, 86400, "/", "", false, false) // Secure: false for local dev, HttpOnly: false to let JS read it
 
 	c.JSON(http.StatusOK, gin.H{
 		"token": token,
@@ -44,7 +43,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 func (h *AuthHandler) Logout(c *gin.Context) {
 	// Clear the auth_token cookie
-	c.SetCookie("auth_token", "", -1, "/", "", false, true)
+	c.SetCookie("auth_token", "", -1, "/", "", false, false)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
 }

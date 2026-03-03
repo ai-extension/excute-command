@@ -74,7 +74,8 @@ const UsersPage = () => {
     const fetchRoles = async () => {
         try {
             const response = await apiFetch(`${API_BASE_URL}/roles`);
-            const data = await response.json();
+            const dataRaw = await response.json();
+            const data = dataRaw.items || dataRaw || [];
             setRoles(Array.isArray(data) ? data : []);
         } catch (error) {
             console.error('Failed to fetch roles:', error);

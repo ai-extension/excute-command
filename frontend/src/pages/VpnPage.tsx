@@ -70,8 +70,16 @@ const VpnPage = () => {
                 throw new Error(data.error || `Server error: ${response.status}`);
             }
             const data = await response.json();
-            setVpns(data.items || []);
-            setTotal(data.total || 0);
+            // Handle pagination wrapper if present, otherwise assume array
+            const vpnItems = data.items || data || [];
+            if (Array.isArray(vpnItems)) {
+                setVpns(vpnItems);
+                setTotal(data.total || vpnItems.length);
+            } else {
+                setVpns([]);
+                setTotal(0);
+                console.error('Unexpected vpns format:', data);
+            }
         } catch (error) {
             console.error('Failed to fetch VPN configs:', error);
             setError(error instanceof Error ? error.message : 'Failed to retrieve VPN configurations');

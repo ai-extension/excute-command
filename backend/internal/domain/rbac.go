@@ -103,21 +103,24 @@ func GetPermissionScope(user *User, permType, action string) PermissionScope {
 				continue
 			}
 
-			// 1. Check for hierarchy: Namespace RESOURCE_* permissions
-			if rp.Permission.Type == "namespaces" && rp.Permission.Action == "RESOURCE_"+action {
-				if rp.ResourceID == nil || *rp.ResourceID == "" {
-					scope.IsGlobal = true
-				} else {
-					scope.AllowedNamespaceIDs = append(scope.AllowedNamespaceIDs, *rp.ResourceID)
+			// Apply hierarchical inheritance ONLY if the requested permType is a namespace-bound resource
+			if isNamespaceScoped(permType) {
+				// 1. Check for hierarchy: Namespace RESOURCE_* permissions
+				if rp.Permission.Type == "namespaces" && rp.Permission.Action == "RESOURCE_"+action {
+					if rp.ResourceID == nil || *rp.ResourceID == "" {
+						scope.IsGlobal = true
+					} else {
+						scope.AllowedNamespaceIDs = append(scope.AllowedNamespaceIDs, *rp.ResourceID)
+					}
 				}
-			}
 
-			// 2. Check for hierarchy: Tag RESOURCE_* permissions
-			if rp.Permission.Type == "tags" && rp.Permission.Action == "RESOURCE_"+action {
-				if rp.ResourceID == nil || *rp.ResourceID == "" {
-					scope.IsGlobal = true
-				} else {
-					scope.AllowedTagIDs = append(scope.AllowedTagIDs, *rp.ResourceID)
+				// 2. Check for hierarchy: Tag RESOURCE_* permissions
+				if rp.Permission.Type == "tags" && rp.Permission.Action == "RESOURCE_"+action {
+					if rp.ResourceID == nil || *rp.ResourceID == "" {
+						scope.IsGlobal = true
+					} else {
+						scope.AllowedTagIDs = append(scope.AllowedTagIDs, *rp.ResourceID)
+					}
 				}
 			}
 
@@ -144,4 +147,14 @@ func GetPermissionScope(user *User, permType, action string) PermissionScope {
 		user.Username, permType, action, len(user.Roles), scope)
 
 	return scope
+}
+
+// isNamespaceScoped checks if a given permission type refers to a resource that lives inside a namespace.
+func isNamespaceScoped(permType string) bool {
+	switch permType {
+	case "workflows", "history", "executions", "variables", "global-variables", "schedules", "pages", "tags":
+		return true
+	default:
+		return false
+	}
 }

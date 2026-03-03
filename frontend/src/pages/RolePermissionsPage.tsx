@@ -104,24 +104,31 @@ export default function RolePermissionsPage() {
             try {
                 // 1. Fetch current role
                 const rolesRes = await apiFetch(`${API_BASE_URL}/roles`);
-                const rolesData = await rolesRes.json();
-                const currentRole = rolesData.find((r: any) => r.id === id);
-                if (currentRole) {
-                    setRole(currentRole);
-                    setRolePerms(currentRole.permissions || []);
+                const rolesDataRaw = await rolesRes.json();
+                const rolesData = rolesDataRaw.items || rolesDataRaw || [];
+
+                if (Array.isArray(rolesData)) {
+                    const currentRole = rolesData.find((r: any) => r.id === id);
+                    if (currentRole) {
+                        setRole(currentRole);
+                        setRolePerms(currentRole.permissions || []);
+                    }
+                } else {
+                    console.error('Unexpected roles format:', rolesDataRaw);
                 }
 
                 // 2. Fetch all permissions
                 const permsRes = await apiFetch(`${API_BASE_URL}/permissions`);
-                const permsData = await permsRes.json();
-                setAllPermissions(permsData);
+                const permsDataRaw = await permsRes.json();
+                setAllPermissions(permsDataRaw.items || permsDataRaw || []);
 
                 // 3. Fetch namespaces
                 const nsRes = await apiFetch(`${API_BASE_URL}/namespaces`);
-                const nsData = await nsRes.json();
-                setNamespaces(nsData);
+                const nsDataRaw = await nsRes.json();
+                const nsData = nsDataRaw.items || nsDataRaw || [];
+                setNamespaces(Array.isArray(nsData) ? nsData : []);
 
-                const activeNsId = nsData.length > 0 ? nsData[0].id : null;
+                const activeNsId = Array.isArray(nsData) && nsData.length > 0 ? nsData[0].id : null;
 
                 // 4. Fetch all resources in parallel
                 const allResourceItems = CATEGORIES.flatMap(c => c.items);

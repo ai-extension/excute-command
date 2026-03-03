@@ -10,3 +10,19 @@ export const TAGGABLE_RESOURCES = [
     'workflows',
     'schedules'
 ];
+
+// Define which resource types are scoped within a namespace.
+// Hierarchical permissions (e.g., namespace 'RESOURCE_READ') will only
+// grant access to these specific resources.
+export const NAMESPACE_SCOPED_RESOURCES = [
+    'workflows',
+    'history',
+    'executions',
+    'variables',
+    'global-variables',
+    'schedules',
+    'pages',
+    'tags',
+    'dashboard'
+];
+

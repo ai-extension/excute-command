@@ -106,7 +106,14 @@ const ServerPage = () => {
                 return;
             }
             const data = await response.json();
-            setVpns(data || []);
+            // Handle pagination wrapper if present, otherwise assume array
+            const vpnItems = data.items || data || [];
+            if (Array.isArray(vpnItems)) {
+                setVpns(vpnItems);
+            } else {
+                setVpns([]);
+                console.error('Unexpected vpns format:', data);
+            }
         } catch (error) {
             console.error('Failed to fetch vpns:', error);
         }
