@@ -3,13 +3,10 @@ package handler
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -373,6 +370,7 @@ func (h *WorkflowHandler) GetExecutionLogs(c *gin.Context) {
 	}
 
 	stepID := c.Query("step_id")
+	groupID := c.Query("group_id")
 	cwd, _ := os.Getwd()
 	execLogDir := filepath.Join(cwd, "data", "logs", "executions", id.String())
 
@@ -382,6 +380,42 @@ func (h *WorkflowHandler) GetExecutionLogs(c *gin.Context) {
 			c.File(path)
 			return
 		}
+	} else if groupID != "" {
+		groupUUID, err := uuid.Parse(groupID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid group id"})
+			return
+		}
+
+		userVal, _ := c.Get("user")
+		user := userVal.(*domain.User)
+
+		execution, err := h.service.GetExecution(id, user)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "execution not found"})
+			return
+		}
+
+		workflow, err := h.service.GetWorkflow(execution.WorkflowID, user)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "workflow not found"})
+			return
+		}
+
+		var logs string
+		for _, group := range workflow.Groups {
+			if group.ID == groupUUID {
+				for _, step := range group.Steps {
+					stepLogPath := filepath.Join(execLogDir, step.ID.String()+".log")
+					if content, err := os.ReadFile(stepLogPath); err == nil {
+						logs += string(content) + "\n"
+					}
+				}
+				break
+			}
+		}
+		c.String(http.StatusOK, logs)
+		return
 	} else {
 		userVal, _ := c.Get("user")
 		user := userVal.(*domain.User)
@@ -393,56 +427,19 @@ func (h *WorkflowHandler) GetExecutionLogs(c *gin.Context) {
 			return
 		}
 
-		// If the execution is still running, serve the interleaved workflow.log for live updates
-		if execution.Status == domain.StatusRunning {
-			mainLogPath := filepath.Join(execLogDir, "workflow.log")
-			if _, err := os.Stat(mainLogPath); err == nil {
-				c.File(mainLogPath)
-				return
-			}
-		}
-
-		// If finished, or no workflow.log, merge step logs sequentially for a clean view
-		wf, err := h.service.GetWorkflow(execution.WorkflowID, user)
-		if err == nil {
-			// Set headers for streaming
-			c.Header("Content-Type", "text/plain; charset=utf-8")
-			c.Stream(func(w io.Writer) bool {
-				// Write workflow header
-				header := fmt.Sprintf("================================================================================\n"+
-					"--- SEQUENTIAL EXECUTION TRACE ---\n"+
-					"Workflow: %s\n"+
-					"Started: %v\n"+
-					"Status: %v\n"+
-					"================================================================================\n\n",
-					wf.Name, execution.StartedAt.Format(time.RFC3339), execution.Status)
-				w.Write([]byte(header))
-
-				for _, group := range wf.Groups {
-					groupHeader := fmt.Sprintf("\n%s\n[GROUP] %s\n%s\n", strings.Repeat("=", 80), group.Name, strings.Repeat("=", 80))
-					w.Write([]byte(groupHeader))
-
-					for _, step := range group.Steps {
-						stepLogPath := filepath.Join(execLogDir, step.ID.String()+".log")
-						if file, err := os.Open(stepLogPath); err == nil {
-							io.Copy(w, file)
-							file.Close()
-							w.Write([]byte("\n"))
-						} else {
-							// If step log doesn't exist (e.g. skipped), just show the step name
-							w.Write([]byte(fmt.Sprintf("\n  ┌─ [STEP] %s (No log output)\n", step.Name)))
-						}
-					}
-				}
-
-				footer := fmt.Sprintf("\n%s\n--- TRACE END ---\n", strings.Repeat("=", 80))
-				w.Write([]byte(footer))
-				return false
-			})
+		mainLogPath := filepath.Join(execLogDir, "workflow.log")
+		if _, err := os.Stat(mainLogPath); err == nil {
+			c.File(mainLogPath)
 			return
 		}
 
-		// Legacy fallback
+		// If running/pending and workflow.log not created yet, return empty
+		if execution.Status == domain.StatusRunning || execution.Status == domain.StatusPending {
+			c.String(http.StatusOK, "")
+			return
+		}
+
+		// Legacy fallback if workflow.log doesn't exist
 		if execution.LogPath != "" {
 			oldPath := execution.LogPath
 			if !filepath.IsAbs(oldPath) {

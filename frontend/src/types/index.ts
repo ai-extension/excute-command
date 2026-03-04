@@ -67,6 +67,7 @@ export interface WorkflowGroup {
     copy_source_path?: string;
     copy_target_server_id?: string;
     copy_target_path?: string;
+    continue_on_failure: boolean;
     created_at: string;
     updated_at: string;
 }

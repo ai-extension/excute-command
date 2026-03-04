@@ -262,6 +262,7 @@ type WorkflowGroup struct {
 	CopySourcePath     string         `json:"copy_source_path,omitempty" gorm:"default:''"`
 	CopyTargetServerID uuid.UUID      `json:"copy_target_server_id,omitempty" gorm:"type:uuid"`
 	CopyTargetPath     string         `json:"copy_target_path,omitempty" gorm:"default:''"`
+	ContinueOnFailure  bool           `json:"continue_on_failure" gorm:"default:false"`
 	CreatedAt          time.Time      `json:"created_at"`
 	UpdatedAt          time.Time      `json:"updated_at"`
 }

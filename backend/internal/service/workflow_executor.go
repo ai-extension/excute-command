@@ -139,17 +139,38 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 	}
 	defer logFile.Close()
 
-	fmt.Fprintf(logFile, "================================================================================\n")
-	fmt.Fprintf(logFile, "--- WORKFLOW EXECUTION STARTED: %s ---\n", execution.StartedAt.Format(time.RFC3339))
-	fmt.Fprintf(logFile, "Workflow: %s (%s)\n", wf.Name, workflowID)
-	fmt.Fprintf(logFile, "Inputs: %s\n", execution.Inputs)
-	fmt.Fprintf(logFile, "================================================================================\n\n")
+	// Determine who is running the workflow
+	executedBy := "System"
+	if execution.User != nil {
+		if execution.User.FullName != "" {
+			executedBy = execution.User.FullName
+		} else {
+			executedBy = execution.User.Username
+		}
+	} else if execution.ExecutedBy == nil {
+		executedBy = "System"
+	}
 
-	e.hub.BroadcastLog(workflowID.String(), fmt.Sprintf("--- WORKFLOW EXECUTION STARTED: %s ---\n", wf.Name))
+	fmt.Fprintf(logFile, "\033[1;36m▶ WORKFLOW: %s\033[0m\n", wf.Name)
+	fmt.Fprintf(logFile, "\033[36mUser: %s | Started: %s\033[0m\n\n", executedBy, execution.StartedAt.Format("2006-01-02 15:04:05"))
+
+	e.hub.BroadcastLog(workflowID.String(), fmt.Sprintf("\033[1;36m▶ WORKFLOW STARTED: %s (by %s)\033[0m", wf.Name, executedBy))
 
 	wf.Status = domain.StatusRunning
 	e.wfRepo.Update(wf)
 	e.hub.BroadcastStatus(wf.ID.String(), "workflow", string(domain.StatusRunning))
+
+	// Reset groups and steps to PENDING for new execution visualization
+	for i := range wf.Groups {
+		wf.Groups[i].Status = domain.StatusPending
+		e.groupRepo.Update(&wf.Groups[i])
+		e.hub.BroadcastStatus(wf.Groups[i].ID.String(), "group", string(domain.StatusPending))
+		for j := range wf.Groups[i].Steps {
+			wf.Groups[i].Steps[j].Status = domain.StatusPending
+			e.stepRepo.Update(&wf.Groups[i].Steps[j])
+			e.hub.BroadcastStatus(wf.Groups[i].Steps[j].ID.String(), "step", string(domain.StatusPending))
+		}
+	}
 
 	// 0. Execute BEFORE hooks
 	if err := e.RunHooks(ctx, wf.Hooks, domain.HookTypeBefore, wf.NamespaceID, logFile, depth, execution.User); err != nil {
@@ -167,7 +188,7 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 	}
 
 	if len(wf.Files) > 0 {
-		fmt.Fprintf(logFile, "--- TRANSFERRING %d FILES ---\n", len(wf.Files))
+		fmt.Fprintf(logFile, "\033[1;34m📁 FILE OPERATION (%d files)\033[0m\n", len(wf.Files))
 		for _, f := range wf.Files {
 			targetPath := f.TargetPath
 			if wf.TargetFolder != "" {
@@ -175,20 +196,20 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 			}
 			cleanupPaths = append(cleanupPaths, targetPath)
 
-			fmt.Fprintf(logFile, "Copying %s to %s... ", f.FileName, targetPath)
-			e.hub.BroadcastLog(workflowID.String(), fmt.Sprintf("Copying %s to %s...", f.FileName, targetPath))
+			fmt.Fprintf(logFile, "\033[34m→ %s: \033[0m", f.FileName)
+			e.hub.BroadcastLog(workflowID.String(), fmt.Sprintf("\033[34m→ Transferring %s\033[0m", f.FileName))
 
 			err := e.serverService.UploadFileToServers(ctx, transferServerIDs, f.LocalPath, targetPath, nil)
 			if err != nil {
 				runErr = fmt.Errorf("failed to transfer file %s: %w", f.FileName, err)
-				fmt.Fprintf(logFile, "ERROR: %v\n", err)
-				e.hub.BroadcastLog(workflowID.String(), fmt.Sprintf("Error transferring file: %v", err))
+				fmt.Fprintf(logFile, "\033[1;31m✖ FAILED\033[0m\n")
+				e.hub.BroadcastLog(workflowID.String(), fmt.Sprintf("\033[1;31m✖ Transfer failed: %s\033[0m", f.FileName))
 				break
 			} else {
-				fmt.Fprintf(logFile, "SUCCESS\n")
+				fmt.Fprintf(logFile, "\033[1;32mDONE\033[0m\n")
 			}
 		}
-		fmt.Fprintf(logFile, "--- TRANSFER COMPLETE ---\n\n")
+		fmt.Fprintf(logFile, "\n")
 	}
 
 	// Get all unique servers in this workflow for execution
@@ -250,20 +271,18 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 		}
 	}
 
-	// 3. Cleanup files if requested
 	if wf.CleanupFiles && len(cleanupPaths) > 0 && len(serverIDs) > 0 {
-		fmt.Fprintf(logFile, "\n--- CLEANING UP TRANSFERRED FILES ---\n")
+		fmt.Fprintf(logFile, "\n\033[1;34m🗑 CLEANUP OPERATION\033[0m\n")
 		for _, path := range cleanupPaths {
 			cmdStr := fmt.Sprintf("rm -f %s", path)
 			for _, serverID := range serverIDs {
 				_, err := e.serverService.ExecuteCommand(serverID, cmdStr, nil, nil, nil) // Trusted: pass nil user
 				if err != nil {
-					fmt.Fprintf(logFile, "Failed to cleanup %s on server %s: %v\n", path, serverID, err)
+					fmt.Fprintf(logFile, "\033[1;31m✖ Failed: %s (%v)\033[0m\n", path, err)
 				}
 			}
-			fmt.Fprintf(logFile, "Cleaned up %s\n", path)
+			fmt.Fprintf(logFile, "\033[34m✔ Cleaned: %s\033[0m\n", path)
 		}
-		fmt.Fprintf(logFile, "--- CLEANUP COMPLETE ---\n")
 	}
 
 	e.hub.BroadcastStatus(wf.ID.String(), "workflow", string(wf.Status))
@@ -275,16 +294,16 @@ finalize:
 	if runErr != nil {
 		wf.Status = domain.StatusFailed
 		execution.Status = domain.StatusFailed
-		fmt.Fprintf(logFile, "\n--- WORKFLOW FAILED: %v ---\n", runErr)
-		e.hub.BroadcastLog(wf.ID.String(), fmt.Sprintf("--- WORKFLOW FAILED: %v ---", runErr))
+		fmt.Fprintf(logFile, "\n\033[1;31m✖ WORKFLOW FAILED: %v\033[0m\n", runErr)
+		e.hub.BroadcastLog(wf.ID.String(), fmt.Sprintf("\n\033[1;31m✖ WORKFLOW FAILED: %v\033[0m", runErr))
 
 		// Execute AFTER_FAILED hooks
 		e.RunHooks(ctx, wf.Hooks, domain.HookTypeAfterFailed, wf.NamespaceID, logFile, depth, execution.User)
 	} else {
 		wf.Status = domain.StatusSuccess
 		execution.Status = domain.StatusSuccess
-		fmt.Fprintf(logFile, "\n--- WORKFLOW SUCCESS ---\n")
-		e.hub.BroadcastLog(wf.ID.String(), "--- WORKFLOW SUCCESS ---")
+		fmt.Fprintf(logFile, "\n\033[1;32m✔ WORKFLOW SUCCESS\033[0m\n")
+		e.hub.BroadcastLog(wf.ID.String(), "\n\033[1;32m✔ WORKFLOW SUCCESS\033[0m")
 
 		// Execute AFTER_SUCCESS hooks
 		e.RunHooks(ctx, wf.Hooks, domain.HookTypeAfterSuccess, wf.NamespaceID, logFile, depth, execution.User)
@@ -304,10 +323,10 @@ func (e *WorkflowExecutor) RunHooks(ctx context.Context, hooks []domain.Workflow
 		}
 
 		if logFile != nil {
-			fmt.Fprintf(logFile, "\n>>> EXECUTING %s HOOK: %s <<<\n", hookType, hook.TargetWorkflowID)
+			fmt.Fprintf(logFile, "\n\033[1;34m↪ TRIGGER HOOK: %s\033[0m\n", hookType)
 		}
 		if hook.WorkflowID != nil {
-			e.hub.BroadcastLog(hook.WorkflowID.String(), fmt.Sprintf(">>> Executing %s hook...", hookType))
+			e.hub.BroadcastLog(hook.WorkflowID.String(), fmt.Sprintf("\033[1;34m↪ Hook: %s\033[0m", hookType))
 		}
 
 		var hookInputs map[string]string
@@ -318,7 +337,7 @@ func (e *WorkflowExecutor) RunHooks(ctx context.Context, hooks []domain.Workflow
 		hookExecID := uuid.New()
 		err := e.RunWithDepth(ctx, hook.TargetWorkflowID, hookExecID, hookInputs, nil, nil, "HOOK", depth+1, user)
 		if err != nil {
-			errMsg := fmt.Sprintf("Warning: %s hook execution failed: %v (Continuing workflow)", hookType, err)
+			errMsg := fmt.Sprintf("\033[1;33m⚠ Warning: %s hook failed (%v)\033[0m", hookType, err)
 			if logFile != nil {
 				fmt.Fprintf(logFile, "%s\n", errMsg)
 			}
@@ -329,7 +348,7 @@ func (e *WorkflowExecutor) RunHooks(ctx context.Context, hooks []domain.Workflow
 			continue
 		}
 		if logFile != nil {
-			fmt.Fprintf(logFile, ">>> HOOK SUCCESS <<<\n\n")
+			fmt.Fprintf(logFile, "\033[1;32m✔ HOOK SUCCESS\033[0m\n\n")
 		}
 	}
 	return nil
@@ -366,9 +385,9 @@ func (e *WorkflowExecutor) validateInputs(wf *domain.Workflow, provided map[stri
 				return fmt.Errorf("field %s has invalid option: %s", input.Label, val)
 			}
 		default: // "input"
-			// Whitelist approach: only allow alphanumeric, spaces, and basic symbols used in paths/params
+			// Whitelist approach: only allow alphabetic characters (including Unicode), digits, spaces, and basic symbols used in paths/params
 			// We block shell metacharacters: ; & | $ ` > < ( ) etc.
-			matched, _ := regexp.MatchString(`^[a-zA-Z0-9_\-\.\ \/]+$`, val)
+			matched, _ := regexp.MatchString(`^[\pL0-9_\-\.\ \/]+$`, val)
 			if !matched {
 				return fmt.Errorf("field %s contains invalid characters. Security policy: only alpha-numeric, space, _, -, ., / are allowed", input.Label)
 			}
@@ -459,12 +478,12 @@ func (e *WorkflowExecutor) evalAtom(expr, original string) (bool, error) {
 func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowGroup, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, defaultServerID uuid.UUID, logFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, namespaceID uuid.UUID, user *domain.User, workingDirs *sync.Map) error {
 	// Evaluate condition before running
 	if shouldRun, err := e.evaluateCondition(group.Condition, inputs, variables, groupResults, namespaceID, user); err != nil {
-		errStr := fmt.Sprintf("\n%s\n[GROUP CONDITION ERROR] %s\nCondition: %s\nError: %v\n%s\n", strings.Repeat("!", 80), group.Name, group.Condition, err, strings.Repeat("!", 80))
+		errStr := fmt.Sprintf("\n\033[1;31m✖ GROUP CONDITION ERROR: %s\033[0m\n\033[31mCondition: %s\nError: %v\033[0m\n", group.Name, group.Condition, err)
 		fmt.Fprint(logFile, errStr)
 		e.hub.BroadcastLog(workflowID.String(), errStr)
 		return fmt.Errorf("group %q condition error: %w", group.Name, err)
 	} else if !shouldRun {
-		msg := fmt.Sprintf("\n%s\n[GROUP SKIPPED] %s\nCondition: %s\n%s\n", strings.Repeat("-", 80), group.Name, group.Condition, strings.Repeat("-", 80))
+		msg := fmt.Sprintf("\n\033[1;33m⏭ GROUP SKIPPED: %s\033[0m \033[90m(Condition returned false)\033[0m\n", group.Name)
 		fmt.Fprint(logFile, msg)
 		e.hub.BroadcastLog(workflowID.String(), msg)
 		group.Status = "SKIPPED"
@@ -473,7 +492,7 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 		return nil
 	}
 
-	msg := fmt.Sprintf("\n%s\n[GROUP] %s\nParallel: %v\n%s\n", strings.Repeat("=", 80), group.Name, group.IsParallel, strings.Repeat("=", 80))
+	msg := fmt.Sprintf("\n\n\033[1;35m❖ GROUP START: %s\033[0m \033[90m[Parallel: %v]\033[0m\n", group.Name, group.IsParallel)
 	fmt.Fprint(logFile, msg)
 	e.hub.BroadcastLog(group.WorkflowID.String(), msg)
 	group.Status = domain.StatusRunning
@@ -508,6 +527,12 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 				group.Status = domain.StatusFailed
 				e.groupRepo.Update(group)
 				e.hub.BroadcastStatus(group.ID.String(), "group", string(domain.StatusFailed))
+				if group.ContinueOnFailure {
+					msg := fmt.Sprintf("\n\033[1;33m⚠ GROUP FAILED BUT CONTINUING:\033[0m %s (Continue on Failure enabled)\n", group.Name)
+					fmt.Fprint(logFile, msg)
+					e.hub.BroadcastLog(workflowID.String(), msg)
+					return nil
+				}
 				return err
 			}
 		}
@@ -517,6 +542,12 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 				group.Status = domain.StatusFailed
 				e.groupRepo.Update(group)
 				e.hub.BroadcastStatus(group.ID.String(), "group", string(domain.StatusFailed))
+				if group.ContinueOnFailure {
+					msg := fmt.Sprintf("\n\033[1;33m⚠ GROUP FAILED BUT CONTINUING:\033[0m %s (Continue on Failure enabled)\n", group.Name)
+					fmt.Fprint(logFile, msg)
+					e.hub.BroadcastLog(workflowID.String(), msg)
+					return nil
+				}
 				return err
 			}
 			// Sequential Step Delay: 200ms gap between steps to prevent race conditions
@@ -528,33 +559,39 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 	}
 	// Perform relay copy if configured before marking group as SUCCESS
 	if group.IsCopyEnabled {
-		fmt.Fprintf(logFile, "[DEBUG] Relay copy enabled for group %q (ID: %s)\n", group.Name, group.ID)
+		msg := fmt.Sprintf("\033[90m⚙ Relay copy enabled for group %q\033[0m\n", group.Name)
+		fmt.Fprint(logFile, msg)
+		e.hub.BroadcastLog(workflowID.String(), msg)
 
 		if group.CopySourcePath != "" && group.CopyTargetPath != "" {
 			if err := e.relayCopy(ctx, group, inputs, variables, groupResults, namespaceID, effectiveServerID, logFile, workflowID, user); err != nil {
-				fmt.Fprintf(logFile, "Relay copy failed: %v\n", err)
-				e.hub.BroadcastLog(workflowID.String(), fmt.Sprintf("Relay copy failed: %v\n", err))
+				errMsg := fmt.Sprintf("\033[1;31m✖ Relay copy failed: %v\033[0m\n", err)
+				fmt.Fprint(logFile, errMsg)
+				e.hub.BroadcastLog(workflowID.String(), errMsg)
 				group.Status = domain.StatusFailed
 				e.groupRepo.Update(group)
 				e.hub.BroadcastStatus(group.ID.String(), "group", string(domain.StatusFailed))
+				if group.ContinueOnFailure {
+					msg := fmt.Sprintf("\033[1;33m⚠ RELAY COPY FAILED BUT CONTINUING:\033[0m %s (Continue on Failure enabled)\n", group.Name)
+					fmt.Fprint(logFile, msg)
+					e.hub.BroadcastLog(workflowID.String(), msg)
+					return nil
+				}
 				return fmt.Errorf("relay copy failed: %w", err)
 			}
 		} else {
-			msg := fmt.Sprintf("[DEBUG] Relay copy skipped for group %q: missing SourcePath or TargetPath\n", group.Name)
+			msg := "\033[90m⚙ Relay copy skipped: missing paths\033[0m\n"
 			fmt.Fprint(logFile, msg)
 			e.hub.BroadcastLog(workflowID.String(), msg)
 		}
 	} else {
-		fmt.Fprintf(logFile, "[DEBUG] Relay copy disabled for group %q\n", group.Name)
+		msg := fmt.Sprintf("\033[90m⚙ Relay copy disabled for group %q\033[0m\n", group.Name)
+		fmt.Fprint(logFile, msg)
+		e.hub.BroadcastLog(workflowID.String(), msg)
 	}
 
 	group.Status = domain.StatusSuccess
 	e.hub.BroadcastStatus(group.ID.String(), "group", string(domain.StatusSuccess))
-
-	// Explicit completion marker for logs
-	compMsg := fmt.Sprintf("\n%s\n--- GROUP COMPLETE: %s ---\n%s\n", strings.Repeat("-", 20), group.Name, strings.Repeat("-", 20))
-	fmt.Fprint(logFile, compMsg)
-	e.hub.BroadcastLog(workflowID.String(), compMsg)
 
 	return e.groupRepo.Update(group)
 }
@@ -564,12 +601,14 @@ func (e *WorkflowExecutor) relayCopy(ctx context.Context, group *domain.Workflow
 	targetPath := filepath.Clean(group.CopyTargetPath)
 
 	// Perform variable substitution
-	securityRegex := regexp.MustCompile(`^[a-zA-Z0-9_\-\.\ \/]+$`)
+	securityRegex := regexp.MustCompile(`^[\pL0-9_\-\.\ \/]+$`)
 
 	substitute := func(val string) (string, error) {
 		// 1. Static Variables: {{variable.key}}
 		for _, v := range variables {
 			if v.Value != "" && !securityRegex.MatchString(v.Value) {
+				errMsg := fmt.Sprintf("\033[1;31m✖ Security violation: variable %q contains invalid characters\033[0m\n", v.Key)
+				fmt.Fprint(logFile, errMsg)
 				return "", fmt.Errorf("security violation: variable '%s' contains invalid characters", v.Key)
 			}
 			val = strings.ReplaceAll(val, "{{variable."+v.Key+"}}", v.Value)
@@ -577,6 +616,8 @@ func (e *WorkflowExecutor) relayCopy(ctx context.Context, group *domain.Workflow
 		// 2. Runtime Inputs: {{input.key}} and {{key}}
 		for k, v := range inputs {
 			if v != "" && !securityRegex.MatchString(v) {
+				errMsg := fmt.Sprintf("\033[1;31m✖ Security violation: input %q contains invalid characters\033[0m\n", k)
+				fmt.Fprint(logFile, errMsg)
 				return "", fmt.Errorf("security violation: input '%s' contains invalid characters", k)
 			}
 			val = strings.ReplaceAll(val, "{{input."+k+"}}", v)
@@ -585,6 +626,8 @@ func (e *WorkflowExecutor) relayCopy(ctx context.Context, group *domain.Workflow
 		// 3. Group Results: {{step.group_key.status}}
 		for k, v := range groupResults {
 			if v != "" && !securityRegex.MatchString(v) {
+				errMsg := fmt.Sprintf("\033[1;31m✖ Security violation: step status %q contains invalid characters\033[0m\n", k)
+				fmt.Fprint(logFile, errMsg)
 				return "", fmt.Errorf("security violation: group result '%s' contains invalid characters", k)
 			}
 			val = strings.ReplaceAll(val, "{{step."+k+".status}}", v)
@@ -595,6 +638,8 @@ func (e *WorkflowExecutor) relayCopy(ctx context.Context, group *domain.Workflow
 			gvs, _ := e.globalVarRepo.List(namespaceID, &scope)
 			for _, v := range gvs {
 				if v.Value != "" && !securityRegex.MatchString(v.Value) {
+					errMsg := fmt.Sprintf("\033[1;31m✖ Security violation: global variable %q contains invalid characters\033[0m\n", v.Key)
+					fmt.Fprint(logFile, errMsg)
 					return "", fmt.Errorf("security violation: global variable '%s' contains invalid characters", v.Key)
 				}
 				val = strings.ReplaceAll(val, "{{global."+v.Key+"}}", v.Value)
@@ -613,8 +658,11 @@ func (e *WorkflowExecutor) relayCopy(ctx context.Context, group *domain.Workflow
 		return err
 	}
 
-	fmt.Fprintf(logFile, "\n--- RELAY COPY: %s -> Server(%s):%s ---\n", sourcePath, group.CopyTargetServerID, targetPath)
-	e.hub.BroadcastLog(workflowID.String(), "Starting relay copy...\n")
+	msgRef := fmt.Sprintf("\033[1;34m📦 RELAY COPY: %s -> Server(%s):%s\033[0m\n", sourcePath, group.CopyTargetServerID, targetPath)
+	fmt.Fprint(logFile, msgRef)
+	e.hub.BroadcastLog(workflowID.String(), msgRef)
+	fmt.Fprintf(logFile, "\033[34mStarting relay copy...\033[0m\n")
+	e.hub.BroadcastLog(workflowID.String(), "\033[34mStarting relay copy...\033[0m\n")
 
 	// 1. Create tarball on source server
 	tmpTarName := fmt.Sprintf("relay_%s.tar.gz", uuid.New().String())
@@ -658,8 +706,9 @@ func (e *WorkflowExecutor) relayCopy(ctx context.Context, group *domain.Workflow
 		return fmt.Errorf("failed to extract tarball on target: %w", err)
 	}
 
-	fmt.Fprintf(logFile, "--- RELAY COPY SUCCESS ---\n")
-	e.hub.BroadcastLog(workflowID.String(), "Relay copy completed successfully.\n")
+	successMsg := "\033[1;32m✔ RELAY COPY SUCCESS\033[0m\n"
+	fmt.Fprint(logFile, successMsg)
+	e.hub.BroadcastLog(workflowID.String(), successMsg)
 	return nil
 }
 
@@ -685,7 +734,7 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 	stepLogFile, _ := os.OpenFile(stepLogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	defer stepLogFile.Close()
 
-	msg := fmt.Sprintf("\n[STEP] %s\n%s\n", step.Name, strings.Repeat("─", 40))
+	msg := fmt.Sprintf("\033[1;36m>> STEP: %s\033[0m\n", step.Name)
 	fmt.Fprint(mainLogFile, msg)
 	fmt.Fprint(stepLogFile, msg)
 
@@ -693,16 +742,28 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 	e.hub.BroadcastLog(step.GroupID.String(), msg)
 	e.hub.BroadcastLog(workflowID.String(), msg)
 
+	if step.CommandText == "" {
+		emptyMsg := "\033[90m(No command to execute)\033[0m\n"
+		fmt.Fprint(mainLogFile, emptyMsg)
+		fmt.Fprint(stepLogFile, emptyMsg)
+		step.Status = domain.StatusSuccess
+		e.stepRepo.Update(step)
+		e.hub.BroadcastStatus(step.ID.String(), "step", string(domain.StatusSuccess))
+		return nil
+	}
 	var output string
 	var err error
 
 	// Substitute variables in command
 	command := step.CommandText
-	securityRegex := regexp.MustCompile(`^[a-zA-Z0-9_\-\.\ \/]+$`)
+	securityRegex := regexp.MustCompile(`^[\pL0-9_\-\.\ \/]+$`)
 
 	// 1. Static Variables: {{variable.key}}
 	for _, v := range variables {
 		if v.Value != "" && !securityRegex.MatchString(v.Value) {
+			errMsg := fmt.Sprintf("\033[1;31m✖ Security violation: variable %q contains invalid characters\033[0m\n", v.Key)
+			fmt.Fprint(mainLogFile, errMsg)
+			fmt.Fprint(stepLogFile, errMsg)
 			return fmt.Errorf("security violation: variable '%s' contains invalid characters", v.Key)
 		}
 		command = strings.ReplaceAll(command, "{{variable."+v.Key+"}}", v.Value)
@@ -712,6 +773,9 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 		// Note: inputs are already validated at the start of the workflow execution,
 		// but re-validating here doesn't hurt.
 		if v != "" && !securityRegex.MatchString(v) {
+			errMsg := fmt.Sprintf("\033[1;31m✖ Security violation: input %q contains invalid characters\033[0m\n", k)
+			fmt.Fprint(mainLogFile, errMsg)
+			fmt.Fprint(stepLogFile, errMsg)
 			return fmt.Errorf("security violation: input '%s' contains invalid characters", k)
 		}
 		command = strings.ReplaceAll(command, "{{input."+k+"}}", v)
@@ -720,6 +784,9 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 	// 3. Group Results: {{step.group_key.status}}
 	for k, v := range groupResults {
 		if v != "" && !securityRegex.MatchString(v) {
+			errMsg := fmt.Sprintf("\033[1;31m✖ Security violation: step status %q contains invalid characters\033[0m\n", k)
+			fmt.Fprint(mainLogFile, errMsg)
+			fmt.Fprint(stepLogFile, errMsg)
 			return fmt.Errorf("security violation: group result '%s' contains invalid characters", k)
 		}
 		command = strings.ReplaceAll(command, "{{step."+k+".status}}", v)
@@ -730,6 +797,9 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 		gvs, _ := e.globalVarRepo.List(namespaceID, &scope)
 		for _, v := range gvs {
 			if v.Value != "" && !securityRegex.MatchString(v.Value) {
+				errMsg := fmt.Sprintf("\033[1;31m✖ Security violation: global variable %q contains invalid characters\033[0m\n", v.Key)
+				fmt.Fprint(mainLogFile, errMsg)
+				fmt.Fprint(stepLogFile, errMsg)
 				return fmt.Errorf("security violation: global variable '%s' contains invalid characters", v.Key)
 			}
 			command = strings.ReplaceAll(command, "{{global."+v.Key+"}}", v.Value)

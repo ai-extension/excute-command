@@ -11,6 +11,7 @@ interface TerminalLogProps {
     executionID?: string;
     isActive: boolean;
     isGlobal?: boolean;
+    isGroup?: boolean;
     initialLogs?: string[];
     isLive?: boolean;
     showHeader?: boolean;
@@ -26,6 +27,7 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
     initialLogs = [],
     isLive = true,
     isGlobal = false,
+    isGroup = false,
     showHeader = true,
     onClear,
     onReady,
@@ -45,20 +47,22 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
                 // Fetch existing logs for the new target
                 const url = isGlobal
                     ? `${API_BASE_URL}/executions/${executionID}/logs`
-                    : `${API_BASE_URL}/executions/${executionID}/logs?step_id=${targetID}`;
+                    : isGroup
+                        ? `${API_BASE_URL}/executions/${executionID}/logs?group_id=${targetID}`
+                        : `${API_BASE_URL}/executions/${executionID}/logs?step_id=${targetID}`;
 
                 apiFetch(url)
                     .then(res => res.text())
                     .then((text: string) => {
                         // Only update if targetID hasn't changed since we started fetching
                         if (targetRef.current === targetID) {
-                            setLogs(text.split('\n').filter((l: string) => l.length > 0));
+                            setLogs(text.split('\n'));
                         }
                     })
                     .catch((err: Error) => console.error('Failed to fetch historical context:', err));
             }
         }
-    }, [targetID, executionID, isLive, isGlobal, apiFetch]);
+    }, [targetID, executionID, isLive, isGlobal, isGroup, apiFetch]);
 
     useEffect(() => {
         if (!isLive) {
@@ -78,7 +82,7 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
                 // Type guard: only process log messages here. 
                 // Status messages are handled by ExecutionMonitor.
                 if (data.type === 'log' && data.target_id === targetID && data.content) {
-                    const newLines = data.content.split('\n').filter((l: string) => l.length > 0);
+                    const newLines = data.content.split('\n');
                     setLogs(prev => [...prev, ...newLines]);
                 }
             } catch (err) {
@@ -123,12 +127,12 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
 
     return (
         <div className={cn(
-            "flex flex-col bg-[#0a0b0e] border border-[#1a1c23] rounded-2xl overflow-hidden shadow-2xl transition-all duration-500 h-full min-h-0",
+            "flex flex-col bg-background border border-border rounded-2xl overflow-hidden shadow-2xl transition-all duration-500 h-full min-h-0",
             className
         )}>
             {/* Header */}
             {showHeader && (
-                <div className="flex items-center justify-between px-4 py-2 bg-[#13151b] border-b border-[#1a1c23]">
+                <div className="flex items-center justify-between px-4 py-2 bg-muted border-b border-border">
                     <div className="flex items-center gap-2">
                         <TerminalIcon className="w-3.5 h-3.5 text-primary" />
                         <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">
@@ -137,7 +141,7 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
                         <div className="flex items-center gap-1.5 ml-2">
                             <div className={cn(
                                 "w-1.5 h-1.5 rounded-full",
-                                isActive ? "bg-emerald-500 animate-pulse" : "bg-zinc-700"
+                                isActive ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground/30"
                             )} />
                             <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/40">
                                 {isLive ? (isActive ? 'Session Active' : 'Disconnected') : 'Historical Data'}
@@ -182,7 +186,7 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
             {/* Content */}
             <div
                 ref={scrollRef}
-                className="flex-1 p-4 font-mono text-[13px] overflow-y-auto min-h-0 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent selection:bg-primary/30"
+                className="flex-1 p-4 font-mono text-[13px] overflow-auto min-h-0 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent selection:bg-primary/30"
             >
                 {logs.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center opacity-20 gap-3 grayscale">
@@ -195,10 +199,10 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
                     <div className="flex flex-col gap-0.5">
                         {logs.map((log, i) => (
                             <div key={i} className="flex gap-2 group animate-in fade-in duration-300">
-                                <span className="text-zinc-700 select-none text-[10px] w-6 shrink-0 pt-0.5">
+                                <span className="text-muted-foreground/40 select-none text-[10px] w-6 shrink-0 pt-0.5">
                                     {(i + 1).toString().padStart(2, '0')}
                                 </span>
-                                <span className="whitespace-pre-wrap leading-relaxed break-words flex-1">
+                                <span className="whitespace-pre leading-relaxed min-w-fit flex-1">
                                     <Ansi linkify={false}>{log}</Ansi>
                                 </span>
                             </div>
@@ -208,17 +212,17 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
             </div>
 
             {/* Footer */}
-            <div className="px-4 py-1.5 bg-[#0a0b0e] border-t border-[#1a1c23] flex justify-between items-center">
-                <div className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">
+            <div className="px-4 py-1.5 bg-background border-t border-border flex justify-between items-center">
+                <div className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-widest">
                     Buffer: {logs.length} Lines • Target: {targetID.substring(0, 8)}
                 </div>
                 <div className="flex gap-4">
                     <div className="flex items-center gap-1.5 opacity-40">
-                        <div className="w-1.5 h-1.5 rounded bg-zinc-700" />
+                        <div className="w-1.5 h-1.5 rounded bg-muted-foreground/30" />
                         <span className="text-[9px] font-black uppercase tracking-tighter">Stdout</span>
                     </div>
                     <div className="flex items-center gap-1.5 opacity-40">
-                        <div className="w-1.5 h-1.5 rounded bg-red-900" />
+                        <div className="w-1.5 h-1.5 rounded bg-destructive/50" />
                         <span className="text-[9px] font-black uppercase tracking-tighter text-red-400">Stderr</span>
                     </div>
                 </div>

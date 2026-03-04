@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
     Zap, Save, ChevronLeft, Layout,
     Settings as SettingsIcon, Layers, Server,
-    Plus, Terminal, Trash2, Clock, History, Database, SlidersHorizontal, ChevronDown, Play, GripVertical, File
+    Plus, Terminal, Trash2, Clock, History, Database, SlidersHorizontal, ChevronDown, Play, GripVertical, File, AlertCircle
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -214,8 +214,9 @@ const WorkflowDesignerPage = () => {
             key: `group_${nextNum}`,
             order: groups.length,
             is_parallel: false,
+            continue_on_failure: false,
             steps: []
-        }]);
+        } as any]);
         setActiveTab('steps');
     };
 
@@ -754,8 +755,18 @@ const WorkflowDesignerPage = () => {
                                                                                     </div>
                                                                                     <div className="flex items-center gap-2">
                                                                                         {/* Active config badges */}
-                                                                                        {(group.condition || group.default_server_id) && (
+                                                                                        {(group.condition || group.default_server_id || group.continue_on_failure || group.is_copy_enabled) && (
                                                                                             <div className="flex items-center gap-2 mr-2 pr-4 border-r border-border/50">
+                                                                                                {group.continue_on_failure && (
+                                                                                                    <Badge variant="outline" className="h-5 px-2 text-[8px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-500 border-amber-500/20 whitespace-nowrap">
+                                                                                                        <AlertCircle className="w-3 h-3 mr-1" /> Continue
+                                                                                                    </Badge>
+                                                                                                )}
+                                                                                                {group.is_copy_enabled && (
+                                                                                                    <Badge variant="outline" className="h-5 px-2 text-[8px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-500 border-emerald-500/20 whitespace-nowrap">
+                                                                                                        <File className="w-3 h-3 mr-1" /> Relay
+                                                                                                    </Badge>
+                                                                                                )}
                                                                                                 {group.condition && (
                                                                                                     <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/20 text-[9px] font-bold text-amber-500 max-w-[160px] truncate">
                                                                                                         if {group.condition}
@@ -817,6 +828,22 @@ const WorkflowDesignerPage = () => {
                                                                                                             <span className="text-[9px] text-muted-foreground font-mono opacity-50">{group.name}</span>
                                                                                                         </div>
                                                                                                         <div className="p-5 grid grid-cols-1 gap-5">
+                                                                                                            {/* Continue on Failure */}
+                                                                                                            <div className="flex items-center justify-between gap-5">
+                                                                                                                <div className="flex items-center gap-2">
+                                                                                                                    <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
+                                                                                                                    <span className="text-[8px] font-black uppercase tracking-widest text-amber-500">Continue on Failure</span>
+                                                                                                                </div>
+                                                                                                                <Switch
+                                                                                                                    checked={group.continue_on_failure}
+                                                                                                                    onCheckedChange={(checked) => {
+                                                                                                                        const ng = [...groups];
+                                                                                                                        ng[gIdx].continue_on_failure = checked;
+                                                                                                                        setGroups(ng);
+                                                                                                                    }}
+                                                                                                                />
+                                                                                                            </div>
+
                                                                                                             {/* Condition */}
                                                                                                             <div className="space-y-2">
                                                                                                                 <label className="text-[8px] font-black uppercase tracking-widest text-amber-500">Condition <span className="text-muted-foreground/50 normal-case font-medium">— skip this group unless condition is true</span></label>
@@ -1142,8 +1169,9 @@ const WorkflowDesignerPage = () => {
                         </>
                     )}
                 </div>
-            )}
-        </WorkflowRunner>
+            )
+            }
+        </WorkflowRunner >
     );
 };
 

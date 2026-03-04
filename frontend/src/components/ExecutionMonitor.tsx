@@ -3,7 +3,7 @@ import {
     Zap, X, CheckCircle2, AlertCircle, Clock,
     ArrowRight, ChevronDown, ChevronRight,
     Terminal, Server, Layers, Play, Pause, Square, Monitor,
-    Download, Plus, FileText, Calendar
+    Download, Plus, FileText, Calendar, File
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -33,6 +33,7 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
     const [workflow, setWorkflow] = useState<Workflow | null>(initialWorkflow || initialExecution?.workflow || null);
     const [execution, setExecution] = useState<WorkflowExecution | null>(initialExecution || null);
     const [activeStepID, setActiveStepID] = useState<string | null>(null);
+    const [activeGroupID, setActiveGroupID] = useState<string | null>(null);
     const [globalLogs, setGlobalLogs] = useState<string[]>([]);
     const [stepLogs, setStepLogs] = useState<string[]>([]);
     const [isStatusWSReady, setIsStatusWSReady] = useState(false);
@@ -159,10 +160,15 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                 .then(res => res.text())
                 .then(text => setStepLogs(text.split('\n').filter(line => line.length > 0)))
                 .catch(() => setStepLogs(['[Log file not found]']));
+        } else if (mode === 'HISTORICAL' && execution && activeGroupID) {
+            apiFetch(`${API_BASE_URL}/executions/${execution.id}/logs?group_id=${activeGroupID}`)
+                .then(res => res.text())
+                .then(text => setStepLogs(text.split('\n').filter(line => line.length > 0)))
+                .catch(() => setStepLogs(['[Log file not found]']));
         } else {
             setStepLogs([]);
         }
-    }, [activeStepID, execution, mode]);
+    }, [activeStepID, activeGroupID, execution, mode]);
 
     if (!workflow) return null;
 
@@ -182,19 +188,19 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
     };
 
     return (
-        <div className="flex flex-col h-full bg-[#0a0b0e] animate-in fade-in zoom-in-95 duration-300 max-h-full overflow-hidden">
+        <div className="flex flex-col h-full bg-background animate-in fade-in zoom-in-95 duration-300 max-h-full overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 bg-[#13151b] border-b border-[#1f212a] select-none shrink-0">
+            <div className="flex items-center justify-between px-6 py-4 bg-card border-b border-border select-none shrink-0">
                 <div className="flex items-center gap-4">
                     <div className="flex gap-2 mr-1">
                         <button onClick={onClose} className="w-3 h-3 rounded-full bg-[#ff5f56] shadow-inner hover:bg-[#ff5f56]/80 transition-colors cursor-pointer" />
                         <button className="w-3 h-3 rounded-full bg-[#ffbd2e] shadow-inner hover:bg-[#ffbd2e]/80 transition-colors cursor-pointer" />
                         <button className="w-3 h-3 rounded-full bg-[#27c93f] shadow-inner hover:bg-[#27c93f]/80 transition-colors cursor-pointer" />
                     </div>
-                    <div className="flex items-center gap-3 py-1 px-3 bg-black/30 rounded-full border border-white/5">
+                    <div className="flex items-center gap-3 py-1 px-3 bg-muted/30 rounded-full border border-border/50">
                         <Zap className={cn("w-3.5 h-3.5 shadow-[0_0_10px_rgba(99,102,241,0.5)]", mode === 'LIVE' ? "text-primary" : "text-amber-500")} />
-                        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">
-                            {mode === 'LIVE' ? 'Live Orchestration Monitor' : 'Execution Audit Vault'} <span className="text-zinc-600 px-1">•</span> {workflow.name}
+                        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                            {mode === 'LIVE' ? 'Live Orchestration Monitor' : 'Execution Audit Vault'} <span className="text-muted-foreground/40 px-1">•</span> {workflow.name}
                         </span>
                         {execution?.trigger_source === 'SCHEDULE' && (
                             <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 font-black text-[8px] uppercase tracking-widest px-2 py-0.5 ml-2">
@@ -224,7 +230,7 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                             variant="ghost"
                             size="sm"
                             onClick={handleDownloadLogs}
-                            className="h-7 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest text-zinc-500 hover:text-primary hover:bg-primary/5 border border-transparent hover:border-primary/20 transition-all"
+                            className="h-7 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary hover:bg-primary/5 border border-transparent hover:border-primary/20 transition-all"
                         >
                             <Download className="w-3.5 h-3.5 mr-2" />
                             Download Trace
@@ -232,10 +238,13 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                         <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => setActiveStepID(null)}
+                            onClick={() => {
+                                setActiveStepID(null);
+                                setActiveGroupID(null);
+                            }}
                             className={cn(
                                 "h-7 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all",
-                                !activeStepID ? "bg-primary/20 text-primary border border-primary/30" : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+                                !activeStepID ? "bg-primary/20 text-primary border border-primary/30" : "text-muted-foreground hover:text-foreground hover:bg-muted"
                             )}
                         >
                             <Monitor className="w-3.5 h-3.5 mr-2" />
@@ -265,7 +274,7 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                     </div>
                     <Badge variant="outline" className={cn(
                         "font-black text-[9px] uppercase tracking-widest px-3 py-1",
-                        mode === 'LIVE' ? "bg-primary/10 border-primary/20 text-primary animate-pulse" : "bg-zinc-800 border-white/10 text-zinc-400"
+                        mode === 'LIVE' ? "bg-primary/10 border-primary/20 text-primary animate-pulse" : "bg-muted border-border text-muted-foreground"
                     )}>
                         {mode === 'LIVE' ? workflow.status : execution?.status}
                     </Badge>
@@ -274,7 +283,7 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
 
             <div className="flex-1 flex overflow-hidden min-h-0">
                 {/* Workflow Structure */}
-                <div className="w-1/2 overflow-y-auto border-r border-white/5 p-6 bg-black/20 custom-scrollbar">
+                <div className="w-80 shrink-0 overflow-auto border-r border-border p-6 bg-muted/20 custom-scrollbar">
                     <div className="space-y-6">
                         {workflow.groups?.map((group) => (
                             <div key={group.id} className="space-y-3">
@@ -284,16 +293,42 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                                             "w-7 h-7 rounded-lg flex items-center justify-center border",
                                             group.status === 'RUNNING' ? "bg-primary/20 border-primary/40 animate-pulse text-primary" :
                                                 group.status === 'SUCCESS' ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500" :
-                                                    "bg-zinc-800 border-white/5 text-zinc-500"
+                                                    "bg-muted border-border text-muted-foreground/60"
                                         )}>
                                             <Layers className="w-3.5 h-3.5" />
                                         </div>
-                                        <div>
-                                            <p className="text-[12px] font-black tracking-tight text-white uppercase">{group.name}</p>
-                                            <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">
+                                        <button
+                                            onClick={() => {
+                                                setActiveGroupID(group.id);
+                                                setActiveStepID(null);
+                                            }}
+                                            className={cn(
+                                                "flex flex-col gap-0.5 text-left transition-all",
+                                                activeGroupID === group.id ? "opacity-100" : "opacity-60 hover:opacity-100"
+                                            )}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <p className={cn(
+                                                    "text-[12px] font-black tracking-tight uppercase",
+                                                    activeGroupID === group.id ? "text-primary" : "text-foreground"
+                                                )}>{group.name}</p>
+                                                <div className="flex items-center gap-1">
+                                                    {group.continue_on_failure && (
+                                                        <span title="Continue on Failure">
+                                                            <AlertCircle className="w-2.5 h-2.5 text-amber-500" />
+                                                        </span>
+                                                    )}
+                                                    {group.is_copy_enabled && (
+                                                        <span title="Relay Enabled">
+                                                            <File className="w-2.5 h-2.5 text-emerald-500" />
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <p className="text-[9px] font-bold text-muted-foreground/60 uppercase tracking-widest">
                                                 {group.is_parallel ? 'Parallel Execution' : 'Sequential Order'}
                                             </p>
-                                        </div>
+                                        </button>
                                     </div>
                                 </div>
 
@@ -303,10 +338,13 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                                         return (
                                             <button
                                                 key={step.id}
-                                                onClick={() => setActiveStepID(step.id)}
+                                                onClick={() => {
+                                                    setActiveStepID(step.id);
+                                                    setActiveGroupID(null);
+                                                }}
                                                 className={cn(
                                                     "w-full flex items-center justify-between p-3 rounded-xl border transition-all text-left group",
-                                                    activeStepID === step.id ? "bg-primary/10 border-primary/30" : "bg-black/30 border-white/5 hover:border-white/10",
+                                                    activeStepID === step.id ? "bg-primary/10 border-primary/30" : "bg-muted/10 border-border hover:border-border/80",
                                                     status === 'RUNNING' && "border-primary/50 shadow-[0_0_15px_rgba(99,102,241,0.15)]"
                                                 )}
                                             >
@@ -315,19 +353,19 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                                                         "w-1.5 h-1.5 rounded-full",
                                                         status === 'RUNNING' ? "bg-primary animate-pulse shadow-[0_0_8px_rgba(99,102,241,1)]" :
                                                             status === 'SUCCESS' ? "bg-emerald-500" :
-                                                                status === 'FAILED' ? "bg-destructive" : "bg-zinc-700"
+                                                                status === 'FAILED' ? "bg-destructive" : "bg-muted-foreground/30"
                                                     )} />
                                                     <div>
-                                                        <p className="text-[11px] font-bold tracking-tight text-zinc-300">{step.name}</p>
+                                                        <p className="text-[11px] font-bold tracking-tight text-foreground/80">{step.name}</p>
                                                         <div className="flex items-center gap-2 mt-0.5">
-                                                            <Server className="w-2.5 h-2.5 text-zinc-600" />
-                                                            <span className="text-[8px] font-black uppercase text-zinc-600 tracking-tighter">
+                                                            <Server className="w-2.5 h-2.5 text-muted-foreground/40" />
+                                                            <span className="text-[8px] font-black uppercase text-muted-foreground/40 tracking-tighter">
                                                                 {step.server_id ? 'Remote Host' : 'Local Engine'}
                                                             </span>
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <ChevronRight className="w-3 h-3 text-zinc-700" />
+                                                <ChevronRight className="w-3 h-3 text-muted-foreground/40" />
                                             </button>
                                         );
                                     })}
@@ -337,16 +375,17 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                     </div>
                 </div>
 
-                <div className="flex-1 flex flex-col bg-black min-h-0">
-                    <div className="flex-1 flex flex-col overflow-hidden p-1 min-h-0">
+                <div className="flex-1 flex flex-col bg-background min-w-0 overflow-hidden">
+                    <div className="flex-1 flex flex-col overflow-hidden p-1">
                         <TerminalLog
-                            targetID={activeStepID || (workflow?.id || 'GLOBAL')}
+                            targetID={activeStepID || activeGroupID || (workflow?.id || 'GLOBAL')}
                             executionID={execution?.id || (workflow as any)?.execution_id}
                             isActive={true}
-                            isGlobal={!activeStepID}
+                            isGlobal={!activeStepID && !activeGroupID}
+                            isGroup={!!activeGroupID && !activeStepID}
                             isLive={mode === 'LIVE'}
                             showHeader={false}
-                            initialLogs={activeStepID ? stepLogs : globalLogs}
+                            initialLogs={activeStepID || activeGroupID ? stepLogs : globalLogs}
                             onReady={() => setIsTerminalReady(true)}
                             className="flex-1 border-0 rounded-none bg-transparent"
                         />
@@ -355,24 +394,24 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
             </div>
 
             {/* Status Footer */}
-            <div className="px-8 py-3 bg-[#13151b] border-t border-[#1f212a] flex items-center justify-between shrink-0">
+            <div className="px-8 py-3 bg-card border-t border-border flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-6">
                     <div className="flex items-center gap-2">
-                        <Clock className="w-3.5 h-3.5 text-zinc-600" />
-                        <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500">
+                        <Clock className="w-3.5 h-3.5 text-muted-foreground/40" />
+                        <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">
                             {mode === 'LIVE' ? `Session Start: ${new Date().toLocaleTimeString()}` : `Executed: ${new Date(execution?.started_at || "").toLocaleString()}`}
                         </span>
                     </div>
-                    <div className="w-px h-3 bg-white/5" />
+                    <div className="w-px h-3 bg-border/50" />
                     <div className="flex items-center gap-2">
-                        <Monitor className="w-3.5 h-3.5 text-zinc-600" />
-                        <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500">
+                        <Monitor className="w-3.5 h-3.5 text-muted-foreground/40" />
+                        <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">
                             {mode === 'LIVE' ? 'Telemetry Feed: Encrypted' : 'Audit Integrity: Verified'}
                         </span>
                     </div>
                 </div>
             </div>
-        </div>
+        </div >
     );
 };
 
