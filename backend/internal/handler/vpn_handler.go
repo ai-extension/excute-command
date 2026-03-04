@@ -34,9 +34,10 @@ func (h *VpnConfigHandler) List(c *gin.Context) {
 
 	searchTerm := c.Query("search")
 	authType := c.Query("auth_type")
+	vpnType := c.Query("vpn_type")
 
 	userVal, _ := c.Get("user")
-	vpns, total, err := h.service.ListPaginated(limit, offset, searchTerm, authType, userVal.(*domain.User))
+	vpns, total, err := h.service.ListPaginated(limit, offset, searchTerm, vpnType, authType, userVal.(*domain.User))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

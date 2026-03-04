@@ -45,12 +45,16 @@ const VpnPage = () => {
     const [formData, setFormData] = useState<Partial<VpnConfig>>({
         name: '',
         description: '',
+        vpn_type: 'SSH',
         host: '',
         port: 22,
         user: '',
         auth_type: 'PASSWORD',
         password: '',
-        private_key: ''
+        private_key: '',
+        config_file: '',
+        public_key: '',
+        shared_key: ''
     });
 
     const [limit, setLimit] = useState(20);
@@ -111,12 +115,16 @@ const VpnPage = () => {
             setFormData({
                 name: '',
                 description: '',
+                vpn_type: 'SSH',
                 host: '',
                 port: 22,
                 user: '',
                 auth_type: 'PASSWORD',
                 password: '',
-                private_key: ''
+                private_key: '',
+                config_file: '',
+                public_key: '',
+                shared_key: ''
             });
         }
         setIsFormOpen(true);
@@ -194,6 +202,18 @@ const VpnPage = () => {
                 filters={{ authType: authTypeFilter }}
                 filterConfigs={[
                     {
+                        key: 'vpnType',
+                        placeholder: 'VPN TYPE',
+                        options: [
+                            { label: 'ALL TYPES', value: 'ALL' },
+                            { label: 'SSH JUMP', value: 'SSH' },
+                            { label: 'OPENVPN', value: 'OPENVPN' },
+                            { label: 'WIREGUARD', value: 'WIREGUARD' }
+                        ],
+                        width: 'w-48',
+                        isSearchable: true
+                    },
+                    {
                         key: 'authType',
                         placeholder: 'AUTH TYPE',
                         options: [
@@ -244,9 +264,9 @@ const VpnPage = () => {
                     <TableHeader>
                         <TableRow className="bg-muted hover:bg-muted/80 border-border">
                             <TableHead className="px-6 h-12 font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">VPN Configuration</TableHead>
-                            <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Authentication</TableHead>
+                            <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Protocol</TableHead>
+                            <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Authentication / Config</TableHead>
                             <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Endpoint</TableHead>
-                            <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Created By</TableHead>
                             <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground text-right px-6">Operations</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -267,31 +287,33 @@ const VpnPage = () => {
                                     </div>
                                 </TableCell>
                                 <TableCell>
-                                    <div className="flex items-center gap-2">
-                                        {vpn.auth_type === 'PASSWORD' ? (
-                                            <Shield className="w-3.5 h-3.5 text-amber-500" />
-                                        ) : (
-                                            <Key className="w-3.5 h-3.5 text-indigo-500" />
-                                        )}
-                                        <span className="text-[11px] font-bold uppercase tracking-widest">
-                                            {vpn.auth_type} ({vpn.user})
-                                        </span>
+                                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 border border-primary/20 w-fit">
+                                        <span className="text-[9px] font-black tracking-widest text-primary uppercase">{vpn.vpn_type}</span>
                                     </div>
+                                </TableCell>
+                                <TableCell>
+                                    {vpn.vpn_type === 'SSH' ? (
+                                        <div className="flex items-center gap-2">
+                                            {vpn.auth_type === 'PASSWORD' ? (
+                                                <Shield className="w-3.5 h-3.5 text-amber-500" />
+                                            ) : (
+                                                <Key className="w-3.5 h-3.5 text-indigo-500" />
+                                            )}
+                                            <span className="text-[11px] font-bold uppercase tracking-widest">
+                                                {vpn.auth_type} ({vpn.user})
+                                            </span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2">
+                                            <Shield className="w-3.5 h-3.5 text-emerald-500" />
+                                            <span className="text-[11px] font-bold uppercase tracking-widest">
+                                                {vpn.vpn_type === 'WIREGUARD' ? 'WG Config' : 'OVPN Config'} Ready
+                                            </span>
+                                        </div>
+                                    )}
                                 </TableCell>
                                 <TableCell className="font-mono text-[11px] text-muted-foreground tracking-tight">
                                     {vpn.host}:{vpn.port}
-                                </TableCell>
-                                <TableCell>
-                                    {vpn.created_by_username ? (
-                                        <div className="flex items-center gap-1.5">
-                                            <div className="h-5 w-5 rounded-full bg-primary/20 flex items-center justify-center text-[8px] font-black text-primary uppercase shrink-0">
-                                                {vpn.created_by_username[0]}
-                                            </div>
-                                            <span className="text-[10px] font-semibold text-muted-foreground">{vpn.created_by_username}</span>
-                                        </div>
-                                    ) : (
-                                        <span className="text-[10px] text-muted-foreground/40 italic">—</span>
-                                    )}
                                 </TableCell>
                                 <TableCell className="text-right px-6">
                                     <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0">
@@ -344,6 +366,19 @@ const VpnPage = () => {
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                         <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="vpn_type" className="text-right text-[10px] font-black uppercase opacity-60">Protocol</Label>
+                            <SearchableSelect
+                                options={[
+                                    { label: 'SSH JUMP HOST', value: 'SSH' },
+                                    { label: 'OPENVPN (.ovpn)', value: 'OPENVPN' },
+                                    { label: 'WIREGUARD (.conf)', value: 'WIREGUARD' }
+                                ]}
+                                value={formData.vpn_type || 'SSH'}
+                                onValueChange={(val) => setFormData({ ...formData, vpn_type: val as any })}
+                                triggerClassName="col-span-3 text-xs font-bold bg-background border-border"
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="name" className="text-right text-[10px] font-black uppercase opacity-60">Identity</Label>
                             <Input
                                 id="name"
@@ -353,68 +388,157 @@ const VpnPage = () => {
                                 placeholder="Core VPN Node"
                             />
                         </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="host" className="text-right text-[10px] font-black uppercase opacity-60">Endpoint</Label>
-                            <div className="col-span-3 flex gap-2">
-                                <Input
-                                    id="host"
-                                    value={formData.host}
-                                    onChange={e => setFormData({ ...formData, host: e.target.value })}
-                                    className="flex-1 text-xs font-bold bg-background border-border"
-                                    placeholder="vpn.example.com"
-                                />
-                                <Input
-                                    type="number"
-                                    value={formData.port}
-                                    onChange={e => setFormData({ ...formData, port: parseInt(e.target.value) })}
-                                    className="w-20 text-xs font-bold bg-background border-border"
-                                    placeholder="22"
-                                />
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="user" className="text-right text-[10px] font-black uppercase opacity-60">User</Label>
-                            <Input
-                                id="user"
-                                value={formData.user}
-                                onChange={e => setFormData({ ...formData, user: e.target.value })}
-                                className="col-span-3 text-xs font-bold bg-background border-border"
-                                placeholder="proxy_user"
-                            />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label className="text-right text-[10px] font-black uppercase opacity-60">Protocol</Label>
-                            <SearchableSelect
-                                options={[
-                                    { label: 'SSH PASSWORD', value: 'PASSWORD' },
-                                    { label: 'PUBLIC KEY (RSA/ED25519)', value: 'PUBLIC_KEY' }
-                                ]}
-                                value={(formData.auth_type || "") as string}
-                                onValueChange={(val) => setFormData({ ...formData, auth_type: val as 'PASSWORD' | 'PUBLIC_KEY' })}
-                                triggerClassName="col-span-3 text-xs font-bold bg-background border-border"
-                            />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label className="text-right text-[10px] font-black uppercase opacity-60">
-                                {formData.auth_type === 'PASSWORD' ? 'Secret' : 'Priv Key'}
-                            </Label>
-                            {formData.auth_type === 'PASSWORD' ? (
-                                <Input
-                                    type="password"
-                                    value={formData.password}
-                                    onChange={e => setFormData({ ...formData, password: e.target.value })}
-                                    className="col-span-3 text-xs font-bold bg-background border-border"
-                                    placeholder="••••••••"
-                                />
-                            ) : (
-                                <Textarea
-                                    value={formData.private_key}
-                                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, private_key: e.target.value })}
-                                    className="col-span-3 text-xs font-mono bg-background border-border resize-none h-24"
-                                    placeholder="-----BEGIN RSA PRIVATE KEY-----"
-                                />
-                            )}
-                        </div>
+
+                        {formData.vpn_type === 'SSH' ? (
+                            <>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="host" className="text-right text-[10px] font-black uppercase opacity-60">Endpoint</Label>
+                                    <div className="col-span-3 flex gap-2">
+                                        <Input
+                                            id="host"
+                                            value={formData.host}
+                                            onChange={e => setFormData({ ...formData, host: e.target.value })}
+                                            className="flex-1 text-xs font-bold bg-background border-border"
+                                            placeholder="vpn.example.com"
+                                        />
+                                        <Input
+                                            type="number"
+                                            value={formData.port}
+                                            onChange={e => setFormData({ ...formData, port: parseInt(e.target.value) })}
+                                            className="w-20 text-xs font-bold bg-background border-border"
+                                            placeholder="22"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="user" className="text-right text-[10px] font-black uppercase opacity-60">User</Label>
+                                    <Input
+                                        id="user"
+                                        value={formData.user}
+                                        onChange={e => setFormData({ ...formData, user: e.target.value })}
+                                        className="col-span-3 text-xs font-bold bg-background border-border"
+                                        placeholder="proxy_user"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label className="text-right text-[10px] font-black uppercase opacity-60">Auth Type</Label>
+                                    <SearchableSelect
+                                        options={[
+                                            { label: 'SSH PASSWORD', value: 'PASSWORD' },
+                                            { label: 'PUBLIC KEY (RSA/ED25519)', value: 'PUBLIC_KEY' }
+                                        ]}
+                                        value={(formData.auth_type || "") as string}
+                                        onValueChange={(val) => setFormData({ ...formData, auth_type: val as 'PASSWORD' | 'PUBLIC_KEY' })}
+                                        triggerClassName="col-span-3 text-xs font-bold bg-background border-border"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label className="text-right text-[10px] font-black uppercase opacity-60">
+                                        {formData.auth_type === 'PASSWORD' ? 'Secret' : 'Priv Key'}
+                                    </Label>
+                                    {formData.auth_type === 'PASSWORD' ? (
+                                        <Input
+                                            type="password"
+                                            value={formData.password}
+                                            onChange={e => setFormData({ ...formData, password: e.target.value })}
+                                            className="col-span-3 text-xs font-bold bg-background border-border"
+                                            placeholder="••••••••"
+                                        />
+                                    ) : (
+                                        <Textarea
+                                            value={formData.private_key}
+                                            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, private_key: e.target.value })}
+                                            className="col-span-3 text-xs font-mono bg-background border-border resize-none h-24"
+                                            placeholder="-----BEGIN RSA PRIVATE KEY-----"
+                                        />
+                                    )}
+                                </div>
+                            </>
+                        ) : formData.vpn_type === 'OPENVPN' ? (
+                            <>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="host" className="text-right text-[10px] font-black uppercase opacity-60">Endpoint</Label>
+                                    <div className="col-span-3 flex gap-2">
+                                        <Input
+                                            id="host"
+                                            value={formData.host}
+                                            onChange={e => setFormData({ ...formData, host: e.target.value })}
+                                            className="flex-1 text-xs font-bold bg-background border-border"
+                                            placeholder="ovpn.example.com"
+                                        />
+                                        <Input
+                                            type="number"
+                                            value={formData.port}
+                                            onChange={e => setFormData({ ...formData, port: parseInt(e.target.value) })}
+                                            className="w-20 text-xs font-bold bg-background border-border"
+                                            placeholder="1194"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="config" className="text-right text-[10px] font-black uppercase opacity-60">OVPN Config</Label>
+                                    <Textarea
+                                        id="config"
+                                        value={formData.config_file}
+                                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, config_file: e.target.value })}
+                                        className="col-span-3 text-xs font-mono bg-background border-border resize-none h-32"
+                                        placeholder="client\nremote ovpn.example.com 1194\n..."
+                                    />
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="host" className="text-right text-[10px] font-black uppercase opacity-60">Endpoint</Label>
+                                    <div className="col-span-3 flex gap-2">
+                                        <Input
+                                            id="host"
+                                            value={formData.host}
+                                            onChange={e => setFormData({ ...formData, host: e.target.value })}
+                                            className="flex-1 text-xs font-bold bg-background border-border"
+                                            placeholder="wg.example.com"
+                                        />
+                                        <Input
+                                            type="number"
+                                            value={formData.port}
+                                            onChange={e => setFormData({ ...formData, port: parseInt(e.target.value) })}
+                                            className="w-20 text-xs font-bold bg-background border-border"
+                                            placeholder="51820"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="pubkey" className="text-right text-[10px] font-black uppercase opacity-60">Public Key</Label>
+                                    <Input
+                                        id="pubkey"
+                                        value={formData.public_key}
+                                        onChange={e => setFormData({ ...formData, public_key: e.target.value })}
+                                        className="col-span-3 text-xs font-bold bg-background border-border"
+                                        placeholder="Server Public Key"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="sharedkey" className="text-right text-[10px] font-black uppercase opacity-60">Shared Key</Label>
+                                    <Input
+                                        id="sharedkey"
+                                        value={formData.shared_key}
+                                        onChange={e => setFormData({ ...formData, shared_key: e.target.value })}
+                                        className="col-span-3 text-xs font-bold bg-background border-border"
+                                        placeholder="Preshared Key (Optional)"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="config" className="text-right text-[10px] font-black uppercase opacity-60">WG Config</Label>
+                                    <Textarea
+                                        id="config"
+                                        value={formData.config_file}
+                                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, config_file: e.target.value })}
+                                        className="col-span-3 text-xs font-mono bg-background border-border resize-none h-32"
+                                        placeholder="[Interface]\nPrivateKey = ...\nAddress = 10.0.0.1/24"
+                                    />
+                                </div>
+                            </>
+                        )}
                     </div>
                     <DialogFooter>
                         <Button

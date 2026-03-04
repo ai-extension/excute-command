@@ -145,12 +145,16 @@ type VpnConfig struct {
 	ID                 uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey"`
 	Name               string     `json:"name" gorm:"not null"`
 	Description        string     `json:"description"`
+	VpnType            string     `json:"vpn_type" gorm:"not null;default:'SSH'"` // SSH, OPENVPN, WIREGUARD
 	Host               string     `json:"host" gorm:"not null"`
 	Port               int        `json:"port" gorm:"default:22"`
-	User               string     `json:"user" gorm:"not null"`
-	AuthType           string     `json:"auth_type" gorm:"not null"` // PASSWORD or PUBLIC_KEY
+	User               string     `json:"user"`
+	AuthType           string     `json:"auth_type"` // PASSWORD or PUBLIC_KEY
 	Password           string     `json:"password,omitempty"`
 	PrivateKey         string     `json:"private_key,omitempty"`
+	ConfigFile         string     `json:"config_file,omitempty"`          // For OpenVPN (.ovpn) or WireGuard (.conf)
+	PublicKey          string     `json:"public_key,omitempty"`           // For WireGuard
+	SharedKey          string     `json:"shared_key,omitempty"`           // For WireGuard
 	HostKeyFingerprint string     `json:"host_key_fingerprint,omitempty"` // For strict host key checking (TOFU or manual)
 	CreatedBy          *uuid.UUID `json:"created_by,omitempty" gorm:"type:uuid"`
 	CreatedByUsername  string     `json:"created_by_username,omitempty"`
@@ -162,7 +166,7 @@ type VpnConfigRepository interface {
 	Create(vpn *VpnConfig) error
 	GetByID(id uuid.UUID, scope *PermissionScope) (*VpnConfig, error)
 	List(scope *PermissionScope) ([]VpnConfig, error)
-	ListPaginated(limit, offset int, searchTerm string, authType string, scope *PermissionScope) ([]VpnConfig, int64, error)
+	ListPaginated(limit, offset int, searchTerm string, vpnType string, authType string, scope *PermissionScope) ([]VpnConfig, int64, error)
 	Update(vpn *VpnConfig) error
 	Delete(id uuid.UUID) error
 }

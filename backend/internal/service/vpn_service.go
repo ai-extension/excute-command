@@ -42,13 +42,13 @@ func (s *VpnConfigService) List(user *domain.User) ([]domain.VpnConfig, error) {
 	return s.repo.List(&scope)
 }
 
-func (s *VpnConfigService) ListPaginated(limit, offset int, searchTerm string, authType string, user *domain.User) ([]domain.VpnConfig, int64, error) {
+func (s *VpnConfigService) ListPaginated(limit, offset int, searchTerm string, vpnType string, authType string, user *domain.User) ([]domain.VpnConfig, int64, error) {
 	if user == nil {
 		scope := domain.PermissionScope{IsGlobal: true}
-		return s.repo.ListPaginated(limit, offset, searchTerm, authType, &scope)
+		return s.repo.ListPaginated(limit, offset, searchTerm, vpnType, authType, &scope)
 	}
 	scope := domain.GetPermissionScope(user, "vpns", "READ")
-	return s.repo.ListPaginated(limit, offset, searchTerm, authType, &scope)
+	return s.repo.ListPaginated(limit, offset, searchTerm, vpnType, authType, &scope)
 }
 
 func (s *VpnConfigService) Update(vpn *domain.VpnConfig, user *domain.User) error {

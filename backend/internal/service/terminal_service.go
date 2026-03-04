@@ -20,17 +20,19 @@ type TerminalSession struct {
 }
 
 type TerminalService struct {
-	repo     domain.ServerRepository
-	hub      *Hub
-	sessions map[string]*TerminalSession
-	mu       sync.Mutex
+	repo         domain.ServerRepository
+	hub          *Hub
+	vpnConnector *VpnConnector
+	sessions     map[string]*TerminalSession
+	mu           sync.Mutex
 }
 
-func NewTerminalService(repo domain.ServerRepository, hub *Hub) *TerminalService {
+func NewTerminalService(repo domain.ServerRepository, hub *Hub, vpnConnector *VpnConnector) *TerminalService {
 	return &TerminalService{
-		repo:     repo,
-		hub:      hub,
-		sessions: make(map[string]*TerminalSession),
+		repo:         repo,
+		hub:          hub,
+		vpnConnector: vpnConnector,
+		sessions:     make(map[string]*TerminalSession),
 	}
 }
 
@@ -45,7 +47,7 @@ func (s *TerminalService) StartSession(serverID uuid.UUID, user *domain.User) (s
 		return "", fmt.Errorf("terminal session is not supported for the local server")
 	}
 
-	client, err := ConnectSSH(server)
+	client, err := ConnectSSH(server, s.vpnConnector)
 
 	if err != nil {
 		return "", err

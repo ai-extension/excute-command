@@ -5,12 +5,16 @@ export interface VpnConfig {
     id: string;
     name: string;
     description: string;
+    vpn_type: 'SSH' | 'OPENVPN' | 'WIREGUARD';
     host: string;
     port: number;
-    user: string;
-    auth_type: 'PASSWORD' | 'PUBLIC_KEY';
+    user?: string;
+    auth_type?: 'PASSWORD' | 'PUBLIC_KEY';
     password?: string;
     private_key?: string;
+    config_file?: string; // For OpenVPN (.ovpn) or WireGuard (.conf)
+    public_key?: string;   // For WireGuard
+    shared_key?: string;  // For WireGuard
     created_by?: string;
     created_by_username?: string;
     created_at: string;

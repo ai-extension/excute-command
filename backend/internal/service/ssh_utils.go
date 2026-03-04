@@ -22,7 +22,7 @@ func getSSHAuthMethod(authType, password, privateKey string) (ssh.AuthMethod, er
 	return nil, fmt.Errorf("unsupported auth type: %s", authType)
 }
 
-func ConnectSSH(server *domain.Server) (*ssh.Client, error) {
+func ConnectSSH(server *domain.Server, vpnConnector *VpnConnector) (*ssh.Client, error) {
 	targetAuth, err := getSSHAuthMethod(server.AuthType, server.Password, server.PrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("target server %s: %w", server.Name, err)
@@ -54,6 +54,33 @@ func ConnectSSH(server *domain.Server) (*ssh.Client, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to dial target server: %w", err)
 		}
+		return client, nil
+	}
+
+	// Connect via VPN
+	if server.Vpn.VpnType != "SSH" {
+		if vpnConnector == nil {
+			return nil, fmt.Errorf("vpn connector not initialized for %s", server.Vpn.VpnType)
+		}
+
+		ifName, cleanup, err := vpnConnector.Connect(server.Vpn)
+		if err != nil {
+			return nil, fmt.Errorf("failed to establish %s connection: %w", server.Vpn.VpnType, err)
+		}
+		_ = ifName // Reserved for future routing table adjustments
+
+		client, err := ssh.Dial("tcp", targetAddr, targetConfig)
+		if err != nil {
+			cleanup()
+			return nil, fmt.Errorf("failed to dial target server via %s: %w", server.Vpn.VpnType, err)
+		}
+
+		// Wrap client to ensure VPN cleanup on close
+		go func() {
+			client.Wait()
+			cleanup()
+		}()
+
 		return client, nil
 	}
 

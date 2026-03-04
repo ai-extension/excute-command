@@ -19,12 +19,13 @@ import (
 )
 
 type ServerService struct {
-	repo domain.ServerRepository
-	hub  *Hub
+	repo         domain.ServerRepository
+	hub          *Hub
+	vpnConnector *VpnConnector
 }
 
-func NewServerService(repo domain.ServerRepository, hub *Hub) *ServerService {
-	return &ServerService{repo: repo, hub: hub}
+func NewServerService(repo domain.ServerRepository, hub *Hub, vpnConnector *VpnConnector) *ServerService {
+	return &ServerService{repo: repo, hub: hub, vpnConnector: vpnConnector}
 }
 
 func (s *ServerService) CreateServer(server *domain.Server, user *domain.User) error {
@@ -96,10 +97,9 @@ func (s *ServerService) ExecuteCommand(serverID uuid.UUID, commandText string, u
 		return "", fmt.Errorf("failed to get server: %w", err)
 	}
 
-	client, err := ConnectSSH(server)
-
+	client, err := ConnectSSH(server, s.vpnConnector)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to connect to server: %w", err)
 	}
 	defer client.Close()
 
@@ -132,6 +132,7 @@ func (s *ServerService) DownloadFileFromServer(ctx context.Context, serverID uui
 
 	var server *domain.Server
 	var err error
+	var cleanup func()
 
 	if user == nil {
 		// Internal system request: bypass RBAC
@@ -140,15 +141,26 @@ func (s *ServerService) DownloadFileFromServer(ctx context.Context, serverID uui
 	} else {
 		scope := domain.GetPermissionScope(user, "servers", "READ")
 		server, err = s.repo.GetByID(serverID, &scope)
+		if err == nil && server.Vpn != nil {
+			var ifID string
+			ifID, cleanup, err = s.vpnConnector.Connect(server.Vpn)
+			if err != nil {
+				return fmt.Errorf("failed to establish %s connection: %w", server.Vpn.VpnType, err)
+			}
+			_ = ifID // Reserved for future routing table adjustments
+		}
 	}
 
 	if err != nil {
 		return fmt.Errorf("failed to get server %s: %w", serverID, err)
 	}
 
-	client, err := ConnectSSH(server)
+	client, err := ConnectSSH(server, s.vpnConnector)
+	if cleanup != nil {
+		defer cleanup()
+	}
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to connect to server: %w", err)
 	}
 	defer client.Close()
 
@@ -174,7 +186,7 @@ func (s *ServerService) DownloadFileFromServer(ctx context.Context, serverID uui
 
 	localFile, err := os.Create(localPath)
 	if err != nil {
-		return fmt.Errorf("failed to create local file %s: %w", localPath, err)
+		return fmt.Errorf("failed to create local file %s: %w", localDir, err)
 	}
 	defer localFile.Close()
 
@@ -213,6 +225,7 @@ func (s *ServerService) UploadFileToServers(ctx context.Context, serverIDs []uui
 
 		var server *domain.Server
 		var err error
+		var cleanup func()
 
 		if user == nil {
 			// Internal system request: bypass RBAC
@@ -221,16 +234,26 @@ func (s *ServerService) UploadFileToServers(ctx context.Context, serverIDs []uui
 		} else {
 			scope := domain.GetPermissionScope(user, "servers", "WRITE")
 			server, err = s.repo.GetByID(serverID, &scope)
+			if err == nil && server.Vpn != nil {
+				var ifID string
+				ifID, cleanup, err = s.vpnConnector.Connect(server.Vpn)
+				if err != nil {
+					return fmt.Errorf("failed to establish %s connection: %w", server.Vpn.VpnType, err)
+				}
+				_ = ifID // Reserved for future routing table adjustments
+			}
 		}
 
 		if err != nil {
 			return fmt.Errorf("failed to get server %s: %w", serverID, err)
 		}
 
-		client, err := ConnectSSH(server)
-
+		client, err := ConnectSSH(server, s.vpnConnector)
+		if cleanup != nil {
+			defer cleanup()
+		}
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to connect to server: %w", err)
 		}
 
 		sftpClient, err := sftp.NewClient(client)

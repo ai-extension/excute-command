@@ -143,7 +143,7 @@ func (h *PermissionHandler) ListResourceItems(c *gin.Context) {
 	case "roles":
 		items, total, err = h.roleRepo.ListPaginated(limit, offset, searchTerm)
 	case "vpns":
-		items, total, err = h.vpnRepo.ListPaginated(limit, offset, searchTerm, "", &scope)
+		items, total, err = h.vpnRepo.ListPaginated(limit, offset, searchTerm, "", "", &scope)
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported resource type: " + resourceType})
 		return
