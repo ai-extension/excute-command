@@ -33,7 +33,7 @@ import {
 const SettingsPage = () => {
     const { apiFetch, user } = useAuth();
     const { refreshNamespaces, namespaces } = useNamespace();
-    const [activeTab, setActiveTab] = useState<'namespaces' | 'account'>('namespaces');
+    const [activeTab, setActiveTab] = useState<'namespaces'>('namespaces');
     const [isLoading, setIsLoading] = useState(false);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isEditOpen, setIsEditOpen] = useState(false);
@@ -149,15 +149,6 @@ const SettingsPage = () => {
                 >
                     <Layers className="w-3.5 h-3.5" /> Logical Namespaces
                 </button>
-                <button
-                    onClick={() => setActiveTab('account')}
-                    className={cn(
-                        "flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-                        activeTab === 'account' ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"
-                    )}
-                >
-                    <User className="w-3.5 h-3.5" /> Account Profile
-                </button>
             </div>
 
             {/* Content Area */}
@@ -232,37 +223,6 @@ const SettingsPage = () => {
                             </div>
                         </CardContent>
                     </Card>
-                )}
-
-                {activeTab === 'account' && (
-                    <div className="grid md:grid-cols-2 gap-6">
-                        <Card className="bg-card border-border shadow-card">
-                            <CardHeader className="p-6">
-                                <CardTitle className="text-xl font-black tracking-tight">Identity Profile</CardTitle>
-                                <CardDescription className="text-xs font-medium opacity-70">Your authenticated system credentials.</CardDescription>
-                            </CardHeader>
-                            <CardContent className="p-6 space-y-6">
-                                <div className="flex items-center gap-6">
-                                    <div className="w-20 h-20 rounded-3xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
-                                        <User className="w-10 h-10" />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <h2 className="text-2xl font-black tracking-tighter uppercase">{user?.username}</h2>
-                                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">{user?.email || 'OFFLINE_IDENTITY'}</p>
-                                    </div>
-                                </div>
-                                <div className="grid gap-3">
-                                    <div className="p-4 rounded-2xl bg-muted/30 border border-border flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <Shield className="w-4 h-4 text-emerald-500" />
-                                            <span className="text-[10px] font-black uppercase tracking-widest">Authentication Status</span>
-                                        </div>
-                                        <Badge className="bg-emerald-500/10 text-emerald-500 border-none font-black text-[8px] uppercase tracking-widest">VERIFIED</Badge>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
                 )}
             </div>
 

@@ -28,6 +28,7 @@ type Namespace struct {
 type User struct {
 	ID           uuid.UUID    `json:"id" gorm:"type:uuid;primaryKey"`
 	Username     string       `json:"username" gorm:"uniqueIndex;not null"`
+	FullName     string       `json:"full_name"`
 	PasswordHash string       `json:"-" gorm:"not null"`
 	Email        string       `json:"email"`
 	Roles        []Role       `json:"roles" gorm:"many2many:user_roles;"`

@@ -19,6 +19,7 @@ import PagesListPage from './pages/PagesListPage';
 import PageDesignerPage from './pages/PageDesignerPage';
 import RolePermissionsPage from './pages/RolePermissionsPage';
 import PublicPageView from './pages/PublicPageView';
+import ProfilePage from './pages/ProfilePage';
 import { useAuth } from './context/AuthContext';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -62,6 +63,7 @@ function App() {
                     <Route path="settings" element={<SettingsPage />} />
                     <Route path="pages" element={<PagesListPage />} />
                     <Route path="pages/:id/edit" element={<PageDesignerPage />} />
+                    <Route path="profile" element={<ProfilePage />} />
                 </Route>
                 <Route path="/public/pages/:slug" element={<PublicPageView />} />
                 <Route path="*" element={<Navigate to="/" replace />} />

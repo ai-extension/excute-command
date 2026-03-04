@@ -131,11 +131,6 @@ func main() {
 	// Initialize Router
 	r := gin.Default()
 
-	// Debug: Print routes
-	for _, route := range r.Routes() {
-		log.Printf("Route: %s %s", route.Method, route.Path)
-	}
-
 	// CORS Middleware
 	r.Use(func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
@@ -175,6 +170,9 @@ func main() {
 			protected.DELETE("/namespaces/:id", middleware.RBACMiddleware(userRepo, "namespaces", "DELETE"), namespaceHandler.DeleteNamespace)
 
 			// User & Role Management
+			protected.GET("/me", userHandler.GetMe)
+			protected.PUT("/me/profile", userHandler.UpdateProfile)
+			protected.PUT("/me/password", userHandler.UpdatePassword)
 			protected.GET("/users", middleware.RBACMiddleware(userRepo, "users", "READ"), userHandler.ListUsers)
 			protected.POST("/users", middleware.RBACMiddleware(userRepo, "users", "WRITE"), userHandler.CreateUser)
 			protected.POST("/users/:id/roles", middleware.RBACMiddleware(userRepo, "users", "WRITE"), userHandler.UpdateUserRoles)
@@ -261,6 +259,12 @@ func main() {
 	}
 
 	log.Printf("Server starting on :%s", serverPort)
+	// Debug: Print all registered routes
+	log.Println("Registered Routes:")
+	for _, route := range r.Routes() {
+		log.Printf("Route: %s %s", route.Method, route.Path)
+	}
+
 	if err := r.Run(":" + serverPort); err != nil {
 		log.Fatal(err)
 	}

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
-import { Moon, Sun, Bell, Command as CmdIcon, Search, LogOut, User as UserIcon, Settings } from 'lucide-react';
+import { Moon, Sun, Command as CmdIcon, Search, LogOut, User as UserIcon, Settings } from 'lucide-react';
 import { Button } from './ui/button';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -41,6 +41,7 @@ const Layout = () => {
         if (path === '/tags') return 'Metadata Labels';
         if (path === '/schedules') return 'Temporal Engine';
         if (path === '/settings') return 'System Configuration';
+        if (path === '/profile') return 'Identity Vault';
         return 'Control Center';
     };
 
@@ -62,14 +63,7 @@ const Layout = () => {
 
                     <div className="flex items-center gap-6">
                         <div className="flex items-center gap-1.5">
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="rounded-xl hover:bg-muted relative text-foreground/60 hover:text-foreground transition-all"
-                            >
-                                <Bell className="h-4.5 w-4.5" />
-                                <div className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full border-2 border-background" />
-                            </Button>
+
                             <Button
                                 variant="ghost"
                                 size="icon"
@@ -108,7 +102,10 @@ const Layout = () => {
                                     </div>
                                 </DropdownMenuLabel>
                                 <DropdownMenuSeparator className="bg-border/50 my-1" />
-                                <DropdownMenuItem className="rounded-xl px-3 py-2.5 flex items-center gap-2 cursor-pointer focus:bg-primary/10 transition-colors">
+                                <DropdownMenuItem
+                                    onClick={() => navigate('/profile')}
+                                    className="rounded-xl px-3 py-2.5 flex items-center gap-2 cursor-pointer focus:bg-primary/10 transition-colors"
+                                >
                                     <UserIcon className="w-4 h-4 text-primary" />
                                     <span className="text-sm font-semibold">Account Detail</span>
                                 </DropdownMenuItem>
