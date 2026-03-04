@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -18,13 +19,15 @@ type PageHandler struct {
 	service         *service.PageService
 	workflowService *service.WorkflowService
 	executor        *service.WorkflowExecutor
+	terminalService *service.TerminalService
 }
 
-func NewPageHandler(s *service.PageService, ws *service.WorkflowService, e *service.WorkflowExecutor) *PageHandler {
+func NewPageHandler(s *service.PageService, ws *service.WorkflowService, e *service.WorkflowExecutor, ts *service.TerminalService) *PageHandler {
 	return &PageHandler{
 		service:         s,
 		workflowService: ws,
 		executor:        e,
+		terminalService: ts,
 	}
 }
 
@@ -213,8 +216,37 @@ func (h *PageHandler) VerifyPublicPage(c *gin.Context) {
 		return
 	}
 
+	// Issue short-lived session token
+	token, expiresAt, err := h.service.IssuePageToken(page)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to issue token"})
+		return
+	}
+
 	h.sanitizePage(page)
-	c.JSON(http.StatusOK, page)
+	c.JSON(http.StatusOK, gin.H{
+		"page":       page,
+		"token":      token,
+		"expires_at": expiresAt,
+	})
+}
+
+// verifyPageToken checks the X-Page-Token header for password-protected pages.
+// Returns false and writes the error response if invalid.
+func (h *PageHandler) verifyPageToken(c *gin.Context, page *domain.Page) bool {
+	if page.Password == "" {
+		return true // No password → no token required
+	}
+	token := c.GetHeader("X-Page-Token")
+	if token == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication required", "token_required": true})
+		return false
+	}
+	if err := h.service.ValidatePageToken(page, token); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error(), "token_required": true})
+		return false
+	}
+	return true
 }
 
 func (h *PageHandler) RunPublicWorkflow(c *gin.Context) {
@@ -243,26 +275,17 @@ func (h *PageHandler) RunPublicWorkflow(c *gin.Context) {
 		return
 	}
 
-	// Password check
+	// Token verification (replaces raw password passing)
+	if !h.verifyPageToken(c, page) {
+		return
+	}
+
 	var inputReq struct {
-		Password string            `json:"password"`
-		Inputs   map[string]string `json:"inputs"`
+		Inputs map[string]string `json:"inputs"`
 	}
 	if c.Request.ContentLength > 0 {
 		if err := c.ShouldBindJSON(&inputReq); err != nil {
-			// Ignore bind error if it's just partially missing
-		}
-	}
-
-	if page.Password != "" {
-		password := c.GetHeader("X-Page-Password")
-		if password == "" {
-			password = inputReq.Password
-		}
-
-		if err := h.service.ValidatePagePassword(page, password); err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid password"})
-			return
+			// Ignore bind error, inputs are optional
 		}
 	}
 
@@ -310,12 +333,8 @@ func (h *PageHandler) GetPublicExecutionStatus(c *gin.Context) {
 		return
 	}
 
-	if page.Password != "" {
-		password := c.GetHeader("X-Page-Password")
-		if err := h.service.ValidatePagePassword(page, password); err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid password"})
-			return
-		}
+	if !h.verifyPageToken(c, page) {
+		return
 	}
 
 	execution, err := h.workflowService.GetExecution(execID, nil)
@@ -362,12 +381,8 @@ func (h *PageHandler) GetPublicExecutionLogs(c *gin.Context) {
 		return
 	}
 
-	if page.Password != "" {
-		password := c.GetHeader("X-Page-Password")
-		if err := h.service.ValidatePagePassword(page, password); err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid password"})
-			return
-		}
+	if !h.verifyPageToken(c, page) {
+		return
 	}
 
 	execution, err := h.workflowService.GetExecution(execID, nil)
@@ -476,4 +491,73 @@ func (h *PageHandler) sanitizeExecution(execution *domain.WorkflowExecution) {
 		execution.User.PasswordHash = ""
 		execution.User.Email = "" // Protect PII
 	}
+}
+
+// pageLayoutWidget is a minimal struct to extract widget config from the layout JSON.
+type pageLayoutWidget struct {
+	ID       string `json:"id"`
+	Type     string `json:"type"`
+	ServerID string `json:"server_id"`
+	Command  string `json:"command"`
+}
+
+type pageLayout struct {
+	Widgets []pageLayoutWidget `json:"widgets"`
+}
+
+// RunPublicWidgetCommand executes the predefined command for a terminal widget on a page.
+// It reads the widget config from the page layout, prevents arbitrary command injection.
+func (h *PageHandler) RunPublicWidgetCommand(c *gin.Context) {
+	slug := c.Param("slug")
+	widgetID := c.Param("widget_id")
+
+	page, err := h.service.GetPageBySlug(slug)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "page not found"})
+		return
+	}
+
+	if !page.IsPublic {
+		c.JSON(http.StatusForbidden, gin.H{"error": "page is not public"})
+		return
+	}
+
+	if page.ExpiresAt != nil && page.ExpiresAt.Before(time.Now()) {
+		c.JSON(http.StatusGone, gin.H{"error": "page has expired"})
+		return
+	}
+
+	if !h.verifyPageToken(c, page) {
+		return
+	}
+
+	// Parse layout to find widget
+	var layout pageLayout
+	if err := json.Unmarshal([]byte(page.Layout), &layout); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid page layout"})
+		return
+	}
+
+	var widget *pageLayoutWidget
+	for i := range layout.Widgets {
+		if layout.Widgets[i].ID == widgetID && layout.Widgets[i].Type == "TERMINAL" {
+			w := layout.Widgets[i]
+			widget = &w
+			break
+		}
+	}
+	if widget == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "terminal widget not found"})
+		return
+	}
+
+	serverID, err := uuid.Parse(widget.ServerID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid server id in widget config"})
+		return
+	}
+
+	runner := h.terminalService.RunCommandOnServer(serverID)
+	output, _ := runner(widget.Command) // Ignore execution error, return output regardless
+	c.JSON(http.StatusOK, gin.H{"output": output})
 }

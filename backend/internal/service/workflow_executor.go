@@ -63,8 +63,12 @@ func (e *WorkflowExecutor) RunWithDepth(ctx context.Context, workflowID uuid.UUI
 
 	var scope *domain.PermissionScope
 	if depth == 0 {
-		s := domain.GetPermissionScope(user, "workflows", "EXECUTE")
-		scope = &s
+		if user == nil {
+			scope = &domain.PermissionScope{IsGlobal: true}
+		} else {
+			s := domain.GetPermissionScope(user, "workflows", "EXECUTE")
+			scope = &s
+		}
 	}
 
 	wf, err := e.wfRepo.GetByID(workflowID, scope)
@@ -152,7 +156,19 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 	}
 
 	fmt.Fprintf(logFile, "\033[1;36m▶ WORKFLOW: %s\033[0m\n", wf.Name)
-	fmt.Fprintf(logFile, "\033[36mUser: %s | Started: %s\033[0m\n\n", executedBy, execution.StartedAt.Format("2006-01-02 15:04:05"))
+	fmt.Fprintf(logFile, "\033[36mUser: %s | Started: %s\033[0m\n", executedBy, execution.StartedAt.Format("2006-01-02 15:04:05"))
+
+	// Log Inputs if available
+	if execution.Inputs != "" && execution.Inputs != "{}" {
+		var inputs map[string]string
+		if err := json.Unmarshal([]byte(execution.Inputs), &inputs); err == nil && len(inputs) > 0 {
+			fmt.Fprintf(logFile, "\033[36mInputs:\033[0m\n")
+			for k, v := range inputs {
+				fmt.Fprintf(logFile, "  \033[90m- %s:\033[0m %s\n", k, v)
+			}
+		}
+	}
+	fmt.Fprintf(logFile, "\n")
 
 	e.hub.BroadcastLog(workflowID.String(), fmt.Sprintf("\033[1;36m▶ WORKFLOW STARTED: %s (by %s)\033[0m", wf.Name, executedBy))
 

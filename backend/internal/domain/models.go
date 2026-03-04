@@ -478,18 +478,19 @@ type WorkflowFileRepository interface {
 }
 
 type Page struct {
-	ID          uuid.UUID      `json:"id" gorm:"type:uuid;primaryKey"`
-	NamespaceID uuid.UUID      `json:"namespace_id" gorm:"type:uuid;index"`
-	Title       string         `json:"title" gorm:"not null"`
-	Description string         `json:"description"`
-	Slug        string         `json:"slug" gorm:"uniqueIndex;not null"`
-	IsPublic    bool           `json:"is_public" gorm:"default:false"`
-	Password    string         `json:"password,omitempty" gorm:"column:password"`
-	ExpiresAt   *time.Time     `json:"expires_at" gorm:"index"`
-	Layout      string         `json:"layout" gorm:"type:text"`
-	Workflows   []PageWorkflow `json:"workflows,omitempty" gorm:"foreignKey:PageID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
+	ID              uuid.UUID      `json:"id" gorm:"type:uuid;primaryKey"`
+	NamespaceID     uuid.UUID      `json:"namespace_id" gorm:"type:uuid;index"`
+	Title           string         `json:"title" gorm:"not null"`
+	Description     string         `json:"description"`
+	Slug            string         `json:"slug" gorm:"uniqueIndex;not null"`
+	IsPublic        bool           `json:"is_public" gorm:"default:false"`
+	Password        string         `json:"password,omitempty" gorm:"column:password"`
+	TokenTTLMinutes int            `json:"token_ttl_minutes" gorm:"default:15"`
+	ExpiresAt       *time.Time     `json:"expires_at" gorm:"index"`
+	Layout          string         `json:"layout" gorm:"type:text"`
+	Workflows       []PageWorkflow `json:"workflows,omitempty" gorm:"foreignKey:PageID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	CreatedAt       time.Time      `json:"created_at"`
+	UpdatedAt       time.Time      `json:"updated_at"`
 }
 
 type PageWorkflow struct {

@@ -128,7 +128,7 @@ func main() {
 	workflowFileService := service.NewWorkflowFileService(workflowFileRepo)
 	workflowFileHandler := handler.NewWorkflowFileHandler(workflowFileService)
 	vpnHandler := handler.NewVpnConfigHandler(vpnService)
-	pageHandler := handler.NewPageHandler(pageService, workflowService, workflowExecutor)
+	pageHandler := handler.NewPageHandler(pageService, workflowService, workflowExecutor, terminalService)
 
 	// Initialize Router
 	r := gin.Default()
@@ -147,7 +147,7 @@ func main() {
 
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, X-Page-Password")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, X-Page-Password, X-Page-Token")
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
 			return
@@ -256,6 +256,7 @@ func main() {
 		api.POST("/public/pages/:slug/run/:workflow_id", middleware.LoginRateLimiter(), pageHandler.RunPublicWorkflow)
 		api.GET("/public/pages/:slug/executions/:exec_id", middleware.LoginRateLimiter(), pageHandler.GetPublicExecutionStatus)
 		api.GET("/public/pages/:slug/executions/:exec_id/logs", middleware.LoginRateLimiter(), pageHandler.GetPublicExecutionLogs)
+		api.GET("/public/pages/:slug/widgets/:widget_id/run", middleware.LoginRateLimiter(), pageHandler.RunPublicWidgetCommand)
 	}
 
 	serverPort := os.Getenv("SERVER_PORT")

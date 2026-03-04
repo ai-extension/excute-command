@@ -235,6 +235,31 @@ export interface PageWorkflow {
     workflow?: Workflow;
 }
 
+export type PageWidgetSize = 'full' | 'half';
+export type PageWidgetType = 'TERMINAL' | 'ENDPOINT';
+export type PageWidgetReload = 'realtime' | '5' | '10' | '30' | '60';
+
+export interface PageWidget {
+    id: string;
+    type: PageWidgetType;
+    title: string;
+    size: PageWidgetSize;
+    // TERMINAL-specific
+    server_id?: string;
+    command?: string;
+    reload_interval?: PageWidgetReload;
+    // ENDPOINT-specific
+    workflow_id?: string;
+    label?: string;
+    style?: string;
+    show_log?: boolean;
+    description?: string;
+}
+
+export interface PageLayout {
+    widgets: PageWidget[];
+}
+
 export interface Page {
     id: string;
     namespace_id: string;
@@ -243,6 +268,7 @@ export interface Page {
     slug: string;
     is_public: boolean;
     password?: string;
+    token_ttl_minutes?: number;
     expires_at?: string;
     layout: string;
     workflows?: PageWorkflow[];

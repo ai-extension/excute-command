@@ -1,8 +1,10 @@
 package service
 
 import (
+	"bytes"
 	"fmt"
 	"io"
+	"os/exec"
 	"sync"
 
 	"github.com/google/uuid"
@@ -143,4 +145,48 @@ func (s *TerminalService) HandleInput(sessionID string, input string) error {
 
 	_, err := ts.Stdin.Write([]byte(input))
 	return err
+}
+
+// RunCommandOnServer connects to a server, runs the given command, and returns its combined output.
+// It supports the local server (running command locally via /bin/sh) as well as remote SSH servers.
+func (s *TerminalService) RunCommandOnServer(serverID uuid.UUID) func(command string) (string, error) {
+	return func(command string) (string, error) {
+		// Local server: run via /bin/sh
+		if serverID == domain.LocalServerID {
+			session := &localCmdSession{}
+			return session.Run(command)
+		}
+
+		server, err := s.repo.GetByID(serverID, nil)
+		if err != nil {
+			return "", fmt.Errorf("server not found: %w", err)
+		}
+
+		client, err := ConnectSSH(server, s.vpnConnector)
+		if err != nil {
+			return "", fmt.Errorf("ssh connect failed: %w", err)
+		}
+		defer client.Close()
+
+		sess, err := client.NewSession()
+		if err != nil {
+			return "", fmt.Errorf("ssh session failed: %w", err)
+		}
+		defer sess.Close()
+
+		out, err := sess.CombinedOutput(command)
+		return string(out), err
+	}
+}
+
+// localCmdSession is a helper to run a command on the local machine.
+type localCmdSession struct{}
+
+func (l *localCmdSession) Run(command string) (string, error) {
+	var buf bytes.Buffer
+	cmd := exec.Command("/bin/sh", "-c", command)
+	cmd.Stdout = &buf
+	cmd.Stderr = &buf
+	_ = cmd.Run() // Ignore exit code; return combined output
+	return buf.String(), nil
 }

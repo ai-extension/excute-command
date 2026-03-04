@@ -74,6 +74,9 @@ func (s *WorkflowService) CreateWorkflow(wf *domain.Workflow, user *domain.User)
 }
 
 func (s *WorkflowService) GetWorkflow(id uuid.UUID, user *domain.User) (*domain.Workflow, error) {
+	if user == nil {
+		return s.repo.GetByID(id, &domain.PermissionScope{IsGlobal: true})
+	}
 	scope := domain.GetPermissionScope(user, "workflows", "READ")
 	return s.repo.GetByID(id, &scope)
 }
@@ -155,6 +158,9 @@ func (s *WorkflowService) ListNamespaceExecutionsPaginated(namespaceID uuid.UUID
 }
 
 func (s *WorkflowService) GetExecution(id uuid.UUID, user *domain.User) (*domain.WorkflowExecution, error) {
+	if user == nil {
+		return s.execRepo.GetByID(id, &domain.PermissionScope{IsGlobal: true})
+	}
 	scope := domain.GetPermissionScope(user, "workflows", "READ")
 	return s.execRepo.GetByID(id, &scope)
 }

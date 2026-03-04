@@ -1,7 +1,13 @@
 package service
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/binary"
 	"errors"
+	"fmt"
+	"os"
 	"time"
 
 	"github.com/google/uuid"
@@ -117,4 +123,85 @@ func (s *PageService) ValidatePagePassword(page *domain.Page, password string) e
 		return nil // No password required
 	}
 	return bcrypt.CompareHashAndPassword([]byte(page.Password), []byte(password))
+}
+
+// pageTokenSecret returns the HMAC signing key.
+// Uses PAGE_TOKEN_SECRET env var; falls back to the page's bcrypt hash.
+func pageTokenSecret(page *domain.Page) []byte {
+	if s := os.Getenv("PAGE_TOKEN_SECRET"); s != "" {
+		return []byte(s)
+	}
+	return []byte(page.Password)
+}
+
+// IssuePageToken creates a signed token for a verified page session.
+// Token layout (base64url): [ 8B pageIDHash | 8B expiryUnix ] + "." + HMAC
+func (s *PageService) IssuePageToken(page *domain.Page) (token string, expiresAt time.Time, err error) {
+	ttl := page.TokenTTLMinutes
+	if ttl <= 0 {
+		ttl = 15
+	}
+	expiresAt = time.Now().Add(time.Duration(ttl) * time.Minute)
+
+	payload := make([]byte, 16)
+	// First 8 bytes: truncated HMAC of the page-ID (stable identifier w/o exposing the ID)
+	h := hmac.New(sha256.New, pageTokenSecret(page))
+	h.Write([]byte(page.ID.String()))
+	copy(payload[:8], h.Sum(nil)[:8])
+	// Next 8 bytes: expiry unix timestamp
+	binary.BigEndian.PutUint64(payload[8:], uint64(expiresAt.Unix()))
+
+	mac := hmac.New(sha256.New, pageTokenSecret(page))
+	mac.Write(payload)
+	sig := mac.Sum(nil)
+
+	token = base64.RawURLEncoding.EncodeToString(payload) + "." + base64.RawURLEncoding.EncodeToString(sig)
+	return token, expiresAt, nil
+}
+
+// ValidatePageToken verifies a token previously issued by IssuePageToken.
+func (s *PageService) ValidatePageToken(page *domain.Page, token string) error {
+	// Split payload.sig
+	dot := -1
+	for i, c := range token {
+		if c == '.' {
+			dot = i
+			break
+		}
+	}
+	if dot < 0 {
+		return errors.New("invalid token format")
+	}
+
+	payload, err := base64.RawURLEncoding.DecodeString(token[:dot])
+	if err != nil || len(payload) != 16 {
+		return errors.New("invalid token payload")
+	}
+	sig, err := base64.RawURLEncoding.DecodeString(token[dot+1:])
+	if err != nil {
+		return errors.New("invalid token signature encoding")
+	}
+
+	// Verify HMAC
+	mac := hmac.New(sha256.New, pageTokenSecret(page))
+	mac.Write(payload)
+	expected := mac.Sum(nil)
+	if !hmac.Equal(sig, expected) {
+		return errors.New("invalid token signature")
+	}
+
+	// Check page-ID binding (first 8 bytes)
+	h := hmac.New(sha256.New, pageTokenSecret(page))
+	h.Write([]byte(page.ID.String()))
+	if !hmac.Equal(payload[:8], h.Sum(nil)[:8]) {
+		return errors.New("token not issued for this page")
+	}
+
+	// Check expiry
+	expiry := int64(binary.BigEndian.Uint64(payload[8:]))
+	if time.Now().Unix() > expiry {
+		return fmt.Errorf("token expired")
+	}
+
+	return nil
 }

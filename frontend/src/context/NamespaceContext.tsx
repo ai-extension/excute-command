@@ -25,7 +25,8 @@ export const NamespaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const [isLoading, setIsLoading] = useState(true);
 
     const refreshNamespaces = useCallback(async () => {
-        if (!isAuthenticated) {
+        // Skip calling namespaces on public pages or if not authenticated
+        if (window.location.pathname.startsWith('/public/') || !isAuthenticated) {
             setIsLoading(false);
             return;
         }

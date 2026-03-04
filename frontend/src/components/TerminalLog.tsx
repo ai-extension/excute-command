@@ -82,7 +82,7 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
                 // Type guard: only process log messages here. 
                 // Status messages are handled by ExecutionMonitor.
                 if (data.type === 'log' && data.target_id === targetID && data.content) {
-                    const newLines = data.content.split('\n');
+                    const newLines = data.content.split('\n').filter((line: string) => line.length > 0);
                     setLogs(prev => [...prev, ...newLines]);
                 }
             } catch (err) {
