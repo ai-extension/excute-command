@@ -19,13 +19,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "../components/ui/dialog";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "../components/ui/select";
+import { SearchableSelect } from '../components/SearchableSelect';
 import { Textarea } from "../components/ui/textarea";
 import { Label } from "../components/ui/label";
 import { useAuth } from '../context/AuthContext';
@@ -96,7 +90,7 @@ const VpnPage = () => {
         fetchVpns();
     }, [offset, limit]);
 
-    const handleApplyFilter = (search: string, filters: { [key: string]: string }) => {
+    const handleApplyFilter = (search: string, filters: { [key: string]: any }) => {
         setSearchTerm(search);
         if (filters.authType) setAuthTypeFilter(filters.authType);
         setOffset(0);
@@ -185,9 +179,6 @@ const VpnPage = () => {
                 onSearchChange={setSearchTerm}
                 onApply={handleApplyFilter}
                 filters={{ authType: authTypeFilter }}
-                onFilterChange={(key: string, val: string) => {
-                    if (key === 'authType') setAuthTypeFilter(val);
-                }}
                 filterConfigs={[
                     {
                         key: 'authType',
@@ -197,7 +188,8 @@ const VpnPage = () => {
                             { label: 'SSH PASSWORD', value: 'PASSWORD' },
                             { label: 'PUBLIC KEY', value: 'PUBLIC_KEY' }
                         ],
-                        width: 'w-48'
+                        width: 'w-48',
+                        isSearchable: true
                     }
                 ]}
                 searchPlaceholder="Filter by name, ip..."
@@ -379,18 +371,15 @@ const VpnPage = () => {
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label className="text-right text-[10px] font-black uppercase opacity-60">Protocol</Label>
-                            <Select
-                                value={formData.auth_type}
-                                onValueChange={(val: any) => setFormData({ ...formData, auth_type: val })}
-                            >
-                                <SelectTrigger className="col-span-3 text-xs font-bold bg-background border-border">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent className="bg-card border-border">
-                                    <SelectItem value="PASSWORD">SSH Password</SelectItem>
-                                    <SelectItem value="PUBLIC_KEY">Public Key (RSA/Ed25519)</SelectItem>
-                                </SelectContent>
-                            </Select>
+                            <SearchableSelect
+                                options={[
+                                    { label: 'SSH PASSWORD', value: 'PASSWORD' },
+                                    { label: 'PUBLIC KEY (RSA/ED25519)', value: 'PUBLIC_KEY' }
+                                ]}
+                                value={(formData.auth_type || "") as string}
+                                onValueChange={(val) => setFormData({ ...formData, auth_type: val as 'PASSWORD' | 'PUBLIC_KEY' })}
+                                triggerClassName="col-span-3 text-xs font-bold bg-background border-border"
+                            />
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label className="text-right text-[10px] font-black uppercase opacity-60">

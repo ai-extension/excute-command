@@ -4,13 +4,6 @@ import { Layout, Plus, Search, MoreVertical, Edit2, Trash2, Globe, Lock, Chevron
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "../components/ui/select";
 import { cn } from '../lib/utils';
 import { Page } from '../types';
 import { useNamespace } from '../context/NamespaceContext';
@@ -137,7 +130,7 @@ const PagesListPage = () => {
             <ResourceFilters
                 searchTerm={searchQuery}
                 onSearchChange={setSearchQuery}
-                onApply={(search: string, filters: { [key: string]: string }) => {
+                onApply={(search: string, filters: { [key: string]: any }) => {
                     setSearchQuery(search);
                     setVisibilityFilter(filters.visibility || 'ALL');
                     setOffset(0);
@@ -155,7 +148,8 @@ const PagesListPage = () => {
                             { label: 'PUBLIC ONLY', value: 'PUBLIC' },
                             { label: 'PRIVATE ONLY', value: 'PRIVATE' }
                         ],
-                        width: 'w-40'
+                        width: 'w-40',
+                        isSearchable: true
                     }
                 ]}
                 searchPlaceholder="Search pages by title or slug..."

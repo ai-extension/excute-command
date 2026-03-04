@@ -19,13 +19,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "../components/ui/dialog";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "../components/ui/select";
+import { SelectOption, SearchableSelect } from '../components/SearchableSelect';
 import { Textarea } from "../components/ui/textarea";
 import { Label } from "../components/ui/label";
 import TerminalLog from '../components/TerminalLog';
@@ -106,9 +100,11 @@ const ServerPage = () => {
         }
     };
 
-    const fetchVpns = async () => {
+    const fetchVpns = async (search?: string) => {
         try {
-            const response = await apiFetch(`${API_BASE_URL}/vpns`);
+            let url = `${API_BASE_URL}/vpns?limit=20`;
+            if (search) url += `&search=${encodeURIComponent(search)}`;
+            const response = await apiFetch(url);
             if (!response.ok) {
                 console.error(`Failed to fetch vpns: ${response.status}`);
                 return;
@@ -135,7 +131,7 @@ const ServerPage = () => {
         fetchServers();
     }, [offset, limit]);
 
-    const handleApplyFilter = (search: string, filters: { [key: string]: string }) => {
+    const handleApplyFilter = (search: string, filters: { [key: string]: any }) => {
         setSearchTerm(search);
         if (filters.authType) setAuthTypeFilter(filters.authType);
         if (filters.vpn) setVpnFilter(filters.vpn);
@@ -258,10 +254,6 @@ const ServerPage = () => {
                 onSearchChange={setSearchTerm}
                 onApply={handleApplyFilter}
                 filters={{ authType: authTypeFilter, vpn: vpnFilter }}
-                onFilterChange={(key: string, val: string) => {
-                    if (key === 'authType') setAuthTypeFilter(val);
-                    if (key === 'vpn') setVpnFilter(val);
-                }}
                 filterConfigs={[
                     {
                         key: 'authType',
@@ -271,7 +263,8 @@ const ServerPage = () => {
                             { label: 'PASSWORD', value: 'PASSWORD' },
                             { label: 'PUB KEY', value: 'PUBLIC_KEY' }
                         ],
-                        width: 'w-32'
+                        width: 'w-32',
+                        isSearchable: true
                     },
                     {
                         key: 'vpn',
@@ -281,7 +274,9 @@ const ServerPage = () => {
                             { label: 'DIRECT', value: 'NONE' },
                             ...vpns.map(v => ({ label: v.name.toUpperCase(), value: v.id }))
                         ],
-                        width: 'w-40'
+                        width: 'w-40',
+                        isSearchable: true,
+                        onSearch: (query) => fetchVpns(query)
                     }
                 ]}
                 searchPlaceholder="Filter by name, ip, or credentials..."
@@ -487,40 +482,29 @@ const ServerPage = () => {
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label className="text-right text-[10px] font-black uppercase opacity-60">VPN Proxy</Label>
-                            <Select
-                                value={formData.vpn_id || 'none'}
-                                onValueChange={(val: any) => setFormData({ ...formData, vpn_id: val })}
-                            >
-                                <SelectTrigger className="col-span-3 text-xs font-bold bg-background border-border">
-                                    <SelectValue placeholder="Direct Connection (No VPN)" />
-                                </SelectTrigger>
-                                <SelectContent className="bg-card border-border">
-                                    <SelectItem value="none">Direct Connection (No VPN)</SelectItem>
-                                    {vpns.map(v => (
-                                        <SelectItem key={v.id} value={v.id}>
-                                            <div className="flex items-center gap-2">
-                                                <Network className="w-3.5 h-3.5" />
-                                                <span>{v.name}</span>
-                                            </div>
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <SearchableSelect
+                                options={[
+                                    { label: 'Direct Connection (No VPN)', value: 'none' },
+                                    ...vpns.map(v => ({ label: v.name.toUpperCase(), value: v.id }))
+                                ]}
+                                value={(formData.vpn_id || "none") as string}
+                                onValueChange={(val) => setFormData({ ...formData, vpn_id: val })}
+                                isSearchable
+                                placeholder="Direct Connection (No VPN)"
+                                triggerClassName="col-span-3 text-xs font-bold bg-background border-border"
+                            />
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label className="text-right text-[10px] font-black uppercase opacity-60">Protocol</Label>
-                            <Select
+                            <SearchableSelect
+                                options={[
+                                    { label: 'SSH PASSWORD', value: 'PASSWORD' },
+                                    { label: 'PUBLIC KEY (RSA/ED25519)', value: 'PUBLIC_KEY' }
+                                ]}
                                 value={formData.auth_type}
-                                onValueChange={(val: any) => setFormData({ ...formData, auth_type: val })}
-                            >
-                                <SelectTrigger className="col-span-3 text-xs font-bold bg-background border-border">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent className="bg-card border-border">
-                                    <SelectItem value="PASSWORD">SSH Password</SelectItem>
-                                    <SelectItem value="PUBLIC_KEY">Public Key (RSA/Ed25519)</SelectItem>
-                                </SelectContent>
-                            </Select>
+                                onValueChange={(val) => setFormData({ ...formData, auth_type: val as 'PASSWORD' | 'PUBLIC_KEY' })}
+                                triggerClassName="col-span-3 text-xs font-bold bg-background border-border"
+                            />
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label className="text-right text-[10px] font-black uppercase opacity-60">

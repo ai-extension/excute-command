@@ -165,6 +165,15 @@ const WorkflowPage = () => {
                                     key: 'tags',
                                     placeholder: 'Tags',
                                     type: 'multi',
+                                    isSearchable: true,
+                                    onSearch: (query) => {
+                                        apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace?.id}/tags?search=${encodeURIComponent(query)}`)
+                                            .then(res => res.json())
+                                            .then(data => {
+                                                setAvailableTags(data.items || (Array.isArray(data) ? data : []));
+                                            })
+                                            .catch(err => console.error('Failed to search tags:', err));
+                                    },
                                     options: availableTags.map(t => ({ label: t.name, value: t.id }))
                                 }
                             ]}
@@ -291,7 +300,10 @@ const WorkflowPage = () => {
                                                     variant="outline"
                                                     className={cn(
                                                         "font-black text-[9px] uppercase tracking-widest px-3 py-1.5 rounded-xl border-none",
-                                                        wf.status === 'active' ? "bg-emerald-500/10 text-emerald-500" : "bg-muted text-muted-foreground"
+                                                        wf.status === 'SUCCESS' ? "bg-emerald-500/10 text-emerald-500" :
+                                                            wf.status === 'FAILED' ? "bg-destructive/10 text-destructive" :
+                                                                wf.status === 'RUNNING' ? "bg-primary/10 text-primary animate-pulse" :
+                                                                    "bg-muted text-muted-foreground"
                                                     )}
                                                 >
                                                     {wf.status}

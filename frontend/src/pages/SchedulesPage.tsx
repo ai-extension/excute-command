@@ -522,6 +522,15 @@ const SchedulesPage = () => {
                             key: 'tags',
                             placeholder: 'Tags',
                             type: 'multi',
+                            isSearchable: true,
+                            onSearch: (query) => {
+                                apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace?.id}/tags?search=${encodeURIComponent(query)}`)
+                                    .then(res => res.json())
+                                    .then(data => {
+                                        setAvailableTags(data.items || (Array.isArray(data) ? data : []));
+                                    })
+                                    .catch(err => console.error('Failed to search tags:', err));
+                            },
                             options: availableTags.map(t => ({ label: t.name, value: t.id }))
                         }
                     ]}

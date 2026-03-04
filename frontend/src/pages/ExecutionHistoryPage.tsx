@@ -26,13 +26,6 @@ import {
     DialogTitle,
     DialogDescription
 } from '../components/ui/dialog';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "../components/ui/select";
 import { WorkflowExecution, Workflow } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useNamespace } from '../context/NamespaceContext';
@@ -66,10 +59,12 @@ const ExecutionHistoryPage = () => {
         }
     }, [activeNamespace, offset, limit]);
 
-    const fetchWorkflows = async () => {
+    const fetchWorkflows = async (search?: string) => {
         if (!activeNamespace) return;
         try {
-            const response = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/workflows?limit=1000`);
+            let url = `${API_BASE_URL}/namespaces/${activeNamespace.id}/workflows?limit=20`;
+            if (search) url += `&search=${encodeURIComponent(search)}`;
+            const response = await apiFetch(url);
             const data = await response.json();
             setWorkflows(data.items || (Array.isArray(data) ? data : []));
         } catch (error) {
@@ -179,7 +174,7 @@ const ExecutionHistoryPage = () => {
         return `${mins}m ${secs}s`;
     };
 
-    const handleApplyFilter = (search: string, filters: { [key: string]: string }) => {
+    const handleApplyFilter = (search: string, filters: { [key: string]: any }) => {
         setSearchQuery(search);
         setStatusFilter(filters.status || 'ALL');
         setWorkflowFilter(filters.workflowId || 'ALL');
@@ -206,10 +201,6 @@ const ExecutionHistoryPage = () => {
                         onSearchChange={setSearchQuery}
                         onApply={handleApplyFilter}
                         filters={{ status: statusFilter, workflowId: workflowFilter }}
-                        onFilterChange={(key, val) => {
-                            if (key === 'status') setStatusFilter(val);
-                            if (key === 'workflowId') setWorkflowFilter(val);
-                        }}
                         filterConfigs={[
                             {
                                 key: 'status',
@@ -220,7 +211,8 @@ const ExecutionHistoryPage = () => {
                                     { label: 'FAILED', value: 'FAILED' },
                                     { label: 'RUNNING', value: 'RUNNING' }
                                 ],
-                                width: 'w-32'
+                                width: 'w-32',
+                                isSearchable: true
                             },
                             {
                                 key: 'workflowId',
@@ -229,7 +221,9 @@ const ExecutionHistoryPage = () => {
                                     { label: 'ALL WORKFLOWS', value: 'ALL' },
                                     ...workflows.map(wf => ({ label: wf.name.toUpperCase(), value: wf.id }))
                                 ],
-                                width: 'w-48'
+                                width: 'w-48',
+                                isSearchable: true,
+                                onSearch: (query) => fetchWorkflows(query)
                             }
                         ]}
                         searchPlaceholder="SEARCH BY WORKFLOW OR ID..."

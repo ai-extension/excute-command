@@ -17,13 +17,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../lib/api';
 import { Pagination } from '../components/Pagination';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "../components/ui/select";
 import { ResourceFilters } from '../components/ResourceFilters';
 
 import {
@@ -76,9 +69,11 @@ const UsersPage = () => {
         }
     };
 
-    const fetchRoles = async () => {
+    const fetchRoles = async (search?: string) => {
         try {
-            const response = await apiFetch(`${API_BASE_URL}/roles`);
+            let url = `${API_BASE_URL}/roles?limit=20`;
+            if (search) url += `&search=${encodeURIComponent(search)}`;
+            const response = await apiFetch(url);
             const dataRaw = await response.json();
             const data = dataRaw.items || dataRaw || [];
             setRoles(Array.isArray(data) ? data : []);
@@ -301,7 +296,6 @@ const UsersPage = () => {
                 onSearchChange={setSearchTerm}
                 onApply={handleApplyFilter}
                 filters={{ roleID: roleFilter }}
-                onFilterChange={(key: string, val: string) => setRoleFilter(val)}
                 filterConfigs={[
                     {
                         key: 'roleID',
@@ -310,7 +304,9 @@ const UsersPage = () => {
                             { label: 'ALL ROLES', value: 'ALL' },
                             ...roles.map(r => ({ label: r.name.toUpperCase(), value: r.id }))
                         ],
-                        width: 'w-48'
+                        width: 'w-48',
+                        isSearchable: true,
+                        onSearch: (query) => fetchRoles(query)
                     }
                 ]}
                 searchPlaceholder="Search by name, email, or role..."
