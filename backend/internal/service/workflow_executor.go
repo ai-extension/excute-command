@@ -634,7 +634,8 @@ func (e *WorkflowExecutor) relayCopy(ctx context.Context, group *domain.Workflow
 		}
 		// 4. Global Variables: {{global.key}}
 		if e.globalVarRepo != nil {
-			scope := domain.GetPermissionScope(user, "namespaces", "READ")
+			// Workflow execution has full access to its namespace's global variables
+			scope := domain.PermissionScope{IsGlobal: true}
 			gvs, _ := e.globalVarRepo.List(namespaceID, &scope)
 			for _, v := range gvs {
 				if v.Value != "" && !securityRegex.MatchString(v.Value) {
@@ -791,9 +792,10 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 		}
 		command = strings.ReplaceAll(command, "{{step."+k+".status}}", v)
 	}
-	// 3. Global Variables: {{global.key}}
+	// 4. Global Variables: {{global.key}}
 	if e.globalVarRepo != nil {
-		scope := domain.GetPermissionScope(user, "namespaces", "READ")
+		// Workflow execution has full access to its namespace's global variables
+		scope := domain.PermissionScope{IsGlobal: true}
 		gvs, _ := e.globalVarRepo.List(namespaceID, &scope)
 		for _, v := range gvs {
 			if v.Value != "" && !securityRegex.MatchString(v.Value) {

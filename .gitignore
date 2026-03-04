@@ -18,6 +18,7 @@ backend/vendor/
 backend/go.work
 backend/data/
 backend/.env
+backend/tmp/
 
 # Frontend (Node/React/Vite)
 frontend/node_modules/
