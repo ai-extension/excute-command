@@ -183,22 +183,22 @@ const PublicPageView = () => {
         return () => clearInterval(check);
     }, [tokenExpiresAt, isAuthorized]);
 
-    // Logs Polling
+    // Logs Polling - REMOVED since we use streaming for live runs
+    // Keep it only if we need to sync status independently? 
+    // Actually, the run stream captures everything for public pages.
     useEffect(() => {
-        if (!activeExecutionId || !isAuthorized || !pageToken) return;
+        if (!activeExecutionId || !isAuthorized || !pageToken || !isPollingLogs) return;
         let isMounted = true;
+
+        // Status check only
         const poll = setInterval(async () => {
             try {
                 const headers = { 'X-Page-Token': pageToken };
                 const sRes = await fetch(`${API_BASE_URL}/public/pages/${slug}/executions/${activeExecutionId}`, { headers });
-
                 if (sRes.status === 401) {
-                    setTokenExpired(true);
-                    setIsAuthorized(false);
-                    setIsPollingLogs(false);
+                    setTokenExpired(true); setIsAuthorized(false); setIsPollingLogs(false);
                     return;
                 }
-
                 const sData = await sRes.json();
                 if (isMounted) {
                     setExecutionStatus(sData.status);
@@ -207,13 +207,10 @@ const PublicPageView = () => {
                         clearInterval(poll);
                     }
                 }
-                const lRes = await fetch(`${API_BASE_URL}/public/pages/${slug}/executions/${activeExecutionId}/logs`, { headers });
-                const lData = await lRes.text();
-                if (isMounted) setExecutionLogs(lData);
             } catch (err) { }
-        }, 2000);
+        }, 3000);
         return () => { isMounted = false; clearInterval(poll); };
-    }, [activeExecutionId, slug, isAuthorized, pageToken]);
+    }, [activeExecutionId, slug, isAuthorized, pageToken, isPollingLogs]);
 
     const runWidget = async (widget: PageWidget, inputs: Record<string, string> = {}) => {
         const pw = page?.workflows?.find(p => p.workflow_id === widget.workflow_id);
@@ -235,6 +232,12 @@ const PublicPageView = () => {
 
         setInputModal({ isOpen: false, widget: null, workflowInputs: [] });
         setRunningWidgets(prev => ({ ...prev, [widget.id]: true }));
+
+        // Reset terminal logs and execution ID before running
+        setExecutionStatus(null);
+        setExecutionLogs('');
+        setActiveExecutionId(null);
+
         try {
             const headers: Record<string, string> = { 'Content-Type': 'application/json' };
             if (pageToken) headers['X-Page-Token'] = pageToken;
@@ -245,22 +248,44 @@ const PublicPageView = () => {
                 body: JSON.stringify({ inputs })
             });
 
-            const data = await response.json();
             if (response.status === 401) {
                 setTokenExpired(true); setIsAuthorized(false);
                 return;
             }
 
+            const executionId = response.headers.get('X-Execution-ID');
+
             if (response.ok) {
                 setExecutionResults(prev => ({ ...prev, [widget.id]: { success: true, message: 'SUCCESS' } }));
-                if (widget.show_log) {
-                    setActiveExecutionId(data.execution_id);
-                    setExecutionLogs('Initializing trace...');
+                if (widget.show_log && executionId) {
+                    setActiveExecutionId(executionId);
+                    setExecutionLogs('Initializing trace...\n');
                     setExecutionStatus('RUNNING');
                     setIsPollingLogs(true);
                     setTerminalState('normal');
+
+                    // Read the stream
+                    const reader = response.body?.getReader();
+                    const decoder = new TextDecoder();
+                    if (reader) {
+                        (async () => {
+                            try {
+                                while (true) {
+                                    const { done, value } = await reader.read();
+                                    if (done) break;
+                                    const chunk = decoder.decode(value, { stream: true });
+                                    setExecutionLogs(prev => prev + chunk);
+                                }
+                            } catch (err) {
+                                console.error('Stream read error:', err);
+                            } finally {
+                                reader.releaseLock();
+                            }
+                        })();
+                    }
                 }
             } else {
+                const data = await response.json().catch(() => ({}));
                 setExecutionResults(prev => ({ ...prev, [widget.id]: { success: false, message: data.error || 'FAILED' } }));
             }
         } catch (err) {

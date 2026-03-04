@@ -16,6 +16,7 @@ import TerminalLog from './TerminalLog';
 interface ExecutionMonitorProps {
     mode: 'LIVE' | 'HISTORICAL';
     workflow?: Workflow;
+    streamLogs?: string[];
     execution?: WorkflowExecution;
     onClose: () => void;
     onReady?: () => void;
@@ -25,6 +26,7 @@ interface ExecutionMonitorProps {
 const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
     mode,
     workflow: initialWorkflow,
+    streamLogs = [],
     execution: initialExecution,
     onClose,
     onReady,
@@ -385,6 +387,7 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                             isGroup={!!activeGroupID && !activeStepID}
                             isLive={mode === 'LIVE'}
                             showHeader={false}
+                            streamLogs={streamLogs}
                             initialLogs={activeStepID || activeGroupID ? stepLogs : globalLogs}
                             onReady={() => setIsTerminalReady(true)}
                             className="flex-1 border-0 rounded-none bg-transparent"

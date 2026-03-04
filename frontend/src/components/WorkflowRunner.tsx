@@ -17,6 +17,7 @@ export const WorkflowRunner: React.FC<WorkflowRunnerProps> = ({ children, onRunC
     const [isMonitorOpen, setIsMonitorOpen] = useState(false);
     const [isInputOpen, setIsInputOpen] = useState(false);
     const [runningWorkflow, setRunningWorkflow] = useState<(Partial<Workflow> & { id: string, execution_id?: string }) | null>(null);
+    const [streamLogs, setStreamLogs] = useState<string[]>([]);
     const [isStarting, setIsStarting] = useState(false);
     const [pendingRun, setPendingRun] = useState<{ workflow: any, inputs?: Record<string, string> } | null>(null);
 
@@ -30,7 +31,8 @@ export const WorkflowRunner: React.FC<WorkflowRunnerProps> = ({ children, onRunC
 
         setIsInputOpen(false);
         setPendingRun({ workflow, inputs: inputsValues });
-        setRunningWorkflow(workflow);
+        setRunningWorkflow({ ...workflow, execution_id: undefined } as any);
+        setStreamLogs([]); // Clear logs before opening monitor
         setIsMonitorOpen(true);
     };
 
@@ -50,9 +52,40 @@ export const WorkflowRunner: React.FC<WorkflowRunnerProps> = ({ children, onRunC
                 body: JSON.stringify({ inputs: inputs || {} })
             });
 
-            const data = await response.json();
-            if (data.execution_id) {
-                setRunningWorkflow(prev => prev ? { ...prev, execution_id: data.execution_id } : null);
+            const execID = response.headers.get('X-Execution-ID');
+            if (execID) {
+                setRunningWorkflow(prev => prev ? {
+                    ...prev,
+                    execution_id: execID
+                } : null);
+                setStreamLogs([]); // Reset logs for new run
+
+                // Read the stream
+                const reader = response.body?.getReader();
+                const decoder = new TextDecoder();
+                if (reader) {
+                    (async () => {
+                        let buffer = '';
+                        try {
+                            while (true) {
+                                const { done, value } = await reader.read();
+                                if (done) break;
+
+                                buffer += decoder.decode(value, { stream: true });
+                                const lines = buffer.split('\n');
+                                buffer = lines.pop() || '';
+
+                                if (lines.length > 0) {
+                                    setStreamLogs(prev => [...prev, ...lines]);
+                                }
+                            }
+                        } catch (err) {
+                            console.error('Error reading log stream:', err);
+                        } finally {
+                            reader.releaseLock();
+                        }
+                    })();
+                }
             }
 
             if (onRunComplete) {
@@ -75,6 +108,7 @@ export const WorkflowRunner: React.FC<WorkflowRunnerProps> = ({ children, onRunC
                     {runningWorkflow && (
                         <WorkflowMonitor
                             workflow={runningWorkflow as any}
+                            streamLogs={streamLogs}
                             onReady={handleMonitorReady}
                             onReRun={(workflow, inputs) => {
                                 // Reset starting states to allow a fresh run

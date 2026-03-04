@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -222,18 +223,45 @@ func (h *WorkflowHandler) RunWorkflow(c *gin.Context) {
 		return
 	}
 
+	// Channel for streaming logs
+	logChan := make(chan string, 100)
+	logFunc := func(log string) {
+		logChan <- log
+	}
+
+	// Wait group to know when the execution is done
+	doneChan := make(chan struct{})
+
 	// Run inside a goroutine to not block the request
 	go func() {
-		err := h.executor.Run(context.Background(), id, execID, req.Inputs, nil, nil, "MANUAL", user)
+		defer close(doneChan)
+		err := h.executor.Run(context.Background(), id, execID, req.Inputs, nil, nil, "MANUAL", user, logFunc)
 		if err != nil {
 			// Hub broadcast will handle status updates, but we can log error
 			println("Workflow execution error:", err.Error())
 		}
 	}()
 
-	c.JSON(http.StatusAccepted, gin.H{
-		"message":      "Workflow started",
-		"execution_id": execID,
+	// Stream logs to the client
+	c.Header("X-Execution-ID", execID.String())
+	c.Stream(func(w io.Writer) bool {
+		select {
+		case logLine := <-logChan:
+			w.Write([]byte(logLine))
+			return true
+		case <-doneChan:
+			// Drain remaining logs
+			for {
+				select {
+				case logLine := <-logChan:
+					w.Write([]byte(logLine))
+				default:
+					return false
+				}
+			}
+		case <-c.Request.Context().Done():
+			return false
+		}
 	})
 }
 

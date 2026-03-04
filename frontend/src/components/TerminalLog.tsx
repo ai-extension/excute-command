@@ -13,6 +13,7 @@ interface TerminalLogProps {
     isGlobal?: boolean;
     isGroup?: boolean;
     initialLogs?: string[];
+    streamLogs?: string[];
     isLive?: boolean;
     showHeader?: boolean;
     onClear?: () => void;
@@ -29,6 +30,7 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
     isGlobal = false,
     isGroup = false,
     showHeader = true,
+    streamLogs = [],
     onClear,
     onReady,
     className
@@ -67,11 +69,16 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
     useEffect(() => {
         if (!isLive) {
             setLogs(initialLogs);
+        } else if (isGlobal && streamLogs.length > 0) {
+            // Seed logs with whatever we've captured from the stream so far
+            setLogs(streamLogs);
         }
-    }, [initialLogs, isLive]);
+    }, [initialLogs, isLive, isGlobal, streamLogs]);
 
     useEffect(() => {
-        if (!isActive || !isLive) return;
+        // If we're displaying global logs in live mode, we rely on the streamLogs prop.
+        // We STILL need WS for step-specific or group-specific logs because those aren't in the main run stream.
+        if (!isActive || !isLive || (isGlobal && streamLogs.length > 0)) return;
 
         const wsUrl = `ws://${window.location.hostname}:8080/api/ws`;
         const socket = new WebSocket(wsUrl);

@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -303,14 +304,37 @@ func (h *PageHandler) RunPublicWorkflow(c *gin.Context) {
 	}
 
 	execID := uuid.New()
+	logChan := make(chan string, 100)
+	logFunc := func(log string) {
+		logChan <- log
+	}
+
+	doneChan := make(chan struct{})
 	go func() {
+		defer close(doneChan)
 		// Public run uses background context
-		h.executor.Run(context.Background(), workflowID, execID, inputReq.Inputs, nil, &page.ID, "PAGE", nil)
+		h.executor.Run(context.Background(), workflowID, execID, inputReq.Inputs, nil, &page.ID, "PAGE", nil, logFunc)
 	}()
 
-	c.JSON(http.StatusAccepted, gin.H{
-		"message":      "Workflow started",
-		"execution_id": execID,
+	// Stream logs to the client
+	c.Header("X-Execution-ID", execID.String())
+	c.Stream(func(w io.Writer) bool {
+		select {
+		case logLine := <-logChan:
+			w.Write([]byte(logLine))
+			return true
+		case <-doneChan:
+			for {
+				select {
+				case logLine := <-logChan:
+					w.Write([]byte(logLine))
+				default:
+					return false
+				}
+			}
+		case <-c.Request.Context().Done():
+			return false
+		}
 	})
 }
 
