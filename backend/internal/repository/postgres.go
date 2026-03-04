@@ -56,7 +56,7 @@ func (r *PostgresNamespaceRepo) List(scope *domain.PermissionScope) ([]domain.Na
 	if scope != nil && !scope.IsGlobal {
 		db = db.Where("id IN ?", scope.AllowedItemIDs)
 	}
-	if err := db.Find(&nss).Error; err != nil {
+	if err := db.Order("created_at DESC").Find(&nss).Error; err != nil {
 		return nil, err
 	}
 	return nss, nil
@@ -100,7 +100,7 @@ func (r *PostgresUserRepo) GetByUsername(username string) (*domain.User, error) 
 
 func (r *PostgresUserRepo) List() ([]domain.User, error) {
 	var users []domain.User
-	if err := r.db.Preload("Roles").Find(&users).Error; err != nil {
+	if err := r.db.Preload("Roles").Order("created_at DESC").Find(&users).Error; err != nil {
 		return nil, err
 	}
 	return users, nil
@@ -162,7 +162,7 @@ func (r *PostgresRoleRepo) GetByID(id uuid.UUID) (*domain.Role, error) {
 
 func (r *PostgresRoleRepo) List() ([]domain.Role, error) {
 	var roles []domain.Role
-	if err := r.db.Preload("Permissions.Permission").Find(&roles).Error; err != nil {
+	if err := r.db.Preload("Permissions.Permission").Order("created_at DESC").Find(&roles).Error; err != nil {
 		return nil, err
 	}
 	return roles, nil
@@ -182,7 +182,7 @@ func (r *PostgresRoleRepo) ListPaginated(limit, offset int, searchTerm string) (
 		return nil, 0, err
 	}
 
-	err := db.Preload("Permissions.Permission").Limit(limit).Offset(offset).Order("name ASC").Find(&roles).Error
+	err := db.Preload("Permissions.Permission").Limit(limit).Offset(offset).Order("created_at DESC").Find(&roles).Error
 	return roles, total, err
 }
 
@@ -231,7 +231,7 @@ func (r *PostgresPermissionRepo) Create(perm *domain.Permission) error {
 
 func (r *PostgresPermissionRepo) List() ([]domain.Permission, error) {
 	var perms []domain.Permission
-	if err := r.db.Find(&perms).Error; err != nil {
+	if err := r.db.Order("created_at DESC").Find(&perms).Error; err != nil {
 		return nil, err
 	}
 	return perms, nil

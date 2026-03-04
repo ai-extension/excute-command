@@ -325,21 +325,24 @@ type ScheduleWorkflow struct {
 }
 
 type WorkflowExecution struct {
-	ID          uuid.UUID               `json:"id" gorm:"type:uuid;primaryKey"`
-	WorkflowID  uuid.UUID               `json:"workflow_id" gorm:"type:uuid;index"`
-	ScheduledID *uuid.UUID              `json:"scheduled_id" gorm:"type:uuid;index"`
-	Status      Status                  `json:"status"`
-	Inputs      string                  `json:"inputs"` // JSON string
-	ExecutedBy  *uuid.UUID              `json:"executed_by" gorm:"type:uuid"`
-	User        *User                   `json:"user,omitempty" gorm:"foreignKey:ExecutedBy"`
-	LogPath     string                  `json:"log_path"`
-	StartedAt   time.Time               `json:"started_at"`
-	FinishedAt  *time.Time              `json:"finished_at,omitempty"`
-	CreatedAt   time.Time               `json:"created_at"`
-	UpdatedAt   time.Time               `json:"updated_at"`
-	Workflow    *Workflow               `json:"workflow,omitempty" gorm:"foreignKey:WorkflowID"`
-	Schedule    *Schedule               `json:"schedule,omitempty" gorm:"foreignKey:ScheduledID"`
-	Steps       []WorkflowExecutionStep `json:"steps,omitempty" gorm:"foreignKey:ExecutionID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	ID            uuid.UUID               `json:"id" gorm:"type:uuid;primaryKey"`
+	WorkflowID    uuid.UUID               `json:"workflow_id" gorm:"type:uuid;index"`
+	ScheduledID   *uuid.UUID              `json:"scheduled_id" gorm:"type:uuid;index"`
+	PageID        *uuid.UUID              `json:"page_id,omitempty" gorm:"type:uuid;index"`
+	TriggerSource string                  `json:"trigger_source" gorm:"size:50;index"` // MANUAL, PAGE, SCHEDULE, HOOK
+	Status        Status                  `json:"status"`
+	Inputs        string                  `json:"inputs"` // JSON string
+	ExecutedBy    *uuid.UUID              `json:"executed_by" gorm:"type:uuid"`
+	User          *User                   `json:"user,omitempty" gorm:"foreignKey:ExecutedBy"`
+	LogPath       string                  `json:"log_path"`
+	StartedAt     time.Time               `json:"started_at"`
+	FinishedAt    *time.Time              `json:"finished_at,omitempty"`
+	CreatedAt     time.Time               `json:"created_at"`
+	UpdatedAt     time.Time               `json:"updated_at"`
+	Workflow      *Workflow               `json:"workflow,omitempty" gorm:"foreignKey:WorkflowID"`
+	Schedule      *Schedule               `json:"schedule,omitempty" gorm:"foreignKey:ScheduledID"`
+	Page          *Page                   `json:"page,omitempty" gorm:"foreignKey:PageID"`
+	Steps         []WorkflowExecutionStep `json:"steps,omitempty" gorm:"foreignKey:ExecutionID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 }
 
 type WorkflowExecutionStep struct {

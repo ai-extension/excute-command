@@ -3,7 +3,7 @@ import {
     Zap, X, CheckCircle2, AlertCircle, Clock,
     ArrowRight, ChevronDown, ChevronRight,
     Terminal, Server, Layers, Play, Pause, Square, Monitor,
-    Download
+    Download, Plus, FileText, Calendar
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -196,9 +196,24 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                         <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">
                             {mode === 'LIVE' ? 'Live Orchestration Monitor' : 'Execution Audit Vault'} <span className="text-zinc-600 px-1">•</span> {workflow.name}
                         </span>
-                        {execution?.scheduled_id && (
+                        {execution?.trigger_source === 'SCHEDULE' && (
                             <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 font-black text-[8px] uppercase tracking-widest px-2 py-0.5 ml-2">
-                                Scheduled
+                                <Clock className="w-3 h-3 mr-1" /> Scheduled
+                            </Badge>
+                        )}
+                        {execution?.trigger_source === 'PAGE' && (
+                            <Badge variant="outline" className="bg-purple-500/10 text-purple-500 border-purple-500/20 font-black text-[8px] uppercase tracking-widest px-2 py-0.5 ml-2">
+                                <Layers className="w-3 h-3 mr-1" /> Page: {execution.page?.title || 'Public'}
+                            </Badge>
+                        )}
+                        {execution?.trigger_source === 'HOOK' && (
+                            <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/20 font-black text-[8px] uppercase tracking-widest px-2 py-0.5 ml-2">
+                                <Zap className="w-3 h-3 mr-1" /> Hook
+                            </Badge>
+                        )}
+                        {execution?.trigger_source === 'MANUAL' && (
+                            <Badge variant="outline" className="bg-slate-500/10 text-slate-400 border-slate-500/20 font-black text-[8px] uppercase tracking-widest px-2 py-0.5 ml-2">
+                                <Plus className="w-3 h-3 mr-1" /> Manual
                             </Badge>
                         )}
                     </div>

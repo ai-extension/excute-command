@@ -52,11 +52,11 @@ func NewWorkflowExecutor(
 	}
 }
 
-func (e *WorkflowExecutor) Run(ctx context.Context, workflowID uuid.UUID, execID uuid.UUID, inputs map[string]string, scheduledID *uuid.UUID, user *domain.User) error {
-	return e.RunWithDepth(ctx, workflowID, execID, inputs, scheduledID, 0, user)
+func (e *WorkflowExecutor) Run(ctx context.Context, workflowID uuid.UUID, execID uuid.UUID, inputs map[string]string, scheduledID *uuid.UUID, pageID *uuid.UUID, triggerSource string, user *domain.User) error {
+	return e.RunWithDepth(ctx, workflowID, execID, inputs, scheduledID, pageID, triggerSource, 0, user)
 }
 
-func (e *WorkflowExecutor) RunWithDepth(ctx context.Context, workflowID uuid.UUID, execID uuid.UUID, inputs map[string]string, scheduledID *uuid.UUID, depth int, user *domain.User) error {
+func (e *WorkflowExecutor) RunWithDepth(ctx context.Context, workflowID uuid.UUID, execID uuid.UUID, inputs map[string]string, scheduledID *uuid.UUID, pageID *uuid.UUID, triggerSource string, depth int, user *domain.User) error {
 	if depth > 3 {
 		return fmt.Errorf("maximum hook depth exceeded (circular dependency?)")
 	}
@@ -91,17 +91,27 @@ func (e *WorkflowExecutor) RunWithDepth(ctx context.Context, workflowID uuid.UUI
 		// Fallback if not found
 		inputsJSON, _ := json.Marshal(inputs)
 		execution = &domain.WorkflowExecution{
-			ID:         execID,
-			WorkflowID: workflowID,
-			Status:     domain.StatusRunning,
-			Inputs:     string(inputsJSON),
-			StartedAt:  time.Now(),
+			ID:            execID,
+			WorkflowID:    workflowID,
+			Status:        domain.StatusRunning,
+			Inputs:        string(inputsJSON),
+			StartedAt:     time.Now(),
+			ScheduledID:   scheduledID,
+			PageID:        pageID,
+			TriggerSource: triggerSource,
 		}
 		if user != nil {
 			execution.ExecutedBy = &user.ID
 			execution.User = user
 		}
 		e.execRepo.Create(execution)
+	} else {
+		// Even if record exists, update with trigger info if missing
+		execution.PageID = pageID
+		execution.TriggerSource = triggerSource
+		if scheduledID != nil {
+			execution.ScheduledID = scheduledID
+		}
 	}
 
 	// Update with log path
@@ -306,7 +316,7 @@ func (e *WorkflowExecutor) RunHooks(ctx context.Context, hooks []domain.Workflow
 		}
 
 		hookExecID := uuid.New()
-		err := e.RunWithDepth(ctx, hook.TargetWorkflowID, hookExecID, hookInputs, nil, depth+1, user)
+		err := e.RunWithDepth(ctx, hook.TargetWorkflowID, hookExecID, hookInputs, nil, nil, "HOOK", depth+1, user)
 		if err != nil {
 			errMsg := fmt.Sprintf("Warning: %s hook execution failed: %v (Continuing workflow)", hookType, err)
 			if logFile != nil {

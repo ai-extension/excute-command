@@ -133,6 +133,7 @@ func (r *PostgresScheduleRepo) ListActive() ([]domain.Schedule, error) {
 		Preload("Hooks.TargetWorkflow").
 		Preload("Tags").
 		Where("status = ?", "ACTIVE").
+		Order("created_at DESC").
 		Find(&schedules).Error; err != nil {
 		return nil, err
 	}

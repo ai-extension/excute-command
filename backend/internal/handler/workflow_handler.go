@@ -202,11 +202,12 @@ func (h *WorkflowHandler) RunWorkflow(c *gin.Context) {
 
 	// Initial execution record creation to avoid race conditions with log fetching
 	execution := &domain.WorkflowExecution{
-		ID:         execID,
-		WorkflowID: id,
-		Status:     domain.StatusRunning,
-		StartedAt:  time.Now(),
-		ExecutedBy: &user.ID,
+		ID:            execID,
+		WorkflowID:    id,
+		Status:        domain.StatusRunning,
+		StartedAt:     time.Now(),
+		ExecutedBy:    &user.ID,
+		TriggerSource: "MANUAL",
 	}
 	if req.Inputs != nil {
 		inputsByes, _ := json.Marshal(req.Inputs)
@@ -220,7 +221,7 @@ func (h *WorkflowHandler) RunWorkflow(c *gin.Context) {
 
 	// Run inside a goroutine to not block the request
 	go func() {
-		err := h.executor.Run(context.Background(), id, execID, req.Inputs, nil, user)
+		err := h.executor.Run(context.Background(), id, execID, req.Inputs, nil, nil, "MANUAL", user)
 		if err != nil {
 			// Hub broadcast will handle status updates, but we can log error
 			println("Workflow execution error:", err.Error())

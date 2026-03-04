@@ -3,13 +3,16 @@ import {
     History,
     Clock,
     CheckCircle2,
-    XCircle,
     Loader2,
     Calendar,
     ChevronRight,
     CalendarClock,
     RefreshCw,
-    ChevronDown
+    ChevronDown,
+    Zap,
+    FileText,
+    Plus,
+    XCircle
 } from 'lucide-react';
 import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
@@ -103,6 +106,35 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({ workflowId, onReRun }
         }
     };
 
+    const getTriggerBadge = (exec: WorkflowExecution) => {
+        switch (exec.trigger_source) {
+            case 'SCHEDULE':
+                return (
+                    <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 font-black text-[8px] uppercase tracking-widest px-2 py-0.5">
+                        <Calendar className="w-3 h-3 mr-1" /> Scheduled
+                    </Badge>
+                );
+            case 'PAGE':
+                return (
+                    <Badge variant="outline" className="bg-purple-500/10 text-purple-500 border-purple-500/20 font-black text-[8px] uppercase tracking-widest px-2 py-0.5">
+                        <FileText className="w-3 h-3 mr-1" /> Page: {exec.page?.title || 'Public'}
+                    </Badge>
+                );
+            case 'HOOK':
+                return (
+                    <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/20 font-black text-[8px] uppercase tracking-widest px-2 py-0.5">
+                        <Zap className="w-3 h-3 mr-1" /> Hook
+                    </Badge>
+                );
+            default:
+                return (
+                    <Badge variant="outline" className="bg-slate-500/10 text-slate-400 border-slate-500/20 font-black text-[8px] uppercase tracking-widest px-2 py-0.5">
+                        <Plus className="w-3 h-3 mr-1" /> Manual
+                    </Badge>
+                );
+        }
+    };
+
     const getDuration = (start: string, end?: string) => {
         if (!end) return 'Running...';
         const diff = Math.floor((new Date(end).getTime() - new Date(start).getTime()) / 1000);
@@ -161,12 +193,7 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({ workflowId, onReRun }
                                         <div className="flex items-center gap-2 flex-wrap">
                                             <span className="text-xs font-mono text-muted-foreground">#{exec.id.slice(0, 8)}</span>
                                             {getStatusBadge(exec.status)}
-                                            {exec.scheduled_id && (
-                                                <Badge className="bg-violet-500/10 text-violet-400 border-violet-500/20 text-[8px] font-black uppercase tracking-widest px-1.5 gap-1">
-                                                    <CalendarClock className="w-2.5 h-2.5" />
-                                                    {(exec as any).schedule?.name || 'Scheduled'}
-                                                </Badge>
-                                            )}
+                                            {getTriggerBadge(exec)}
                                         </div>
                                         <div className="flex items-center gap-4 text-xs text-muted-foreground font-medium">
                                             <span className="flex items-center gap-1">

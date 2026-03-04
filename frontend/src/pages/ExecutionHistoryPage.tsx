@@ -139,6 +139,35 @@ const ExecutionHistoryPage = () => {
         }
     };
 
+    const getTriggerBadge = (exec: WorkflowExecution) => {
+        switch (exec.trigger_source) {
+            case 'SCHEDULE':
+                return (
+                    <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 font-black text-[8px] uppercase tracking-widest px-2 py-0.5">
+                        <Calendar className="w-3 h-3 mr-1" /> Scheduled
+                    </Badge>
+                );
+            case 'PAGE':
+                return (
+                    <Badge variant="outline" className="bg-purple-500/10 text-purple-500 border-purple-500/20 font-black text-[8px] uppercase tracking-widest px-2 py-0.5">
+                        <FileText className="w-3 h-3 mr-1" /> Page: {exec.page?.title || 'Public'}
+                    </Badge>
+                );
+            case 'HOOK':
+                return (
+                    <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/20 font-black text-[8px] uppercase tracking-widest px-2 py-0.5">
+                        <Zap className="w-3 h-3 mr-1" /> Hook
+                    </Badge>
+                );
+            default:
+                return (
+                    <Badge variant="outline" className="bg-slate-500/10 text-slate-400 border-slate-500/20 font-black text-[8px] uppercase tracking-widest px-2 py-0.5">
+                        <Plus className="w-3 h-3 mr-1" /> Manual
+                    </Badge>
+                );
+        }
+    };
+
     const getDuration = (start: string, end?: string) => {
         if (!end) return 'In Progress...';
         const startTime = new Date(start).getTime();
@@ -292,11 +321,7 @@ const ExecutionHistoryPage = () => {
                                                                 {exec.workflow?.name || 'TERMINATED_FLOW'}
                                                             </h3>
                                                             {getStatusBadge(exec.status)}
-                                                            {exec.scheduled_id && (
-                                                                <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 font-black text-[9px] uppercase tracking-widest px-2 py-0.5">
-                                                                    <Calendar className="w-3 h-3 mr-1" /> Scheduled
-                                                                </Badge>
-                                                            )}
+                                                            {getTriggerBadge(exec)}
                                                         </div>
                                                         <div className="flex items-center gap-4 text-[10px] text-muted-foreground font-bold tracking-wider uppercase opacity-80">
                                                             <span className="flex items-center gap-1.5 font-mono text-primary/60">

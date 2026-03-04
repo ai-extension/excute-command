@@ -30,7 +30,7 @@ func (r *PostgresGlobalVariableRepo) GetByID(id uuid.UUID, scope *domain.Permiss
 func (r *PostgresGlobalVariableRepo) List(namespaceID uuid.UUID, scope *domain.PermissionScope) ([]domain.GlobalVariable, error) {
 	var gvs []domain.GlobalVariable
 	db := applyScope(r.db, scope, "", "")
-	if err := db.Where("namespace_id = ?", namespaceID).Find(&gvs).Error; err != nil {
+	if err := db.Where("namespace_id = ?", namespaceID).Order("created_at DESC").Find(&gvs).Error; err != nil {
 		return nil, err
 	}
 	return gvs, nil

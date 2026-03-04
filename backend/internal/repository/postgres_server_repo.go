@@ -73,7 +73,7 @@ func (r *PostgresServerRepo) decryptServer(server *domain.Server) {
 func (r *PostgresServerRepo) List(scope *domain.PermissionScope) ([]domain.Server, error) {
 	var servers []domain.Server
 	db := applyScope(r.db, scope, "server_tags", "server_id")
-	if err := db.Preload("Vpn").Find(&servers).Error; err != nil {
+	if err := db.Preload("Vpn").Order("created_at DESC").Find(&servers).Error; err != nil {
 		return nil, err
 	}
 

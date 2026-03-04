@@ -127,6 +127,8 @@ export interface WorkflowExecution {
     id: string;
     workflow_id: string;
     scheduled_id?: string;
+    page_id?: string;
+    trigger_source: string;
     status: Status;
     inputs: string;
     executed_by?: string;
@@ -137,6 +139,7 @@ export interface WorkflowExecution {
     created_at: string;
     updated_at: string;
     workflow?: Workflow;
+    page?: Page;
     steps?: WorkflowExecutionStep[];
 }
 

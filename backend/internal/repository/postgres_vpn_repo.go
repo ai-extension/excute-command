@@ -53,7 +53,7 @@ func (r *PostgresVpnConfigRepo) GetByID(id uuid.UUID, scope *domain.PermissionSc
 func (r *PostgresVpnConfigRepo) List(scope *domain.PermissionScope) ([]domain.VpnConfig, error) {
 	var vpns []domain.VpnConfig
 	db := applyScope(r.db, scope, "", "")
-	if err := db.Find(&vpns).Error; err != nil {
+	if err := db.Order("created_at DESC").Find(&vpns).Error; err != nil {
 		return nil, err
 	}
 

@@ -252,7 +252,7 @@ func (r *PostgresWorkflowInputRepo) Create(input *domain.WorkflowInput) error {
 
 func (r *PostgresWorkflowInputRepo) GetByWorkflowID(workflowID uuid.UUID) ([]domain.WorkflowInput, error) {
 	var inputs []domain.WorkflowInput
-	if err := r.db.Where("workflow_id = ?", workflowID).Find(&inputs).Error; err != nil {
+	if err := r.db.Where("workflow_id = ?", workflowID).Order("created_at DESC").Find(&inputs).Error; err != nil {
 		return nil, err
 	}
 	return inputs, nil
@@ -280,7 +280,7 @@ func (r *PostgresWorkflowVariableRepo) Create(variable *domain.WorkflowVariable)
 
 func (r *PostgresWorkflowVariableRepo) GetByWorkflowID(workflowID uuid.UUID) ([]domain.WorkflowVariable, error) {
 	var variables []domain.WorkflowVariable
-	if err := r.db.Where("workflow_id = ?", workflowID).Find(&variables).Error; err != nil {
+	if err := r.db.Where("workflow_id = ?", workflowID).Order("created_at DESC").Find(&variables).Error; err != nil {
 		return nil, err
 	}
 	return variables, nil
@@ -404,7 +404,7 @@ func (r *PostgresWorkflowExecutionRepo) ListByNamespaceIDPaginated(namespaceID u
 		return nil, 0, err
 	}
 
-	err := db.Preload("Workflow").Preload("Schedule").
+	err := db.Preload("Workflow").Preload("Schedule").Preload("Page").
 		Order("workflow_executions.created_at DESC").
 		Limit(limit).Offset(offset).Find(&execs).Error
 	return execs, total, err
@@ -418,7 +418,7 @@ func (r *PostgresWorkflowExecutionRepo) ListByScheduledID(scheduledID uuid.UUID,
 			Where("workflows.namespace_id IN ? OR workflow_executions.workflow_id IN ?", scope.AllowedNamespaceIDs, scope.AllowedItemIDs)
 	}
 	err := db.
-		Preload("Workflow").
+		Preload("Workflow").Preload("Page").
 		Where("scheduled_id = ?", scheduledID).
 		Order("created_at DESC").
 		Find(&execs).Error

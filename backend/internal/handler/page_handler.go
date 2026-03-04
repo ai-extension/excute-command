@@ -285,7 +285,7 @@ func (h *PageHandler) RunPublicWorkflow(c *gin.Context) {
 	execID := uuid.New()
 	go func() {
 		// Public run uses background context
-		h.executor.Run(context.Background(), workflowID, execID, inputReq.Inputs, nil, nil)
+		h.executor.Run(context.Background(), workflowID, execID, inputReq.Inputs, nil, &page.ID, "PAGE", nil)
 	}()
 
 	c.JSON(http.StatusAccepted, gin.H{
