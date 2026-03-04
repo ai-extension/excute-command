@@ -115,7 +115,7 @@ func main() {
 	authHandler := handler.NewAuthHandler(authService)
 	userHandler := handler.NewUserHandler(userRepo, roleRepo)
 	roleHandler := handler.NewRoleHandler(roleRepo, permRepo)
-	permHandler := handler.NewPermissionHandler(permRepo)
+	permHandler := handler.NewPermissionHandler(permRepo, workflowRepo, globalVarRepo, scheduleRepo, pageRepo, tagRepo, serverRepo, namespaceRepo, execRepo, userRepo, roleRepo, vpnRepo)
 	serverHandler := handler.NewServerHandler(serverService, terminalService)
 	wsHandler := handler.NewWSHandler(hub, terminalService)
 	workflowHandler := handler.NewWorkflowHandler(workflowService, workflowExecutor)
@@ -181,6 +181,7 @@ func main() {
 			protected.POST("/roles", middleware.RBACMiddleware(userRepo, "roles", "WRITE"), roleHandler.CreateRole)
 			protected.POST("/roles/:id/permissions", middleware.RBACMiddleware(userRepo, "roles", "WRITE"), roleHandler.UpdateRolePermissions)
 			protected.GET("/permissions", middleware.RBACMiddleware(userRepo, "roles", "READ"), permHandler.ListPermissions)
+			protected.GET("/permissions/resource-items", middleware.RBACMiddleware(userRepo, "roles", "READ"), permHandler.ListResourceItems)
 
 			protected.GET("/servers", middleware.RBACMiddleware(userRepo, "servers", "READ"), serverHandler.ListServers)
 			protected.POST("/servers", middleware.RBACMiddleware(userRepo, "servers", "WRITE"), serverHandler.CreateServer)

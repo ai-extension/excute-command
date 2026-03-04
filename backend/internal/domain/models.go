@@ -363,6 +363,7 @@ type WorkflowRepository interface {
 	GetByID(id uuid.UUID, scope *PermissionScope) (*Workflow, error)
 	List(namespaceID uuid.UUID, scope *PermissionScope) ([]Workflow, error)
 	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, tagIDs []uuid.UUID, scope *PermissionScope) ([]Workflow, int64, error)
+	ListGlobalPaginated(limit, offset int, searchTerm string, scope *PermissionScope) ([]Workflow, int64, error)
 	Update(wf *Workflow) error
 	Delete(id uuid.UUID) error
 }
@@ -402,6 +403,7 @@ type WorkflowExecutionRepository interface {
 	ListByWorkflowIDPaginated(workflowID uuid.UUID, limit, offset int, scope *PermissionScope) ([]WorkflowExecution, int64, error)
 	ListByNamespaceID(namespaceID uuid.UUID, scope *PermissionScope) ([]WorkflowExecution, error)
 	ListByNamespaceIDPaginated(namespaceID uuid.UUID, limit, offset int, status string, workflowID *uuid.UUID, scope *PermissionScope) ([]WorkflowExecution, int64, error)
+	ListGlobalPaginated(limit, offset int, status string, workflowID *uuid.UUID, scope *PermissionScope) ([]WorkflowExecution, int64, error)
 	ListByScheduledID(scheduledID uuid.UUID, scope *PermissionScope) ([]WorkflowExecution, error)
 	Update(exec *WorkflowExecution) error
 	CreateStepResult(stepExec *WorkflowExecutionStep) error
@@ -412,6 +414,7 @@ type GlobalVariableRepository interface {
 	GetByID(id uuid.UUID, scope *PermissionScope) (*GlobalVariable, error)
 	List(namespaceID uuid.UUID, scope *PermissionScope) ([]GlobalVariable, error)
 	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, scope *PermissionScope) ([]GlobalVariable, int64, error)
+	ListGlobalPaginated(limit, offset int, searchTerm string, scope *PermissionScope) ([]GlobalVariable, int64, error)
 	Update(gv *GlobalVariable) error
 	Delete(id uuid.UUID) error
 }
@@ -421,6 +424,7 @@ type ScheduleRepository interface {
 	GetByID(id uuid.UUID, scope *PermissionScope) (*Schedule, error)
 	List(namespaceID uuid.UUID, scope *PermissionScope) ([]Schedule, error)
 	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, tagIDs []uuid.UUID, scope *PermissionScope) ([]Schedule, int64, error)
+	ListGlobalPaginated(limit, offset int, searchTerm string, scope *PermissionScope) ([]Schedule, int64, error)
 	Update(s *Schedule) error
 	Delete(id uuid.UUID) error
 	AddScheduledWorkflow(sw *ScheduleWorkflow) error
@@ -469,6 +473,7 @@ type PageRepository interface {
 	GetBySlug(slug string) (*Page, error) // Public slug lookup doesn't need scope
 	List(namespaceID uuid.UUID, scope *PermissionScope) ([]Page, error)
 	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, isPublic *bool, scope *PermissionScope) ([]Page, int64, error)
+	ListGlobalPaginated(limit, offset int, searchTerm string, isPublic *bool, scope *PermissionScope) ([]Page, int64, error)
 	Update(page *Page) error
 	Delete(id uuid.UUID) error
 }
@@ -478,6 +483,7 @@ type TagRepository interface {
 	GetByID(id uuid.UUID, scope *PermissionScope) (*Tag, error)
 	ListByNamespace(namespaceID uuid.UUID, scope *PermissionScope) ([]Tag, error)
 	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, scope *PermissionScope) ([]Tag, int64, error)
+	ListGlobalPaginated(limit, offset int, searchTerm string, scope *PermissionScope) ([]Tag, int64, error)
 	Update(tag *Tag) error
 	Delete(id uuid.UUID) error
 }

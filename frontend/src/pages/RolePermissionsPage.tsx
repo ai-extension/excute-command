@@ -19,8 +19,8 @@ const CATEGORIES = [
         label: 'Management',
         icon: Settings,
         items: [
-            { id: 'namespaces', label: 'Namespaces', icon: Globe, path: '/namespaces' },
-            { id: 'tags', label: 'Tags', icon: Tag, path: '/namespaces/%ns%/tags' },
+            { id: 'namespaces', label: 'Namespaces', icon: Globe, path: '/permissions/resource-items?type=namespaces' },
+            { id: 'tags', label: 'Tags', icon: Tag, path: '/permissions/resource-items?type=tags' },
         ]
     },
     {
@@ -29,11 +29,11 @@ const CATEGORIES = [
         icon: Zap,
         items: [
             { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/' },
-            { id: 'workflows', label: 'Workflows', icon: FileText, path: '/namespaces/%ns%/workflows' },
-            { id: 'history', label: 'History', icon: History, path: '/namespaces/%ns%/executions' },
-            { id: 'variables', label: 'Variables', icon: Database, path: '/namespaces/%ns%/global-variables' },
-            { id: 'schedules', label: 'Schedules', icon: Calendar, path: '/namespaces/%ns%/schedules' },
-            { id: 'pages', label: 'Pages', icon: Layout, path: '/namespaces/%ns%/pages' },
+            { id: 'workflows', label: 'Workflows', icon: FileText, path: '/permissions/resource-items?type=workflows' },
+            { id: 'history', label: 'History', icon: History, path: '/permissions/resource-items?type=history' },
+            { id: 'variables', label: 'Variables', icon: Database, path: '/permissions/resource-items?type=variables' },
+            { id: 'schedules', label: 'Schedules', icon: Calendar, path: '/permissions/resource-items?type=schedules' },
+            { id: 'pages', label: 'Pages', icon: Layout, path: '/permissions/resource-items?type=pages' },
         ]
     },
     {
@@ -41,7 +41,7 @@ const CATEGORIES = [
         label: 'Global',
         icon: Network,
         items: [
-            { id: 'servers', label: 'Servers', icon: Server, path: '/servers' },
+            { id: 'servers', label: 'Servers', icon: Server, path: '/permissions/resource-items?type=servers' },
             { id: 'vpns', label: 'VPNs', icon: Key, path: '/vpns' },
         ]
     },
@@ -73,31 +73,10 @@ export default function RolePermissionsPage() {
     const { apiFetch } = useAuth();
     const [role, setRole] = useState<any>(null);
     const [allPermissions, setAllPermissions] = useState<any[]>([]);
-    const [resourceData, setResourceData] = useState<any>({});
     const [rolePerms, setRolePerms] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [namespaces, setNamespaces] = useState<any[]>([]);
-
-    // Grouping logic for the UI
-    const groupedCategories = useMemo(() => {
-        if (allPermissions.length === 0) return [];
-
-        return CATEGORIES.map(categoryGroup => {
-            const itemsWithPermissions = categoryGroup.items.map(item => {
-                const itemPerms = allPermissions.filter(p => p.type === item.id);
-                return {
-                    ...item,
-                    permissions: itemPerms
-                };
-            }).filter(item => item.permissions.length > 0); // Only include items that have permissions
-
-            return {
-                ...categoryGroup,
-                items: itemsWithPermissions
-            };
-        }).filter(categoryGroup => categoryGroup.items.length > 0); // Only include category groups that have items with permissions
-    }, [allPermissions]);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -128,37 +107,6 @@ export default function RolePermissionsPage() {
                 const nsData = nsDataRaw.items || nsDataRaw || [];
                 setNamespaces(Array.isArray(nsData) ? nsData : []);
 
-                const activeNsId = Array.isArray(nsData) && nsData.length > 0 ? nsData[0].id : null;
-
-                // 4. Fetch all resources in parallel
-                const allResourceItems = CATEGORIES.flatMap(c => c.items);
-                const resourcesToFetch = allResourceItems.map(async rt => {
-                    try {
-                        let path = rt.path;
-                        // Skip fetching for dashboard (root path) and settings (singleton)
-                        if (path === '/' || rt.id === 'settings') return { id: rt.id, data: [] };
-
-                        if (path.includes('%ns%')) {
-                            if (!activeNsId) return { id: rt.id, data: [] };
-                            path = path.replace('%ns%', activeNsId);
-                        }
-                        const res = await apiFetch(`${API_BASE_URL}${path}`);
-                        const data = await res.json();
-                        const items = data.items || (Array.isArray(data) ? data : []);
-                        return { id: rt.id, data: items };
-                    } catch (e) {
-                        console.error(`Failed to fetch ${rt.id}:`, e);
-                        return { id: rt.id, data: [] };
-                    }
-                });
-
-                const fetchedResources = await Promise.all(resourcesToFetch);
-                const resourceMap: any = {};
-                fetchedResources.forEach(r => {
-                    resourceMap[r.id] = r.data;
-                });
-                setResourceData(resourceMap);
-
             } catch (error) {
                 console.error('Failed to load role data:', error);
             } finally {
@@ -170,6 +118,10 @@ export default function RolePermissionsPage() {
             fetchData();
         }
     }, [id, apiFetch]);
+
+    const activeNamespaceId = useMemo(() => {
+        return namespaces.length > 0 ? namespaces[0].id : null;
+    }, [namespaces]);
 
     const handleSave = async () => {
         setIsSaving(true);
@@ -272,7 +224,7 @@ export default function RolePermissionsPage() {
                                     <ResourceCategoryRow
                                         key={item.id}
                                         category={{ ...item, permissions: perms }}
-                                        items={resourceData[item.id] || []}
+                                        activeNamespaceId={activeNamespaceId}
                                         isPermEnabled={isPermEnabled}
                                         togglePermission={togglePermission}
                                         rolePerms={rolePerms}
@@ -287,10 +239,18 @@ export default function RolePermissionsPage() {
     );
 }
 
-function ResourceCategoryRow({ category, items, isPermEnabled, togglePermission, rolePerms }: any) {
+function ResourceCategoryRow({ category, activeNamespaceId, isPermEnabled, togglePermission, rolePerms }: any) {
+    const { apiFetch } = useAuth();
+    const [items, setItems] = useState<any[]>([]);
+    const [isLoadingItems, setIsLoadingItems] = useState(false);
+    const [hasLoaded, setHasLoaded] = useState(false);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [searchResults, setSearchResults] = useState<any[] | null>(null);
+
     const getPermByAction = (action: string) => category.permissions.find((p: any) => p.action === action);
 
-    const addedItems = useMemo(() => {
+    const addedItemsIds = useMemo(() => {
         const ids = new Set<string>();
         rolePerms.forEach((rp: any) => {
             const pId = rp.permission_id || rp.permission?.id;
@@ -302,14 +262,72 @@ function ResourceCategoryRow({ category, items, isPermEnabled, togglePermission,
         return Array.from(ids);
     }, [rolePerms, category.permissions]);
 
-    const [searchTerm, setSearchTerm] = useState("");
-    const isExpanded = addedItems.length > 0;
+    const fetchItems = async (search?: string) => {
+        setIsLoadingItems(true);
+        try {
+            const path = category.path;
+            let resourcePath = path;
 
-    const filteredAvailableItems = items.filter((item: any) =>
-        !addedItems.includes(item.id) &&
-        (item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            item.id?.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
+            // Map frontend routes to backend resource types for specific categories
+            if (path === '/vpns') resourcePath = '/permissions/resource-items?type=vpns';
+            else if (path === '/users') resourcePath = '/permissions/resource-items?type=users';
+            else if (path === '/roles') resourcePath = '/permissions/resource-items?type=roles';
+
+            // Settings and dashboard don't have sub-resources
+            if (path === '/' || category.id === 'settings') {
+                setItems([]);
+                setSearchResults([]);
+                return;
+            }
+
+            const queryParams = new URLSearchParams();
+            if (search) queryParams.append('search', search);
+            queryParams.append('limit', '20');
+
+            const separator = resourcePath.includes('?') ? '&' : '?';
+            const res = await apiFetch(`${API_BASE_URL}${resourcePath}${separator}${queryParams.toString()}`);
+            const data = await res.json();
+            const fetchedItems = data.items || (Array.isArray(data) ? data : []);
+
+            // Merge with existing items if it's just a name lookup for existing rules
+            setItems(prev => {
+                const itemMap = new Map();
+                prev.forEach(i => itemMap.set(i.id, i));
+                fetchedItems.forEach((i: any) => itemMap.set(i.id, i));
+                return Array.from(itemMap.values());
+            });
+            setSearchResults(fetchedItems);
+            setHasLoaded(true);
+        } catch (e) {
+            console.error(`Failed to fetch ${category.id}:`, e);
+        } finally {
+            setIsLoadingItems(false);
+        }
+    };
+
+    // Load items once on mount if there are already added items
+    useEffect(() => {
+        if (addedItemsIds.length > 0 && !hasLoaded && !isLoadingItems) {
+            fetchItems();
+        }
+    }, []);
+
+    // Handle search in dialog
+    useEffect(() => {
+        if (isDialogOpen) {
+            const timer = setTimeout(() => {
+                fetchItems(searchTerm);
+            }, 300);
+            return () => clearTimeout(timer);
+        }
+    }, [searchTerm, isDialogOpen]);
+
+    const isExpanded = addedItemsIds.length > 0;
+
+    const availableItems = useMemo(() => {
+        const sourceList = searchResults !== null ? searchResults : items;
+        return sourceList.filter((item: any) => !addedItemsIds.includes(item.id));
+    }, [searchResults, items, addedItemsIds]);
 
     return (
         <Card className="border-border shadow-sm overflow-hidden transition-all duration-300">
@@ -387,7 +405,7 @@ function ResourceCategoryRow({ category, items, isPermEnabled, togglePermission,
                         </div>
                     )}
 
-                    <Dialog>
+                    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                         <DialogTrigger asChild>
                             <Button
                                 variant="ghost"
@@ -395,6 +413,7 @@ function ResourceCategoryRow({ category, items, isPermEnabled, togglePermission,
                                 className="text-xs font-bold gap-2 rounded-lg hover:bg-primary/10 hover:text-primary transition-colors"
                             >
                                 Add Specific Rules
+                                {isLoadingItems && <Loader2 className="w-3 h-3 animate-spin" />}
                                 <Plus className="w-3 h-3" />
                             </Button>
                         </DialogTrigger>
@@ -411,16 +430,21 @@ function ResourceCategoryRow({ category, items, isPermEnabled, togglePermission,
                                         value={searchTerm}
                                         onChange={(e) => setSearchTerm(e.target.value)}
                                     />
+                                    {isLoadingItems && (
+                                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                            <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="max-h-[300px] overflow-y-auto space-y-1 pr-1 custom-scrollbar">
-                                    {filteredAvailableItems.length > 0 ? (
-                                        filteredAvailableItems.map((item: any) => (
+                                    {availableItems.length > 0 ? (
+                                        availableItems.map((item: any) => (
                                             <div
                                                 key={item.id}
                                                 className="flex items-center justify-between p-2.5 rounded-xl hover:bg-muted/50 border border-transparent hover:border-border transition-all group"
                                             >
                                                 <div className="flex flex-col">
-                                                    <span className="text-sm font-bold">{item.name || item.id}</span>
+                                                    <span className="text-sm font-bold">{item.name || item.title || item.username || item.id}</span>
                                                     <span className="text-[10px] text-muted-foreground font-mono">{item.id}</span>
                                                 </div>
                                                 <Button
@@ -438,7 +462,7 @@ function ResourceCategoryRow({ category, items, isPermEnabled, togglePermission,
                                         ))
                                     ) : (
                                         <div className="text-center py-8 text-muted-foreground text-xs italic">
-                                            No more items to add.
+                                            {isLoadingItems ? 'Searching...' : 'No more items found.'}
                                         </div>
                                     )}
                                 </div>
@@ -478,11 +502,11 @@ function ResourceCategoryRow({ category, items, isPermEnabled, togglePermission,
                                     )}
                                 </thead>
                                 <tbody className="divide-y divide-border">
-                                    {addedItems.map(itemId => {
+                                    {addedItemsIds.map(itemId => {
                                         const item = items.find((i: any) => i.id === itemId);
                                         return (
                                             <tr key={itemId} className="hover:bg-muted/10 transition-colors">
-                                                <td className="p-3 pl-5 font-bold text-xs">{item?.name || itemId}</td>
+                                                <td className="p-3 pl-5 font-bold text-xs">{item?.name || item?.title || item?.username || itemId}</td>
                                                 {ACTIONS.map(action => {
                                                     const perm = getPermByAction(action);
                                                     return (

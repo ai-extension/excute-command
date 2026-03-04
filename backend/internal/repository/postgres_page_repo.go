@@ -88,6 +88,28 @@ func (r *PostgresPageRepo) ListPaginated(namespaceID uuid.UUID, limit, offset in
 	return pages, total, err
 }
 
+func (r *PostgresPageRepo) ListGlobalPaginated(limit, offset int, searchTerm string, isPublic *bool, scope *domain.PermissionScope) ([]domain.Page, int64, error) {
+	var pages []domain.Page
+	var total int64
+	db := applyScope(r.db, scope, "", "") // Pages don't have tags in this schema
+	db = db.Model(&domain.Page{})
+
+	if searchTerm != "" {
+		db = db.Where("title ILIKE ? OR description ILIKE ?", "%"+searchTerm+"%", "%"+searchTerm+"%")
+	}
+
+	if isPublic != nil {
+		db = db.Where("is_public = ?", *isPublic)
+	}
+
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	err := db.Limit(limit).Offset(offset).Order("created_at DESC").Find(&pages).Error
+	return pages, total, err
+}
+
 func (r *PostgresPageRepo) Update(page *domain.Page) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		// Sync Workflows

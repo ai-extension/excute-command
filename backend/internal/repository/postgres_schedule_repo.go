@@ -90,6 +90,38 @@ func (r *PostgresScheduleRepo) ListPaginated(namespaceID uuid.UUID, limit, offse
 	return ss, total, nil
 }
 
+func (r *PostgresScheduleRepo) ListGlobalPaginated(limit, offset int, searchTerm string, scope *domain.PermissionScope) ([]domain.Schedule, int64, error) {
+	var ss []domain.Schedule
+	var total int64
+
+	db := applyScope(r.db, scope, "schedule_tags", "schedule_id")
+	db = db.Model(&domain.Schedule{})
+
+	if searchTerm != "" {
+		db = db.Where("name ILIKE ?", "%"+searchTerm+"%")
+	}
+
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	if err := db.
+		Preload("ScheduledWorkflows").
+		Preload("ScheduledWorkflows.Workflow").
+		Preload("Hooks", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
+		Preload("Hooks.TargetWorkflow").
+		Preload("Tags").
+		Limit(limit).Offset(offset).
+		Order("created_at desc").
+		Find(&ss).Error; err != nil {
+		return nil, 0, err
+	}
+	for i := range ss {
+		r.populateStats(&ss[i])
+	}
+	return ss, total, nil
+}
+
 func (r *PostgresScheduleRepo) Update(s *domain.Schedule) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Model(s).Association("Tags").Replace(s.Tags); err != nil {

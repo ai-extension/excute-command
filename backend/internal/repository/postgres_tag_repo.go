@@ -51,6 +51,30 @@ func (r *PostgresTagRepo) ListPaginated(namespaceID uuid.UUID, limit, offset int
 	return tags, total, err
 }
 
+func (r *PostgresTagRepo) ListGlobalPaginated(limit, offset int, searchTerm string, scope *domain.PermissionScope) ([]domain.Tag, int64, error) {
+	var tags []domain.Tag
+	var total int64
+	db := r.db.Model(&domain.Tag{})
+
+	if scope != nil && !scope.IsGlobal {
+		// Tags filter by their own IDs and their namespaces
+		// Wait, according to applyScope logic for tags, it might need special handling or just be items
+		// For tags themselves, they don't have separate tags, so tagJoinTable is empty
+		db = applyScope(db, scope, "", "")
+	}
+
+	if searchTerm != "" {
+		db = db.Where("name ILIKE ?", "%"+searchTerm+"%")
+	}
+
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	err := db.Limit(limit).Offset(offset).Order("created_at DESC").Find(&tags).Error
+	return tags, total, err
+}
+
 func (r *PostgresTagRepo) Update(tag *domain.Tag) error {
 	return r.db.Save(tag).Error
 }

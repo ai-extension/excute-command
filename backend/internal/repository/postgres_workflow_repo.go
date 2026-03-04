@@ -96,6 +96,40 @@ func (r *PostgresWorkflowRepo) ListPaginated(namespaceID uuid.UUID, limit, offse
 	return wfs, total, err
 }
 
+func (r *PostgresWorkflowRepo) ListGlobalPaginated(limit, offset int, searchTerm string, scope *domain.PermissionScope) ([]domain.Workflow, int64, error) {
+	var wfs []domain.Workflow
+	var total int64
+
+	db := applyScope(r.db, scope, "workflow_tags", "workflow_id")
+	db = db.Model(&domain.Workflow{})
+
+	if searchTerm != "" {
+		db = db.Where("name ILIKE ? OR description ILIKE ?", "%"+searchTerm+"%", "%"+searchTerm+"%")
+	}
+
+	// Count total
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Fetch paginated
+	err := db.
+		Preload("Inputs").
+		Preload("Variables").
+		Preload("Groups", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
+		Preload("Groups.Steps", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
+		Preload("Hooks", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
+		Preload("Hooks.TargetWorkflow").
+		Preload("Files").
+		Preload("Tags").
+		Order("created_at DESC").
+		Limit(limit).
+		Offset(offset).
+		Find(&wfs).Error
+
+	return wfs, total, err
+}
+
 func (r *PostgresWorkflowRepo) Update(wf *domain.Workflow) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		// Sync Inputs: explicitly delete all old inputs and recreate them.
@@ -387,6 +421,34 @@ func (r *PostgresWorkflowExecutionRepo) ListByNamespaceIDPaginated(namespaceID u
 	db := r.db.Model(&domain.WorkflowExecution{}).
 		Joins("JOIN workflows w2 ON w2.id = workflow_executions.workflow_id").
 		Where("w2.namespace_id = ?", namespaceID)
+
+	if scope != nil && !scope.IsGlobal {
+		db = db.Where("w2.namespace_id IN ? OR workflow_executions.workflow_id IN ?", scope.AllowedNamespaceIDs, scope.AllowedItemIDs)
+	}
+
+	if status != "" && status != "ALL" {
+		db = db.Where("workflow_executions.status = ?", status)
+	}
+
+	if workflowID != nil {
+		db = db.Where("workflow_executions.workflow_id = ?", workflowID)
+	}
+
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	err := db.Preload("Workflow").Preload("Schedule").Preload("Page").
+		Order("workflow_executions.created_at DESC").
+		Limit(limit).Offset(offset).Find(&execs).Error
+	return execs, total, err
+}
+
+func (r *PostgresWorkflowExecutionRepo) ListGlobalPaginated(limit, offset int, status string, workflowID *uuid.UUID, scope *domain.PermissionScope) ([]domain.WorkflowExecution, int64, error) {
+	var execs []domain.WorkflowExecution
+	var total int64
+	db := r.db.Model(&domain.WorkflowExecution{}).
+		Joins("JOIN workflows w2 ON w2.id = workflow_executions.workflow_id")
 
 	if scope != nil && !scope.IsGlobal {
 		db = db.Where("w2.namespace_id IN ? OR workflow_executions.workflow_id IN ?", scope.AllowedNamespaceIDs, scope.AllowedItemIDs)

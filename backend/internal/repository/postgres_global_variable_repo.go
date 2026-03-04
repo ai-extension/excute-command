@@ -55,6 +55,24 @@ func (r *PostgresGlobalVariableRepo) ListPaginated(namespaceID uuid.UUID, limit,
 	return gvs, total, err
 }
 
+func (r *PostgresGlobalVariableRepo) ListGlobalPaginated(limit, offset int, searchTerm string, scope *domain.PermissionScope) ([]domain.GlobalVariable, int64, error) {
+	var gvs []domain.GlobalVariable
+	var total int64
+	db := applyScope(r.db, scope, "", "") // Global variables don't have tags
+	db = db.Model(&domain.GlobalVariable{})
+
+	if searchTerm != "" {
+		db = db.Where("key ILIKE ? OR value ILIKE ? OR description ILIKE ?", "%"+searchTerm+"%", "%"+searchTerm+"%", "%"+searchTerm+"%")
+	}
+
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	err := db.Limit(limit).Offset(offset).Order("created_at DESC").Find(&gvs).Error
+	return gvs, total, err
+}
+
 func (r *PostgresGlobalVariableRepo) Update(gv *domain.GlobalVariable) error {
 	return r.db.Save(gv).Error
 }
