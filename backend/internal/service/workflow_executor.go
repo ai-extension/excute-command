@@ -308,13 +308,15 @@ func (e *WorkflowExecutor) RunHooks(ctx context.Context, hooks []domain.Workflow
 		hookExecID := uuid.New()
 		err := e.RunWithDepth(ctx, hook.TargetWorkflowID, hookExecID, hookInputs, nil, depth+1, user)
 		if err != nil {
+			errMsg := fmt.Sprintf("Warning: %s hook execution failed: %v (Continuing workflow)", hookType, err)
 			if logFile != nil {
-				fmt.Fprintf(logFile, "Error executing %s hook: %v\n", hookType, err)
+				fmt.Fprintf(logFile, "%s\n", errMsg)
 			}
 			if hook.WorkflowID != nil {
-				e.hub.BroadcastLog(hook.WorkflowID.String(), fmt.Sprintf("Error: %s hook failed: %v", hookType, err))
+				e.hub.BroadcastLog(hook.WorkflowID.String(), errMsg)
 			}
-			return err
+			// Don't return error to let the main workflow continue
+			continue
 		}
 		if logFile != nil {
 			fmt.Fprintf(logFile, ">>> HOOK SUCCESS <<<\n\n")
