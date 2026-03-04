@@ -20,6 +20,7 @@ import PageDesignerPage from './pages/PageDesignerPage';
 import RolePermissionsPage from './pages/RolePermissionsPage';
 import PublicPageView from './pages/PublicPageView';
 import ProfilePage from './pages/ProfilePage';
+import APIKeysPage from './pages/APIKeysPage';
 import { useAuth } from './context/AuthContext';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -64,6 +65,7 @@ function App() {
                     <Route path="pages" element={<PagesListPage />} />
                     <Route path="pages/:id/edit" element={<PageDesignerPage />} />
                     <Route path="profile" element={<ProfilePage />} />
+                    <Route path="api-keys" element={<APIKeysPage />} />
                 </Route>
                 <Route path="/public/pages/:slug" element={<PublicPageView />} />
                 <Route path="*" element={<Navigate to="/" replace />} />

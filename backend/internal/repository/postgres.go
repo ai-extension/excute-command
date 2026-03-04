@@ -1,10 +1,65 @@
 package repository
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/user/csm-backend/internal/domain"
 	"gorm.io/gorm"
 )
+
+type PostgresAPIKeyRepo struct {
+	db *gorm.DB
+}
+
+func NewPostgresAPIKeyRepo(db *gorm.DB) *PostgresAPIKeyRepo {
+	return &PostgresAPIKeyRepo{db: db}
+}
+
+func (r *PostgresAPIKeyRepo) Create(apiKey *domain.APIKey) error {
+	return r.db.Create(apiKey).Error
+}
+
+func (r *PostgresAPIKeyRepo) GetByID(id uuid.UUID) (*domain.APIKey, error) {
+	var apiKey domain.APIKey
+	if err := r.db.First(&apiKey, "id = ?", id).Error; err != nil {
+		return nil, err
+	}
+	return &apiKey, nil
+}
+
+func (r *PostgresAPIKeyRepo) GetByHash(hash string) (*domain.APIKey, error) {
+	var apiKey domain.APIKey
+	if err := r.db.First(&apiKey, "key_hash = ?", hash).Error; err != nil {
+		return nil, err
+	}
+	return &apiKey, nil
+}
+
+func (r *PostgresAPIKeyRepo) ListByUserID(userID uuid.UUID) ([]domain.APIKey, error) {
+	var apiKeys []domain.APIKey
+	if err := r.db.Where("user_id = ?", userID).Order("created_at DESC").Find(&apiKeys).Error; err != nil {
+		return nil, err
+	}
+	return apiKeys, nil
+}
+
+func (r *PostgresAPIKeyRepo) ListByPrefix(prefix string) ([]domain.APIKey, error) {
+	var apiKeys []domain.APIKey
+	if err := r.db.Where("key_prefix = ?", prefix).Find(&apiKeys).Error; err != nil {
+		return nil, err
+	}
+	return apiKeys, nil
+}
+
+func (r *PostgresAPIKeyRepo) Delete(id uuid.UUID) error {
+	return r.db.Delete(&domain.APIKey{}, "id = ?", id).Error
+}
+
+func (r *PostgresAPIKeyRepo) UpdateLastUsed(id uuid.UUID) error {
+	now := time.Now()
+	return r.db.Model(&domain.APIKey{}).Where("id = ?", id).Update("last_used", &now).Error
+}
 
 type PostgresNamespaceRepo struct {
 	db *gorm.DB

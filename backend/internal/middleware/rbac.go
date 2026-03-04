@@ -7,18 +7,45 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/user/csm-backend/internal/domain"
 	"github.com/user/csm-backend/internal/service"
+	"golang.org/x/crypto/bcrypt"
 )
 
-func AuthMiddleware(authService *service.AuthService) gin.HandlerFunc {
+func AuthMiddleware(authService *service.AuthService, userRepo domain.UserRepository, apiKeyRepo domain.APIKeyRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// 1. Try API Key first (automation friendly)
+		apiKeyStr := c.GetHeader("X-API-Key")
+		if apiKeyStr != "" && len(apiKeyStr) > 8 {
+			prefix := apiKeyStr[:8]
+			keys, err := apiKeyRepo.ListByPrefix(prefix)
+			if err == nil {
+				for _, key := range keys {
+					if err := bcrypt.CompareHashAndPassword([]byte(key.KeyHash), []byte(apiKeyStr)); err == nil {
+						// Found a matching key
+						user, err := userRepo.GetByID(key.UserID)
+						if err == nil {
+							c.Set("user_id", user.ID)
+							c.Set("username", user.Username)
+							c.Set("user", user)
+
+							// Update last used in background
+							go apiKeyRepo.UpdateLastUsed(key.ID)
+
+							c.Next()
+							return
+						}
+					}
+				}
+			}
+		}
+
 		var tokenStr string
 
-		// 1. Try to get token from cookie first (preferred for web frontend)
+		// 2. Try to get token from cookie first (preferred for web frontend)
 		cookie, err := c.Cookie("auth_token")
 		if err == nil && cookie != "" {
 			tokenStr = cookie
 		} else {
-			// 2. Fallback to Authorization header (APIs)
+			// 3. Fallback to Authorization header (APIs)
 			authHeader := c.GetHeader("Authorization")
 			if authHeader != "" {
 				parts := strings.Split(authHeader, " ")
@@ -29,7 +56,7 @@ func AuthMiddleware(authService *service.AuthService) gin.HandlerFunc {
 		}
 
 		if tokenStr == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required (Missing cookie or Authorization header)"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required (Missing cookie, Authorization header, or API Key)"})
 			c.Abort()
 			return
 		}

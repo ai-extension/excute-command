@@ -2,15 +2,16 @@ import React, { useState, useEffect } from 'react';
 import {
     User,
     Shield,
-    Key,
     Lock,
     Mail,
     RefreshCw,
     Save,
     AlertCircle,
-    CheckCircle2
+    CheckCircle2,
+    Key
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
+
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
@@ -149,7 +150,7 @@ const ProfilePage = () => {
                                                 value={profileData.username}
                                                 readOnly
                                                 disabled
-                                                className="pl-12 h-14 bg-muted/10 border-border cursor-not-allowed rounded-2xl font-bold text-sm"
+                                                className="pl-12 h-12 bg-muted/10 border-border cursor-not-allowed rounded-xl font-bold text-sm"
                                             />
                                         </div>
                                     </div>
@@ -162,7 +163,7 @@ const ProfilePage = () => {
                                                 value={profileData.full_name}
                                                 onChange={(e) => setProfileData({ ...profileData, full_name: e.target.value })}
                                                 placeholder="Legal name or alias"
-                                                className="pl-12 h-14 bg-muted/20 border-border focus:bg-muted/40 transition-all rounded-2xl font-bold text-sm"
+                                                className="pl-12 h-12 bg-muted/20 border-border focus:bg-muted/40 transition-all rounded-xl font-bold text-sm"
                                             />
                                         </div>
                                     </div>
@@ -176,7 +177,7 @@ const ProfilePage = () => {
                                                 value={profileData.email}
                                                 onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
                                                 placeholder="Contact coordinate"
-                                                className="pl-12 h-14 bg-muted/20 border-border focus:bg-muted/40 transition-all rounded-2xl font-bold text-sm"
+                                                className="pl-12 h-12 bg-muted/20 border-border focus:bg-muted/40 transition-all rounded-xl font-bold text-sm"
                                                 required
                                             />
                                         </div>
@@ -186,7 +187,7 @@ const ProfilePage = () => {
                                 <Button
                                     type="submit"
                                     disabled={isLoading}
-                                    className="w-full premium-gradient h-14 font-black uppercase tracking-[0.2em] text-[10px] rounded-2xl shadow-premium gap-3 mt-4"
+                                    className="w-full premium-gradient h-12 font-black uppercase tracking-[0.2em] text-[10px] rounded-xl shadow-premium gap-3 mt-4"
                                 >
                                     {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                                     Commit Identity Changes
@@ -245,7 +246,7 @@ const ProfilePage = () => {
                                                 value={passwordData.old_password}
                                                 onChange={(e) => setPasswordData({ ...passwordData, old_password: e.target.value })}
                                                 placeholder="Verification required"
-                                                className="pl-12 h-14 bg-muted/20 border-border focus:bg-muted/40 transition-all rounded-2xl font-bold text-sm"
+                                                className="pl-12 h-12 bg-muted/20 border-border focus:bg-muted/40 transition-all rounded-xl font-bold text-sm"
                                                 required
                                             />
                                         </div>
@@ -260,7 +261,7 @@ const ProfilePage = () => {
                                                 value={passwordData.new_password}
                                                 onChange={(e) => setPasswordData({ ...passwordData, new_password: e.target.value })}
                                                 placeholder="New security string"
-                                                className="pl-12 h-14 bg-muted/20 border-border focus:bg-muted/40 transition-all rounded-2xl font-bold text-sm"
+                                                className="pl-12 h-12 bg-muted/20 border-border focus:bg-muted/40 transition-all rounded-xl font-bold text-sm"
                                                 required
                                                 minLength={6}
                                             />
@@ -276,7 +277,7 @@ const ProfilePage = () => {
                                                 value={passwordData.confirm_password}
                                                 onChange={(e) => setPasswordData({ ...passwordData, confirm_password: e.target.value })}
                                                 placeholder="Re-enter for precision"
-                                                className="pl-12 h-14 bg-muted/20 border-border focus:bg-muted/40 transition-all rounded-2xl font-bold text-sm"
+                                                className="pl-12 h-12 bg-muted/20 border-border focus:bg-muted/40 transition-all rounded-xl font-bold text-sm"
                                                 required
                                             />
                                         </div>
@@ -286,7 +287,7 @@ const ProfilePage = () => {
                                 <Button
                                     type="submit"
                                     disabled={isLoading}
-                                    className="w-full bg-amber-500 hover:bg-amber-600 text-white h-14 font-black uppercase tracking-[0.2em] text-[10px] rounded-2xl shadow-lg shadow-amber-500/10 gap-3 mt-4 transition-all"
+                                    className="w-full bg-amber-500 hover:bg-amber-600 text-white h-12 font-black uppercase tracking-[0.2em] text-[10px] rounded-xl shadow-lg shadow-amber-500/10 gap-3 mt-4 transition-all"
                                 >
                                     {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Shield className="w-4 h-4" />}
                                     Authorize Key Re-deployment

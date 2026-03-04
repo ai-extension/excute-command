@@ -1,8 +1,11 @@
 package handler
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -11,12 +14,13 @@ import (
 )
 
 type UserHandler struct {
-	userRepo domain.UserRepository
-	roleRepo domain.RoleRepository
+	userRepo   domain.UserRepository
+	roleRepo   domain.RoleRepository
+	apiKeyRepo domain.APIKeyRepository
 }
 
-func NewUserHandler(userRepo domain.UserRepository, roleRepo domain.RoleRepository) *UserHandler {
-	return &UserHandler{userRepo: userRepo, roleRepo: roleRepo}
+func NewUserHandler(userRepo domain.UserRepository, roleRepo domain.RoleRepository, apiKeyRepo domain.APIKeyRepository) *UserHandler {
+	return &UserHandler{userRepo: userRepo, roleRepo: roleRepo, apiKeyRepo: apiKeyRepo}
 }
 
 func (h *UserHandler) GetMe(c *gin.Context) {
@@ -240,4 +244,130 @@ func (h *UserHandler) UpdateUserRoles(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "user roles updated successfully"})
+}
+
+func (h *UserHandler) ListAPIKeys(c *gin.Context) {
+	userIDVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	var userID uuid.UUID
+	switch v := userIDVal.(type) {
+	case uuid.UUID:
+		userID = v
+	case string:
+		userID, _ = uuid.Parse(v)
+	}
+
+	keys, err := h.apiKeyRepo.ListByUserID(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, keys)
+}
+
+func (h *UserHandler) GenerateAPIKey(c *gin.Context) {
+	userIDVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	var userID uuid.UUID
+	switch v := userIDVal.(type) {
+	case uuid.UUID:
+		userID = v
+	case string:
+		userID, _ = uuid.Parse(v)
+	}
+
+	var input struct {
+		Name string `json:"name" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Generate 32 bytes of random data
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate key"})
+		return
+	}
+	rawKey := hex.EncodeToString(b)
+	prefix := rawKey[:8]
+
+	// Base64 or just hex? The plan mentions "hashed version of the key"
+	// Let's use bcrypt to hash the raw key for secure storage
+	hashedKey, err := bcrypt.GenerateFromPassword([]byte(rawKey), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to hash key"})
+		return
+	}
+
+	apiKey := &domain.APIKey{
+		ID:        uuid.New(),
+		UserID:    userID,
+		Name:      input.Name,
+		KeyPrefix: prefix,
+		KeyHash:   string(hashedKey),
+		CreatedAt: time.Now(),
+	}
+
+	if err := h.apiKeyRepo.Create(apiKey); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Return the raw key ONLY once
+	c.JSON(http.StatusCreated, gin.H{
+		"id":         apiKey.ID,
+		"name":       apiKey.Name,
+		"prefix":     apiKey.KeyPrefix,
+		"key":        rawKey, // The raw key to show the user
+		"created_at": apiKey.CreatedAt,
+	})
+}
+
+func (h *UserHandler) DeleteAPIKey(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id film"})
+		return
+	}
+
+	userIDVal, _ := c.Get("user_id")
+	var userID uuid.UUID
+	switch v := userIDVal.(type) {
+	case uuid.UUID:
+		userID = v
+	case string:
+		userID, _ = uuid.Parse(v)
+	}
+
+	// Security check: ensure key belongs to user
+	key, err := h.apiKeyRepo.GetByID(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "api key not found"})
+		return
+	}
+
+	if key.UserID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return
+	}
+
+	if err := h.apiKeyRepo.Delete(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "api key deleted"})
 }

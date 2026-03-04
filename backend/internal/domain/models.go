@@ -63,6 +63,16 @@ type Permission struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type APIKey struct {
+	ID        uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey"`
+	UserID    uuid.UUID  `json:"user_id" gorm:"type:uuid;index;not null"`
+	Name      string     `json:"name" gorm:"not null"`
+	KeyPrefix string     `json:"key_prefix" gorm:"not null"`
+	KeyHash   string     `json:"-" gorm:"not null"`
+	LastUsed  *time.Time `json:"last_used"`
+	CreatedAt time.Time  `json:"created_at"`
+}
+
 type PermissionScope struct {
 	IsGlobal            bool
 	AllowedItemIDs      []string
@@ -97,6 +107,16 @@ type PermissionRepository interface {
 	List() ([]Permission, error)
 	GetByIDs(ids []uuid.UUID) ([]Permission, error)
 	Delete(id uuid.UUID) error
+}
+
+type APIKeyRepository interface {
+	Create(apiKey *APIKey) error
+	GetByID(id uuid.UUID) (*APIKey, error)
+	GetByHash(hash string) (*APIKey, error)
+	ListByUserID(userID uuid.UUID) ([]APIKey, error)
+	ListByPrefix(prefix string) ([]APIKey, error)
+	Delete(id uuid.UUID) error
+	UpdateLastUsed(id uuid.UUID) error
 }
 
 type NamespaceRepository interface {

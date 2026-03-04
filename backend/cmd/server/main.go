@@ -63,6 +63,7 @@ func main() {
 		&domain.VpnConfig{},
 		&domain.Page{},
 		&domain.PageWorkflow{},
+		&domain.APIKey{},
 	); err != nil {
 		log.Fatal("Failed to migrate database:", err)
 	}
@@ -85,6 +86,7 @@ func main() {
 	workflowFileRepo := repository.NewPostgresWorkflowFileRepo(db)
 	vpnRepo := repository.NewPostgresVpnConfigRepo(db)
 	pageRepo := repository.NewPostgresPageRepo(db)
+	apiKeyRepo := repository.NewPostgresAPIKeyRepo(db)
 
 	// Seed Admin User and Default Namespace
 	seedAdmin(db)
@@ -114,7 +116,7 @@ func main() {
 	// Initialize Handlers
 	namespaceHandler := handler.NewNamespaceHandler(namespaceRepo)
 	authHandler := handler.NewAuthHandler(authService)
-	userHandler := handler.NewUserHandler(userRepo, roleRepo)
+	userHandler := handler.NewUserHandler(userRepo, roleRepo, apiKeyRepo)
 	roleHandler := handler.NewRoleHandler(roleRepo, permRepo)
 	permHandler := handler.NewPermissionHandler(permRepo, workflowRepo, globalVarRepo, scheduleRepo, pageRepo, tagRepo, serverRepo, namespaceRepo, execRepo, userRepo, roleRepo, vpnRepo)
 	serverHandler := handler.NewServerHandler(serverService, terminalService)
@@ -161,7 +163,7 @@ func main() {
 
 		// Protected routes
 		protected := api.Group("")
-		protected.Use(middleware.AuthMiddleware(authService))
+		protected.Use(middleware.AuthMiddleware(authService, userRepo, apiKeyRepo))
 		{
 			// Namespaces
 			protected.GET("/namespaces", middleware.RBACMiddleware(userRepo, "namespaces", "READ"), namespaceHandler.ListNamespaces)
@@ -173,6 +175,9 @@ func main() {
 			protected.GET("/me", userHandler.GetMe)
 			protected.PUT("/me/profile", userHandler.UpdateProfile)
 			protected.PUT("/me/password", userHandler.UpdatePassword)
+			protected.GET("/me/api-keys", userHandler.ListAPIKeys)
+			protected.POST("/me/api-keys", userHandler.GenerateAPIKey)
+			protected.DELETE("/me/api-keys/:id", userHandler.DeleteAPIKey)
 			protected.GET("/users", middleware.RBACMiddleware(userRepo, "users", "READ"), userHandler.ListUsers)
 			protected.POST("/users", middleware.RBACMiddleware(userRepo, "users", "WRITE"), userHandler.CreateUser)
 			protected.POST("/users/:id/roles", middleware.RBACMiddleware(userRepo, "users", "WRITE"), userHandler.UpdateUserRoles)

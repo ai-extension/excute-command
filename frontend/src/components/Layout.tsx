@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
-import { Moon, Sun, Command as CmdIcon, Search, LogOut, User as UserIcon, Settings } from 'lucide-react';
+import { Moon, Sun, Command as CmdIcon, Search, LogOut, User as UserIcon, Settings, Key } from 'lucide-react';
 import { Button } from './ui/button';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -110,11 +110,11 @@ const Layout = () => {
                                     <span className="text-sm font-semibold">Account Detail</span>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
-                                    onClick={() => navigate('/settings')}
+                                    onClick={() => navigate('/api-keys')}
                                     className="rounded-xl px-3 py-2.5 flex items-center gap-2 cursor-pointer focus:bg-primary/10 transition-colors"
                                 >
-                                    <Settings className="w-4 h-4 text-primary" />
-                                    <span className="text-sm font-semibold">Preferences</span>
+                                    <Key className="w-4 h-4 text-primary" />
+                                    <span className="text-sm font-semibold">API Keys</span>
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator className="bg-border/50 my-1" />
                                 <DropdownMenuItem
