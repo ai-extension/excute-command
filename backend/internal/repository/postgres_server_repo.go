@@ -36,6 +36,14 @@ func (r *PostgresServerRepo) GetByID(id uuid.UUID, scope *domain.PermissionScope
 		return nil, err
 	}
 
+	r.decryptServer(&server)
+	return &server, nil
+}
+
+func (r *PostgresServerRepo) decryptServer(server *domain.Server) {
+	if server == nil {
+		return
+	}
 	if server.Password != "" {
 		if dec, err := crypto.Decrypt(server.Password); err == nil {
 			server.Password = dec
@@ -47,7 +55,19 @@ func (r *PostgresServerRepo) GetByID(id uuid.UUID, scope *domain.PermissionScope
 		}
 	}
 
-	return &server, nil
+	// Also decrypt preloaded VPN if present
+	if server.Vpn != nil {
+		if server.Vpn.Password != "" {
+			if dec, err := crypto.Decrypt(server.Vpn.Password); err == nil {
+				server.Vpn.Password = dec
+			}
+		}
+		if server.Vpn.PrivateKey != "" {
+			if dec, err := crypto.Decrypt(server.Vpn.PrivateKey); err == nil {
+				server.Vpn.PrivateKey = dec
+			}
+		}
+	}
 }
 
 func (r *PostgresServerRepo) List(scope *domain.PermissionScope) ([]domain.Server, error) {
@@ -58,16 +78,7 @@ func (r *PostgresServerRepo) List(scope *domain.PermissionScope) ([]domain.Serve
 	}
 
 	for i := range servers {
-		if servers[i].Password != "" {
-			if dec, err := crypto.Decrypt(servers[i].Password); err == nil {
-				servers[i].Password = dec
-			}
-		}
-		if servers[i].PrivateKey != "" {
-			if dec, err := crypto.Decrypt(servers[i].PrivateKey); err == nil {
-				servers[i].PrivateKey = dec
-			}
-		}
+		r.decryptServer(&servers[i])
 	}
 
 	return servers, nil
@@ -101,16 +112,7 @@ func (r *PostgresServerRepo) ListPaginated(limit, offset int, searchTerm string,
 	}
 
 	for i := range servers {
-		if servers[i].Password != "" {
-			if dec, err := crypto.Decrypt(servers[i].Password); err == nil {
-				servers[i].Password = dec
-			}
-		}
-		if servers[i].PrivateKey != "" {
-			if dec, err := crypto.Decrypt(servers[i].PrivateKey); err == nil {
-				servers[i].PrivateKey = dec
-			}
-		}
+		r.decryptServer(&servers[i])
 	}
 
 	return servers, total, nil

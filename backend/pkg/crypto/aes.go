@@ -9,11 +9,19 @@ import (
 	"io"
 	"log"
 	"os"
+
+	"github.com/joho/godotenv"
 )
 
 var defaultKey []byte
 
 func init() {
+	// Load .env file at the very beginning to ensure DATA_ENCRYPTION_KEY is available
+	// regardless of where this package is initialized from.
+	// We look for .env in the current directory and also try going up a few levels
+	// to handle different execution contexts (e.g. running from root or cmd/server).
+	_ = godotenv.Load(".env", "../.env", "../../.env")
+
 	keyStr := os.Getenv("DATA_ENCRYPTION_KEY")
 	if keyStr != "" {
 		// Expecting a 32-byte key for AES-256, encoded as base64 or just raw string if exactly 32 chars.

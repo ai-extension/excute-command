@@ -50,10 +50,10 @@ const WorkflowDesignerPage = () => {
     useEffect(() => {
         const fetchServers = async () => {
             try {
-                const response = await apiFetch(`${API_BASE_URL}/servers`);
+                const response = await apiFetch(`${API_BASE_URL}/servers?limit=1000`);
                 if (!response.ok) throw new Error(`Servers fetch failed: ${response.status}`);
                 const data = await response.json();
-                setAvailableServers(Array.isArray(data) ? data : []);
+                setAvailableServers(data.items || (Array.isArray(data) ? data : []));
             } catch (error) {
                 console.error('Failed to fetch servers:', error);
             }
@@ -448,7 +448,6 @@ const WorkflowDesignerPage = () => {
                                                                 onChange={(e) => setDefaultServerId(e.target.value || undefined)}
                                                                 className="flex h-10 w-full rounded-lg border border-border bg-background px-3 text-sm font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
                                                             >
-                                                                <option value="">Local Engine Orchestrator</option>
                                                                 {availableServers.map(s => (
                                                                     <option key={s.id} value={s.id}>{s.name} ({s.host})</option>
                                                                 ))}
@@ -885,7 +884,6 @@ const WorkflowDesignerPage = () => {
                                                                                                                                     }}
                                                                                                                                     className="flex h-9 w-full rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
                                                                                                                                 >
-                                                                                                                                    <option value="00000000-0000-0000-0000-000000000001">Local Engine Orchestrator</option>
                                                                                                                                     {availableServers.map(s => (
                                                                                                                                         <option key={s.id} value={s.id}>{s.name} ({s.host})</option>
                                                                                                                                     ))}

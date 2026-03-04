@@ -25,22 +25,39 @@ func (s *VpnConfigService) Create(vpn *domain.VpnConfig, user *domain.User) erro
 }
 
 func (s *VpnConfigService) GetByID(id uuid.UUID, user *domain.User) (*domain.VpnConfig, error) {
+	if user == nil {
+		scope := domain.PermissionScope{IsGlobal: true}
+		return s.repo.GetByID(id, &scope)
+	}
 	scope := domain.GetPermissionScope(user, "vpns", "READ")
 	return s.repo.GetByID(id, &scope)
 }
 
 func (s *VpnConfigService) List(user *domain.User) ([]domain.VpnConfig, error) {
+	if user == nil {
+		scope := domain.PermissionScope{IsGlobal: true}
+		return s.repo.List(&scope)
+	}
 	scope := domain.GetPermissionScope(user, "vpns", "READ")
 	return s.repo.List(&scope)
 }
 
 func (s *VpnConfigService) ListPaginated(limit, offset int, searchTerm string, authType string, user *domain.User) ([]domain.VpnConfig, int64, error) {
+	if user == nil {
+		scope := domain.PermissionScope{IsGlobal: true}
+		return s.repo.ListPaginated(limit, offset, searchTerm, authType, &scope)
+	}
 	scope := domain.GetPermissionScope(user, "vpns", "READ")
 	return s.repo.ListPaginated(limit, offset, searchTerm, authType, &scope)
 }
 
 func (s *VpnConfigService) Update(vpn *domain.VpnConfig, user *domain.User) error {
-	scope := domain.GetPermissionScope(user, "vpns", "WRITE")
+	var scope domain.PermissionScope
+	if user == nil {
+		scope = domain.PermissionScope{IsGlobal: true}
+	} else {
+		scope = domain.GetPermissionScope(user, "vpns", "WRITE")
+	}
 	_, err := s.repo.GetByID(vpn.ID, &scope)
 	if err != nil {
 		return err
@@ -49,7 +66,12 @@ func (s *VpnConfigService) Update(vpn *domain.VpnConfig, user *domain.User) erro
 }
 
 func (s *VpnConfigService) Delete(id uuid.UUID, user *domain.User) error {
-	scope := domain.GetPermissionScope(user, "vpns", "DELETE")
+	var scope domain.PermissionScope
+	if user == nil {
+		scope = domain.PermissionScope{IsGlobal: true}
+	} else {
+		scope = domain.GetPermissionScope(user, "vpns", "DELETE")
+	}
 	_, err := s.repo.GetByID(id, &scope)
 	if err != nil {
 		return err

@@ -7,7 +7,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/joho/godotenv"
 	"github.com/user/csm-backend/internal/domain"
 	"github.com/user/csm-backend/internal/handler"
 	"github.com/user/csm-backend/internal/middleware"
@@ -19,10 +18,7 @@ import (
 )
 
 func main() {
-	// Load environment variables from .env file
-	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found, relying on system environment variables")
-	}
+	// Environment variables are now loaded in the crypto package init
 
 	// Database connection string from environment variables
 	dbHost := os.Getenv("DB_HOST")
@@ -443,8 +439,8 @@ func seedLocalServer(db *gorm.DB) {
 		localServer := domain.Server{
 			ID: domain.LocalServerID,
 
-			Name:        "Local",
-			Description: "The local host machine where the application is running.",
+			Name:        "Local Engine Orchestrator",
+			Description: "The local system where the engine is running.",
 			Host:        "localhost",
 			Port:        0,
 			User:        "system",

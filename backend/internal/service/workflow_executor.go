@@ -165,7 +165,7 @@ func (e *WorkflowExecutor) RunWithDepth(ctx context.Context, workflowID uuid.UUI
 			fmt.Fprintf(logFile, "Copying %s to %s... ", f.FileName, targetPath)
 			e.hub.BroadcastLog(workflowID.String(), fmt.Sprintf("Copying %s to %s...", f.FileName, targetPath))
 
-			err := e.serverService.UploadFileToServers(ctx, serverIDs, f.LocalPath, targetPath, execution.User)
+			err := e.serverService.UploadFileToServers(ctx, serverIDs, f.LocalPath, targetPath, nil) // Trusted: pass nil user
 			if err != nil {
 				runErr = fmt.Errorf("failed to transfer file %s: %w", f.FileName, err)
 				fmt.Fprintf(logFile, "ERROR: %v\n", err)
@@ -216,7 +216,7 @@ func (e *WorkflowExecutor) RunWithDepth(ctx context.Context, workflowID uuid.UUI
 		for _, path := range cleanupPaths {
 			cmdStr := fmt.Sprintf("rm -f %s", path)
 			for _, serverID := range serverIDs {
-				_, err := e.serverService.ExecuteCommand(serverID, cmdStr, execution.User, nil, nil)
+				_, err := e.serverService.ExecuteCommand(serverID, cmdStr, nil, nil, nil) // Trusted: pass nil user
 				if err != nil {
 					fmt.Fprintf(logFile, "Failed to cleanup %s on server %s: %v\n", path, serverID, err)
 				}
@@ -575,11 +575,11 @@ func (e *WorkflowExecutor) relayCopy(ctx context.Context, group *domain.Workflow
 
 	// Use tar -czf to create a compressed archive. Use -C to change directory so the path in tar is relative.
 	tarCmd := fmt.Sprintf("tar -czf /tmp/%s -C %s %s", tmpTarName, strconv.Quote(sourceDir), strconv.Quote(sourceBase))
-	_, err = e.serverService.ExecuteCommand(sourceServerID, tarCmd, user)
+	_, err = e.serverService.ExecuteCommand(sourceServerID, tarCmd, nil) // Trusted: pass nil user
 	if err != nil {
 		return fmt.Errorf("failed to create tarball on source: %w", err)
 	}
-	defer e.serverService.ExecuteCommand(sourceServerID, fmt.Sprintf("rm -f /tmp/%s", tmpTarName), user)
+	defer e.serverService.ExecuteCommand(sourceServerID, fmt.Sprintf("rm -f /tmp/%s", tmpTarName), nil) // Trusted: pass nil user
 
 	// 2. Download tarball to backend
 	localTmpDir := filepath.Join("data", "tmp", "relay")
@@ -587,25 +587,25 @@ func (e *WorkflowExecutor) relayCopy(ctx context.Context, group *domain.Workflow
 		return fmt.Errorf("failed to create local relay directory: %w", err)
 	}
 	localTarPath := filepath.Join(localTmpDir, tmpTarName)
-	err = e.serverService.DownloadFileFromServer(ctx, sourceServerID, "/tmp/"+tmpTarName, localTarPath, user)
+	err = e.serverService.DownloadFileFromServer(ctx, sourceServerID, "/tmp/"+tmpTarName, localTarPath, nil) // Trusted: pass nil user
 	if err != nil {
 		return fmt.Errorf("failed to download tarball to backend: %w", err)
 	}
 	defer os.Remove(localTarPath)
 
 	// 3. Upload tarball to target server
-	err = e.serverService.UploadFileToServers(ctx, []uuid.UUID{group.CopyTargetServerID}, localTarPath, "/tmp/"+tmpTarName, user)
+	err = e.serverService.UploadFileToServers(ctx, []uuid.UUID{group.CopyTargetServerID}, localTarPath, "/tmp/"+tmpTarName, nil) // Trusted: pass nil user
 	if err != nil {
 		return fmt.Errorf("failed to upload tarball to target: %w", err)
 	}
-	defer e.serverService.ExecuteCommand(group.CopyTargetServerID, fmt.Sprintf("rm -f /tmp/%s", tmpTarName), user)
+	defer e.serverService.ExecuteCommand(group.CopyTargetServerID, fmt.Sprintf("rm -f /tmp/%s", tmpTarName), nil) // Trusted: pass nil user
 
 	// 4. Extract tarball on target server
 	mkdirCmd := fmt.Sprintf("mkdir -p %s", strconv.Quote(targetPath))
-	e.serverService.ExecuteCommand(group.CopyTargetServerID, mkdirCmd, user)
+	e.serverService.ExecuteCommand(group.CopyTargetServerID, mkdirCmd, nil) // Trusted: pass nil user
 
 	extractCmd := fmt.Sprintf("tar -xzf /tmp/%s -C %s", tmpTarName, strconv.Quote(targetPath))
-	_, err = e.serverService.ExecuteCommand(group.CopyTargetServerID, extractCmd, user)
+	_, err = e.serverService.ExecuteCommand(group.CopyTargetServerID, extractCmd, nil) // Trusted: pass nil user
 	if err != nil {
 		return fmt.Errorf("failed to extract tarball on target: %w", err)
 	}
@@ -718,7 +718,7 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 			marker:     cwdMarker,
 		}
 
-		_, err = e.serverService.ExecuteCommand(targetServerID, command, user, filter)
+		_, err = e.serverService.ExecuteCommand(targetServerID, command, nil, filter) // Trusted: pass nil user
 		filter.Finalize()
 		output = out.String()
 		if filter.found {
