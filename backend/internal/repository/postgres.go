@@ -301,3 +301,39 @@ func (r *PostgresPermissionRepo) GetByIDs(ids []uuid.UUID) ([]domain.Permission,
 	err := r.db.Where("id IN ?", ids).Find(&perms).Error
 	return perms, err
 }
+
+type PostgresSystemSettingRepo struct {
+	db *gorm.DB
+}
+
+func NewPostgresSystemSettingRepo(db *gorm.DB) *PostgresSystemSettingRepo {
+	return &PostgresSystemSettingRepo{db: db}
+}
+
+func (r *PostgresSystemSettingRepo) GetByKey(key string) (*domain.SystemSetting, error) {
+	var setting domain.SystemSetting
+	if err := r.db.First(&setting, "key = ?", key).Error; err != nil {
+		return nil, err
+	}
+	return &setting, nil
+}
+
+func (r *PostgresSystemSettingRepo) Upsert(setting *domain.SystemSetting) error {
+	var existing domain.SystemSetting
+	if err := r.db.First(&existing, "key = ?", setting.Key).Error; err == nil {
+		setting.ID = existing.ID
+		return r.db.Save(setting).Error
+	}
+	if setting.ID == uuid.Nil {
+		setting.ID = uuid.New()
+	}
+	return r.db.Create(setting).Error
+}
+
+func (r *PostgresSystemSettingRepo) List() ([]domain.SystemSetting, error) {
+	var settings []domain.SystemSetting
+	if err := r.db.Find(&settings).Error; err != nil {
+		return nil, err
+	}
+	return settings, nil
+}

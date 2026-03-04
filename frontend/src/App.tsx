@@ -21,6 +21,7 @@ import RolePermissionsPage from './pages/RolePermissionsPage';
 import PublicPageView from './pages/PublicPageView';
 import ProfilePage from './pages/ProfilePage';
 import APIKeysPage from './pages/APIKeysPage';
+import RegisterPage from './pages/RegisterPage';
 import { useAuth } from './context/AuthContext';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -39,6 +40,7 @@ function App() {
         <BrowserRouter>
             <Routes>
                 <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
                 <Route
                     path="/"
                     element={

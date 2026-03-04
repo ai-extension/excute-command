@@ -10,12 +10,16 @@ import {
     X,
     AlertCircle,
     CheckCircle2,
-    Shield
+    Shield,
+    Globe,
+    Lock
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
+import { Switch } from '../components/ui/switch';
+import { Label } from '../components/ui/label';
 import { useAuth } from '../context/AuthContext';
 import { useNamespace } from '../context/NamespaceContext';
 import { API_BASE_URL } from '../lib/api';
@@ -33,17 +37,64 @@ import {
 const SettingsPage = () => {
     const { apiFetch, user } = useAuth();
     const { refreshNamespaces, namespaces } = useNamespace();
-    const [activeTab, setActiveTab] = useState<'namespaces'>('namespaces');
+    const [activeTab, setActiveTab] = useState<'namespaces' | 'general'>('general');
     const [isLoading, setIsLoading] = useState(false);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [selectedNamespace, setSelectedNamespace] = useState<any>(null);
     const [formData, setFormData] = useState({ name: '', description: '' });
     const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
+
+    // System Settings state
+    const [systemSettings, setSystemSettings] = useState<Record<string, string>>({
+        allow_registration: 'false'
+    });
+    const [isSettingsLoading, setIsSettingsLoading] = useState(false);
 
     // Delete state
     const [deleteTarget, setDeleteTarget] = useState<any>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    useEffect(() => {
+        fetchSystemSettings();
+    }, []);
+
+    const fetchSystemSettings = async () => {
+        setIsSettingsLoading(true);
+        try {
+            const response = await apiFetch(`${API_BASE_URL}/settings`);
+            if (response.ok) {
+                const data = await response.json();
+                setSystemSettings(data);
+            }
+        } catch (err) {
+            console.error('Failed to fetch settings:', err);
+        } finally {
+            setIsSettingsLoading(false);
+        }
+    };
+
+    const updateSetting = async (key: string, value: string) => {
+        setSuccess('');
+        setError('');
+        try {
+            const response = await apiFetch(`${API_BASE_URL}/settings`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key, value })
+            });
+            if (response.ok) {
+                setSystemSettings(prev => ({ ...prev, [key]: value }));
+                setSuccess('Setting updated successfully');
+                setTimeout(() => setSuccess(''), 3000);
+            } else {
+                setError('Failed to update setting');
+            }
+        } catch (err) {
+            setError('An error occurred');
+        }
+    };
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -138,8 +189,28 @@ const SettingsPage = () => {
                 <p className="text-muted-foreground text-sm font-medium">Manage namespaces, security policies, and application behavior.</p>
             </div>
 
+            {/* Notification Area */}
+            {(error || success) && (
+                <div className={cn(
+                    "p-4 rounded-2xl border flex items-center gap-3 animate-in fade-in zoom-in duration-300",
+                    error ? "bg-destructive/10 border-destructive/20 text-destructive" : "bg-emerald-500/10 border-emerald-500/20 text-emerald-500"
+                )}>
+                    {error ? <AlertCircle className="w-5 h-5" /> : <CheckCircle2 className="w-5 h-5" />}
+                    <p className="text-[11px] font-black uppercase tracking-wider">{error || success}</p>
+                </div>
+            )}
+
             {/* Tabs Navigation */}
             <div className="flex items-center p-1 bg-muted/30 rounded-2xl border border-border w-fit">
+                <button
+                    onClick={() => setActiveTab('general')}
+                    className={cn(
+                        "flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                        activeTab === 'general' ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"
+                    )}
+                >
+                    <Globe className="w-3.5 h-3.5" /> General
+                </button>
                 <button
                     onClick={() => setActiveTab('namespaces')}
                     className={cn(
@@ -153,6 +224,57 @@ const SettingsPage = () => {
 
             {/* Content Area */}
             <div className="grid gap-6">
+                {activeTab === 'general' && (
+                    <div className="grid gap-6">
+                        <Card className="bg-card border-border shadow-card overflow-hidden">
+                            <CardHeader className="border-b border-border bg-muted/10 p-6">
+                                <CardTitle className="text-xl font-black tracking-tight">Identity & Access</CardTitle>
+                                <CardDescription className="text-xs font-medium opacity-70">Configure how users join and access the platform.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="p-6 space-y-6">
+                                <div className="flex items-center justify-between p-4 bg-muted/20 border border-border/50 rounded-2xl">
+                                    <div className="space-y-1">
+                                        <div className="flex items-center gap-2">
+                                            <Label htmlFor="allow-registration" className="text-sm font-black tracking-tight cursor-pointer">Allow Public Registration</Label>
+                                            <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 border-primary/20 text-primary">Security Policy</Badge>
+                                        </div>
+                                        <p className="text-[10px] font-medium opacity-60">When enabled, anyone can create an account via the login page.</p>
+                                    </div>
+                                    <Switch
+                                        id="allow-registration"
+                                        checked={systemSettings.allow_registration === 'true'}
+                                        onCheckedChange={(checked) => updateSetting('allow_registration', checked ? 'true' : 'false')}
+                                        disabled={isSettingsLoading}
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="p-4 bg-muted/5 border border-border/50 rounded-2xl opacity-50 cursor-not-allowed">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <Lock className="w-4 h-4 text-orange-500" />
+                                            <h4 className="text-[10px] font-black uppercase tracking-widest">Google OAuth Provider</h4>
+                                        </div>
+                                        <p className="text-[10px] font-medium opacity-60 mb-3">Enable registration and login with Google Identity.</p>
+                                        <Button variant="outline" className="h-8 text-[9px] font-black uppercase tracking-widest px-4 rounded-xl border-border/50" disabled>
+                                            Configure Provider
+                                        </Button>
+                                    </div>
+                                    <div className="p-4 bg-muted/5 border border-border/50 rounded-2xl opacity-50 cursor-not-allowed">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <Lock className="w-4 h-4 text-blue-500" />
+                                            <h4 className="text-[10px] font-black uppercase tracking-widest">Facebook OAuth Provider</h4>
+                                        </div>
+                                        <p className="text-[10px] font-medium opacity-60 mb-3">Enable registration and login with Facebook Login.</p>
+                                        <Button variant="outline" className="h-8 text-[9px] font-black uppercase tracking-widest px-4 rounded-xl border-border/50" disabled>
+                                            Configure Provider
+                                        </Button>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                )}
+
                 {activeTab === 'namespaces' && (
                     <Card className="bg-card border-border shadow-card overflow-hidden">
                         <CardHeader className="border-b border-border bg-muted/10 p-6">

@@ -64,6 +64,7 @@ func main() {
 		&domain.Page{},
 		&domain.PageWorkflow{},
 		&domain.APIKey{},
+		&domain.SystemSetting{},
 	); err != nil {
 		log.Fatal("Failed to migrate database:", err)
 	}
@@ -87,11 +88,13 @@ func main() {
 	vpnRepo := repository.NewPostgresVpnConfigRepo(db)
 	pageRepo := repository.NewPostgresPageRepo(db)
 	apiKeyRepo := repository.NewPostgresAPIKeyRepo(db)
+	settingRepo := repository.NewPostgresSystemSettingRepo(db)
 
 	// Seed Admin User and Default Namespace
 	seedAdmin(db)
 	seedDefaultNamespace(db)
 	seedLocalServer(db)
+	seedSystemSettings(db)
 
 	// Initialize Hub
 	hub := service.NewHub()
@@ -99,7 +102,7 @@ func main() {
 
 	// Initialize Services
 	vpnConnector := service.NewVpnConnector()
-	authService := service.NewAuthService(userRepo)
+	authService := service.NewAuthService(userRepo, settingRepo)
 	serverService := service.NewServerService(serverRepo, hub, vpnConnector)
 	terminalService := service.NewTerminalService(serverRepo, hub, vpnConnector)
 	workflowService := service.NewWorkflowService(workflowRepo, workflowGroupRepo, workflowStepRepo, workflowInputRepo, workflowVariableRepo, execRepo)
@@ -109,6 +112,7 @@ func main() {
 	tagService := service.NewTagService(tagRepo)
 	vpnService := service.NewVpnConfigService(vpnRepo)
 	pageService := service.NewPageService(pageRepo)
+	settingsService := service.NewSettingsService(settingRepo)
 
 	// Initialize scheduling engine
 	scheduleService.Init()
@@ -129,6 +133,7 @@ func main() {
 	workflowFileHandler := handler.NewWorkflowFileHandler(workflowFileService)
 	vpnHandler := handler.NewVpnConfigHandler(vpnService)
 	pageHandler := handler.NewPageHandler(pageService, workflowService, workflowExecutor, terminalService)
+	settingsHandler := handler.NewSettingsHandler(settingsService)
 
 	// Initialize Router
 	r := gin.Default()
@@ -158,8 +163,13 @@ func main() {
 	api := r.Group("/api")
 	{
 		api.POST("/login", middleware.LoginRateLimiter(), authHandler.Login)
+		api.POST("/register", middleware.LoginRateLimiter(), authHandler.Register)
+		api.POST("/social-login", middleware.LoginRateLimiter(), authHandler.SocialLogin)
 		api.POST("/logout", authHandler.Logout)
 		api.GET("/ws", wsHandler.HandleWS)
+
+		// Public Settings (e.g. for registration status)
+		api.GET("/settings/public", settingsHandler.GetPublicSettings)
 
 		// Protected routes
 		protected := api.Group("")
@@ -248,6 +258,10 @@ func main() {
 			protected.GET("/pages/:id", middleware.RBACMiddleware(userRepo, "pages", "READ"), pageHandler.GetPage)
 			protected.PUT("/pages/:id", middleware.RBACMiddleware(userRepo, "pages", "WRITE"), pageHandler.UpdatePage)
 			protected.DELETE("/pages/:id", middleware.RBACMiddleware(userRepo, "pages", "DELETE"), pageHandler.DeletePage)
+
+			// System Settings
+			protected.GET("/settings", middleware.RBACMiddleware(userRepo, "settings", "READ"), settingsHandler.GetSettings)
+			protected.PUT("/settings", middleware.RBACMiddleware(userRepo, "settings", "WRITE"), settingsHandler.UpdateSetting)
 		}
 
 		// Public Page access (no auth required)
@@ -465,6 +479,24 @@ func seedLocalServer(db *gorm.DB) {
 			log.Println("Failed to seed local server:", err)
 		} else {
 			log.Println("Local server seeded successfully.")
+		}
+	}
+}
+
+func seedSystemSettings(db *gorm.DB) {
+	var count int64
+	db.Model(&domain.SystemSetting{}).Where("key = ?", "allow_registration").Count(&count)
+	if count == 0 {
+		log.Println("Seeding system settings...")
+		setting := domain.SystemSetting{
+			ID:    uuid.New(),
+			Key:   "allow_registration",
+			Value: "false",
+		}
+		if err := db.Create(&setting).Error; err != nil {
+			log.Println("Failed to seed system setting:", err)
+		} else {
+			log.Println("System settings seeded successfully.")
 		}
 	}
 }

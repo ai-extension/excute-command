@@ -25,16 +25,27 @@ type Namespace struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
+type SystemSetting struct {
+	ID        uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
+	Key       string    `json:"key" gorm:"uniqueIndex;not null"`
+	Value     string    `json:"value" gorm:"not null"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type User struct {
-	ID           uuid.UUID    `json:"id" gorm:"type:uuid;primaryKey"`
-	Username     string       `json:"username" gorm:"uniqueIndex;not null"`
-	FullName     string       `json:"full_name"`
-	PasswordHash string       `json:"-" gorm:"not null"`
-	Email        string       `json:"email"`
-	Roles        []Role       `json:"roles" gorm:"many2many:user_roles;"`
-	Permissions  []Permission `json:"permissions" gorm:"many2many:user_permissions;"`
-	CreatedAt    time.Time    `json:"created_at"`
-	UpdatedAt    time.Time    `json:"updated_at"`
+	ID             uuid.UUID    `json:"id" gorm:"type:uuid;primaryKey"`
+	Username       string       `json:"username" gorm:"uniqueIndex;not null"`
+	FullName       string       `json:"full_name"`
+	PasswordHash   string       `json:"-" gorm:"default:null"`
+	Email          string       `json:"email"`
+	SocialProvider string       `json:"social_provider"` // google, facebook, etc.
+	SocialID       string       `json:"social_id"`
+	AvatarURL      string       `json:"avatar_url"`
+	Roles          []Role       `json:"roles" gorm:"many2many:user_roles;"`
+	Permissions    []Permission `json:"permissions" gorm:"many2many:user_permissions;"`
+	CreatedAt      time.Time    `json:"created_at"`
+	UpdatedAt      time.Time    `json:"updated_at"`
 }
 
 type Role struct {
@@ -523,4 +534,10 @@ type TagRepository interface {
 	ListGlobalPaginated(limit, offset int, searchTerm string, scope *PermissionScope) ([]Tag, int64, error)
 	Update(tag *Tag) error
 	Delete(id uuid.UUID) error
+}
+
+type SystemSettingRepository interface {
+	GetByKey(key string) (*SystemSetting, error)
+	Upsert(setting *SystemSetting) error
+	List() ([]SystemSetting, error)
 }
