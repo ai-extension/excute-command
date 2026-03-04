@@ -133,6 +133,19 @@ const ScheduleDetailPage = () => {
                                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">
                                     Schedule ID: {schedule.id}
                                 </p>
+                                {schedule.tags && schedule.tags.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-2">
+                                        {schedule.tags.map(tag => (
+                                            <span
+                                                key={tag.id}
+                                                className="px-2 py-0.5 rounded text-[10px] font-bold border"
+                                                style={{ backgroundColor: `${tag.color}20`, color: tag.color, borderColor: `${tag.color}40` }}
+                                            >
+                                                {tag.name}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
 

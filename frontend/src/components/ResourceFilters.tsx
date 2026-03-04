@@ -17,14 +17,14 @@ export interface FilterConfig {
     placeholder: string;
     options: { label: string; value: string }[];
     width?: string;
+    type?: 'single' | 'multi';
 }
 
 interface ResourceFiltersProps {
     searchTerm: string;
     onSearchChange: (value: string) => void;
-    onApply: (search: string, filters: { [key: string]: string }) => void;
-    filters?: { [key: string]: string };
-    onFilterChange?: (key: string, value: string) => void;
+    onApply: (search: string, filters: { [key: string]: any }) => void;
+    filters?: { [key: string]: any };
     filterConfigs?: FilterConfig[];
     primaryAction?: React.ReactNode;
     searchPlaceholder?: string;
@@ -36,7 +36,6 @@ export const ResourceFilters: React.FC<ResourceFiltersProps> = ({
     onSearchChange,
     onApply,
     filters = {},
-    onFilterChange,
     filterConfigs = [],
     primaryAction,
     searchPlaceholder = "Search...",
@@ -49,8 +48,6 @@ export const ResourceFilters: React.FC<ResourceFiltersProps> = ({
         setLocalSearch(searchTerm);
     }, [searchTerm]);
 
-    // Use JSON.stringify as dependency to avoid infinite loops if the filters object 
-    // is recreated on every render in the parent component.
     const filtersStr = JSON.stringify(filters);
     React.useEffect(() => {
         setLocalFilters(JSON.parse(filtersStr));
@@ -60,23 +57,37 @@ export const ResourceFilters: React.FC<ResourceFiltersProps> = ({
         onApply(localSearch, localFilters);
     };
 
+    const toggleMultiValue = (key: string, value: string) => {
+        setLocalFilters(prev => {
+            const current = Array.isArray(prev[key]) ? prev[key] : [];
+            const next = current.includes(value)
+                ? current.filter((v: string) => v !== value)
+                : [...current, value];
+            return { ...prev, [key]: next };
+        });
+    };
+
     const getSelectedLabel = (config: FilterConfig) => {
         const val = localFilters[config.key];
+        if (config.type === 'multi') {
+            const selectedCount = Array.isArray(val) ? val.length : 0;
+            return selectedCount > 0 ? `${config.placeholder} (${selectedCount})` : config.placeholder;
+        }
         const opt = config.options.find(o => o.value === val);
         return opt ? opt.label : config.placeholder;
     };
 
     const isFiltered = (config: FilterConfig) => {
         const val = localFilters[config.key];
-        // The first option is usually the "ALL" option — if selected or unset, not filtered
+        if (config.type === 'multi') {
+            return Array.isArray(val) && val.length > 0;
+        }
         return val && val !== config.options[0]?.value;
     };
 
     return (
         <div className="flex items-center gap-3 bg-card/60 backdrop-blur-md px-2 py-2 rounded-xl border border-border shadow-premium group/filter transition-all duration-300 hover:border-primary/30">
-            {/* Left: search + dropdown filters */}
             <div className="flex flex-1 items-center gap-2 min-w-0">
-                {/* Search */}
                 <div className="relative w-56 shrink-0 group">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/60 transition-all group-focus-within:text-primary" />
                     <Input
@@ -88,7 +99,6 @@ export const ResourceFilters: React.FC<ResourceFiltersProps> = ({
                     />
                 </div>
 
-                {/* Filter dropdowns as DropdownMenu */}
                 {filterConfigs.map((config) => (
                     <DropdownMenu key={config.key}>
                         <DropdownMenuTrigger asChild>
@@ -116,15 +126,22 @@ export const ResourceFilters: React.FC<ResourceFiltersProps> = ({
                                 {config.placeholder}
                             </DropdownMenuLabel>
                             <DropdownMenuSeparator className="bg-border/50" />
-                            <div className="py-0.5">
+                            <div className="py-0.5 max-h-[300px] overflow-y-auto">
                                 {config.options.map((option) => {
-                                    const isActive = localFilters[config.key] === option.value;
+                                    const isActive = config.type === 'multi'
+                                        ? Array.isArray(localFilters[config.key]) && localFilters[config.key].includes(option.value)
+                                        : localFilters[config.key] === option.value;
+
                                     return (
                                         <DropdownMenuItem
                                             key={option.value}
-                                            onClick={() => {
-                                                setLocalFilters(prev => ({ ...prev, [config.key]: option.value }));
-                                                if (onFilterChange) onFilterChange(config.key, option.value);
+                                            onSelect={(e) => {
+                                                if (config.type === 'multi') {
+                                                    e.preventDefault();
+                                                    toggleMultiValue(config.key, option.value);
+                                                } else {
+                                                    setLocalFilters(prev => ({ ...prev, [config.key]: option.value }));
+                                                }
                                             }}
                                             className={cn(
                                                 "px-2.5 py-2 rounded-lg cursor-pointer flex items-center justify-between mb-0.5 last:mb-0 font-bold text-[11px] uppercase tracking-wide transition-all duration-150",
@@ -140,7 +157,11 @@ export const ResourceFilters: React.FC<ResourceFiltersProps> = ({
                                                 )} />
                                                 <span>{option.label}</span>
                                             </div>
-                                            {isActive && <Check className="w-3.5 h-3.5 shrink-0" />}
+                                            {isActive && (
+                                                config.type === 'multi'
+                                                    ? <div className="w-3 h-3 bg-primary rounded flex items-center justify-center"><Check className="w-2.5 h-2.5 text-background" /></div>
+                                                    : <Check className="w-3.5 h-3.5 shrink-0" />
+                                            )}
                                         </DropdownMenuItem>
                                     );
                                 })}
@@ -150,7 +171,6 @@ export const ResourceFilters: React.FC<ResourceFiltersProps> = ({
                 ))}
             </div>
 
-            {/* Right: Apply + primary action */}
             <div className="flex items-center gap-2 shrink-0 border-l border-border/30 pl-3">
                 <Button
                     onClick={handleApply}

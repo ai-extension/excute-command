@@ -81,6 +81,8 @@ const SchedulesPage = () => {
 
     const [total, setTotal] = useState(0);
 
+    const [availableTags, setAvailableTags] = useState<Tag[]>([]);
+
     const fetchSchedules = async (searchOverride?: string, tagIdsOverride?: string[]) => {
         if (!activeNamespace) return;
         setIsLoading(true);
@@ -117,16 +119,28 @@ const SchedulesPage = () => {
         }
     };
 
+    const fetchTags = async () => {
+        if (!activeNamespace) return;
+        try {
+            const response = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/tags`);
+            const data = await response.json();
+            setAvailableTags(data.items || (Array.isArray(data) ? data : []));
+        } catch (error) {
+            console.error('Failed to fetch tags:', error);
+        }
+    };
+
     useEffect(() => {
         fetchSchedules();
         fetchWorkflows();
-    }, [activeNamespace, offset, limit]);
+        fetchTags();
+    }, [activeNamespace, offset, limit, appliedSearchTerm, appliedTagIds]);
 
-    const handleApplyFilter = (search: string) => {
+    const handleApplyFilter = (search: string, filters: { [key: string]: any }) => {
+        setSearchTerm(search);
         setAppliedSearchTerm(search);
-        setAppliedTagIds(selectedTagIds);
+        setAppliedTagIds(filters.tags || []);
         setOffset(0);
-        fetchSchedules(search, selectedTagIds);
     };
 
     const handleCreate = async (e: React.FormEvent) => {
@@ -277,15 +291,6 @@ const SchedulesPage = () => {
             workflows: prev.workflows.filter((_, i) => i !== index)
         }));
     };
-
-    const filteredSchedules = schedules.filter(s => {
-        const matchesSearch = s.name.toLowerCase().includes(appliedSearchTerm.toLowerCase());
-        const matchesTags = appliedTagIds.length === 0 ||
-            appliedTagIds.every(tagId => s.tags?.some(st => st.id === tagId));
-        return matchesSearch && matchesTags;
-    });
-
-    const paginatedSchedules = filteredSchedules.slice(offset, offset + limit);
 
     return (
         <>
@@ -511,44 +516,60 @@ const SchedulesPage = () => {
                     searchTerm={searchTerm}
                     onSearchChange={setSearchTerm}
                     onApply={handleApplyFilter}
+                    filters={{ tags: appliedTagIds }}
+                    filterConfigs={[
+                        {
+                            key: 'tags',
+                            placeholder: 'Tags',
+                            type: 'multi',
+                            options: availableTags.map(t => ({ label: t.name, value: t.id }))
+                        }
+                    ]}
                     searchPlaceholder="Search schedules..."
                     isLoading={isLoading}
                     primaryAction={
-                        <div className="flex items-center gap-1 bg-muted/40 rounded-xl p-1 border border-border">
+                        <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1 bg-muted/40 rounded-xl p-1 border border-border">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setViewMode('list')}
+                                    className={cn(
+                                        "h-8 px-3 rounded-lg gap-1.5 text-[9px] font-black uppercase tracking-widest transition-all",
+                                        viewMode === 'list' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+                                    )}
+                                >
+                                    <LayoutList className="w-3.5 h-3.5" /> List
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setViewMode('calendar')}
+                                    className={cn(
+                                        "h-8 px-3 rounded-lg gap-1.5 text-[9px] font-black uppercase tracking-widest transition-all",
+                                        viewMode === 'calendar' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+                                    )}
+                                >
+                                    <CalendarDays className="w-3.5 h-3.5" /> Calendar
+                                </Button>
+                            </div>
                             <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setViewMode('list')}
-                                className={cn(
-                                    "h-8 px-3 rounded-lg gap-1.5 text-[9px] font-black uppercase tracking-widest transition-all",
-                                    viewMode === 'list' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
-                                )}
+                                onClick={() => {
+                                    setIsEditing(false);
+                                    setEditingID(null);
+                                    setFormData({ name: '', type: 'ONE_TIME', cron_expression: '', next_run_at: '', status: 'ACTIVE', retries: 0, workflows: [], hooks: [], tags: [] });
+                                    setIsCreateOpen(true);
+                                }}
+                                className="h-9 px-4 rounded-xl premium-gradient text-[10px] font-black uppercase tracking-widest shadow-premium transition-all active:scale-95 gap-2"
                             >
-                                <LayoutList className="w-3.5 h-3.5" /> List
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setViewMode('calendar')}
-                                className={cn(
-                                    "h-8 px-3 rounded-lg gap-1.5 text-[9px] font-black uppercase tracking-widest transition-all",
-                                    viewMode === 'calendar' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
-                                )}
-                            >
-                                <CalendarDays className="w-3.5 h-3.5" /> Calendar
+                                <Plus className="w-4 h-4" /> New Schedule
                             </Button>
                         </div>
                     }
                 />
 
-                <TagFilter
-                    selectedTagIds={selectedTagIds}
-                    onChange={setSelectedTagIds}
-                    className="px-1"
-                />
-
-                {
-                    viewMode === 'calendar' ? (
+                <div className="mt-4">
+                    {viewMode === 'calendar' ? (
                         <ScheduleCalendar
                             schedules={schedules}
                             onEdit={handleEdit}
@@ -752,78 +773,79 @@ const SchedulesPage = () => {
                             />
                         </Card>
                     )
-                }
+                    }
 
-                <Dialog open={isPickerOpen} onOpenChange={setIsPickerOpen}>
-                    <DialogContent className="sm:max-w-[400px]">
-                        <DialogHeader>
-                            <DialogTitle className="text-xl font-black uppercase tracking-tight">Select Workflow</DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-4 py-4">
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                                <Input
-                                    placeholder="Filter blueprints..."
-                                    className="pl-10 h-10 rounded-xl"
-                                    value={workflowSearch}
-                                    onChange={(e) => setWorkflowSearch(e.target.value)}
-                                />
-                            </div>
-                            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-                                {workflows
-                                    .filter(wf => wf.name.toLowerCase().includes(workflowSearch.toLowerCase()))
-                                    .map(wf => (
-                                        <div
-                                            key={wf.id}
-                                            className="flex items-center justify-between p-4 bg-muted/20 hover:bg-muted/40 border border-border rounded-2xl cursor-pointer transition-all group"
-                                            onClick={() => {
-                                                handleSelectWorkflow(wf);
-                                                setIsPickerOpen(false);
-                                                setWorkflowSearch('');
-                                            }}
-                                        >
-                                            <div className="flex flex-col gap-1">
-                                                <span className="font-bold text-sm tracking-tight text-white">{wf.name}</span>
-                                                <span className="text-[9px] opacity-40 uppercase font-black tracking-widest">{wf.inputs?.length || 0} inputs required</span>
+                    <Dialog open={isPickerOpen} onOpenChange={setIsPickerOpen}>
+                        <DialogContent className="sm:max-w-[400px]">
+                            <DialogHeader>
+                                <DialogTitle className="text-xl font-black uppercase tracking-tight">Select Workflow</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                    <Input
+                                        placeholder="Filter blueprints..."
+                                        className="pl-10 h-10 rounded-xl"
+                                        value={workflowSearch}
+                                        onChange={(e) => setWorkflowSearch(e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                                    {workflows
+                                        .filter(wf => wf.name.toLowerCase().includes(workflowSearch.toLowerCase()))
+                                        .map(wf => (
+                                            <div
+                                                key={wf.id}
+                                                className="flex items-center justify-between p-4 bg-muted/20 hover:bg-muted/40 border border-border rounded-2xl cursor-pointer transition-all group"
+                                                onClick={() => {
+                                                    handleSelectWorkflow(wf);
+                                                    setIsPickerOpen(false);
+                                                    setWorkflowSearch('');
+                                                }}
+                                            >
+                                                <div className="flex flex-col gap-1">
+                                                    <span className="font-bold text-sm tracking-tight text-white">{wf.name}</span>
+                                                    <span className="text-[9px] opacity-40 uppercase font-black tracking-widest">{wf.inputs?.length || 0} inputs required</span>
+                                                </div>
+                                                <Plus className="w-4 h-4 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
                                             </div>
-                                            <Plus className="w-4 h-4 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
-                                        </div>
-                                    ))
-                                }
+                                        ))
+                                    }
+                                </div>
                             </div>
-                        </div>
-                    </DialogContent>
-                </Dialog>
+                        </DialogContent>
+                    </Dialog>
 
-                <Dialog open={isInputDialogOpen} onOpenChange={setIsInputDialogOpen}>
-                    <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden bg-slate-950 border-white/10 rounded-2xl shadow-2xl">
-                        {pendingWorkflow && (
-                            <>
-                                <DialogHeader className="p-6 border-b border-white/5 bg-slate-900/40">
-                                    <DialogTitle className="text-xl font-black uppercase tracking-tight text-white flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
-                                            <Zap className="w-4 h-4 text-indigo-400" />
-                                        </div>
-                                        Configure {pendingWorkflow.name}
-                                    </DialogTitle>
-                                </DialogHeader>
-                                <WorkflowInputDialog
-                                    inputs={pendingWorkflow.inputs as WorkflowInput[]}
-                                    onConfirm={(values) => {
-                                        addWorkflowToForm(pendingWorkflow, values);
-                                        setIsInputDialogOpen(false);
-                                        setPendingWorkflow(null);
-                                    }}
-                                    onCancel={() => {
-                                        setIsInputDialogOpen(false);
-                                        setPendingWorkflow(null);
-                                    }}
-                                />
-                            </>
-                        )}
-                    </DialogContent>
-                </Dialog>
-            </div >
+                    <Dialog open={isInputDialogOpen} onOpenChange={setIsInputDialogOpen}>
+                        <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden bg-slate-950 border-white/10 rounded-2xl shadow-2xl">
+                            {pendingWorkflow && (
+                                <>
+                                    <DialogHeader className="p-6 border-b border-white/5 bg-slate-900/40">
+                                        <DialogTitle className="text-xl font-black uppercase tracking-tight text-white flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
+                                                <Zap className="w-4 h-4 text-indigo-400" />
+                                            </div>
+                                            Configure {pendingWorkflow.name}
+                                        </DialogTitle>
+                                    </DialogHeader>
+                                    <WorkflowInputDialog
+                                        inputs={pendingWorkflow.inputs as WorkflowInput[]}
+                                        onConfirm={(values) => {
+                                            addWorkflowToForm(pendingWorkflow, values);
+                                            setIsInputDialogOpen(false);
+                                            setPendingWorkflow(null);
+                                        }}
+                                        onCancel={() => {
+                                            setIsInputDialogOpen(false);
+                                            setPendingWorkflow(null);
+                                        }}
+                                    />
+                                </>
+                            )}
+                        </DialogContent>
+                    </Dialog>
+                </div>
+            </div>
         </>
     );
 };

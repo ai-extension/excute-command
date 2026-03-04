@@ -35,7 +35,7 @@ export function TagSelector({ selectedTags, onChange, className }: TagSelectorPr
             try {
                 const response = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/tags`);
                 const data = await response.json();
-                setAvailableTags(Array.isArray(data) ? data : []);
+                setAvailableTags(data.items || (Array.isArray(data) ? data : []));
             } catch (error) {
                 console.error('Failed to fetch tags:', error);
             } finally {
