@@ -61,8 +61,13 @@ func (e *WorkflowExecutor) RunWithDepth(ctx context.Context, workflowID uuid.UUI
 		return fmt.Errorf("maximum hook depth exceeded (circular dependency?)")
 	}
 
-	scope := domain.GetPermissionScope(user, "workflows", "EXECUTE")
-	wf, err := e.wfRepo.GetByID(workflowID, &scope)
+	var scope *domain.PermissionScope
+	if depth == 0 {
+		s := domain.GetPermissionScope(user, "workflows", "EXECUTE")
+		scope = &s
+	}
+
+	wf, err := e.wfRepo.GetByID(workflowID, scope)
 	if err != nil {
 		return err
 	}
@@ -103,7 +108,25 @@ func (e *WorkflowExecutor) RunWithDepth(ctx context.Context, workflowID uuid.UUI
 	execution.LogPath = mainLogPath
 	e.execRepo.Update(execution)
 
-	logFile, _ := os.OpenFile(mainLogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	return e.Execute(ctx, workflowID, execution, depth)
+}
+
+func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, execution *domain.WorkflowExecution, depth int) error {
+	var runErr error
+	var serverIDs []uuid.UUID
+	var transferServerIDs []uuid.UUID
+	var cleanupPaths []string
+	serverSet := make(map[uuid.UUID]bool)
+
+	wf, err := e.wfRepo.GetByID(workflowID, nil)
+	if err != nil {
+		return fmt.Errorf("failed to get workflow: %w", err)
+	}
+
+	logFile, err := os.OpenFile(execution.LogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open log file: %w", err)
+	}
 	defer logFile.Close()
 
 	fmt.Fprintf(logFile, "================================================================================\n")
@@ -118,18 +141,47 @@ func (e *WorkflowExecutor) RunWithDepth(ctx context.Context, workflowID uuid.UUI
 	e.wfRepo.Update(wf)
 	e.hub.BroadcastStatus(wf.ID.String(), "workflow", string(domain.StatusRunning))
 
-	var runErr error
-	var serverIDs []uuid.UUID
-	var cleanupPaths []string
-	serverSet := make(map[uuid.UUID]bool)
-
 	// 0. Execute BEFORE hooks
 	if err := e.RunHooks(ctx, wf.Hooks, domain.HookTypeBefore, wf.NamespaceID, logFile, depth, execution.User); err != nil {
 		runErr = fmt.Errorf("before hook failed: %w", err)
+		e.hub.BroadcastLog(workflowID.String(), fmt.Sprintf("Error: %v", runErr))
 		goto finalize
 	}
 
-	// Get all unique servers in this workflow
+	// 1. Transfer files to servers
+	// Per user request: ONLY upload to the primary Workflow Default Server to avoid unintentional "local Mac" targeting
+	if wf.DefaultServerID != uuid.Nil {
+		transferServerIDs = []uuid.UUID{wf.DefaultServerID}
+	} else {
+		transferServerIDs = []uuid.UUID{domain.LocalServerID}
+	}
+
+	if len(wf.Files) > 0 {
+		fmt.Fprintf(logFile, "--- TRANSFERRING %d FILES ---\n", len(wf.Files))
+		for _, f := range wf.Files {
+			targetPath := f.TargetPath
+			if wf.TargetFolder != "" {
+				targetPath = filepath.Join(wf.TargetFolder, f.FileName)
+			}
+			cleanupPaths = append(cleanupPaths, targetPath)
+
+			fmt.Fprintf(logFile, "Copying %s to %s... ", f.FileName, targetPath)
+			e.hub.BroadcastLog(workflowID.String(), fmt.Sprintf("Copying %s to %s...", f.FileName, targetPath))
+
+			err := e.serverService.UploadFileToServers(ctx, transferServerIDs, f.LocalPath, targetPath, nil)
+			if err != nil {
+				runErr = fmt.Errorf("failed to transfer file %s: %w", f.FileName, err)
+				fmt.Fprintf(logFile, "ERROR: %v\n", err)
+				e.hub.BroadcastLog(workflowID.String(), fmt.Sprintf("Error transferring file: %v", err))
+				break
+			} else {
+				fmt.Fprintf(logFile, "SUCCESS\n")
+			}
+		}
+		fmt.Fprintf(logFile, "--- TRANSFER COMPLETE ---\n\n")
+	}
+
+	// Get all unique servers in this workflow for execution
 	if wf.DefaultServerID != uuid.Nil {
 		serverSet[wf.DefaultServerID] = true
 	} else {
@@ -152,32 +204,6 @@ func (e *WorkflowExecutor) RunWithDepth(ctx context.Context, workflowID uuid.UUI
 		serverIDs = append(serverIDs, id)
 	}
 
-	// 1. Transfer files to servers
-	if len(wf.Files) > 0 && len(serverIDs) > 0 {
-		fmt.Fprintf(logFile, "--- TRANSFERRING %d FILES TO %d SERVERS ---\n", len(wf.Files), len(serverIDs))
-		for _, f := range wf.Files {
-			targetPath := f.TargetPath // Fallback to file-specific if present (for backward compatibility), but standard is to use wf.TargetFolder now
-			if wf.TargetFolder != "" {
-				targetPath = filepath.Join(wf.TargetFolder, f.FileName)
-			}
-			cleanupPaths = append(cleanupPaths, targetPath)
-
-			fmt.Fprintf(logFile, "Copying %s to %s... ", f.FileName, targetPath)
-			e.hub.BroadcastLog(workflowID.String(), fmt.Sprintf("Copying %s to %s...", f.FileName, targetPath))
-
-			err := e.serverService.UploadFileToServers(ctx, serverIDs, f.LocalPath, targetPath, nil) // Trusted: pass nil user
-			if err != nil {
-				runErr = fmt.Errorf("failed to transfer file %s: %w", f.FileName, err)
-				fmt.Fprintf(logFile, "ERROR: %v\n", err)
-				e.hub.BroadcastLog(workflowID.String(), fmt.Sprintf("Error transferring file: %v", err))
-				break
-			} else {
-				fmt.Fprintf(logFile, "SUCCESS\n")
-			}
-		}
-		fmt.Fprintf(logFile, "--- TRANSFER COMPLETE ---\n\n")
-	}
-
 	// 2. Execute workflow groups
 	if runErr == nil {
 		groupResults := make(map[string]string) // key -> status string
@@ -197,8 +223,12 @@ func (e *WorkflowExecutor) RunWithDepth(ctx context.Context, workflowID uuid.UUI
 			}
 		}
 
+		// Re-parse inputs from execution.Inputs for runGroup
+		var inputsMap map[string]string
+		json.Unmarshal([]byte(execution.Inputs), &inputsMap)
+
 		for i := range wf.Groups {
-			err := e.runGroup(ctx, &wf.Groups[i], inputs, wf.Variables, groupResults, wf.DefaultServerID, logFile, workflowID, execID, wf.NamespaceID, execution.User, workingDirs)
+			err := e.runGroup(ctx, &wf.Groups[i], inputsMap, wf.Variables, groupResults, wf.DefaultServerID, logFile, workflowID, execution.ID, wf.NamespaceID, execution.User, workingDirs)
 			groupResults[wf.Groups[i].Key] = string(wf.Groups[i].Status)
 			if err != nil {
 				runErr = err
@@ -236,6 +266,7 @@ finalize:
 		wf.Status = domain.StatusFailed
 		execution.Status = domain.StatusFailed
 		fmt.Fprintf(logFile, "\n--- WORKFLOW FAILED: %v ---\n", runErr)
+		e.hub.BroadcastLog(wf.ID.String(), fmt.Sprintf("--- WORKFLOW FAILED: %v ---", runErr))
 
 		// Execute AFTER_FAILED hooks
 		e.RunHooks(ctx, wf.Hooks, domain.HookTypeAfterFailed, wf.NamespaceID, logFile, depth, execution.User)
@@ -243,6 +274,7 @@ finalize:
 		wf.Status = domain.StatusSuccess
 		execution.Status = domain.StatusSuccess
 		fmt.Fprintf(logFile, "\n--- WORKFLOW SUCCESS ---\n")
+		e.hub.BroadcastLog(wf.ID.String(), "--- WORKFLOW SUCCESS ---")
 
 		// Execute AFTER_SUCCESS hooks
 		e.RunHooks(ctx, wf.Hooks, domain.HookTypeAfterSuccess, wf.NamespaceID, logFile, depth, execution.User)
@@ -277,7 +309,10 @@ func (e *WorkflowExecutor) RunHooks(ctx context.Context, hooks []domain.Workflow
 		err := e.RunWithDepth(ctx, hook.TargetWorkflowID, hookExecID, hookInputs, nil, depth+1, user)
 		if err != nil {
 			if logFile != nil {
-				fmt.Fprintf(logFile, "!!! HOOK FAILED: %v !!!\n", err)
+				fmt.Fprintf(logFile, "Error executing %s hook: %v\n", hookType, err)
+			}
+			if hook.WorkflowID != nil {
+				e.hub.BroadcastLog(hook.WorkflowID.String(), fmt.Sprintf("Error: %s hook failed: %v", hookType, err))
 			}
 			return err
 		}
@@ -447,7 +482,7 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 			wg.Add(1)
 			go func(step *domain.WorkflowStep) {
 				defer wg.Done()
-				if err := e.runStep(ctx, step, inputs, variables, effectiveServerID, logFile, workflowID, executionID, namespaceID, user, workingDirs); err != nil {
+				if err := e.runStep(ctx, step, inputs, variables, groupResults, effectiveServerID, logFile, workflowID, executionID, namespaceID, user, workingDirs); err != nil {
 					errs <- err
 				}
 			}(&group.Steps[i])
@@ -466,7 +501,7 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 		}
 	} else {
 		for i := range group.Steps {
-			if err := e.runStep(ctx, &group.Steps[i], inputs, variables, effectiveServerID, logFile, workflowID, executionID, namespaceID, user, workingDirs); err != nil {
+			if err := e.runStep(ctx, &group.Steps[i], inputs, variables, groupResults, effectiveServerID, logFile, workflowID, executionID, namespaceID, user, workingDirs); err != nil {
 				group.Status = domain.StatusFailed
 				e.groupRepo.Update(group)
 				e.hub.BroadcastStatus(group.ID.String(), "group", string(domain.StatusFailed))
@@ -527,19 +562,20 @@ func (e *WorkflowExecutor) relayCopy(ctx context.Context, group *domain.Workflow
 			}
 			val = strings.ReplaceAll(val, "{{variable."+v.Key+"}}", v.Value)
 		}
-		// 2. Runtime Inputs: {{key}}
+		// 2. Runtime Inputs: {{input.key}} and {{key}}
 		for k, v := range inputs {
 			if v != "" && !securityRegex.MatchString(v) {
 				return "", fmt.Errorf("security violation: input '%s' contains invalid characters", k)
 			}
+			val = strings.ReplaceAll(val, "{{input."+k+"}}", v)
 			val = strings.ReplaceAll(val, "{{"+k+"}}", v)
 		}
-		// 3. Group Results: {{group_name.result}}
+		// 3. Group Results: {{step.group_key.status}}
 		for k, v := range groupResults {
 			if v != "" && !securityRegex.MatchString(v) {
 				return "", fmt.Errorf("security violation: group result '%s' contains invalid characters", k)
 			}
-			val = strings.ReplaceAll(val, "{{"+k+"}}", v)
+			val = strings.ReplaceAll(val, "{{step."+k+".status}}", v)
 		}
 		// 4. Global Variables: {{global.key}}
 		if e.globalVarRepo != nil {
@@ -615,7 +651,7 @@ func (e *WorkflowExecutor) relayCopy(ctx context.Context, group *domain.Workflow
 	return nil
 }
 
-func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowStep, inputs map[string]string, variables []domain.WorkflowVariable, defaultServerID uuid.UUID, mainLogFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, namespaceID uuid.UUID, user *domain.User, workingDirs *sync.Map) error {
+func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowStep, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, defaultServerID uuid.UUID, mainLogFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, namespaceID uuid.UUID, user *domain.User, workingDirs *sync.Map) error {
 	step.Status = domain.StatusRunning
 	e.stepRepo.Update(step)
 	e.hub.BroadcastStatus(step.ID.String(), "step", string(domain.StatusRunning))
@@ -659,14 +695,22 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 		}
 		command = strings.ReplaceAll(command, "{{variable."+v.Key+"}}", v.Value)
 	}
-	// 2. Runtime Inputs: {{key}}
+	// 2. Runtime Inputs: {{input.key}} and {{key}}
 	for k, v := range inputs {
 		// Note: inputs are already validated at the start of the workflow execution,
 		// but re-validating here doesn't hurt.
 		if v != "" && !securityRegex.MatchString(v) {
 			return fmt.Errorf("security violation: input '%s' contains invalid characters", k)
 		}
+		command = strings.ReplaceAll(command, "{{input."+k+"}}", v)
 		command = strings.ReplaceAll(command, "{{"+k+"}}", v)
+	}
+	// 3. Group Results: {{step.group_key.status}}
+	for k, v := range groupResults {
+		if v != "" && !securityRegex.MatchString(v) {
+			return fmt.Errorf("security violation: group result '%s' contains invalid characters", k)
+		}
+		command = strings.ReplaceAll(command, "{{step."+k+".status}}", v)
 	}
 	// 3. Global Variables: {{global.key}}
 	if e.globalVarRepo != nil {
