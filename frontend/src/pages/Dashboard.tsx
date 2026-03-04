@@ -21,7 +21,123 @@ interface DashboardStats {
     servers: { total: number; items: any[] };
     vpns: { total: number; items: any[] };
     users: { total: number; items: any[] };
+    analytics: any[];
 }
+
+// ─────────── MINI COMPONENTS ───────────
+const ExecutionTrendChart = ({ data }: { data: any[] }) => {
+    if (!data || data.length === 0) return (
+        <div className="h-[200px] flex items-center justify-center text-[10px] font-black uppercase tracking-widest text-muted-foreground/20 italic">
+            Insufficient data for trend analysis
+        </div>
+    );
+
+    // Format dates for display
+    const chartData = data.map(d => ({
+        ...d,
+        displayDate: new Date(d.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+    }));
+
+    const width = 800;
+    const height = 200;
+    const padding = 20;
+    const chartWidth = width - padding * 2;
+    const chartHeight = height - padding * 2;
+
+    const maxVal = Math.max(...chartData.map(d => Math.max(d.success, d.failed)), 10);
+    const stepX = chartWidth / (chartData.length - 1 || 1);
+
+    const getX = (i: number) => padding + i * stepX;
+    const getY = (val: number) => height - padding - (val / maxVal) * chartHeight;
+
+    const successPoints = chartData.map((d, i) => `${getX(i)},${getY(d.success)}`).join(' ');
+    const failedPoints = chartData.map((d, i) => `${getX(i)},${getY(d.failed)}`).join(' ');
+
+    const successArea = `${padding},${height - padding} ${successPoints} ${padding + (chartData.length - 1) * stepX},${height - padding}`;
+    const failedArea = `${padding},${height - padding} ${failedPoints} ${padding + (chartData.length - 1) * stepX},${height - padding}`;
+
+    return (
+        <div className="h-[250px] w-full pt-4 relative group">
+            <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible">
+                <defs>
+                    <linearGradient id="successGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#10b981" stopOpacity="0.4" />
+                        <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
+                    </linearGradient>
+                    <linearGradient id="failedGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#ef4444" stopOpacity="0.3" />
+                        <stop offset="100%" stopColor="#ef4444" stopOpacity="0" />
+                    </linearGradient>
+                    <filter id="glow">
+                        <feGaussianBlur stdDeviation="2" result="coloredBlur" />
+                        <feMerge>
+                            <feMergeNode in="coloredBlur" />
+                            <feMergeNode in="SourceGraphic" />
+                        </feMerge>
+                    </filter>
+                </defs>
+
+                {/* Grid Lines */}
+                {[0, 0.25, 0.5, 0.75, 1].map(p => (
+                    <line
+                        key={p}
+                        x1={padding}
+                        y1={height - padding - p * chartHeight}
+                        x2={width - padding}
+                        y2={height - padding - p * chartHeight}
+                        stroke="currentColor"
+                        className="text-muted-foreground/5"
+                        strokeDasharray="4 4"
+                    />
+                ))}
+
+                {/* Failed Area */}
+                <polygon points={failedArea} fill="url(#failedGradient)" />
+                <polyline
+                    points={failedPoints}
+                    fill="none"
+                    stroke="#ef4444"
+                    strokeWidth="2"
+                    strokeDasharray="4 4"
+                    className="opacity-60"
+                />
+
+                {/* Success Area */}
+                <polygon points={successArea} fill="url(#successGradient)" />
+                <polyline
+                    points={successPoints}
+                    fill="none"
+                    stroke="#10b981"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    filter="url(#glow)"
+                />
+
+                {/* Data Points */}
+                {chartData.map((d, i) => (
+                    <g key={i} className="cursor-pointer group/point">
+                        <circle
+                            cx={getX(i)}
+                            cy={getY(d.success)}
+                            r="4"
+                            fill="#10b981"
+                            className="transition-all duration-300 group-hover/point:r-6"
+                        />
+                        <text
+                            x={getX(i)}
+                            y={height - padding + 15}
+                            textAnchor="middle"
+                            className="text-[10px] fill-muted-foreground/40 font-black uppercase tracking-widest pointer-events-none"
+                        >
+                            {d.displayDate}
+                        </text>
+                    </g>
+                ))}
+            </svg>
+        </div>
+    );
+};
 
 // ─────────── MINI COMPONENTS ───────────
 const StatCard = ({ icon: Icon, label, value, sub, color, onClick }: any) => (
@@ -95,24 +211,25 @@ const Dashboard = () => {
         setLoading(true);
         try {
             const nsId = activeNamespace.id;
-            const [wfRes, execRes, schRes, srvRes, vpnRes, userRes] = await Promise.allSettled([
+            const [wfRes, execRes, schRes, srvRes, vpnRes, userRes, analyticsRes] = await Promise.allSettled([
                 apiFetch(`${API_BASE_URL}/namespaces/${nsId}/workflows?limit=100`),
                 apiFetch(`${API_BASE_URL}/namespaces/${nsId}/executions?limit=20`),
                 apiFetch(`${API_BASE_URL}/namespaces/${nsId}/schedules?limit=100`),
                 apiFetch(`${API_BASE_URL}/servers?limit=100`),
                 apiFetch(`${API_BASE_URL}/vpns?limit=100`),
                 apiFetch(`${API_BASE_URL}/users?limit=100`),
+                apiFetch(`${API_BASE_URL}/namespaces/${nsId}/analytics/executions?days=7`),
             ]);
 
             const parse = async (r: PromiseSettledResult<Response>) => {
                 if (r.status === 'fulfilled' && r.value.ok) {
                     return await r.value.json();
                 }
-                return { items: [], total: 0 };
+                return r.status === 'fulfilled' && r.value.status === 404 ? [] : { items: [], total: 0 };
             };
 
-            const [wf, exec, sch, srv, vpn, usr] = await Promise.all([
-                parse(wfRes), parse(execRes), parse(schRes), parse(srvRes), parse(vpnRes), parse(userRes)
+            const [wf, exec, sch, srv, vpn, usr, analytics] = await Promise.all([
+                parse(wfRes), parse(execRes), parse(schRes), parse(srvRes), parse(vpnRes), parse(userRes), parse(analyticsRes)
             ]);
 
             const execItems: any[] = exec?.items || [];
@@ -133,6 +250,7 @@ const Dashboard = () => {
                 servers: { total: srv?.total || 0, items: (srv?.items || []).slice(0, 5) },
                 vpns: { total: vpn?.total || 0, items: vpn?.items || [] },
                 users: { total: usr?.total || 0, items: usr?.items || [] },
+                analytics: Array.isArray(analytics) ? analytics : [],
             });
             setLastRefresh(new Date());
         } catch (err) {
@@ -212,48 +330,75 @@ const Dashboard = () => {
                 <StatCard icon={Users} label="Users" value={stats?.users.total} color="bg-pink-500" onClick={() => navigate('/users')} />
             </div>
 
-            {/* ── Execution Status Bar ── */}
-            {stats && stats.executions.total > 0 && (
-                <Card className="border-border bg-card shadow-card overflow-hidden">
-                    <CardHeader className="px-5 pt-4 pb-2">
+            {/* ── Visual Analytics Row ── */}
+            <div className="grid lg:grid-cols-3 gap-4">
+                <Card className="lg:col-span-2 border-border bg-card shadow-premium overflow-hidden">
+                    <CardHeader className="px-5 pt-4 pb-0">
                         <div className="flex items-center justify-between">
-                            <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Execution Health (last 20)</CardTitle>
-                            <Button variant="ghost" size="sm" onClick={() => navigate('/history')} className="h-7 px-2 text-[9px] font-black uppercase tracking-widest gap-1 text-muted-foreground hover:text-foreground">
-                                View All <ArrowUpRight className="w-3 h-3" />
-                            </Button>
+                            <div>
+                                <CardTitle className="text-sm font-black tracking-tight">Execution Trends</CardTitle>
+                                <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/40 mt-0.5 font-black">Success vs Failure Rate (Last 7 Days)</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1">
+                                    <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                                    <span className="text-[8px] font-black uppercase text-muted-foreground/60">Success</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <div className="w-2 h-2 rounded-full bg-red-500" />
+                                    <span className="text-[8px] font-black uppercase text-muted-foreground/60">Failed</span>
+                                </div>
+                            </div>
                         </div>
                     </CardHeader>
+                    <CardContent className="px-4 pb-2">
+                        <ExecutionTrendChart data={stats?.analytics || []} />
+                    </CardContent>
+                </Card>
+
+                <Card className="border-border bg-card shadow-card overflow-hidden">
+                    <CardHeader className="px-5 pt-4 pb-2">
+                        <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Execution Health</CardTitle>
+                    </CardHeader>
                     <CardContent className="px-5 pb-4">
-                        <div className="flex gap-4 mb-3">
-                            {[
-                                { label: 'Success', count: stats.executions.success, color: 'text-emerald-400' },
-                                { label: 'Failed', count: stats.executions.failed, color: 'text-red-400' },
-                                { label: 'Running', count: stats.executions.running, color: 'text-blue-400' },
-                            ].map(s => (
-                                <div key={s.label} className="flex items-center gap-1.5">
-                                    <span className={cn("text-lg font-black tracking-tighter", s.color)}>{s.count}</span>
-                                    <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/50">{s.label}</span>
+                        <div className="space-y-6 pt-2">
+                            <div className="flex items-center justify-between">
+                                <div className="flex flex-col">
+                                    <span className="text-2xl font-black tracking-tighter text-emerald-400">{stats?.executions.success || 0}</span>
+                                    <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/40">Success</span>
                                 </div>
-                            ))}
-                        </div>
-                        {/* Visual bar */}
-                        <div className="h-2 w-full bg-muted/50 rounded-full overflow-hidden flex">
-                            {stats.executions.success > 0 && (
-                                <div className="h-full bg-emerald-500 rounded-l-full transition-all duration-700"
-                                    style={{ width: `${(stats.executions.success / stats.executions.total) * 100}%` }} />
-                            )}
-                            {stats.executions.running > 0 && (
-                                <div className="h-full bg-blue-500 animate-pulse transition-all duration-700"
-                                    style={{ width: `${(stats.executions.running / stats.executions.total) * 100}%` }} />
-                            )}
-                            {stats.executions.failed > 0 && (
-                                <div className="h-full bg-red-500 rounded-r-full transition-all duration-700"
-                                    style={{ width: `${(stats.executions.failed / stats.executions.total) * 100}%` }} />
-                            )}
+                                <div className="flex flex-col text-right">
+                                    <span className="text-2xl font-black tracking-tighter text-red-400">{stats?.executions.failed || 0}</span>
+                                    <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/40">Failed</span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-widest">
+                                    <span className="text-muted-foreground/60">Reliability</span>
+                                    <span className="text-primary">{successRate ?? 0}%</span>
+                                </div>
+                                <div className="h-2 w-full bg-muted/30 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-primary transition-all duration-1000"
+                                        style={{ width: `${successRate ?? 0}%` }}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="pt-2">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => navigate('/history')}
+                                    className="w-full h-8 border-border hover:bg-muted/50 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all"
+                                >
+                                    Review Reports
+                                </Button>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
-            )}
+            </div>
 
             {/* ── Two Column: Recent Executions + Schedules ── */}
             <div className="grid lg:grid-cols-5 gap-4">

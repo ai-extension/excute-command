@@ -19,6 +19,7 @@ import { useNamespace } from '../context/NamespaceContext';
 import { API_BASE_URL } from '../lib/api';
 import { GlobalVariable } from '../types';
 import { Pagination } from '../components/Pagination';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 import {
     Dialog,
@@ -44,6 +45,10 @@ const GlobalVariablesPage = () => {
     const [selectedVar, setSelectedVar] = useState<GlobalVariable | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Delete state
+    const [deleteTarget, setDeleteTarget] = useState<GlobalVariable | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const [total, setTotal] = useState(0);
     const [limit, setLimit] = useState(20);
@@ -128,10 +133,15 @@ const GlobalVariablesPage = () => {
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this global variable?')) return;
+    const handleDelete = (gv: GlobalVariable) => {
+        setDeleteTarget(gv);
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteTarget) return;
+        setIsDeleting(true);
         try {
-            const response = await apiFetch(`${API_BASE_URL}/global-variables/${id}`, {
+            const response = await apiFetch(`${API_BASE_URL}/global-variables/${deleteTarget.id}`, {
                 method: 'DELETE'
             });
             if (response.ok) {
@@ -139,6 +149,9 @@ const GlobalVariablesPage = () => {
             }
         } catch (error) {
             console.error('Failed to delete global variable:', error);
+        } finally {
+            setIsDeleting(false);
+            setDeleteTarget(null);
         }
     };
 
@@ -311,7 +324,7 @@ const GlobalVariablesPage = () => {
                                             variant="ghost"
                                             size="icon"
                                             className="rounded-xl hover:bg-destructive/10 hover:text-destructive transition-colors"
-                                            onClick={() => handleDelete(v.id)}
+                                            onClick={() => handleDelete(v)}
                                         >
                                             <Trash2 className="w-4 h-4" />
                                         </Button>
@@ -401,6 +414,17 @@ const GlobalVariablesPage = () => {
                     </form>
                 </DialogContent>
             </Dialog>
+
+            <ConfirmDialog
+                isOpen={!!deleteTarget}
+                onClose={() => setDeleteTarget(null)}
+                onConfirm={confirmDelete}
+                title="Delete Global Variable"
+                description={`Are you sure you want to delete the variable "${deleteTarget?.key}"?`}
+                confirmText="Delete Variable"
+                variant="danger"
+                isLoading={isDeleting}
+            />
         </div>
     );
 };

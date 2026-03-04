@@ -30,6 +30,7 @@ import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../lib/api';
 import { Server, VpnConfig } from '../types';
 import { Pagination } from '../components/Pagination';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 const LOCAL_SERVER_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -60,10 +61,16 @@ const ServerPage = () => {
     const [limit, setLimit] = useState(20);
     const [offset, setOffset] = useState(0);
 
+    // Delete state
+    const [deleteTarget, setDeleteTarget] = useState<Server | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+
     const [terminalOpen, setTerminalOpen] = useState(false);
     const [activeTerminalServer, setActiveTerminalServer] = useState<Server | null>(null);
     const [terminalSessionID, setTerminalSessionID] = useState<string | null>(null);
     const [isMaximized, setIsMaximized] = useState(false);
+
+    const [metrics, setMetrics] = useState<{ [key: string]: any }>({});
 
     const fetchServers = async (searchOverride?: string, filtersOverride?: { [key: string]: string }) => {
         setIsLoading(true);
@@ -100,6 +107,20 @@ const ServerPage = () => {
         }
     };
 
+    const fetchMetrics = async () => {
+        for (const server of servers) {
+            try {
+                const response = await apiFetch(`${API_BASE_URL}/servers/${server.id}/metrics`);
+                if (response.ok) {
+                    const data = await response.json();
+                    setMetrics(prev => ({ ...prev, [server.id]: data }));
+                }
+            } catch (error) {
+                console.error(`Failed to fetch metrics for server ${server.id}:`, error);
+            }
+        }
+    };
+
     const fetchVpns = async (search?: string) => {
         try {
             let url = `${API_BASE_URL}/vpns?limit=20`;
@@ -110,7 +131,6 @@ const ServerPage = () => {
                 return;
             }
             const data = await response.json();
-            // Handle pagination wrapper if present, otherwise assume array
             const vpnItems = data.items || data || [];
             if (Array.isArray(vpnItems)) {
                 setVpns(vpnItems);
@@ -130,6 +150,14 @@ const ServerPage = () => {
     useEffect(() => {
         fetchServers();
     }, [offset, limit]);
+
+    useEffect(() => {
+        if (servers.length > 0) {
+            fetchMetrics();
+            const interval = setInterval(fetchMetrics, 10000);
+            return () => clearInterval(interval);
+        }
+    }, [servers]);
 
     const handleApplyFilter = (search: string, filters: { [key: string]: any }) => {
         setSearchTerm(search);
@@ -189,15 +217,23 @@ const ServerPage = () => {
         }
     };
 
-    const handleDeleteServer = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this server?')) return;
+    const handleDeleteServer = (server: Server) => {
+        setDeleteTarget(server);
+    };
+
+    const confirmDeleteServer = async () => {
+        if (!deleteTarget) return;
+        setIsDeleting(true);
         try {
-            await apiFetch(`${API_BASE_URL}/servers/${id}`, {
+            await apiFetch(`${API_BASE_URL}/servers/${deleteTarget.id}`, {
                 method: 'DELETE'
             });
             fetchServers();
         } catch (error) {
             console.error('Failed to delete server:', error);
+        } finally {
+            setIsDeleting(false);
+            setDeleteTarget(null);
         }
     };
 
@@ -220,8 +256,6 @@ const ServerPage = () => {
             console.error('Failed to start terminal session:', error);
         }
     };
-
-
 
     const filteredServers = servers.filter(s => {
         const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -318,9 +352,9 @@ const ServerPage = () => {
                     <TableHeader>
                         <TableRow className="bg-muted hover:bg-muted/80 border-border">
                             <TableHead className="px-6 h-12 font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Managed Host</TableHead>
+                            <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Status / Health</TableHead>
                             <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Authentication</TableHead>
                             <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Endpoint</TableHead>
-                            <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Created By</TableHead>
                             <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground text-right px-6">Operations</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -343,42 +377,65 @@ const ServerPage = () => {
                                                 {server.description || 'No description provided'}
                                             </p>
                                         </div>
-
                                     </div>
                                 </TableCell>
                                 <TableCell>
-                                    <div className="flex items-center gap-2">
-                                        {server.auth_type === 'PASSWORD' ? (
-                                            <Shield className="w-3.5 h-3.5 text-amber-500" />
+                                    <div className="flex flex-col gap-2 min-w-[140px]">
+                                        {metrics[server.id] ? (
+                                            <>
+                                                <div className="flex flex-col gap-1">
+                                                    <div className="flex justify-between items-center text-[8px] font-black uppercase tracking-widest text-muted-foreground/60">
+                                                        <span>CPU</span>
+                                                        <span>{Math.round(metrics[server.id].cpu_usage)}%</span>
+                                                    </div>
+                                                    <div className="h-1 w-full bg-muted/40 rounded-full overflow-hidden">
+                                                        <div
+                                                            className={cn(
+                                                                "h-full transition-all duration-500",
+                                                                metrics[server.id].cpu_usage > 80 ? "bg-red-500" : metrics[server.id].cpu_usage > 50 ? "bg-amber-500" : "bg-emerald-500"
+                                                            )}
+                                                            style={{ width: `${metrics[server.id].cpu_usage}%` }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-col gap-1">
+                                                    <div className="flex justify-between items-center text-[8px] font-black uppercase tracking-widest text-muted-foreground/60">
+                                                        <span>RAM</span>
+                                                        <span>{Math.round(metrics[server.id].ram_usage)}%</span>
+                                                    </div>
+                                                    <div className="h-1 w-full bg-muted/40 rounded-full overflow-hidden">
+                                                        <div
+                                                            className={cn(
+                                                                "h-full transition-all duration-500",
+                                                                metrics[server.id].ram_usage > 80 ? "bg-red-500" : metrics[server.id].ram_usage > 60 ? "bg-amber-500" : "bg-emerald-500"
+                                                            )}
+                                                            style={{ width: `${metrics[server.id].ram_usage}%` }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-1.5 mt-0.5">
+                                                    <CheckCircle2 className="w-2.5 h-2.5 text-emerald-500" />
+                                                    <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/80">{metrics[server.id].uptime}</span>
+                                                </div>
+                                            </>
                                         ) : (
-                                            <Key className="w-3.5 h-3.5 text-indigo-500" />
-                                        )}
-                                        <span className="text-[11px] font-bold uppercase tracking-widest">
-                                            {server.auth_type} ({server.user})
-                                        </span>
-                                    </div>
-                                </TableCell>
-                                <TableCell className="font-mono text-[11px] text-muted-foreground tracking-tight">
-                                    <div className="flex flex-col gap-1">
-                                        <span>{server.host}:{server.port}</span>
-                                        {server.vpn_id && (
-                                            <span className="text-[9px] text-primary/70 font-bold uppercase tracking-widest flex items-center gap-1">
-                                                <Network className="w-3 h-3" /> via {server.vpn?.name || 'VPN'}
-                                            </span>
+                                            <div className="flex items-center gap-2 animate-pulse">
+                                                <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30" />
+                                                <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/30 italic">Syncing Health...</span>
+                                            </div>
                                         )}
                                     </div>
                                 </TableCell>
                                 <TableCell>
-                                    {server.created_by_username ? (
-                                        <div className="flex items-center gap-1.5">
-                                            <div className="h-5 w-5 rounded-full bg-primary/20 flex items-center justify-center text-[8px] font-black text-primary uppercase shrink-0">
-                                                {server.created_by_username[0]}
-                                            </div>
-                                            <span className="text-[10px] font-semibold text-muted-foreground">{server.created_by_username}</span>
-                                        </div>
-                                    ) : (
-                                        <span className="text-[10px] text-muted-foreground/40 italic">—</span>
-                                    )}
+                                    <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg border-muted-foreground/20 bg-muted/50">
+                                        {server.auth_type}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell>
+                                    <div className="flex flex-col">
+                                        <span className="text-[11px] font-black tracking-tight">{server.host}</span>
+                                        <span className="text-[9px] font-bold text-muted-foreground">Port {server.port}</span>
+                                    </div>
                                 </TableCell>
                                 <TableCell className="text-right px-6">
                                     <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0">
@@ -403,18 +460,17 @@ const ServerPage = () => {
                                             variant="ghost"
                                             size="icon"
                                             disabled={server.id === LOCAL_SERVER_ID}
-                                            onClick={() => handleDeleteServer(server.id)}
+                                            onClick={() => handleDeleteServer(server)}
                                             className="h-8 w-8 rounded-lg hover:bg-destructive/10 hover:text-destructive disabled:opacity-30"
                                         >
                                             <Trash2 className="w-3.5 h-3.5" />
                                         </Button>
-
                                     </div>
                                 </TableCell>
                             </TableRow>
                         )) : (
                             <TableRow>
-                                <TableCell colSpan={4} className="h-32 text-center text-muted-foreground/40 font-black uppercase tracking-[0.2em] text-[10px]">
+                                <TableCell colSpan={5} className="h-32 text-center text-muted-foreground/40 font-black uppercase tracking-[0.2em] text-[10px]">
                                     {isLoading ? 'Synchronizing Node Records...' : 'No Hosts Registered in Fleet'}
                                 </TableCell>
                             </TableRow>
@@ -501,7 +557,7 @@ const ServerPage = () => {
                                     { label: 'SSH PASSWORD', value: 'PASSWORD' },
                                     { label: 'PUBLIC KEY (RSA/ED25519)', value: 'PUBLIC_KEY' }
                                 ]}
-                                value={formData.auth_type}
+                                value={formData.auth_type || "PASSWORD"}
                                 onValueChange={(val) => setFormData({ ...formData, auth_type: val as 'PASSWORD' | 'PUBLIC_KEY' })}
                                 triggerClassName="col-span-3 text-xs font-bold bg-background border-border"
                             />
@@ -634,7 +690,7 @@ const ServerPage = () => {
                     Fleet Management v2.1.0 • ANTIGRAVITY ENGINE
                 </p>
             </div>
-        </div>
+        </div >
     );
 };
 

@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/user/csm-backend/internal/domain"
 	"gorm.io/gorm"
@@ -58,12 +60,16 @@ func (r *PostgresWorkflowRepo) List(namespaceID uuid.UUID, scope *domain.Permiss
 	return wfs, nil
 }
 
-func (r *PostgresWorkflowRepo) ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, tagIDs []uuid.UUID, scope *domain.PermissionScope) ([]domain.Workflow, int64, error) {
+func (r *PostgresWorkflowRepo) ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, tagIDs []uuid.UUID, isTemplate *bool, scope *domain.PermissionScope) ([]domain.Workflow, int64, error) {
 	var wfs []domain.Workflow
 	var total int64
 
 	db := applyScope(r.db, scope, "workflow_tags", "workflow_id")
 	db = db.Model(&domain.Workflow{}).Where("namespace_id = ?", namespaceID)
+
+	if isTemplate != nil {
+		db = db.Where("is_template = ?", *isTemplate)
+	}
 
 	if searchTerm != "" {
 		db = db.Where("name ILIKE ? OR description ILIKE ?", "%"+searchTerm+"%", "%"+searchTerm+"%")
@@ -96,12 +102,16 @@ func (r *PostgresWorkflowRepo) ListPaginated(namespaceID uuid.UUID, limit, offse
 	return wfs, total, err
 }
 
-func (r *PostgresWorkflowRepo) ListGlobalPaginated(limit, offset int, searchTerm string, scope *domain.PermissionScope) ([]domain.Workflow, int64, error) {
+func (r *PostgresWorkflowRepo) ListGlobalPaginated(limit, offset int, searchTerm string, isTemplate *bool, scope *domain.PermissionScope) ([]domain.Workflow, int64, error) {
 	var wfs []domain.Workflow
 	var total int64
 
 	db := applyScope(r.db, scope, "workflow_tags", "workflow_id")
 	db = db.Model(&domain.Workflow{})
+
+	if isTemplate != nil {
+		db = db.Where("is_template = ?", *isTemplate)
+	}
 
 	if searchTerm != "" {
 		db = db.Where("name ILIKE ? OR description ILIKE ?", "%"+searchTerm+"%", "%"+searchTerm+"%")
@@ -493,4 +503,26 @@ func (r *PostgresWorkflowExecutionRepo) Update(exec *domain.WorkflowExecution) e
 
 func (r *PostgresWorkflowExecutionRepo) CreateStepResult(stepExec *domain.WorkflowExecutionStep) error {
 	return r.db.Save(stepExec).Error // Use Save to handle both Create and Update
+}
+
+func (r *PostgresWorkflowExecutionRepo) GetExecutionAnalytics(namespaceID uuid.UUID, days int, scope *domain.PermissionScope) ([]map[string]interface{}, error) {
+	var results []map[string]interface{}
+
+	startDate := time.Now().AddDate(0, 0, -days)
+
+	db := r.db.Table("workflow_executions").
+		Select("DATE(workflow_executions.created_at) as date, COUNT(CASE WHEN workflow_executions.status = 'SUCCESS' THEN 1 END) as success, COUNT(CASE WHEN workflow_executions.status = 'FAILED' THEN 1 END) as failed").
+		Joins("JOIN workflows ON workflows.id = workflow_executions.workflow_id").
+		Where("workflows.namespace_id = ?", namespaceID).
+		Where("workflow_executions.created_at >= ?", startDate)
+
+	if scope != nil && !scope.IsGlobal {
+		db = db.Where("workflows.namespace_id IN ? OR workflow_executions.workflow_id IN ?", scope.AllowedNamespaceIDs, scope.AllowedItemIDs)
+	}
+
+	err := db.Group("DATE(workflow_executions.created_at)").
+		Order("date ASC").
+		Scan(&results).Error
+
+	return results, err
 }

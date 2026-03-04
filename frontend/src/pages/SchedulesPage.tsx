@@ -20,9 +20,9 @@ import { useNamespace } from '../context/NamespaceContext';
 import { API_BASE_URL } from '../lib/api';
 import { Schedule, Workflow, WorkflowInput, Tag } from '../types';
 import { TagSelector } from '../components/TagSelector';
-import { TagFilter } from '../components/TagFilter';
 import { Pagination } from '../components/Pagination';
 import { ResourceFilters } from '../components/ResourceFilters';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 import {
     Dialog,
@@ -80,6 +80,10 @@ const SchedulesPage = () => {
     const [workflowSearch, setWorkflowSearch] = useState('');
 
     const [total, setTotal] = useState(0);
+
+    // Delete state
+    const [deleteTarget, setDeleteTarget] = useState<Schedule | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const [availableTags, setAvailableTags] = useState<Tag[]>([]);
 
@@ -184,10 +188,15 @@ const SchedulesPage = () => {
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this schedule?')) return;
+    const handleDelete = (schedule: Schedule) => {
+        setDeleteTarget(schedule);
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteTarget) return;
+        setIsDeleting(true);
         try {
-            const response = await apiFetch(`${API_BASE_URL}/schedules/${id}`, {
+            const response = await apiFetch(`${API_BASE_URL}/schedules/${deleteTarget.id}`, {
                 method: 'DELETE'
             });
             if (response.ok) {
@@ -195,6 +204,9 @@ const SchedulesPage = () => {
             }
         } catch (error) {
             console.error('Failed to delete schedule:', error);
+        } finally {
+            setIsDeleting(false);
+            setDeleteTarget(null);
         }
     };
 
@@ -512,70 +524,80 @@ const SchedulesPage = () => {
                     </DialogContent>
                 </Dialog>
 
-                <ResourceFilters
-                    searchTerm={searchTerm}
-                    onSearchChange={setSearchTerm}
-                    onApply={handleApplyFilter}
-                    filters={{ tags: appliedTagIds }}
-                    filterConfigs={[
-                        {
-                            key: 'tags',
-                            placeholder: 'Tags',
-                            type: 'multi',
-                            isSearchable: true,
-                            onSearch: (query) => {
-                                apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace?.id}/tags?search=${encodeURIComponent(query)}`)
-                                    .then(res => res.json())
-                                    .then(data => {
-                                        setAvailableTags(data.items || (Array.isArray(data) ? data : []));
-                                    })
-                                    .catch(err => console.error('Failed to search tags:', err));
-                            },
-                            options: availableTags.map(t => ({ label: t.name, value: t.id }))
-                        }
-                    ]}
-                    searchPlaceholder="Search schedules..."
-                    isLoading={isLoading}
-                    primaryAction={
-                        <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1 bg-muted/40 rounded-xl p-1 border border-border">
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setViewMode('list')}
-                                    className={cn(
-                                        "h-8 px-3 rounded-lg gap-1.5 text-[9px] font-black uppercase tracking-widest transition-all",
-                                        viewMode === 'list' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
-                                    )}
-                                >
-                                    <LayoutList className="w-3.5 h-3.5" /> List
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setViewMode('calendar')}
-                                    className={cn(
-                                        "h-8 px-3 rounded-lg gap-1.5 text-[9px] font-black uppercase tracking-widest transition-all",
-                                        viewMode === 'calendar' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
-                                    )}
-                                >
-                                    <CalendarDays className="w-3.5 h-3.5" /> Calendar
-                                </Button>
-                            </div>
-                            <Button
-                                onClick={() => {
-                                    setIsEditing(false);
-                                    setEditingID(null);
-                                    setFormData({ name: '', type: 'ONE_TIME', cron_expression: '', next_run_at: '', status: 'ACTIVE', retries: 0, workflows: [], hooks: [], tags: [] });
-                                    setIsCreateOpen(true);
-                                }}
-                                className="h-9 px-4 rounded-xl premium-gradient text-[10px] font-black uppercase tracking-widest shadow-premium transition-all active:scale-95 gap-2"
-                            >
-                                <Plus className="w-4 h-4" /> New Schedule
-                            </Button>
-                        </div>
-                    }
+                <ConfirmDialog
+                    isOpen={!!deleteTarget}
+                    onClose={() => setDeleteTarget(null)}
+                    onConfirm={confirmDelete}
+                    title="Delete Schedule"
+                    description={`Are you sure you want to delete the schedule "${deleteTarget?.name}"? Any recurring automation associated with this will stop.`}
+                    confirmText="Delete Schedule"
+                    variant="danger"
+                    isLoading={isDeleting}
                 />
+
+                <div className="flex flex-col gap-4">
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="flex bg-muted p-1 rounded-xl border border-border/50">
+                            <button
+                                onClick={() => setViewMode('list')}
+                                className={cn(
+                                    "px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-2",
+                                    viewMode === 'list' ? "bg-card text-primary shadow-sm border border-border/50" : "text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                <LayoutList className={cn("w-3 h-3", viewMode === 'list' ? "text-primary" : "text-muted-foreground")} />
+                                List View
+                            </button>
+                            <button
+                                onClick={() => setViewMode('calendar')}
+                                className={cn(
+                                    "px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all gap-2 flex items-center",
+                                    viewMode === 'calendar' ? "bg-card text-primary shadow-sm border border-border/50" : "text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                <CalendarDays className={cn("w-3 h-3", viewMode === 'calendar' ? "text-primary" : "text-muted-foreground")} />
+                                Calendar View
+                            </button>
+                        </div>
+                        <Button
+                            onClick={() => {
+                                setIsEditing(false);
+                                setEditingID(null);
+                                setFormData({ name: '', type: 'ONE_TIME', cron_expression: '', next_run_at: '', status: 'ACTIVE', retries: 0, workflows: [], hooks: [], tags: [] });
+                                setIsCreateOpen(true);
+                            }}
+                            className="h-9 px-4 rounded-xl premium-gradient text-[10px] font-black uppercase tracking-widest shadow-premium transition-all active:scale-95 gap-2"
+                        >
+                            <Plus className="w-4 h-4" /> New Schedule
+                        </Button>
+                    </div>
+
+                    <ResourceFilters
+                        searchTerm={searchTerm}
+                        onSearchChange={setSearchTerm}
+                        onApply={handleApplyFilter}
+                        filters={{ tags: appliedTagIds }}
+                        filterConfigs={[
+                            {
+                                key: 'tags',
+                                placeholder: 'Tags',
+                                type: 'multi',
+                                isSearchable: true,
+                                onSearch: (query) => {
+                                    apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace?.id}/tags?search=${encodeURIComponent(query)}`)
+                                        .then(res => res.json())
+                                        .then(data => {
+                                            setAvailableTags(data.items || (Array.isArray(data) ? data : []));
+                                        })
+                                        .catch(err => console.error('Failed to search tags:', err));
+                                },
+                                options: availableTags.map(t => ({ label: t.name, value: t.id }))
+                            }
+                        ]}
+                        searchPlaceholder="Search schedules..."
+                        isLoading={isLoading}
+                    />
+                </div>
 
                 <div className="mt-4">
                     {viewMode === 'calendar' ? (
@@ -750,7 +772,7 @@ const SchedulesPage = () => {
                                                         variant="ghost"
                                                         size="icon"
                                                         className="rounded-xl hover:bg-destructive/10 hover:text-destructive transition-colors text-zinc-400"
-                                                        onClick={() => handleDelete(s.id)}
+                                                        onClick={() => handleDelete(s)}
                                                     >
                                                         <Trash2 className="w-4 h-4" />
                                                     </Button>

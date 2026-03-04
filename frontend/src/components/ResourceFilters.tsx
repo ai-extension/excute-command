@@ -84,7 +84,7 @@ export const ResourceFilters: React.FC<ResourceFiltersProps> = ({
                         isSearchable={config.isSearchable}
                         onSearch={config.onSearch}
                         type={config.type}
-                        width={config.width}
+                        width={config.width || "w-48"}
                         triggerClassName={cn(
                             "h-9 flex items-center gap-2 px-3 rounded-lg border font-black uppercase tracking-wider text-[10px] transition-all shrink-0",
                             isFiltered(config)

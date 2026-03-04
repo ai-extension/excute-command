@@ -189,13 +189,16 @@ func main() {
 			protected.DELETE("/servers/:id", middleware.RBACMiddleware(userRepo, "servers", "DELETE"), serverHandler.DeleteServer)
 			protected.POST("/servers/:id/execute", middleware.RBACMiddleware(userRepo, "servers", "EXECUTE"), serverHandler.ExecuteCommand)
 			protected.POST("/servers/:id/terminal", middleware.RBACMiddleware(userRepo, "servers", "EXECUTE"), serverHandler.StartTerminalSession)
+			protected.GET("/servers/:id/metrics", middleware.RBACMiddleware(userRepo, "servers", "READ"), serverHandler.GetServerMetrics)
 
 			protected.GET("/namespaces/:ns_id/workflows", middleware.RBACMiddleware(userRepo, "workflows", "READ"), workflowHandler.ListWorkflows)
 			protected.POST("/namespaces/:ns_id/workflows", middleware.RBACMiddleware(userRepo, "workflows", "WRITE"), workflowHandler.CreateWorkflow)
+			protected.GET("/namespaces/:ns_id/analytics/executions", middleware.RBACMiddleware(userRepo, "workflows", "READ"), workflowHandler.GetExecutionAnalytics)
 			protected.GET("/namespaces/:ns_id/executions", middleware.RBACMiddleware(userRepo, "history", "READ"), workflowHandler.ListAllExecutions)
 			protected.GET("/workflows/:id", middleware.RBACMiddleware(userRepo, "workflows", "READ"), workflowHandler.GetWorkflow)
 			protected.PUT("/workflows/:id", middleware.RBACMiddleware(userRepo, "workflows", "WRITE"), workflowHandler.UpdateWorkflow)
 			protected.POST("/workflows/:id/run", middleware.RBACMiddleware(userRepo, "workflows", "EXECUTE"), workflowHandler.RunWorkflow)
+			protected.POST("/workflows/:id/clone", middleware.RBACMiddleware(userRepo, "workflows", "WRITE"), workflowHandler.CloneWorkflow)
 			protected.POST("/workflow-groups", middleware.RBACMiddleware(userRepo, "workflows", "WRITE"), workflowHandler.CreateGroup)
 			protected.POST("/workflow-steps", middleware.RBACMiddleware(userRepo, "workflows", "WRITE"), workflowHandler.CreateStep)
 

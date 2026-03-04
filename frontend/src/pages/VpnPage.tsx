@@ -26,6 +26,7 @@ import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../lib/api';
 import { VpnConfig } from '../types';
 import { Pagination } from '../components/Pagination';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 const VpnPage = () => {
     const { apiFetch } = useAuth();
@@ -37,6 +38,10 @@ const VpnPage = () => {
     const [authTypeFilter, setAuthTypeFilter] = useState<string>('ALL');
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingVpn, setEditingVpn] = useState<VpnConfig | null>(null);
+
+    // Delete VPN state
+    const [deleteTarget, setDeleteTarget] = useState<VpnConfig | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
     const [formData, setFormData] = useState<Partial<VpnConfig>>({
         name: '',
         description: '',
@@ -141,15 +146,23 @@ const VpnPage = () => {
         }
     };
 
-    const handleDeleteVpn = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this VPN configuration?')) return;
+    const handleDeleteVpn = (vpn: VpnConfig) => {
+        setDeleteTarget(vpn);
+    };
+
+    const confirmDeleteVpn = async () => {
+        if (!deleteTarget) return;
+        setIsDeleting(true);
         try {
-            await apiFetch(`${API_BASE_URL}/vpns/${id}`, {
+            await apiFetch(`${API_BASE_URL}/vpns/${deleteTarget.id}`, {
                 method: 'DELETE'
             });
             fetchVpns();
         } catch (error) {
             console.error('Failed to delete VPN config:', error);
+        } finally {
+            setIsDeleting(false);
+            setDeleteTarget(null);
         }
     };
 
@@ -293,7 +306,7 @@ const VpnPage = () => {
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            onClick={() => handleDeleteVpn(vpn.id)}
+                                            onClick={() => handleDeleteVpn(vpn)}
                                             className="h-8 w-8 rounded-lg hover:bg-destructive/10 hover:text-destructive"
                                         >
                                             <Trash2 className="w-3.5 h-3.5" />
@@ -421,6 +434,16 @@ const VpnPage = () => {
                 </DialogContent>
             </Dialog>
 
+            <ConfirmDialog
+                isOpen={!!deleteTarget}
+                onClose={() => setDeleteTarget(null)}
+                onConfirm={confirmDeleteVpn}
+                title="Delete VPN Configuration"
+                description={`Are you sure you want to delete the VPN config "${deleteTarget?.name}"?`}
+                confirmText="Delete Config"
+                variant="danger"
+                isLoading={isDeleting}
+            />
         </div>
     );
 };

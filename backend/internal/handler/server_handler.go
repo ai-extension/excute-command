@@ -159,3 +159,23 @@ func (h *ServerHandler) StartTerminalSession(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"session_id": sessionID})
 }
+
+func (h *ServerHandler) GetServerMetrics(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	userVal, _ := c.Get("user")
+	user := userVal.(*domain.User)
+
+	metrics, err := h.service.GetServerMetrics(id, user)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, metrics)
+}

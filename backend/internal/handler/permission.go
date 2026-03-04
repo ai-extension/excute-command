@@ -125,7 +125,7 @@ func (h *PermissionHandler) ListResourceItems(c *gin.Context) {
 			items = filtered[start:end]
 		}
 	case "workflows":
-		items, total, err = h.workflowRepo.ListGlobalPaginated(limit, offset, searchTerm, &scope)
+		items, total, err = h.workflowRepo.ListGlobalPaginated(limit, offset, searchTerm, nil, &scope)
 	case "variables", "global-variables":
 		items, total, err = h.globalVarRepo.ListGlobalPaginated(limit, offset, searchTerm, &scope)
 	case "schedules":

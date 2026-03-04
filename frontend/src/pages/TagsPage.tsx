@@ -18,6 +18,7 @@ import { API_BASE_URL } from '../lib/api';
 import { Tag } from '../types';
 import { Pagination } from '../components/Pagination';
 import { ResourceFilters } from '../components/ResourceFilters';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 import {
     Dialog,
@@ -40,6 +41,10 @@ const TagsPage = () => {
     const [selectedTag, setSelectedTag] = useState<Tag | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Delete tag state
+    const [deleteTarget, setDeleteTarget] = useState<Tag | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const [total, setTotal] = useState(0);
     const [limit, setLimit] = useState(20);
@@ -123,10 +128,15 @@ const TagsPage = () => {
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this tag?')) return;
+    const handleDelete = (tag: Tag) => {
+        setDeleteTarget(tag);
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteTarget) return;
+        setIsDeleting(true);
         try {
-            const response = await apiFetch(`${API_BASE_URL}/tags/${id}`, {
+            const response = await apiFetch(`${API_BASE_URL}/tags/${deleteTarget.id}`, {
                 method: 'DELETE'
             });
             if (response.ok) {
@@ -134,6 +144,9 @@ const TagsPage = () => {
             }
         } catch (error) {
             console.error('Failed to delete tag:', error);
+        } finally {
+            setIsDeleting(false);
+            setDeleteTarget(null);
         }
     };
 
@@ -296,7 +309,7 @@ const TagsPage = () => {
                                             variant="ghost"
                                             size="icon"
                                             className="h-10 w-10 rounded-xl hover:bg-destructive/10 hover:text-destructive transition-colors"
-                                            onClick={() => handleDelete(t.id)}
+                                            onClick={() => handleDelete(t)}
                                         >
                                             <Trash2 className="w-4 h-4" />
                                         </Button>
@@ -384,6 +397,17 @@ const TagsPage = () => {
                     </form>
                 </DialogContent>
             </Dialog>
+
+            <ConfirmDialog
+                isOpen={!!deleteTarget}
+                onClose={() => setDeleteTarget(null)}
+                onConfirm={confirmDelete}
+                title="Delete Tag"
+                description={`Are you sure you want to delete the tag "${deleteTarget?.name}"?`}
+                confirmText="Delete Tag"
+                variant="danger"
+                isLoading={isDeleting}
+            />
         </div>
     );
 };

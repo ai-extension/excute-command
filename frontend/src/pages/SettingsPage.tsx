@@ -20,6 +20,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNamespace } from '../context/NamespaceContext';
 import { API_BASE_URL } from '../lib/api';
 import { cn } from '../lib/utils';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import {
     Dialog,
     DialogContent,
@@ -39,6 +40,10 @@ const SettingsPage = () => {
     const [selectedNamespace, setSelectedNamespace] = useState<any>(null);
     const [formData, setFormData] = useState({ name: '', description: '' });
     const [error, setError] = useState('');
+
+    // Delete state
+    const [deleteTarget, setDeleteTarget] = useState<any>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -89,11 +94,16 @@ const SettingsPage = () => {
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (!window.confirm('Are you sure you want to delete this namespace? All associated data will be lost.')) return;
+    const handleDelete = (ns: any) => {
+        setDeleteTarget(ns);
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteTarget) return;
+        setIsDeleting(true);
 
         try {
-            const response = await apiFetch(`${API_BASE_URL}/namespaces/${id}`, {
+            const response = await apiFetch(`${API_BASE_URL}/namespaces/${deleteTarget.id}`, {
                 method: 'DELETE'
             });
             if (response.ok) {
@@ -104,6 +114,9 @@ const SettingsPage = () => {
             }
         } catch (err) {
             alert('An error occurred');
+        } finally {
+            setIsDeleting(false);
+            setDeleteTarget(null);
         }
     };
 
@@ -209,7 +222,7 @@ const SettingsPage = () => {
                                                     (ns.name === "Default" || namespaces.length <= 1) ? "opacity-30 cursor-not-allowed" : "text-destructive hover:bg-destructive/10"
                                                 )}
                                                 disabled={ns.name === "Default" || namespaces.length <= 1}
-                                                onClick={() => handleDelete(ns.id)}
+                                                onClick={() => handleDelete(ns)}
                                             >
                                                 <Trash2 className="w-3 h-3" /> Terminate
                                             </Button>
@@ -318,6 +331,17 @@ const SettingsPage = () => {
                     </form>
                 </DialogContent>
             </Dialog>
+
+            <ConfirmDialog
+                isOpen={!!deleteTarget}
+                onClose={() => setDeleteTarget(null)}
+                onConfirm={confirmDelete}
+                title="Terminate Namespace"
+                description={`Are you sure you want to delete the namespace "${deleteTarget?.name}"? All associated data, flows, and records will be permanently lost.`}
+                confirmText="Confirm Termination"
+                variant="danger"
+                isLoading={isDeleting}
+            />
         </div>
     );
 };

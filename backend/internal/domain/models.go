@@ -125,6 +125,13 @@ type Server struct {
 	UpdatedAt          time.Time  `json:"updated_at"`
 }
 
+type ServerMetrics struct {
+	CPUUsage  float64 `json:"cpu_usage"`
+	RAMUsage  float64 `json:"ram_usage"`
+	DiskUsage float64 `json:"disk_usage"`
+	Uptime    string  `json:"uptime"`
+}
+
 type ServerRepository interface {
 	Create(server *Server) error
 	GetByID(id uuid.UUID, scope *PermissionScope) (*Server, error)
@@ -188,6 +195,8 @@ type Workflow struct {
 	Description       string             `json:"description"`
 	DefaultServerID   uuid.UUID          `json:"default_server_id,omitempty" gorm:"type:uuid"`
 	Status            Status             `json:"status"`
+	IsTemplate        bool               `json:"is_template" gorm:"default:false"`
+	TriggerSource     string             `json:"trigger_source,omitempty" gorm:"size:50"` // For templates or specific defaults
 	Inputs            []WorkflowInput    `json:"inputs,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Variables         []WorkflowVariable `json:"variables,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Groups            []WorkflowGroup    `json:"groups,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
@@ -362,8 +371,8 @@ type WorkflowRepository interface {
 	Create(wf *Workflow) error
 	GetByID(id uuid.UUID, scope *PermissionScope) (*Workflow, error)
 	List(namespaceID uuid.UUID, scope *PermissionScope) ([]Workflow, error)
-	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, tagIDs []uuid.UUID, scope *PermissionScope) ([]Workflow, int64, error)
-	ListGlobalPaginated(limit, offset int, searchTerm string, scope *PermissionScope) ([]Workflow, int64, error)
+	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, tagIDs []uuid.UUID, isTemplate *bool, scope *PermissionScope) ([]Workflow, int64, error)
+	ListGlobalPaginated(limit, offset int, searchTerm string, isTemplate *bool, scope *PermissionScope) ([]Workflow, int64, error)
 	Update(wf *Workflow) error
 	Delete(id uuid.UUID) error
 }
@@ -407,6 +416,7 @@ type WorkflowExecutionRepository interface {
 	ListByScheduledID(scheduledID uuid.UUID, scope *PermissionScope) ([]WorkflowExecution, error)
 	Update(exec *WorkflowExecution) error
 	CreateStepResult(stepExec *WorkflowExecutionStep) error
+	GetExecutionAnalytics(namespaceID uuid.UUID, days int, scope *PermissionScope) ([]map[string]interface{}, error)
 }
 
 type GlobalVariableRepository interface {

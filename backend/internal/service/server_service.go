@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/pkg/sftp"
@@ -384,4 +385,40 @@ func (s *ServerService) copyFileLocally(localPath, remotePath string) error {
 	}
 
 	return nil
+}
+
+func (s *ServerService) GetServerMetrics(id uuid.UUID, user *domain.User) (*domain.ServerMetrics, error) {
+	// Standard monitoring command for Linux
+	// CPU: load avg or custom awk
+	// RAM: free -m
+	// Disk: df
+	// Uptime: uptime -p
+	monitorCmd := `
+		cpu=$(top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1}')
+		ram=$(free -m | awk 'NR==2{printf "%.2f", $3*100/$2 }')
+		disk=$(df -h / | awk 'NR==2{print $5}' | sed 's/%//')
+		uptime=$(uptime -p)
+		echo "$cpu|$ram|$disk|$uptime"
+	`
+
+	output, err := s.ExecuteCommand(id, monitorCmd, user)
+	if err != nil {
+		return nil, err
+	}
+
+	parts := strings.Split(strings.TrimSpace(output), "|")
+	if len(parts) < 4 {
+		return nil, fmt.Errorf("unexpected metrics format: %s", output)
+	}
+
+	cpu, _ := strconv.ParseFloat(parts[0], 64)
+	ram, _ := strconv.ParseFloat(parts[1], 64)
+	disk, _ := strconv.ParseFloat(parts[2], 64)
+
+	return &domain.ServerMetrics{
+		CPUUsage:  cpu,
+		RAMUsage:  ram,
+		DiskUsage: disk,
+		Uptime:    parts[3],
+	}, nil
 }

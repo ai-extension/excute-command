@@ -46,6 +46,7 @@ const WorkflowDesignerPage = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [openSettingsGroupIdx, setOpenSettingsGroupIdx] = useState<number | null>(null);
+    const [isTemplate, setIsTemplate] = useState(false);
 
     useEffect(() => {
         const fetchServers = async () => {
@@ -92,6 +93,7 @@ const WorkflowDesignerPage = () => {
                 setTargetFolder(data.target_folder || '');
                 setCleanupFiles(!!data.cleanup_files);
                 setTags(data.tags || []);
+                setIsTemplate(!!data.is_template);
 
                 const cleanGroups = (data.groups || []).map((g: any) => {
                     const cleanedGroup = { ...g };
@@ -147,6 +149,7 @@ const WorkflowDesignerPage = () => {
                 default_server_id: defaultServerId || undefined,
                 target_folder: targetFolder,
                 cleanup_files: cleanupFiles,
+                is_template: isTemplate,
                 namespace_id: activeNamespace.id,
                 tags,
                 inputs: inputs.filter(i => i.key?.trim()),
@@ -456,6 +459,23 @@ const WorkflowDesignerPage = () => {
                                                                 Individual steps can still override this setting in the Blueprint tab.
                                                             </p>
                                                         </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Template Section */}
+                                                <div className="col-span-12 space-y-4 border-t border-border/50 pt-4">
+                                                    <div className="flex items-center gap-3 mb-2">
+                                                        <div className="p-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-500">
+                                                            <Layers className="w-4 h-4" />
+                                                        </div>
+                                                        <h2 className="text-sm font-bold text-foreground uppercase tracking-tight">Template Status</h2>
+                                                    </div>
+                                                    <div className="bg-card p-6 rounded-xl border border-border flex items-center justify-between">
+                                                        <div className="space-y-1 w-3/4">
+                                                            <h3 className="text-[12px] font-black uppercase tracking-widest text-primary">Library Template</h3>
+                                                            <p className="text-[10px] text-muted-foreground font-medium">Enable this option to publish this workflow into the Template Library. This allows other users across namespaces to clone it as a starting point for their own automations.</p>
+                                                        </div>
+                                                        <Switch checked={isTemplate} onCheckedChange={setIsTemplate} />
                                                     </div>
                                                 </div>
                                             </div>

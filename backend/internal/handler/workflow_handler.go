@@ -58,10 +58,16 @@ func (h *WorkflowHandler) ListWorkflows(c *gin.Context) {
 		}
 	}
 
+	var isTemplate *bool
+	if t := c.Query("is_template"); t != "" {
+		val := t == "true"
+		isTemplate = &val
+	}
+
 	currentUser, _ := c.Get("user")
 	user, _ := currentUser.(*domain.User)
 
-	wfs, total, err := h.service.ListWorkflowsPaginated(nsID, limit, offset, searchTerm, tagIDs, user)
+	wfs, total, err := h.service.ListWorkflowsPaginated(nsID, limit, offset, searchTerm, tagIDs, isTemplate, user)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -450,4 +456,58 @@ func (h *WorkflowHandler) GetExecutionLogs(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusNotFound, gin.H{"error": "log file not found"})
+}
+
+func (h *WorkflowHandler) GetExecutionAnalytics(c *gin.Context) {
+	nsIDStr := c.Param("ns_id")
+	nsID, err := uuid.Parse(nsIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid namespace id"})
+		return
+	}
+
+	days := 7
+	if d := c.Query("days"); d != "" {
+		if v, err := strconv.Atoi(d); err == nil && v > 0 {
+			days = v
+		}
+	}
+
+	userVal, _ := c.Get("user")
+	user := userVal.(*domain.User)
+
+	data, err := h.service.GetExecutionAnalytics(nsID, days, user)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, data)
+}
+
+func (h *WorkflowHandler) CloneWorkflow(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid workflow id"})
+		return
+	}
+
+	var req struct {
+		TargetNamespaceID uuid.UUID `json:"target_namespace_id"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid target namespace id"})
+		return
+	}
+
+	userVal, _ := c.Get("user")
+	user := userVal.(*domain.User)
+
+	clone, err := h.service.CloneWorkflow(id, req.TargetNamespaceID, user)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, clone)
 }

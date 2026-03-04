@@ -4,6 +4,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Switch } from '../components/ui/switch';
 import { WorkflowFile } from '../types';
+import { ConfirmDialog } from './ConfirmDialog';
 
 import { useAuth } from '../context/AuthContext';
 
@@ -23,6 +24,10 @@ export const WorkflowFilesTab: React.FC<WorkflowFilesTabProps> = ({ workflowId, 
     const [isLoading, setIsLoading] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Delete state
+    const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const fetchFiles = async () => {
         if (!workflowId) return;
@@ -82,19 +87,27 @@ export const WorkflowFilesTab: React.FC<WorkflowFilesTabProps> = ({ workflowId, 
         }
     };
 
-    const handleDelete = async (fileId: string) => {
-        if (!confirm('Are you sure you want to delete this file?')) return;
+    const handleDelete = (fileId: string) => {
+        setDeleteTargetId(fileId);
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteTargetId) return;
+        setIsDeleting(true);
 
         try {
-            const response = await apiFetch(`${API_BASE_URL}/workflow-files/${fileId}`, {
+            const response = await apiFetch(`${API_BASE_URL}/workflow-files/${deleteTargetId}`, {
                 method: 'DELETE'
             });
 
             if (!response.ok) throw new Error('Failed to delete file');
 
-            setFiles(files.filter(f => f.id !== fileId));
+            setFiles(files.filter(f => f.id !== deleteTargetId));
         } catch (error: any) {
             alert(error.message || 'An error occurred');
+        } finally {
+            setIsDeleting(false);
+            setDeleteTargetId(null);
         }
     };
 
@@ -249,6 +262,17 @@ export const WorkflowFilesTab: React.FC<WorkflowFilesTabProps> = ({ workflowId, 
                     </div>
                 )}
             </div>
+
+            <ConfirmDialog
+                isOpen={!!deleteTargetId}
+                onClose={() => setDeleteTargetId(null)}
+                onConfirm={confirmDelete}
+                title="Delete Workflow File"
+                description="Are you sure you want to delete this file? It will be permanently removed from the workflow metadata."
+                confirmText="Delete File"
+                variant="danger"
+                isLoading={isDeleting}
+            />
         </div>
     );
 };

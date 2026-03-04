@@ -83,9 +83,9 @@ func (s *WorkflowService) ListWorkflows(namespaceID uuid.UUID, user *domain.User
 	return s.repo.List(namespaceID, &scope)
 }
 
-func (s *WorkflowService) ListWorkflowsPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, tagIDs []uuid.UUID, user *domain.User) ([]domain.Workflow, int64, error) {
+func (s *WorkflowService) ListWorkflowsPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, tagIDs []uuid.UUID, isTemplate *bool, user *domain.User) ([]domain.Workflow, int64, error) {
 	scope := domain.GetPermissionScope(user, "workflows", "READ")
-	return s.repo.ListPaginated(namespaceID, limit, offset, searchTerm, tagIDs, &scope)
+	return s.repo.ListPaginated(namespaceID, limit, offset, searchTerm, tagIDs, isTemplate, &scope)
 }
 
 func (s *WorkflowService) UpdateWorkflow(wf *domain.Workflow, user *domain.User) error {
@@ -177,4 +177,69 @@ func (s *WorkflowService) CreateStep(step *domain.WorkflowStep) error {
 
 func (s *WorkflowService) CreateExecution(exec *domain.WorkflowExecution) error {
 	return s.execRepo.Create(exec)
+}
+
+func (s *WorkflowService) GetExecutionAnalytics(namespaceID uuid.UUID, days int, user *domain.User) ([]map[string]interface{}, error) {
+	scope := domain.GetPermissionScope(user, "workflows", "READ")
+	return s.execRepo.GetExecutionAnalytics(namespaceID, days, &scope)
+}
+
+func (s *WorkflowService) CloneWorkflow(id uuid.UUID, targetNamespaceID uuid.UUID, user *domain.User) (*domain.Workflow, error) {
+	scope := domain.GetPermissionScope(user, "workflows", "READ")
+	original, err := s.repo.GetByID(id, &scope)
+	if err != nil {
+		return nil, err
+	}
+
+	// Deep copy and reset IDs
+	clone := *original
+	clone.ID = uuid.New()
+	clone.NamespaceID = targetNamespaceID
+	clone.IsTemplate = false // Cloned item is a regular workflow by default
+	clone.Status = domain.StatusPending
+	if user != nil {
+		clone.CreatedBy = &user.ID
+		clone.CreatedByUsername = user.Username
+	}
+
+	// Clone Inputs
+	newInputs := make([]domain.WorkflowInput, len(original.Inputs))
+	for i, input := range original.Inputs {
+		newInputs[i] = input
+		newInputs[i].ID = uuid.New()
+		newInputs[i].WorkflowID = clone.ID
+	}
+	clone.Inputs = newInputs
+
+	// Clone Variables
+	newVars := make([]domain.WorkflowVariable, len(original.Variables))
+	for i, variable := range original.Variables {
+		newVars[i] = variable
+		newVars[i].ID = uuid.New()
+		newVars[i].WorkflowID = clone.ID
+	}
+	clone.Variables = newVars
+
+	// Clone Groups and Steps
+	newGroups := make([]domain.WorkflowGroup, len(original.Groups))
+	for i, group := range original.Groups {
+		newGroups[i] = group
+		newGroups[i].ID = uuid.New()
+		newGroups[i].WorkflowID = clone.ID
+
+		newSteps := make([]domain.WorkflowStep, len(group.Steps))
+		for j, step := range group.Steps {
+			newSteps[j] = step
+			newSteps[j].ID = uuid.New()
+			newSteps[j].GroupID = newGroups[i].ID
+		}
+		newGroups[i].Steps = newSteps
+	}
+	clone.Groups = newGroups
+
+	if err := s.repo.Create(&clone); err != nil {
+		return nil, err
+	}
+
+	return &clone, nil
 }

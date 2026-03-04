@@ -11,6 +11,7 @@ import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../lib/api';
 import { Pagination } from '../components/Pagination';
 import { ResourceFilters } from '../components/ResourceFilters';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 const PagesListPage = () => {
     const navigate = useNavigate();
@@ -26,6 +27,10 @@ const PagesListPage = () => {
 
     const [limit, setLimit] = useState(21);
     const [offset, setOffset] = useState(0);
+
+    // Delete state
+    const [deleteTarget, setDeleteTarget] = useState<Page | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const fetchPages = async () => {
         if (!activeNamespace) return;
@@ -91,18 +96,26 @@ const PagesListPage = () => {
         }
     };
 
-    const handleDeletePage = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this page?')) return;
+    const handleDeletePage = (page: Page) => {
+        setDeleteTarget(page);
+    };
+
+    const confirmDeletePage = async () => {
+        if (!deleteTarget) return;
+        setIsDeleting(true);
 
         try {
-            const response = await apiFetch(`${API_BASE_URL}/pages/${id}`, {
+            const response = await apiFetch(`${API_BASE_URL}/pages/${deleteTarget.id}`, {
                 method: 'DELETE'
             });
             if (response.ok) {
-                setPages(pages.filter(p => p.id !== id));
+                setPages(pages.filter(p => p.id !== deleteTarget.id));
             }
         } catch (error) {
             console.error('Failed to delete page:', error);
+        } finally {
+            setIsDeleting(false);
+            setDeleteTarget(null);
         }
     };
 
@@ -212,7 +225,7 @@ const PagesListPage = () => {
                                         <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => navigate(`/pages/${page.id}/edit`)}>
                                             <Edit2 className="w-4 h-4 text-muted-foreground" />
                                         </Button>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:text-destructive" onClick={() => handleDeletePage(page.id)}>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:text-destructive" onClick={() => handleDeletePage(page)}>
                                             <Trash2 className="w-4 h-4" />
                                         </Button>
                                     </div>
@@ -258,6 +271,17 @@ const PagesListPage = () => {
                     />
                 </div>
             )}
+
+            <ConfirmDialog
+                isOpen={!!deleteTarget}
+                onClose={() => setDeleteTarget(null)}
+                onConfirm={confirmDeletePage}
+                title="Delete Page"
+                description={`Are you sure you want to delete "${deleteTarget?.title}"? All design data and components will be permanently removed.`}
+                confirmText="Delete Page"
+                variant="danger"
+                isLoading={isDeleting}
+            />
         </div>
     );
 };
