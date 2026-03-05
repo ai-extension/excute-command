@@ -279,16 +279,20 @@ type WorkflowGroup struct {
 }
 
 type WorkflowStep struct {
-	ID          uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
-	GroupID     uuid.UUID `json:"group_id" gorm:"type:uuid;index"`
-	ServerID    uuid.UUID `json:"server_id,omitempty" gorm:"type:uuid"` // Optional: If empty, run locally
-	Name        string    `json:"name" gorm:"not null"`
-	CommandText string    `json:"command_text" gorm:"not null"`
-	Order       int       `json:"order"`
-	Status      Status    `json:"status"`
-	Output      string    `json:"output"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID                   uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey"`
+	GroupID              uuid.UUID  `json:"group_id" gorm:"type:uuid;index"`
+	ServerID             uuid.UUID  `json:"server_id,omitempty" gorm:"type:uuid"` // Optional: If empty, run locally
+	Name                 string     `json:"name" gorm:"not null"`
+	ActionType           string     `json:"action_type" gorm:"not null;default:'COMMAND'"` // COMMAND or WORKFLOW
+	CommandText          string     `json:"command_text"`
+	TargetWorkflowID     *uuid.UUID `json:"target_workflow_id,omitempty" gorm:"type:uuid"`
+	TargetWorkflowInputs string     `json:"target_workflow_inputs,omitempty"` // JSON string of inputs for the target workflow
+	WaitToFinish         bool       `json:"wait_to_finish" gorm:"default:true"`
+	Order                int        `json:"order"`
+	Status               Status     `json:"status"`
+	Output               string     `json:"output"`
+	CreatedAt            time.Time  `json:"created_at"`
+	UpdatedAt            time.Time  `json:"updated_at"`
 }
 
 type WorkflowInput struct {

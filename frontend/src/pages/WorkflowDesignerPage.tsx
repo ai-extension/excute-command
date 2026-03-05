@@ -1035,8 +1035,8 @@ const WorkflowDesignerPage = () => {
                                                                                                             <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center text-muted-foreground font-bold text-[10px] shrink-0 border border-border">
                                                                                                                 {sIdx + 1}
                                                                                                             </div>
-                                                                                                            <div className="flex-1 grid grid-cols-12 gap-4">
-                                                                                                                <div className="col-span-4 space-y-1">
+                                                                                                            <div className="flex-1 grid grid-cols-12 gap-3">
+                                                                                                                <div className="col-span-3 space-y-1">
                                                                                                                     <label className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Action Label</label>
                                                                                                                     <Input
                                                                                                                         value={step.name}
@@ -1048,19 +1048,104 @@ const WorkflowDesignerPage = () => {
                                                                                                                         className="bg-muted/50 border-border h-8 text-[11px] font-medium rounded-md px-2"
                                                                                                                     />
                                                                                                                 </div>
-                                                                                                                <div className="col-span-8 space-y-1">
-                                                                                                                    <label className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Execution Sequence</label>
-                                                                                                                    <Textarea
-                                                                                                                        value={step.command_text}
+                                                                                                                <div className="col-span-2 space-y-1">
+                                                                                                                    <label className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Type</label>
+                                                                                                                    <select
+                                                                                                                        value={step.action_type || 'COMMAND'}
                                                                                                                         onChange={(e) => {
                                                                                                                             const ng = [...groups];
-                                                                                                                            ng[gIdx]!.steps![sIdx].command_text = e.target.value;
+                                                                                                                            ng[gIdx]!.steps![sIdx].action_type = e.target.value as 'COMMAND' | 'WORKFLOW';
+                                                                                                                            if (e.target.value === 'COMMAND') {
+                                                                                                                                ng[gIdx]!.steps![sIdx].target_workflow_id = undefined;
+                                                                                                                                ng[gIdx]!.steps![sIdx].target_workflow_inputs = undefined;
+                                                                                                                            }
                                                                                                                             setGroups(ng);
                                                                                                                         }}
-                                                                                                                        className="bg-muted/50 border-border min-h-[40px] text-[11px] font-mono rounded-md px-2 py-2 resize-y"
-                                                                                                                        placeholder="Enter command sequence..."
-                                                                                                                    />
+                                                                                                                        className="h-8 px-2 w-full text-[11px] font-semibold border border-border rounded-md bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 cursor-pointer"
+                                                                                                                    >
+                                                                                                                        <option value="COMMAND">Command</option>
+                                                                                                                        <option value="WORKFLOW">Workflow</option>
+                                                                                                                    </select>
                                                                                                                 </div>
+                                                                                                                {(!step.action_type || step.action_type === 'COMMAND') ? (
+                                                                                                                    <div className="col-span-7 space-y-1">
+                                                                                                                        <label className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Execution Sequence</label>
+                                                                                                                        <Textarea
+                                                                                                                            value={step.command_text}
+                                                                                                                            onChange={(e) => {
+                                                                                                                                const ng = [...groups];
+                                                                                                                                ng[gIdx]!.steps![sIdx].command_text = e.target.value;
+                                                                                                                                setGroups(ng);
+                                                                                                                            }}
+                                                                                                                            className="bg-muted/50 border-border min-h-[40px] text-[11px] font-mono rounded-md px-2 py-2 resize-y"
+                                                                                                                            placeholder="Enter command sequence..."
+                                                                                                                        />
+                                                                                                                    </div>
+                                                                                                                ) : (
+                                                                                                                    <div className="col-span-7 space-y-2">
+                                                                                                                        <div className="space-y-1">
+                                                                                                                            <label className="text-[8px] font-bold uppercase tracking-widest text-indigo-500">Target Workflow</label>
+                                                                                                                            <select
+                                                                                                                                value={step.target_workflow_id || ''}
+                                                                                                                                onChange={(e) => {
+                                                                                                                                    const ng = [...groups];
+                                                                                                                                    ng[gIdx]!.steps![sIdx].target_workflow_id = e.target.value || undefined;
+                                                                                                                                    ng[gIdx]!.steps![sIdx].target_workflow_inputs = undefined;
+                                                                                                                                    setGroups(ng);
+                                                                                                                                }}
+                                                                                                                                className="h-8 px-2 w-full text-[11px] font-semibold border border-indigo-500/30 rounded-md bg-background text-foreground outline-none focus:ring-1 focus:ring-indigo-500/30 cursor-pointer"
+                                                                                                                            >
+                                                                                                                                <option value="">— Select workflow —</option>
+                                                                                                                                {allWorkflows.filter(w => w.id !== id).map(w => (
+                                                                                                                                    <option key={w.id} value={w.id}>{w.name}</option>
+                                                                                                                                ))}
+                                                                                                                            </select>
+                                                                                                                        </div>
+                                                                                                                        {/* Dynamic inputs for selected target workflow */}
+                                                                                                                        {(() => {
+                                                                                                                            const targetWf = allWorkflows.find(w => w.id === step.target_workflow_id);
+                                                                                                                            if (!targetWf?.inputs?.length) return null;
+                                                                                                                            const parsedInputs: Record<string, string> = (() => {
+                                                                                                                                try { return JSON.parse(step.target_workflow_inputs || '{}'); } catch { return {}; }
+                                                                                                                            })();
+                                                                                                                            return (
+                                                                                                                                <div className="space-y-1.5 bg-indigo-500/5 border border-indigo-500/20 rounded-lg p-3">
+                                                                                                                                    <label className="text-[8px] font-bold uppercase tracking-widest text-indigo-500">Workflow Inputs</label>
+                                                                                                                                    {targetWf.inputs.map(inp => (
+                                                                                                                                        <div key={inp.key} className="flex items-center gap-2">
+                                                                                                                                            <span className="text-[10px] font-mono text-muted-foreground w-24 truncate shrink-0">{inp.label || inp.key}</span>
+                                                                                                                                            <Input
+                                                                                                                                                value={parsedInputs[inp.key] || ''}
+                                                                                                                                                onChange={(e) => {
+                                                                                                                                                    const ng = [...groups];
+                                                                                                                                                    const updated = { ...parsedInputs, [inp.key]: e.target.value };
+                                                                                                                                                    ng[gIdx]!.steps![sIdx].target_workflow_inputs = JSON.stringify(updated);
+                                                                                                                                                    setGroups(ng);
+                                                                                                                                                }}
+                                                                                                                                                placeholder={`{{variable.x}} or value`}
+                                                                                                                                                className="h-7 text-[10px] font-mono border-indigo-500/20 bg-background flex-1"
+                                                                                                                                            />
+                                                                                                                                        </div>
+                                                                                                                                    ))}
+                                                                                                                                </div>
+                                                                                                                            );
+                                                                                                                        })()}
+                                                                                                                        <div className="flex items-center justify-between gap-2 pt-1">
+                                                                                                                            <div>
+                                                                                                                                <span className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Wait for completion</span>
+                                                                                                                                <p className="text-[8px] text-muted-foreground/50">Off = run asynchronously</p>
+                                                                                                                            </div>
+                                                                                                                            <Switch
+                                                                                                                                checked={step.wait_to_finish !== false}
+                                                                                                                                onCheckedChange={(checked) => {
+                                                                                                                                    const ng = [...groups];
+                                                                                                                                    ng[gIdx]!.steps![sIdx].wait_to_finish = checked;
+                                                                                                                                    setGroups(ng);
+                                                                                                                                }}
+                                                                                                                            />
+                                                                                                                        </div>
+                                                                                                                    </div>
+                                                                                                                )}
                                                                                                             </div>
                                                                                                             <Button
                                                                                                                 variant="ghost"
@@ -1195,8 +1280,9 @@ const WorkflowDesignerPage = () => {
                                 </p>
                             </div>
                         </>
-                    )}
-                </div>
+                    )
+                    }
+                </div >
             )
             }
         </WorkflowRunner >

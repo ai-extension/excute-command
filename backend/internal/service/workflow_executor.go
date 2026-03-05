@@ -700,80 +700,87 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 	e.hub.BroadcastLog(step.GroupID.String(), msg)
 	e.hub.BroadcastLog(workflowID.String(), msg)
 
-	if step.CommandText == "" {
-		emptyMsg := "\033[90m(No command to execute)\033[0m\n"
-		fmt.Fprint(mainLogFile, emptyMsg)
-		fmt.Fprint(stepLogFile, emptyMsg)
-		step.Status = domain.StatusSuccess
-		e.stepRepo.Update(step)
-		e.hub.BroadcastStatus(step.ID.String(), "step", string(domain.StatusSuccess))
-		return nil
-	}
 	var output string
 	var err error
 
-	// 1. Resolve variables using Pongo2
-	pcontext := e.getInterpolationContext(inputs, variables, groupResults, namespaceID, user)
-	command, err := e.renderTemplate(step.CommandText, pcontext)
-	if err != nil {
-		errMsg := fmt.Sprintf("\033[1;31m✖ Interpolation error: %v\033[0m\n", err)
-		fmt.Fprint(mainLogFile, errMsg)
-		fmt.Fprint(stepLogFile, errMsg)
-		return fmt.Errorf("interpolation error: %w", err)
-	}
-
-	targetServerID := step.ServerID
-	if targetServerID == uuid.Nil {
-		targetServerID = defaultServerID
-	}
-
-	// Persist CWD: Prepend directory restoration and append directory capture
-	cwdMarker := "::CWD::"
-	var startingDir string // Track where this step started
-	if targetServerID != uuid.Nil {
-		if val, ok := workingDirs.Load(targetServerID); ok {
-			startingDir = val.(string)
-			if startingDir != "" {
-				// Use curly braces for grouping in the same shell context.
-				// Note: Semicolon after the command is required before the closing brace.
-				command = fmt.Sprintf("cd %s && { %s; }", strconv.Quote(startingDir), command)
-			}
-		}
-		// Use -P to resolve physical path (essential for Mac/Unix symlink consistency)
-		command = fmt.Sprintf("%s; printf '%s' && pwd -P", command, cwdMarker)
-	}
-
-	if targetServerID != uuid.Nil {
-		// Run on remote server via ServerService with real-time streaming
-		var out bytes.Buffer
-
-		// Multi-writer for all destinations we want cleaned
-		mw := io.MultiWriter(
-			&wsWriter{hub: e.hub, targetID: step.ID.String(), buffer: &out},
-			&wsWriter{hub: e.hub, targetID: workflowID.String(), buffer: mainLogFile},
-			&fileWriter{file: stepLogFile},
-		)
-
-		// Filter out the CWD marker and capture the directory
-		filter := &cwdFilteredWriter{
-			underlying: mw,
-			marker:     cwdMarker,
-		}
-
-		_, err = e.serverService.ExecuteCommand(targetServerID, command, nil, filter) // Trusted: pass nil user
-		filter.Finalize()
-		output = out.String()
-		if filter.found {
-			newDir := filepath.Clean(strings.TrimSpace(filter.cwdBuffer.String()))
-			// Heuristic: only update the shared state if the directory actually changed.
-			// This prevents parallel "passive" steps from overwriting intentional directory changes.
-			if newDir != "" && newDir != filepath.Clean(startingDir) {
-				workingDirs.Store(targetServerID, newDir)
-			}
-		}
+	// Dispatch based on action type
+	if step.ActionType == "WORKFLOW" {
+		output, err = e.runWorkflowStep(ctx, step, inputs, variables, groupResults, namespaceID, mainLogFile, stepLogFile, workflowID, user)
 	} else {
-		// Run locally
-		output, err = e.runLocalStep(ctx, step, command, mainLogFile, stepLogFile, workflowID, workingDirs)
+		// Default: COMMAND action type
+		if step.CommandText == "" {
+			emptyMsg := "\033[90m(No command to execute)\033[0m\n"
+			fmt.Fprint(mainLogFile, emptyMsg)
+			fmt.Fprint(stepLogFile, emptyMsg)
+			step.Status = domain.StatusSuccess
+			e.stepRepo.Update(step)
+			e.hub.BroadcastStatus(step.ID.String(), "step", string(domain.StatusSuccess))
+			return nil
+		}
+
+		// 1. Resolve variables using Pongo2
+		pcontext := e.getInterpolationContext(inputs, variables, groupResults, namespaceID, user)
+		command, renderErr := e.renderTemplate(step.CommandText, pcontext)
+		if renderErr != nil {
+			errMsg := fmt.Sprintf("\033[1;31m✖ Interpolation error: %v\033[0m\n", renderErr)
+			fmt.Fprint(mainLogFile, errMsg)
+			fmt.Fprint(stepLogFile, errMsg)
+			return fmt.Errorf("interpolation error: %w", renderErr)
+		}
+
+		targetServerID := step.ServerID
+		if targetServerID == uuid.Nil {
+			targetServerID = defaultServerID
+		}
+
+		// Persist CWD: Prepend directory restoration and append directory capture
+		cwdMarker := "::CWD::"
+		var startingDir string // Track where this step started
+		if targetServerID != uuid.Nil {
+			if val, ok := workingDirs.Load(targetServerID); ok {
+				startingDir = val.(string)
+				if startingDir != "" {
+					// Use curly braces for grouping in the same shell context.
+					// Note: Semicolon after the command is required before the closing brace.
+					command = fmt.Sprintf("cd %s && { %s; }", strconv.Quote(startingDir), command)
+				}
+			}
+			// Use -P to resolve physical path (essential for Mac/Unix symlink consistency)
+			command = fmt.Sprintf("%s; printf '%s' && pwd -P", command, cwdMarker)
+		}
+
+		if targetServerID != uuid.Nil {
+			// Run on remote server via ServerService with real-time streaming
+			var out bytes.Buffer
+
+			// Multi-writer for all destinations we want cleaned
+			mw := io.MultiWriter(
+				&wsWriter{hub: e.hub, targetID: step.ID.String(), buffer: &out},
+				&wsWriter{hub: e.hub, targetID: workflowID.String(), buffer: mainLogFile},
+				&fileWriter{file: stepLogFile},
+			)
+
+			// Filter out the CWD marker and capture the directory
+			filter := &cwdFilteredWriter{
+				underlying: mw,
+				marker:     cwdMarker,
+			}
+
+			_, err = e.serverService.ExecuteCommand(targetServerID, command, nil, filter) // Trusted: pass nil user
+			filter.Finalize()
+			output = out.String()
+			if filter.found {
+				newDir := filepath.Clean(strings.TrimSpace(filter.cwdBuffer.String()))
+				// Heuristic: only update the shared state if the directory actually changed.
+				// This prevents parallel "passive" steps from overwriting intentional directory changes.
+				if newDir != "" && newDir != filepath.Clean(startingDir) {
+					workingDirs.Store(targetServerID, newDir)
+				}
+			}
+		} else {
+			// Run locally
+			output, err = e.runLocalStep(ctx, step, command, mainLogFile, stepLogFile, workflowID, workingDirs)
+		}
 	}
 
 	step.Output = output
@@ -795,6 +802,64 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 	e.execRepo.CreateStepResult(stepExec)
 
 	return e.stepRepo.Update(step)
+}
+
+// runWorkflowStep handles a step of action_type=WORKFLOW, running a target workflow either
+// synchronously (WaitToFinish=true) or asynchronously as a spawned goroutine.
+func (e *WorkflowExecutor) runWorkflowStep(ctx context.Context, step *domain.WorkflowStep, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, namespaceID uuid.UUID, mainLogFile *os.File, stepLogFile *os.File, workflowID uuid.UUID, user *domain.User) (string, error) {
+	if step.TargetWorkflowID == nil {
+		return "", fmt.Errorf("step %q has action_type=WORKFLOW but no target_workflow_id set", step.Name)
+	}
+
+	// Interpolate the target workflow inputs
+	var rawInputs map[string]string
+	if step.TargetWorkflowInputs != "" {
+		json.Unmarshal([]byte(step.TargetWorkflowInputs), &rawInputs)
+	}
+
+	// Interpolate each input value through the current workflow context
+	pcontext := e.getInterpolationContext(inputs, variables, groupResults, namespaceID, user)
+	resolvedInputs := make(map[string]string)
+	for k, v := range rawInputs {
+		rendered, err := e.renderTemplate(v, pcontext)
+		if err != nil {
+			rendered = v // fallback to raw value on error
+		}
+		resolvedInputs[k] = rendered
+	}
+
+	hookExecID := uuid.New()
+	logMsg := fmt.Sprintf("\033[1;34m↪ RUN WORKFLOW: %s\033[0m\n", step.TargetWorkflowID)
+	fmt.Fprint(mainLogFile, logMsg)
+	fmt.Fprint(stepLogFile, logMsg)
+	e.hub.BroadcastLog(workflowID.String(), logMsg)
+
+	if !step.WaitToFinish {
+		// Async: spawn the workflow and immediately return success
+		go func(targetID uuid.UUID, execID uuid.UUID, in map[string]string) {
+			bgCtx := context.Background()
+			err := e.RunWithDepth(bgCtx, targetID, execID, in, nil, nil, "STEP", 1, user)
+			if err != nil {
+				e.hub.BroadcastLog(workflowID.String(), fmt.Sprintf("\033[1;33m⚠ Async workflow %s failed: %v\033[0m", targetID, err))
+			} else {
+				e.hub.BroadcastLog(workflowID.String(), fmt.Sprintf("\033[1;32m✔ Async workflow %s succeeded\033[0m", targetID))
+			}
+		}(*step.TargetWorkflowID, hookExecID, resolvedInputs)
+		asyncMsg := "\033[90m⚡ Workflow spawned asynchronously, continuing...\033[0m\n"
+		fmt.Fprint(mainLogFile, asyncMsg)
+		fmt.Fprint(stepLogFile, asyncMsg)
+		return "async", nil
+	}
+
+	// Synchronous: wait for the target workflow to complete
+	err := e.RunWithDepth(ctx, *step.TargetWorkflowID, hookExecID, resolvedInputs, nil, nil, "STEP", 1, user)
+	if err != nil {
+		return "", fmt.Errorf("target workflow %s failed: %w", step.TargetWorkflowID, err)
+	}
+	successMsg := "\033[1;32m✔ Workflow step completed successfully\033[0m\n"
+	fmt.Fprint(mainLogFile, successMsg)
+	fmt.Fprint(stepLogFile, successMsg)
+	return "success", nil
 }
 
 func (e *WorkflowExecutor) runLocalStep(ctx context.Context, step *domain.WorkflowStep, command string, mainLogFile *os.File, stepLogFile *os.File, workflowID uuid.UUID, workingDirs *sync.Map) (string, error) {
