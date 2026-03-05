@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Database, Plus, Search, MoreHorizontal, Trash2, Edit3, Globe, Code, ChevronRight } from 'lucide-react';
+import { Database, Plus, Search, MoreHorizontal, Trash2, Edit3, Globe, Code, ChevronRight, Copy, Check } from 'lucide-react';
 
 import {
     Table,
@@ -45,6 +45,16 @@ const GlobalVariablesPage = () => {
     const [selectedVar, setSelectedVar] = useState<GlobalVariable | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [copiedId, setCopiedId] = useState<string | null>(null);
+
+    const copyToClipboard = (text: string, id: string) => {
+        navigator.clipboard.writeText(text).then(() => {
+            setCopiedId(id);
+            setTimeout(() => setCopiedId(null), 2000);
+        }).catch(err => {
+            console.error('Failed to copy text: ', err);
+        });
+    };
 
     // Delete state
     const [deleteTarget, setDeleteTarget] = useState<GlobalVariable | null>(null);
@@ -291,11 +301,26 @@ const GlobalVariablesPage = () => {
                                     </div>
                                 </TableCell>
                                 <TableCell>
-                                    <div className="flex items-center gap-1.5 group/code cursor-help">
-                                        <Code className="w-3.5 h-3.5 text-indigo-400 opacity-60" />
-                                        <span className="text-[10px] font-black text-indigo-400 tracking-wider">
-                                            {"{{"}global.{v.key}{"}}"}
-                                        </span>
+                                    <div className="flex items-center gap-2 group/copy">
+                                        <div className="flex items-center gap-1.5">
+                                            <Code className="w-3.5 h-3.5 text-indigo-400 opacity-60" />
+                                            <span className="text-[10px] font-black text-indigo-400 tracking-wider">
+                                                {"{{"}global.{v.key}{"}}"}
+                                            </span>
+                                        </div>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6 rounded-md hover:bg-indigo-500/10 hover:text-indigo-500 transition-all opacity-0 group-hover/copy:opacity-100"
+                                            onClick={() => copyToClipboard(`{{global.${v.key}}}`, v.id)}
+                                            title="Copy reference"
+                                        >
+                                            {copiedId === v.id ? (
+                                                <Check className="w-3 h-3 text-emerald-500" />
+                                            ) : (
+                                                <Copy className="w-3 h-3" />
+                                            )}
+                                        </Button>
                                     </div>
                                 </TableCell>
                                 <TableCell>

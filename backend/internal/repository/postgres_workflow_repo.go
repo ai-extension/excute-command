@@ -52,7 +52,7 @@ func (r *PostgresWorkflowRepo) List(namespaceID uuid.UUID, scope *domain.Permiss
 		Preload("Files").
 		Preload("Tags").
 		Where("namespace_id = ?", namespaceID).
-		Order("created_at DESC").
+		Order("workflows.created_at DESC").
 		Find(&wfs).Error
 	if err != nil {
 		return nil, err
@@ -94,7 +94,7 @@ func (r *PostgresWorkflowRepo) ListPaginated(namespaceID uuid.UUID, limit, offse
 		Preload("Hooks.TargetWorkflow").
 		Preload("Files").
 		Preload("Tags").
-		Order("created_at DESC").
+		Order("workflows.created_at DESC").
 		Limit(limit).
 		Offset(offset).
 		Find(&wfs).Error
@@ -132,7 +132,7 @@ func (r *PostgresWorkflowRepo) ListGlobalPaginated(limit, offset int, searchTerm
 		Preload("Hooks.TargetWorkflow").
 		Preload("Files").
 		Preload("Tags").
-		Order("created_at DESC").
+		Order("workflows.created_at DESC").
 		Limit(limit).
 		Offset(offset).
 		Find(&wfs).Error

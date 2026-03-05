@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
     Zap, Save, ChevronLeft, Layout,
     Settings as SettingsIcon, Layers, Server,
-    Plus, Terminal, Trash2, Clock, History, Database, SlidersHorizontal, ChevronDown, Play, GripVertical, File, AlertCircle
+    Plus, Terminal, Trash2, Clock, History, Database, SlidersHorizontal, ChevronDown, Play, GripVertical, File, AlertCircle,
+    Copy, Check
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -47,6 +48,13 @@ const WorkflowDesignerPage = () => {
     const [error, setError] = useState<string | null>(null);
     const [openSettingsGroupIdx, setOpenSettingsGroupIdx] = useState<number | null>(null);
     const [isTemplate, setIsTemplate] = useState(false);
+    const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+    const copyToClipboard = (text: string, key: string) => {
+        navigator.clipboard.writeText(text);
+        setCopiedKey(key);
+        setTimeout(() => setCopiedKey(null), 2000);
+    };
 
     useEffect(() => {
         const fetchServers = async () => {
@@ -506,7 +514,7 @@ const WorkflowDesignerPage = () => {
                                                         <div className="py-6 text-center opacity-40 select-none">
                                                             <Terminal className="w-8 h-8 mx-auto mb-3" />
                                                             <p className="text-[10px] font-bold uppercase tracking-widest">No runtime variables defined</p>
-                                                            <p className="text-[9px] mt-1 font-medium italic">Use runtime variables in your steps via {"{{key}}"}</p>
+                                                            <p className="text-[9px] mt-1 font-medium italic">Use runtime variables in your steps via {"{{input.key}}"}</p>
                                                         </div>
                                                     ) : (
                                                         <div className="space-y-4">
@@ -530,16 +538,27 @@ const WorkflowDesignerPage = () => {
                                                                             </div>
                                                                             <div className="space-y-1.5">
                                                                                 <label className="text-[8px] font-black uppercase tracking-widest text-primary">Variable Key</label>
-                                                                                <Input
-                                                                                    value={input.key}
-                                                                                    onChange={(e) => {
-                                                                                        const ni = [...inputs];
-                                                                                        ni[idx].key = e.target.value.replace(/[^a-zA-Z0-9_]/g, '');
-                                                                                        setInputs(ni);
-                                                                                    }}
-                                                                                    placeholder="e.g. app_node_version"
-                                                                                    className="h-8 text-[11px] font-mono border-border bg-background"
-                                                                                />
+                                                                                <div className="relative">
+                                                                                    <Input
+                                                                                        value={input.key}
+                                                                                        onChange={(e) => {
+                                                                                            const ni = [...inputs];
+                                                                                            ni[idx].key = e.target.value.replace(/[^a-zA-Z0-9_]/g, '');
+                                                                                            setInputs(ni);
+                                                                                        }}
+                                                                                        placeholder="e.g. app_node_version"
+                                                                                        className="h-8 text-[11px] font-mono border-border bg-background pr-8"
+                                                                                    />
+                                                                                    {input.key && (
+                                                                                        <button
+                                                                                            onClick={() => copyToClipboard(`{{input.${input.key}}}`, `input-${idx}`)}
+                                                                                            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-primary transition-colors"
+                                                                                            title="Copy as {{input.key}}"
+                                                                                        >
+                                                                                            {copiedKey === `input-${idx}` ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                                                                                        </button>
+                                                                                    )}
+                                                                                </div>
                                                                             </div>
                                                                         </div>
 
@@ -643,8 +662,17 @@ const WorkflowDesignerPage = () => {
                                                                                     setVariables(nv);
                                                                                 }}
                                                                                 placeholder="e.g. db_host"
-                                                                                className="h-8 text-[11px] font-mono border-border bg-background pl-5"
+                                                                                className="h-8 text-[11px] font-mono border-border bg-background pl-5 pr-8"
                                                                             />
+                                                                            {variable.key && (
+                                                                                <button
+                                                                                    onClick={() => copyToClipboard(`{{variable.${variable.key}}}`, `var-${idx}`)}
+                                                                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-emerald-500 transition-colors"
+                                                                                    title="Copy as {{variable.key}}"
+                                                                                >
+                                                                                    {copiedKey === `var-${idx}` ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                                                                                </button>
+                                                                            )}
                                                                         </div>
                                                                     </div>
                                                                     <div className="flex-[2] space-y-1.5">
@@ -682,7 +710,7 @@ const WorkflowDesignerPage = () => {
                                                         <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-tight">Static Variables vs Runtime Inputs</p>
                                                         <p className="text-[10px] text-muted-foreground leading-relaxed">
                                                             <strong>Static Variables</strong> are saved with the workflow and automatically injected at runtime using <code className="bg-emerald-500/10 px-1 rounded text-emerald-600">{"{{variable.key}}"}</code>.<br />
-                                                            <strong>Runtime Inputs</strong> prompt the user for values on each run and are used via <code className="bg-primary/10 px-1 rounded text-primary">{"{{key}}"}</code>.
+                                                            <strong>Runtime Inputs</strong> prompt the user for values on each run and are used via <code className="bg-primary/10 px-1 rounded text-primary">{"{{input.key}}"}</code>.
                                                         </p>
                                                     </div>
                                                 </div>

@@ -326,7 +326,7 @@ const WorkflowPage = () => {
                                             {!showTemplates && <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Status</TableHead>}
                                             <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Orchestration</TableHead>
                                             <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Created By</TableHead>
-                                            <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Last Updated</TableHead>
+                                            <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Created At</TableHead>
                                             <TableHead className="text-right h-12 px-6 font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Actions</TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -411,7 +411,7 @@ const WorkflowPage = () => {
                                                     )}
                                                 </TableCell>
                                                 <TableCell className="text-[11px] font-semibold text-muted-foreground/60 tracking-tight">
-                                                    {wf.updated_at ? new Date(wf.updated_at).toLocaleString() : 'Never'}
+                                                    {wf.created_at ? new Date(wf.created_at).toLocaleString() : 'Never'}
                                                 </TableCell>
                                                 <TableCell className="text-right px-8">
                                                     <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-4 group-hover:translate-x-0">
