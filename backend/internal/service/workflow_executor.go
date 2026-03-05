@@ -343,7 +343,7 @@ func (e *WorkflowExecutor) RunHooks(ctx context.Context, hooks []domain.Workflow
 			fmt.Fprintf(logFile, "\n\033[1;34m↪ TRIGGER HOOK: %s\033[0m\n", hookType)
 		}
 		if hook.WorkflowID != nil {
-			e.hub.BroadcastLog(hook.WorkflowID.String(), fmt.Sprintf("\033[1;34m↪ Hook: %s\033[0m", hookType))
+			e.hub.BroadcastLog(hook.WorkflowID.String(), fmt.Sprintf("\033[1;34m↪ Hook: %s (Running in background)\033[0m", hookType))
 		}
 
 		var hookInputs map[string]string
@@ -352,21 +352,22 @@ func (e *WorkflowExecutor) RunHooks(ctx context.Context, hooks []domain.Workflow
 		}
 
 		hookExecID := uuid.New()
-		err := e.RunWithDepth(ctx, hook.TargetWorkflowID, hookExecID, hookInputs, nil, nil, "HOOK", depth+1, user)
-		if err != nil {
-			errMsg := fmt.Sprintf("\033[1;33m⚠ Warning: %s hook failed (%v)\033[0m", hookType, err)
-			if logFile != nil {
-				fmt.Fprintf(logFile, "%s\n", errMsg)
+
+		// Run hook asynchronously so it doesn't block the progress of the workflow/schedule
+		go func(h domain.WorkflowHook, execID uuid.UUID, inputs map[string]string) {
+			bgCtx := context.Background()
+			err := e.RunWithDepth(bgCtx, h.TargetWorkflowID, execID, inputs, nil, nil, "HOOK", depth+1, user)
+			if err != nil {
+				errMsg := fmt.Sprintf("\033[1;33m⚠ Warning: %s hook failed (%v)\033[0m", hookType, err)
+				if h.WorkflowID != nil {
+					e.hub.BroadcastLog(h.WorkflowID.String(), errMsg)
+				}
+			} else {
+				if h.WorkflowID != nil {
+					e.hub.BroadcastLog(h.WorkflowID.String(), fmt.Sprintf("\033[1;32m✔ %s HOOK SUCCESS\033[0m", hookType))
+				}
 			}
-			if hook.WorkflowID != nil {
-				e.hub.BroadcastLog(hook.WorkflowID.String(), errMsg)
-			}
-			// Don't return error to let the main workflow continue
-			continue
-		}
-		if logFile != nil {
-			fmt.Fprintf(logFile, "\033[1;32m✔ HOOK SUCCESS\033[0m\n\n")
-		}
+		}(hook, hookExecID, hookInputs)
 	}
 	return nil
 }

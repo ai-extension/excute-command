@@ -185,6 +185,16 @@ const PublicPageView = () => {
 
     const [completionAlert, setCompletionAlert] = useState<{ show: boolean, status: string, message: string } | null>(null);
 
+    // Auto-close completion alert
+    useEffect(() => {
+        if (completionAlert?.show) {
+            const timer = setTimeout(() => {
+                setCompletionAlert(null);
+            }, 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [completionAlert]);
+
     // Logs Polling
     useEffect(() => {
         if (!activeExecutionId || !isAuthorized) return;
@@ -219,9 +229,6 @@ const PublicPageView = () => {
                                 status: newStatus,
                                 message: newStatus === 'SUCCESS' ? 'Workflow executed successfully!' : 'Workflow execution failed.'
                             });
-                            setTimeout(() => {
-                                if (isMounted) setCompletionAlert(null);
-                            }, 5000);
                         }
                     }
                 }
@@ -282,12 +289,29 @@ const PublicPageView = () => {
                     setExecutionStatus('RUNNING');
                     setIsPollingLogs(true);
                     setTerminalState('normal');
+                } else {
+                    // Show alert immediately if not tracking logs
+                    setCompletionAlert({
+                        show: true,
+                        status: 'SUCCESS',
+                        message: 'Workflow executed successfully!'
+                    });
                 }
             } else {
                 setExecutionResults(prev => ({ ...prev, [widget.id]: { success: false, message: data.error || 'FAILED' } }));
+                setCompletionAlert({
+                    show: true,
+                    status: 'FAILED',
+                    message: `Execution failed: ${data.error || 'Unknown error'}`
+                });
             }
         } catch (err) {
             setExecutionResults(prev => ({ ...prev, [widget.id]: { success: false, message: 'ERROR' } }));
+            setCompletionAlert({
+                show: true,
+                status: 'FAILED',
+                message: 'Error connecting to server.'
+            });
         } finally {
             setRunningWidgets(prev => ({ ...prev, [widget.id]: false }));
             setTimeout(() => {
