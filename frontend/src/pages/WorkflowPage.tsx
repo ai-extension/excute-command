@@ -20,11 +20,12 @@ import {
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
+import { SearchableSelect } from '../components/SearchableSelect';
 import { cn } from '../lib/utils';
 import { useNamespace } from '../context/NamespaceContext';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../lib/api';
-import { Workflow, Tag } from '../types';
+import { Workflow, Tag, Server as ServerType } from '../types';
 import WorkflowRunner from '../components/WorkflowRunner';
 import { TagSelector } from '../components/TagSelector';
 import { Pagination } from '../components/Pagination';
@@ -52,6 +53,8 @@ const WorkflowPage = () => {
     const [newWorkflowName, setNewWorkflowName] = useState('');
     const [newWorkflowDescription, setNewWorkflowDescription] = useState('');
     const [newWorkflowTags, setNewWorkflowTags] = useState<Tag[]>([]);
+    const [newWorkflowDefaultServerId, setNewWorkflowDefaultServerId] = useState<string>('');
+    const [availableServers, setAvailableServers] = useState<ServerType[]>([]);
     const [isCreating, setIsCreating] = useState(false);
 
     // Clone workflow state
@@ -96,6 +99,43 @@ const WorkflowPage = () => {
         }
     };
 
+    const fetchServers = async (query?: string) => {
+        try {
+            let url = `${API_BASE_URL}/servers?limit=20`;
+            if (query) url += `&search=${encodeURIComponent(query)}`;
+            const response = await apiFetch(url);
+            if (!response.ok) throw new Error(`Servers fetch failed: ${response.status}`);
+            const data = await response.json();
+            const items = data.items || (Array.isArray(data) ? data : []);
+
+            setAvailableServers(prev => {
+                const existing = new Map(prev.map(s => [s.id, s]));
+                items.forEach((s: ServerType) => existing.set(s.id, s));
+                return Array.from(existing.values());
+            });
+        } catch (error) {
+            console.error('Failed to fetch servers:', error);
+        }
+    };
+
+    const handleSearchServers = async (query: string) => {
+        try {
+            const url = `${API_BASE_URL}/servers?limit=50&search=${encodeURIComponent(query)}`;
+            const response = await apiFetch(url);
+            if (!response.ok) throw new Error(`Search failed: ${response.status}`);
+            const data = await response.json();
+            const items = data.items || (Array.isArray(data) ? data : []);
+
+            setAvailableServers(prev => {
+                const existing = new Map(prev.map(s => [s.id, s]));
+                items.forEach((s: ServerType) => existing.set(s.id, s));
+                return Array.from(existing.values());
+            });
+        } catch (error) {
+            console.error('Failed to search servers:', error);
+        }
+    };
+
     const handleCreateWorkflow = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!activeNamespace || !newWorkflowName.trim()) return;
@@ -111,6 +151,7 @@ const WorkflowPage = () => {
                     name: newWorkflowName,
                     description: newWorkflowDescription,
                     tags: newWorkflowTags,
+                    default_server_id: newWorkflowDefaultServerId || undefined,
                     status: 'active',
                 }),
             });
@@ -121,6 +162,7 @@ const WorkflowPage = () => {
                 setNewWorkflowName('');
                 setNewWorkflowDescription('');
                 setNewWorkflowTags([]);
+                setNewWorkflowDefaultServerId('');
                 navigate(`/workflows/${data.id}/edit`);
             } else {
                 const error = await response.json();
@@ -176,6 +218,7 @@ const WorkflowPage = () => {
         if (activeNamespace) {
             fetchWorkflows();
             fetchTags();
+            fetchServers();
         }
     }, [activeNamespace, limit, offset, searchTerm, selectedTagIds, showTemplates]);
 
@@ -269,6 +312,22 @@ const WorkflowPage = () => {
                                                     <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Organize Tags</label>
                                                     <TagSelector selectedTags={newWorkflowTags} onChange={setNewWorkflowTags} />
                                                 </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-bold uppercase tracking-widest text-primary">Default Target Resource (Mandatory)</label>
+                                                    <SearchableSelect
+                                                        options={availableServers.map(s => ({
+                                                            label: `${s.name} (${s.host})`,
+                                                            value: s.id,
+                                                            searchTerms: `${s.name} ${s.host} ${s.description || ''}`
+                                                        }))}
+                                                        value={newWorkflowDefaultServerId}
+                                                        onValueChange={(val) => setNewWorkflowDefaultServerId(val)}
+                                                        onSearch={handleSearchServers}
+                                                        placeholder="— Select target resource —"
+                                                        isSearchable={true}
+                                                        triggerClassName="h-10 text-sm"
+                                                    />
+                                                </div>
                                                 <DialogFooter className="pt-4">
                                                     <Button
                                                         type="button"
@@ -280,7 +339,7 @@ const WorkflowPage = () => {
                                                     </Button>
                                                     <Button
                                                         type="submit"
-                                                        disabled={!newWorkflowName.trim() || isCreating}
+                                                        disabled={!newWorkflowName.trim() || !newWorkflowDefaultServerId || isCreating}
                                                         className="h-9 text-[10px] font-bold uppercase tracking-widest px-6 premium-gradient"
                                                     >
                                                         {isCreating ? 'Creating...' : 'Initialize Pipeline'}

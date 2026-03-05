@@ -33,7 +33,6 @@ export interface Server {
     private_key?: string;
     vpn_id?: string;
     vpn?: VpnConfig;
-    tags?: Tag[];
     created_by?: string;
     created_by_username?: string;
     created_at: string;

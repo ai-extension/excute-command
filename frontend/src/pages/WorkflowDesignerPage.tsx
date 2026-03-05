@@ -65,7 +65,6 @@ const WorkflowDesignerPage = () => {
             if (!response.ok) throw new Error(`Search failed: ${response.status}`);
             const data = await response.json();
             const items = data.items || (Array.isArray(data) ? data : []);
-            console.log(`Server search for "${query}" returned ${items.length} items`);
 
             setAvailableServers(prev => {
                 // Preserve all current servers that are already in the list
@@ -528,11 +527,7 @@ const WorkflowDesignerPage = () => {
                                                         <div className="max-w-md space-y-1.5">
                                                             <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Default Target Resource</label>
                                                             <SearchableSelect
-                                                                options={availableServers.map(s => ({
-                                                                    label: `${s.name} (${s.host})`,
-                                                                    value: s.id,
-                                                                    searchTerms: `${s.name} ${s.host} ${s.description || ''} ${s.tags?.map(t => t.name).join(' ') || ''}`
-                                                                }))}
+                                                                options={availableServers.map(s => ({ label: `${s.name} (${s.host})`, value: s.id }))}
                                                                 value={defaultServerId || ''}
                                                                 onValueChange={(val) => setDefaultServerId(val || undefined)}
                                                                 onSearch={handleSearchServers}
@@ -968,11 +963,7 @@ const WorkflowDesignerPage = () => {
                                                                                                             <div className="space-y-2">
                                                                                                                 <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Server Override <span className="text-muted-foreground/50 normal-case font-medium">— run all steps on this server</span></label>
                                                                                                                 <SearchableSelect
-                                                                                                                    options={availableServers.map(s => ({
-                                                                                                                        label: `${s.name} (${s.host})`,
-                                                                                                                        value: s.id,
-                                                                                                                        searchTerms: `${s.name} ${s.host} ${s.description || ''} ${s.tags?.map(t => t.name).join(' ') || ''}`
-                                                                                                                    }))}
+                                                                                                                    options={availableServers.map(s => ({ label: `${s.name} (${s.host})`, value: s.id }))}
                                                                                                                     value={group.default_server_id || ''}
                                                                                                                     onValueChange={(val) => {
                                                                                                                         const ng = [...groups];
@@ -1030,11 +1021,7 @@ const WorkflowDesignerPage = () => {
                                                                                                                             <div className="space-y-2">
                                                                                                                                 <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Target Server</label>
                                                                                                                                 <SearchableSelect
-                                                                                                                                    options={availableServers.map(s => ({
-                                                                                                                                        label: `${s.name} (${s.host})`,
-                                                                                                                                        value: s.id,
-                                                                                                                                        searchTerms: `${s.name} ${s.host} ${s.description || ''} ${s.tags?.map(t => t.name).join(' ') || ''}`
-                                                                                                                                    }))}
+                                                                                                                                    options={availableServers.map(s => ({ label: `${s.name} (${s.host})`, value: s.id }))}
                                                                                                                                     value={group.copy_target_server_id || ''}
                                                                                                                                     onValueChange={(val) => {
                                                                                                                                         const ng = [...groups];
@@ -1155,11 +1142,7 @@ const WorkflowDesignerPage = () => {
                                                                                                                         <div className="col-span-3 space-y-1">
                                                                                                                             <label className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Target Resource</label>
                                                                                                                             <SearchableSelect
-                                                                                                                                options={availableServers.map(s => ({
-                                                                                                                                    label: `${s.name} (${s.host})`,
-                                                                                                                                    value: s.id,
-                                                                                                                                    searchTerms: `${s.name} ${s.host} ${s.description || ''} ${s.tags?.map(t => t.name).join(' ') || ''}`
-                                                                                                                                }))}
+                                                                                                                                options={availableServers.map(s => ({ label: `${s.name} (${s.host})`, value: s.id }))}
                                                                                                                                 value={step.server_id || ''}
                                                                                                                                 onValueChange={(val) => {
                                                                                                                                     const ng = [...groups];
