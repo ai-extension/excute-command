@@ -225,9 +225,9 @@ const GlobalVariablesPage = () => {
                                 </div>
                                 <div className="space-y-2">
                                     <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Value</Label>
-                                    <Input
-                                        placeholder="e.g. https://api.example.com"
-                                        className="h-12 bg-muted/30 border-border rounded-xl font-medium"
+                                    <Textarea
+                                        placeholder="Enter variable value... supports multi-line"
+                                        className="min-h-[100px] bg-muted/30 border-border rounded-xl font-medium resize-y"
                                         value={formData.value}
                                         onChange={(e) => setFormData({ ...formData, value: e.target.value })}
                                         required
@@ -410,9 +410,9 @@ const GlobalVariablesPage = () => {
                         </div>
                         <div className="space-y-2">
                             <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">New Value</Label>
-                            <Input
+                            <Textarea
                                 placeholder="Value..."
-                                className="h-12 bg-muted/30 border-border rounded-xl font-medium"
+                                className="min-h-[100px] bg-muted/30 border-border rounded-xl font-medium resize-y"
                                 value={formData.value}
                                 onChange={(e) => setFormData({ ...formData, value: e.target.value })}
                                 required

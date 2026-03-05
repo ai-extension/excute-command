@@ -635,21 +635,33 @@ const WorkflowDesignerPage = () => {
                                                                                 <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">
                                                                                     {input.type === 'select' ? 'Options (comma-separated)' : 'Default Value'}
                                                                                 </label>
-                                                                                <Input
-                                                                                    type={input.type === 'number' ? 'number' : 'text'}
-                                                                                    value={input.default_value}
-                                                                                    onChange={(e) => {
-                                                                                        const ni = [...inputs];
-                                                                                        ni[idx].default_value = e.target.value;
-                                                                                        setInputs(ni);
-                                                                                    }}
-                                                                                    placeholder={
-                                                                                        input.type === 'number' ? '0'
-                                                                                            : input.type === 'select' ? 'option1, option2, option3'
-                                                                                                : 'default text...'
-                                                                                    }
-                                                                                    className="h-8 text-[11px] border-border bg-background"
-                                                                                />
+                                                                                {input.type === 'input' ? (
+                                                                                    <Textarea
+                                                                                        value={input.default_value}
+                                                                                        onChange={(e) => {
+                                                                                            const ni = [...inputs];
+                                                                                            ni[idx].default_value = e.target.value;
+                                                                                            setInputs(ni);
+                                                                                        }}
+                                                                                        placeholder="Default text... supports multi-line"
+                                                                                        className="min-h-[60px] text-[11px] border-border bg-background resize-y"
+                                                                                    />
+                                                                                ) : (
+                                                                                    <Input
+                                                                                        type={input.type === 'number' ? 'number' : 'text'}
+                                                                                        value={input.default_value}
+                                                                                        onChange={(e) => {
+                                                                                            const ni = [...inputs];
+                                                                                            ni[idx].default_value = e.target.value;
+                                                                                            setInputs(ni);
+                                                                                        }}
+                                                                                        placeholder={
+                                                                                            input.type === 'number' ? '0'
+                                                                                                : 'option1, option2, option3'
+                                                                                        }
+                                                                                        className="h-8 text-[11px] border-border bg-background"
+                                                                                    />
+                                                                                )}
                                                                             </div>
                                                                         </div>
 
@@ -705,53 +717,61 @@ const WorkflowDesignerPage = () => {
                                                     ) : (
                                                         <div className="space-y-3">
                                                             {variables.map((variable, idx) => (
-                                                                <div key={idx} className="flex items-end gap-3 p-4 bg-background/50 rounded-lg border border-border/50 animate-in fade-in slide-in-from-bottom-1 duration-300">
-                                                                    <div className="flex-1 space-y-1.5">
-                                                                        <label className="text-[8px] font-black uppercase tracking-widest text-emerald-500">Variable Key</label>
-                                                                        <div className="relative">
-                                                                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-muted-foreground/60 font-mono select-none">$</span>
-                                                                            <Input
-                                                                                value={variable.key}
+                                                                <div key={idx} className="p-4 bg-background/50 rounded-xl border border-border/50 animate-in fade-in slide-in-from-bottom-1 duration-300">
+                                                                    <div className="grid grid-cols-12 gap-4 items-start">
+                                                                        <div className="col-span-4 space-y-1.5">
+                                                                            <label className="text-[8px] font-black uppercase tracking-widest text-emerald-500">Variable Key</label>
+                                                                            <div className="relative">
+                                                                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-muted-foreground/60 font-mono select-none">$</span>
+                                                                                <Input
+                                                                                    value={variable.key}
+                                                                                    onChange={(e) => {
+                                                                                        const nv = [...variables];
+                                                                                        nv[idx].key = e.target.value.replace(/[^a-zA-Z0-9_]/g, '');
+                                                                                        setVariables(nv);
+                                                                                    }}
+                                                                                    placeholder="e.g. host"
+                                                                                    className="h-8 text-[11px] font-mono border-border bg-background pl-5 pr-8"
+                                                                                />
+                                                                                {variable.key && (
+                                                                                    <button
+                                                                                        onClick={() => copyToClipboard(`{{variable.${variable.key}}}`, `var-${idx}`)}
+                                                                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-emerald-500 transition-colors"
+                                                                                        title="Copy as {{variable.key}}"
+                                                                                    >
+                                                                                        {copiedKey === `var-${idx}` ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                                                                                    </button>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="col-span-7 space-y-1.5">
+                                                                            <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Value</label>
+                                                                            <Textarea
+                                                                                value={variable.value}
                                                                                 onChange={(e) => {
                                                                                     const nv = [...variables];
-                                                                                    nv[idx].key = e.target.value.replace(/[^a-zA-Z0-9_]/g, '');
+                                                                                    nv[idx].value = e.target.value;
                                                                                     setVariables(nv);
                                                                                 }}
-                                                                                placeholder="e.g. db_host"
-                                                                                className="h-8 text-[11px] font-mono border-border bg-background pl-5 pr-8"
+                                                                                placeholder="Static value..."
+                                                                                className="min-h-[32px] h-8 text-[11px] border-border bg-background font-mono resize-y py-1"
                                                                             />
-                                                                            {variable.key && (
-                                                                                <button
-                                                                                    onClick={() => copyToClipboard(`{{variable.${variable.key}}}`, `var-${idx}`)}
-                                                                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-emerald-500 transition-colors"
-                                                                                    title="Copy as {{variable.key}}"
-                                                                                >
-                                                                                    {copiedKey === `var-${idx}` ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                                                                                </button>
-                                                                            )}
+                                                                        </div>
+                                                                        <div className="col-span-1 flex justify-end items-start pt-5">
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                size="icon"
+                                                                                className="h-8 w-8 text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                                                                                onClick={() => {
+                                                                                    const nv = variables.filter((_, i) => i !== idx);
+                                                                                    setVariables(nv);
+                                                                                }}
+                                                                                title="Delete variable"
+                                                                            >
+                                                                                <Trash2 className="w-4 h-4" />
+                                                                            </Button>
                                                                         </div>
                                                                     </div>
-                                                                    <div className="flex-[2] space-y-1.5">
-                                                                        <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Value</label>
-                                                                        <Input
-                                                                            value={variable.value}
-                                                                            onChange={(e) => {
-                                                                                const nv = [...variables];
-                                                                                nv[idx].value = e.target.value;
-                                                                                setVariables(nv);
-                                                                            }}
-                                                                            placeholder="Static value..."
-                                                                            className="h-8 text-[11px] border-border bg-background font-mono"
-                                                                        />
-                                                                    </div>
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        className="h-8 w-8 text-muted-foreground hover:text-destructive transition-colors shrink-0 mb-0.5"
-                                                                        onClick={() => setVariables(variables.filter((_, i) => i !== idx))}
-                                                                    >
-                                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                                    </Button>
                                                                 </div>
                                                             ))}
                                                         </div>
