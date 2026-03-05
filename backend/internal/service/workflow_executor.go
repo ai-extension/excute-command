@@ -834,7 +834,7 @@ func (e *WorkflowExecutor) runWorkflowStep(ctx context.Context, step *domain.Wor
 	fmt.Fprint(stepLogFile, logMsg)
 	e.hub.BroadcastLog(workflowID.String(), logMsg)
 
-	if !step.WaitToFinish {
+	if step.WaitToFinish != nil && !*step.WaitToFinish {
 		// Async: spawn the workflow and immediately return success
 		go func(targetID uuid.UUID, execID uuid.UUID, in map[string]string) {
 			bgCtx := context.Background()

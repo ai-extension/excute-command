@@ -287,7 +287,7 @@ type WorkflowStep struct {
 	CommandText          string     `json:"command_text"`
 	TargetWorkflowID     *uuid.UUID `json:"target_workflow_id,omitempty" gorm:"type:uuid"`
 	TargetWorkflowInputs string     `json:"target_workflow_inputs,omitempty"` // JSON string of inputs for the target workflow
-	WaitToFinish         bool       `json:"wait_to_finish" gorm:"default:true"`
+	WaitToFinish         *bool      `json:"wait_to_finish" gorm:"default:true"`
 	Order                int        `json:"order"`
 	Status               Status     `json:"status"`
 	Output               string     `json:"output"`
