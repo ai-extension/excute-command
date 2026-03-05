@@ -22,6 +22,9 @@
     --color-card: #ffffff;
     --color-card-foreground: #0f172a;
 
+    --color-popover: #ffffff;
+    --color-popover-foreground: #0f172a;
+
     --color-muted: #f8fafc;
     --color-muted-foreground: #64748b;
 
@@ -64,6 +67,9 @@
         --color-card: #0f172a;
         /* Card background that pops against deeper body */
         --color-card-foreground: #f8fafc;
+
+        --color-popover: #0f172a;
+        --color-popover-foreground: #f8fafc;
 
         --glass-bg: rgba(15, 23, 42, 0.8);
         --glass-border: rgba(255, 255, 255, 0.08);

@@ -102,7 +102,7 @@ const HookManager: React.FC<HookManagerProps> = ({ hooks, workflows, hookType, o
                             <div className="flex flex-col gap-1">
                                 <div className="flex items-center gap-2">
                                     <Zap className="w-3 h-3 text-primary" />
-                                    <span className="text-[11px] font-black uppercase tracking-tight text-white">{getDisplayName(hook)}</span>
+                                    <span className="text-[11px] font-black uppercase tracking-tight text-foreground">{getDisplayName(hook)}</span>
                                 </div>
                                 {hook.inputs !== "{}" && (
                                     <p className="text-[9px] font-medium text-muted-foreground truncate max-w-[250px]">
@@ -127,7 +127,7 @@ const HookManager: React.FC<HookManagerProps> = ({ hooks, workflows, hookType, o
             <Dialog open={isPickerOpen} onOpenChange={setIsPickerOpen}>
                 <DialogContent className="sm:max-w-[400px]">
                     <DialogHeader>
-                        <DialogTitle className="text-xl font-black uppercase tracking-tight text-white">Select Hook Workflow</DialogTitle>
+                        <DialogTitle className="text-xl font-black uppercase tracking-tight text-foreground">Select Hook Workflow</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                         <div className="relative">
@@ -150,7 +150,7 @@ const HookManager: React.FC<HookManagerProps> = ({ hooks, workflows, hookType, o
                                         onClick={() => handleAddHook(wf)}
                                     >
                                         <div className="flex flex-col gap-1">
-                                            <span className="font-bold text-sm tracking-tight text-white">{wf.name}</span>
+                                            <span className="font-bold text-sm tracking-tight text-foreground">{wf.name}</span>
                                             <span className="text-[9px] opacity-40 uppercase font-black tracking-widest">{wf.inputs?.length || 0} inputs required</span>
                                         </div>
                                         <Plus className="w-4 h-4 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -166,11 +166,11 @@ const HookManager: React.FC<HookManagerProps> = ({ hooks, workflows, hookType, o
                 setIsInputDialogOpen(open);
                 if (!open) setPendingWorkflow(null);
             }}>
-                <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden bg-slate-950 border-white/10 rounded-2xl shadow-2xl">
+                <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden bg-popover border-border rounded-2xl shadow-2xl">
                     {pendingWorkflow && (
                         <>
-                            <DialogHeader className="p-6 border-b border-white/5 bg-slate-900/40">
-                                <DialogTitle className="text-xl font-black uppercase tracking-tight text-white flex items-center gap-3">
+                            <DialogHeader className="p-6 border-b border-border bg-muted/20">
+                                <DialogTitle className="text-xl font-black uppercase tracking-tight text-foreground flex items-center gap-3">
                                     <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
                                         <Zap className="w-4 h-4 text-indigo-400" />
                                     </div>

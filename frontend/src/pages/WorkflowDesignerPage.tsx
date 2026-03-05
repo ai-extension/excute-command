@@ -1132,14 +1132,14 @@ const WorkflowDesignerPage = () => {
                                             />
                                         </div>
                                     ) : activeTab === 'hooks' ? (
-                                        <div className="flex-1 overflow-y-auto p-8 bg-[#0a0b0e] animate-in fade-in slide-in-from-right-2 duration-300">
+                                        <div className="flex-1 overflow-y-auto p-8 bg-background animate-in fade-in slide-in-from-right-2 duration-300">
                                             <div className="max-w-4xl mx-auto space-y-12 pb-20">
-                                                <div className="flex flex-col gap-2 border-b border-white/5 pb-6">
+                                                <div className="flex flex-col gap-2 border-b border-border/50 pb-6">
                                                     <div className="flex items-center gap-3">
                                                         <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
                                                             <Zap className="w-5 h-5 text-primary" />
                                                         </div>
-                                                        <h2 className="text-2xl font-black tracking-tight text-white uppercase italic">Execution Hooks</h2>
+                                                        <h2 className="text-2xl font-black tracking-tight text-foreground uppercase italic">Execution Hooks</h2>
                                                     </div>
                                                     <p className="text-xs font-medium text-muted-foreground opacity-60">Configure secondary workflows to trigger automatically during this pipeline's lifecycle.</p>
                                                 </div>

@@ -73,7 +73,7 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
     const hasErrors = Object.keys(errors).length > 0;
 
     return (
-        <div className="flex flex-col bg-[#0a0b0e] text-slate-200 min-h-[400px]">
+        <div className="flex flex-col bg-popover text-foreground min-h-[400px]">
 
             <form onSubmit={handleSubmit} className="flex-1 p-6 space-y-5 overflow-y-auto max-h-[60vh]">
                 {inputs.map((input) => (
@@ -98,11 +98,11 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                                             setValues(nv);
                                             if (errors[input.key]) setErrors({ ...errors, [input.key]: '' });
                                         }}
-                                        className={`h-11 w-full pl-4 pr-10 bg-[#161821] border focus:border-indigo-500/50 text-xs font-semibold rounded-xl text-slate-200 appearance-none outline-none cursor-pointer hover:border-slate-700 transition-colors ${errors[input.key] ? 'border-destructive' : 'border-slate-800'}`}
+                                        className={`h-11 w-full pl-4 pr-10 bg-muted border focus:border-indigo-500/50 text-xs font-semibold rounded-xl text-foreground appearance-none outline-none cursor-pointer hover:border-border/80 transition-colors ${errors[input.key] ? 'border-destructive' : 'border-border'}`}
                                     >
-                                        <option value="" disabled className="text-slate-500">Select an option...</option>
+                                        <option value="" disabled className="text-muted-foreground">Select an option...</option>
                                         {(input.default_value || '').split(',').map((opt) => opt.trim()).filter(Boolean).map((opt) => (
-                                            <option key={opt} value={opt} className="bg-[#161821] text-white">{opt}</option>
+                                            <option key={opt} value={opt} className="bg-popover text-foreground">{opt}</option>
                                         ))}
                                     </select>
                                     <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-50">
@@ -120,7 +120,7 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                                         setValues(nv);
                                         if (errors[input.key]) setErrors({ ...errors, [input.key]: '' });
                                     }}
-                                    className={`h-11 px-4 bg-[#161821] focus:border-indigo-500/50 focus:ring-indigo-500/20 text-xs font-semibold rounded-xl ${errors[input.key] ? 'border-destructive' : 'border-slate-800'}`}
+                                    className={`h-11 px-4 bg-muted focus:border-indigo-500/50 focus:ring-indigo-500/20 text-xs font-semibold rounded-xl ${errors[input.key] ? 'border-destructive' : 'border-border'}`}
                                     placeholder={`Enter value for ${input.label || input.key}...`}
                                     autoFocus
                                 />
@@ -130,13 +130,13 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                 ))}
             </form>
 
-            <DialogFooter className="p-6 border-t border-border/10 bg-[#0c0e14] flex-shrink-0">
+            <DialogFooter className="p-6 border-t border-border/10 bg-muted/20 flex-shrink-0">
                 <div className="flex w-full gap-3">
                     <Button
                         type="button"
                         variant="ghost"
                         onClick={onCancel}
-                        className="flex-1 h-11 rounded-xl text-[10px] font-black uppercase tracking-widest bg-slate-900/50 hover:bg-slate-800"
+                        className="flex-1 h-11 rounded-xl text-[10px] font-black uppercase tracking-widest bg-muted/50 hover:bg-muted"
                     >
                         Cancel
                     </Button>

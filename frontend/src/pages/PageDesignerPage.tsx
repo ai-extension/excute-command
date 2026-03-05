@@ -466,14 +466,14 @@ const PageDesignerPage = () => {
                             <div className="grid grid-cols-2 gap-6">
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Widget Title</label>
-                                    <Input value={activeWidget.title} onChange={e => updateWidget(activeWidget.id, { title: e.target.value })} className="h-11 text-sm font-bold bg-muted/30 border-none rounded-2xl" />
+                                    <Input value={activeWidget.title} onChange={e => updateWidget(activeWidget.id, { title: e.target.value })} className="h-11 text-sm font-bold bg-muted/30 border border-border/50 rounded-2xl" />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Width</label>
                                     <select value={activeWidget.size} onChange={e => updateWidget(activeWidget.id, { size: e.target.value as any })}
-                                        className="w-full h-11 bg-muted/30 border-none rounded-2xl text-[11px] px-4 outline-none font-bold appearance-none cursor-pointer">
-                                        <option value="half">Half Width</option>
-                                        <option value="full">Full Width</option>
+                                        className="w-full h-11 bg-muted/30 border border-border/50 rounded-2xl text-[11px] px-4 outline-none font-bold appearance-none cursor-pointer">
+                                        <option value="half" className="bg-popover text-foreground">Half Width</option>
+                                        <option value="full" className="bg-popover text-foreground">Full Width</option>
                                     </select>
                                 </div>
                             </div>
@@ -494,13 +494,13 @@ const PageDesignerPage = () => {
                                             onSearch={fetchWorkflows}
                                             placeholder="Select workflow..."
                                             isSearchable
-                                            triggerClassName="h-11 text-[11px] font-bold bg-muted/30 border-none rounded-2xl"
+                                            triggerClassName="h-11 text-[11px] font-bold bg-muted/30 border border-border/50 rounded-2xl"
                                         />
                                     </div>
                                     <div className="grid grid-cols-2 gap-6">
                                         <div className="space-y-2">
                                             <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Button Label</label>
-                                            <Input value={activeWidget.label || ''} onChange={e => updateWidget(activeWidget.id, { label: e.target.value })} className="h-11 text-sm bg-muted/30 border-none rounded-2xl" placeholder="e.g. Deploy" />
+                                            <Input value={activeWidget.label || ''} onChange={e => updateWidget(activeWidget.id, { label: e.target.value })} className="h-11 text-sm bg-muted/30 border border-border/50 rounded-2xl" placeholder="e.g. Deploy" />
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Style</label>
@@ -509,7 +509,7 @@ const PageDesignerPage = () => {
                                                 value={activeWidget.style || 'premium-gradient'}
                                                 onValueChange={(val) => updateWidget(activeWidget.id, { style: val })}
                                                 placeholder="Select style..."
-                                                triggerClassName="h-11 text-[11px] font-bold bg-muted/30 border-none rounded-2xl"
+                                                triggerClassName="h-11 text-[11px] font-bold bg-muted/30 border border-border/50 rounded-2xl"
                                             />
                                         </div>
                                     </div>
@@ -518,7 +518,7 @@ const PageDesignerPage = () => {
                                         <textarea
                                             value={activeWidget.description || ''}
                                             onChange={e => updateWidget(activeWidget.id, { description: e.target.value })}
-                                            className="w-full min-h-[80px] p-4 text-[11px] bg-muted/30 border-none rounded-2xl focus:ring-2 ring-primary/10 outline-none resize-none transition-all"
+                                            className="w-full min-h-[80px] p-4 text-[11px] bg-muted/30 border border-border/50 rounded-2xl focus:ring-2 ring-primary/10 outline-none resize-none transition-all"
                                             placeholder="Explain what this endpoint does..."
                                         />
                                     </div>
@@ -548,13 +548,13 @@ const PageDesignerPage = () => {
                                             onSearch={fetchServers}
                                             placeholder="Select server..."
                                             isSearchable
-                                            triggerClassName="h-11 text-[11px] font-bold bg-muted/30 border-none rounded-2xl"
+                                            triggerClassName="h-11 text-[11px] font-bold bg-muted/30 border border-border/50 rounded-2xl"
                                         />
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Execute Command</label>
                                         <Input value={activeWidget.command || ''} onChange={e => updateWidget(activeWidget.id, { command: e.target.value })}
-                                            placeholder="e.g. top -b -n 1" className="h-11 text-xs font-mono bg-muted/30 border-none rounded-2xl" />
+                                            placeholder="e.g. top -b -n 1" className="h-11 text-xs font-mono bg-muted/30 border border-border/50 rounded-2xl" />
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Refresh Rate</label>

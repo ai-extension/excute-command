@@ -1,9 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useNamespace } from '../context/NamespaceContext';
-import { useAuth } from '../context/AuthContext';
-import { API_BASE_URL } from '../lib/api';
 import { cn } from '../lib/utils';
-import { ChevronDown, Layers, Plus, Check, Globe } from 'lucide-react';
+import { ChevronDown, Check, Globe } from 'lucide-react';
 import { Button } from './ui/button';
 import {
     DropdownMenu,
@@ -19,35 +17,7 @@ interface NamespaceSwitcherProps {
 }
 
 const NamespaceSwitcher = ({ isCollapsed }: NamespaceSwitcherProps) => {
-    const { namespaces, activeNamespace, setActiveNamespace, refreshNamespaces } = useNamespace();
-    const { token, hasPermission } = useAuth();
-    const [isCreating, setIsCreating] = useState(false);
-    const [newName, setNewName] = useState('');
-
-    const handleCreateNamespace = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!newName.trim() || !token) return;
-
-        try {
-            const response = await fetch(`${API_BASE_URL}/namespaces`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ name: newName }),
-            });
-            if (response.ok) {
-                const data = await response.json();
-                await refreshNamespaces();
-                setActiveNamespace(data);
-                setNewName('');
-                setIsCreating(false);
-            }
-        } catch (error) {
-            console.error('Failed to create namespace:', error);
-        }
-    };
+    const { namespaces, activeNamespace, setActiveNamespace } = useNamespace();
 
     return (
         <div className={cn("px-2 mb-2", isCollapsed && "px-0 flex justify-center")}>
@@ -101,32 +71,6 @@ const NamespaceSwitcher = ({ isCollapsed }: NamespaceSwitcherProps) => {
                             </DropdownMenuItem>
                         ))}
                     </div>
-                    <DropdownMenuSeparator className="bg-border/50" />
-                    {isCreating ? (
-                        <form onSubmit={handleCreateNamespace} className="p-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                            <input
-                                autoFocus
-                                className="w-full bg-muted/50 border border-border rounded-lg px-2.5 py-1.5 text-xs font-bold outline-none focus:border-primary/50 transition-all mb-2"
-                                placeholder="Namespace name..."
-                                value={newName}
-                                onChange={(e) => setNewName(e.target.value)}
-                            />
-                            <div className="flex gap-1.5">
-                                <Button type="submit" size="sm" className="flex-1 h-7 text-[10px] font-black uppercase tracking-widest rounded-md">Create</Button>
-                                <Button type="button" variant="ghost" size="sm" onClick={() => setIsCreating(false)} className="h-7 text-[10px] font-black uppercase tracking-widest rounded-md">Cancel</Button>
-                            </div>
-                        </form>
-                    ) : (
-                        hasPermission('namespaces', 'WRITE') && (
-                            <DropdownMenuItem
-                                onClick={(e) => { e.preventDefault(); setIsCreating(true); }}
-                                className="px-2.5 py-2 rounded-lg cursor-pointer flex items-center gap-2.5 text-primary hover:bg-primary/10 font-bold transition-all duration-200"
-                            >
-                                <Plus className="w-4 h-4" />
-                                <span className="text-[12px] font-black uppercase tracking-tighter">Add Namespace</span>
-                            </DropdownMenuItem>
-                        )
-                    )}
                 </DropdownMenuContent>
             </DropdownMenu>
         </div>

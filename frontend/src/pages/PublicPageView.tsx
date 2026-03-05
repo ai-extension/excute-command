@@ -185,11 +185,12 @@ const PublicPageView = () => {
 
     // Logs Polling
     useEffect(() => {
-        if (!activeExecutionId || !isAuthorized || !pageToken) return;
+        if (!activeExecutionId || !isAuthorized) return;
         let isMounted = true;
         const poll = setInterval(async () => {
             try {
-                const headers = { 'X-Page-Token': pageToken };
+                const headers: Record<string, string> = {};
+                if (pageToken) headers['X-Page-Token'] = pageToken;
                 const sRes = await fetch(`${API_BASE_URL}/public/pages/${slug}/executions/${activeExecutionId}`, { headers });
 
                 if (sRes.status === 401) {
@@ -216,6 +217,11 @@ const PublicPageView = () => {
     }, [activeExecutionId, slug, isAuthorized, pageToken]);
 
     const runWidget = async (widget: PageWidget, inputs: Record<string, string> = {}) => {
+        if (widget.type !== 'ENDPOINT' || !widget.workflow_id) {
+            setExecutionResults(prev => ({ ...prev, [widget.id]: { success: false, message: 'INVALID CONFIG' } }));
+            return;
+        }
+
         const pw = page?.workflows?.find(p => p.workflow_id === widget.workflow_id);
         const workflowInputs = pw?.workflow?.inputs || [];
 
@@ -245,12 +251,12 @@ const PublicPageView = () => {
                 body: JSON.stringify({ inputs })
             });
 
-            const data = await response.json();
             if (response.status === 401) {
                 setTokenExpired(true); setIsAuthorized(false);
                 return;
             }
 
+            const data = await response.json();
             if (response.ok) {
                 setExecutionResults(prev => ({ ...prev, [widget.id]: { success: true, message: 'SUCCESS' } }));
                 if (widget.show_log) {

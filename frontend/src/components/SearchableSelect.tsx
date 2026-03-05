@@ -121,7 +121,7 @@ export const SearchableSelect = ({
             <DropdownMenuPortal>
                 <DropdownMenuContent
                     className={cn(
-                        "z-[200] bg-popover/95 backdrop-blur-md border-border/60 shadow-xl rounded-xl p-1.5",
+                        "z-[200] bg-popover text-popover-foreground backdrop-blur-md border-border/60 shadow-xl rounded-xl p-1.5",
                         "min-w-[var(--radix-dropdown-menu-trigger-width)] max-w-[400px] w-auto",
                         className
                     )}
@@ -138,7 +138,7 @@ export const SearchableSelect = ({
                                     onChange={(e) => handleSearch(e.target.value)}
                                     onKeyDown={(e) => e.stopPropagation()}
                                     onClick={(e) => e.stopPropagation()}
-                                    className="pl-7 h-7 text-[10px] bg-muted/30 border-none rounded-md focus-visible:ring-primary/20"
+                                    className="pl-7 h-7 text-[10px] bg-muted border-none rounded-md focus-visible:ring-primary/20"
                                 />
                             </div>
                         </div>
@@ -169,7 +169,7 @@ export const SearchableSelect = ({
                                             "px-2.5 py-2 rounded-lg cursor-pointer flex items-center justify-between mb-0.5 last:mb-0 font-bold text-[10px] uppercase tracking-wide transition-all duration-150",
                                             isActive
                                                 ? "bg-primary/15 text-primary"
-                                                : "text-foreground/70 hover:bg-muted/80 hover:text-foreground"
+                                                : "text-popover-foreground/70 hover:bg-muted hover:text-popover-foreground"
                                         )}
                                     >
                                         <div className="flex items-center gap-2">
