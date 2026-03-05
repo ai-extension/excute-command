@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/flosch/pongo2/v6"
 	"github.com/google/uuid"
 	"github.com/user/csm-backend/internal/domain"
 )
@@ -417,29 +418,11 @@ func (e *WorkflowExecutor) evaluateCondition(condition string, inputs map[string
 		return true, nil // Empty condition = always run
 	}
 
-	// Resolve all placeholders in the condition first
-	resolved := condition
-
-	// 1. Resolve {{global.key}}
-	if e.globalVarRepo != nil {
-		scope := domain.GetPermissionScope(user, "namespaces", "READ")
-		gvs, _ := e.globalVarRepo.List(namespaceID, &scope)
-		for _, v := range gvs {
-			resolved = strings.ReplaceAll(resolved, "{{global."+v.Key+"}}", v.Value)
-		}
-	}
-
-	// Resolve {{variable.key}}
-	for _, v := range variables {
-		resolved = strings.ReplaceAll(resolved, "{{variable."+v.Key+"}}", v.Value)
-	}
-	// Resolve {{input.key}}
-	for k, v := range inputs {
-		resolved = strings.ReplaceAll(resolved, "{{input."+k+"}}", v)
-	}
-	// Resolve {{step.<group_key>.status}}
-	for key, status := range groupResults {
-		resolved = strings.ReplaceAll(resolved, "{{step."+key+".status}}", status)
+	// 1. Resolve variables using Pongo2
+	pcontext := e.getInterpolationContext(inputs, variables, groupResults, namespaceID, user)
+	resolved, err := e.renderTemplate(condition, pcontext)
+	if err != nil {
+		return false, fmt.Errorf("failed to interpolate condition: %w", err)
 	}
 
 	// Evaluate with || (lower precedence) then && (higher precedence)
@@ -617,52 +600,9 @@ func (e *WorkflowExecutor) relayCopy(ctx context.Context, group *domain.Workflow
 	targetPath := filepath.Clean(group.CopyTargetPath)
 
 	// Perform variable substitution
-	securityRegex := regexp.MustCompile(`^[\pL0-9_\-\.\ \/]+$`)
-
 	substitute := func(val string) (string, error) {
-		// 1. Static Variables: {{variable.key}}
-		for _, v := range variables {
-			if v.Value != "" && !securityRegex.MatchString(v.Value) {
-				errMsg := fmt.Sprintf("\033[1;31m✖ Security violation: variable %q contains invalid characters\033[0m\n", v.Key)
-				fmt.Fprint(logFile, errMsg)
-				return "", fmt.Errorf("security violation: variable '%s' contains invalid characters", v.Key)
-			}
-			val = strings.ReplaceAll(val, "{{variable."+v.Key+"}}", v.Value)
-		}
-		// 2. Runtime Inputs: {{input.key}} and {{key}}
-		for k, v := range inputs {
-			if v != "" && !securityRegex.MatchString(v) {
-				errMsg := fmt.Sprintf("\033[1;31m✖ Security violation: input %q contains invalid characters\033[0m\n", k)
-				fmt.Fprint(logFile, errMsg)
-				return "", fmt.Errorf("security violation: input '%s' contains invalid characters", k)
-			}
-			val = strings.ReplaceAll(val, "{{input."+k+"}}", v)
-			val = strings.ReplaceAll(val, "{{"+k+"}}", v)
-		}
-		// 3. Group Results: {{step.group_key.status}}
-		for k, v := range groupResults {
-			if v != "" && !securityRegex.MatchString(v) {
-				errMsg := fmt.Sprintf("\033[1;31m✖ Security violation: step status %q contains invalid characters\033[0m\n", k)
-				fmt.Fprint(logFile, errMsg)
-				return "", fmt.Errorf("security violation: group result '%s' contains invalid characters", k)
-			}
-			val = strings.ReplaceAll(val, "{{step."+k+".status}}", v)
-		}
-		// 4. Global Variables: {{global.key}}
-		if e.globalVarRepo != nil {
-			// Workflow execution has full access to its namespace's global variables
-			scope := domain.PermissionScope{IsGlobal: true}
-			gvs, _ := e.globalVarRepo.List(namespaceID, &scope)
-			for _, v := range gvs {
-				if v.Value != "" && !securityRegex.MatchString(v.Value) {
-					errMsg := fmt.Sprintf("\033[1;31m✖ Security violation: global variable %q contains invalid characters\033[0m\n", v.Key)
-					fmt.Fprint(logFile, errMsg)
-					return "", fmt.Errorf("security violation: global variable '%s' contains invalid characters", v.Key)
-				}
-				val = strings.ReplaceAll(val, "{{global."+v.Key+"}}", v.Value)
-			}
-		}
-		return val, nil
+		pcontext := e.getInterpolationContext(inputs, variables, groupResults, namespaceID, user)
+		return e.renderTemplate(val, pcontext)
 	}
 
 	var err error
@@ -771,57 +711,14 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 	var output string
 	var err error
 
-	// Substitute variables in command
-	command := step.CommandText
-	securityRegex := regexp.MustCompile(`^[\pL0-9_\-\.\ \/]+$`)
-
-	// 1. Static Variables: {{variable.key}}
-	for _, v := range variables {
-		if v.Value != "" && !securityRegex.MatchString(v.Value) {
-			errMsg := fmt.Sprintf("\033[1;31m✖ Security violation: variable %q contains invalid characters\033[0m\n", v.Key)
-			fmt.Fprint(mainLogFile, errMsg)
-			fmt.Fprint(stepLogFile, errMsg)
-			return fmt.Errorf("security violation: variable '%s' contains invalid characters", v.Key)
-		}
-		command = strings.ReplaceAll(command, "{{variable."+v.Key+"}}", v.Value)
-	}
-	// 2. Runtime Inputs: {{input.key}} and {{key}}
-	for k, v := range inputs {
-		// Note: inputs are already validated at the start of the workflow execution,
-		// but re-validating here doesn't hurt.
-		if v != "" && !securityRegex.MatchString(v) {
-			errMsg := fmt.Sprintf("\033[1;31m✖ Security violation: input %q contains invalid characters\033[0m\n", k)
-			fmt.Fprint(mainLogFile, errMsg)
-			fmt.Fprint(stepLogFile, errMsg)
-			return fmt.Errorf("security violation: input '%s' contains invalid characters", k)
-		}
-		command = strings.ReplaceAll(command, "{{input."+k+"}}", v)
-		command = strings.ReplaceAll(command, "{{"+k+"}}", v)
-	}
-	// 3. Group Results: {{step.group_key.status}}
-	for k, v := range groupResults {
-		if v != "" && !securityRegex.MatchString(v) {
-			errMsg := fmt.Sprintf("\033[1;31m✖ Security violation: step status %q contains invalid characters\033[0m\n", k)
-			fmt.Fprint(mainLogFile, errMsg)
-			fmt.Fprint(stepLogFile, errMsg)
-			return fmt.Errorf("security violation: group result '%s' contains invalid characters", k)
-		}
-		command = strings.ReplaceAll(command, "{{step."+k+".status}}", v)
-	}
-	// 4. Global Variables: {{global.key}}
-	if e.globalVarRepo != nil {
-		// Workflow execution has full access to its namespace's global variables
-		scope := domain.PermissionScope{IsGlobal: true}
-		gvs, _ := e.globalVarRepo.List(namespaceID, &scope)
-		for _, v := range gvs {
-			if v.Value != "" && !securityRegex.MatchString(v.Value) {
-				errMsg := fmt.Sprintf("\033[1;31m✖ Security violation: global variable %q contains invalid characters\033[0m\n", v.Key)
-				fmt.Fprint(mainLogFile, errMsg)
-				fmt.Fprint(stepLogFile, errMsg)
-				return fmt.Errorf("security violation: global variable '%s' contains invalid characters", v.Key)
-			}
-			command = strings.ReplaceAll(command, "{{global."+v.Key+"}}", v.Value)
-		}
+	// 1. Resolve variables using Pongo2
+	pcontext := e.getInterpolationContext(inputs, variables, groupResults, namespaceID, user)
+	command, err := e.renderTemplate(step.CommandText, pcontext)
+	if err != nil {
+		errMsg := fmt.Sprintf("\033[1;31m✖ Interpolation error: %v\033[0m\n", err)
+		fmt.Fprint(mainLogFile, errMsg)
+		fmt.Fprint(stepLogFile, errMsg)
+		return fmt.Errorf("interpolation error: %w", err)
 	}
 
 	targetServerID := step.ServerID
@@ -1025,4 +922,59 @@ func (w *cwdFilteredWriter) Finalize() {
 		w.underlying.Write(w.buffer.Bytes())
 		w.buffer.Reset()
 	}
+}
+
+func (e *WorkflowExecutor) renderTemplate(templateStr string, ctx pongo2.Context) (string, error) {
+	tpl, err := pongo2.FromString(templateStr)
+	if err != nil {
+		return "", fmt.Errorf("template syntax error: %w", err)
+	}
+	return tpl.Execute(ctx)
+}
+
+func (e *WorkflowExecutor) getInterpolationContext(inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, namespaceID uuid.UUID, user *domain.User) pongo2.Context {
+	ctx := make(pongo2.Context)
+	securityRegex := regexp.MustCompile(`^[\pL0-9_\-\.\ \/]+$`)
+
+	// 1. Global Variables: global.key
+	global := make(map[string]string)
+	if e.globalVarRepo != nil {
+		scope := domain.PermissionScope{IsGlobal: true}
+		gvs, _ := e.globalVarRepo.List(namespaceID, &scope)
+		for _, v := range gvs {
+			if v.Value == "" || securityRegex.MatchString(v.Value) {
+				global[v.Key] = v.Value
+			}
+		}
+	}
+	ctx["global"] = global
+
+	// 2. Variables: variable.key
+	vars := make(map[string]string)
+	for _, v := range variables {
+		if v.Value == "" || securityRegex.MatchString(v.Value) {
+			vars[v.Key] = v.Value
+		}
+	}
+	ctx["variable"] = vars
+
+	// 3. Inputs: input.key
+	in := make(map[string]string)
+	for k, v := range inputs {
+		if v == "" || securityRegex.MatchString(v) {
+			in[k] = v
+		}
+	}
+	ctx["input"] = in
+
+	// 4. Step/Group Status: step.key.status
+	steps := make(map[string]interface{})
+	for k, v := range groupResults {
+		if v == "" || securityRegex.MatchString(v) {
+			steps[k] = map[string]string{"status": v}
+		}
+	}
+	ctx["step"] = steps
+
+	return ctx
 }
