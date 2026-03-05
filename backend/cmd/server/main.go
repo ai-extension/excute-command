@@ -218,13 +218,13 @@ func main() {
 
 			protected.GET("/workflows/:id/files", middleware.RBACMiddleware(userRepo, "workflows", "READ"), workflowFileHandler.List)
 			protected.POST("/workflows/:id/files", middleware.RBACMiddleware(userRepo, "workflows", "WRITE"), workflowFileHandler.Upload)
-			protected.PUT("/workflow-files/:id", middleware.RBACMiddleware(userRepo, "workflows", "WRITE"), workflowFileHandler.UpdateTargetPath)
-			protected.DELETE("/workflow-files/:id", middleware.RBACMiddleware(userRepo, "workflows", "DELETE"), workflowFileHandler.Delete)
+			protected.PUT("/workflow-files/:file_id", middleware.RBACMiddleware(userRepo, "workflows", "WRITE"), workflowFileHandler.UpdateTargetPath)
+			protected.DELETE("/workflow-files/:file_id", middleware.RBACMiddleware(userRepo, "workflows", "DELETE"), workflowFileHandler.Delete)
 
 			protected.GET("/workflows/:id/executions", middleware.RBACMiddleware(userRepo, "workflows", "READ"), workflowHandler.ListExecutions)
-			protected.GET("/executions/:id", middleware.RBACMiddleware(userRepo, "workflows", "READ"), workflowHandler.GetExecution)
-			protected.POST("/executions/:id/stop", middleware.RBACMiddleware(userRepo, "workflows", "EXECUTE"), workflowHandler.StopExecution)
-			protected.GET("/executions/:id/logs", middleware.RBACMiddleware(userRepo, "workflows", "READ"), workflowHandler.GetExecutionLogs)
+			protected.GET("/executions/:exec_id", middleware.RBACMiddleware(userRepo, "workflows", "READ"), workflowHandler.GetExecution)
+			protected.POST("/executions/:exec_id/stop", middleware.RBACMiddleware(userRepo, "workflows", "EXECUTE"), workflowHandler.StopExecution)
+			protected.GET("/executions/:exec_id/logs", middleware.RBACMiddleware(userRepo, "workflows", "READ"), workflowHandler.GetExecutionLogs)
 
 			// Global Variables
 			protected.GET("/namespaces/:ns_id/global-variables", middleware.RBACMiddleware(userRepo, "variables", "READ"), globalVarHandler.List)

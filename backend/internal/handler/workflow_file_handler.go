@@ -59,7 +59,7 @@ func (h *WorkflowFileHandler) List(c *gin.Context) {
 }
 
 func (h *WorkflowFileHandler) Delete(c *gin.Context) {
-	fileID, err := uuid.Parse(c.Param("id"))
+	fileID, err := uuid.Parse(c.Param("file_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid file id"})
 		return
@@ -75,7 +75,7 @@ func (h *WorkflowFileHandler) Delete(c *gin.Context) {
 }
 
 func (h *WorkflowFileHandler) UpdateTargetPath(c *gin.Context) {
-	fileID, err := uuid.Parse(c.Param("id"))
+	fileID, err := uuid.Parse(c.Param("file_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid file id"})
 		return

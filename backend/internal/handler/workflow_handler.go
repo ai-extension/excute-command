@@ -343,7 +343,7 @@ func (h *WorkflowHandler) ListAllExecutions(c *gin.Context) {
 }
 
 func (h *WorkflowHandler) GetExecution(c *gin.Context) {
-	idStr := c.Param("id")
+	idStr := c.Param("exec_id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
@@ -362,7 +362,7 @@ func (h *WorkflowHandler) GetExecution(c *gin.Context) {
 }
 
 func (h *WorkflowHandler) GetExecutionLogs(c *gin.Context) {
-	idStr := c.Param("id")
+	idStr := c.Param("exec_id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
@@ -510,7 +510,7 @@ func (h *WorkflowHandler) CloneWorkflow(c *gin.Context) {
 }
 
 func (h *WorkflowHandler) StopExecution(c *gin.Context) {
-	idStr := c.Param("id")
+	idStr := c.Param("exec_id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid execution id"})
