@@ -26,6 +26,7 @@ func AuthMiddleware(authService *service.AuthService, userRepo domain.UserReposi
 							c.Set("user_id", user.ID)
 							c.Set("username", user.Username)
 							c.Set("user", user)
+							c.Set("api_key_scopes", key.Scopes)
 
 							// Update last used in background
 							go apiKeyRepo.UpdateLastUsed(key.ID)
@@ -101,6 +102,26 @@ func RBACMiddleware(userRepo domain.UserRepository, permType, action string) gin
 				return
 			}
 			c.Set("user", user)
+		}
+
+		// 1. API Key Scope Check (if authenticated via API key)
+		if scopesVal, exists := c.Get("api_key_scopes"); exists {
+			scopes := scopesVal.(string)
+			if scopes != "" {
+				allowed := false
+				scopeList := strings.Split(scopes, ",")
+				for _, s := range scopeList {
+					if strings.TrimSpace(s) == permType {
+						allowed = true
+						break
+					}
+				}
+				if !allowed {
+					c.JSON(http.StatusForbidden, gin.H{"error": "API key does not have access to this resource type (" + permType + ")"})
+					c.Abort()
+					return
+				}
+			}
 		}
 
 		// Root admin check

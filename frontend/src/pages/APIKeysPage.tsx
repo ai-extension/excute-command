@@ -27,6 +27,39 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../lib/api';
 import { cn } from '../lib/utils';
+import { Book, Info } from 'lucide-react';
+
+const AVAILABLE_SCOPES = [
+    { id: 'workflows', name: 'Workflows' },
+    { id: 'executions', name: 'Executions' },
+    { id: 'servers', name: 'Servers' },
+    { id: 'variables', name: 'Variables' },
+    { id: 'schedules', name: 'Schedules' },
+    { id: 'pages', name: 'Pages' },
+    { id: 'tags', name: 'Tags' },
+    { id: 'vpns', name: 'VPNs' },
+];
+
+const API_DOCS = [
+    {
+        title: "Authentication",
+        description: "Include your token in the X-API-Key header for all requests.",
+        code: "X-API-Key: [YOUR_TOKEN]"
+    },
+    {
+        title: "Workflows",
+        methods: [
+            { method: "GET", path: "/api/namespaces/:ns_id/workflows", desc: "List all workflows" },
+            { method: "POST", path: "/api/workflows/:id/run", desc: "Execute a workflow" }
+        ]
+    },
+    {
+        title: "Servers",
+        methods: [
+            { method: "GET", path: "/api/servers", desc: "List all available servers" }
+        ]
+    }
+];
 
 const APIKeysPage = () => {
     const { apiFetch, user } = useAuth();
@@ -36,6 +69,8 @@ const APIKeysPage = () => {
     const [isKeyDialogOpen, setIsKeyDialogOpen] = useState(false);
     const [copied, setCopied] = useState(false);
     const [isKeyLoading, setIsKeyLoading] = useState(false);
+    const [selectedScopes, setSelectedScopes] = useState<string[]>([]);
+    const [isDocDialogOpen, setIsDocDialogOpen] = useState(false);
 
     useEffect(() => {
         if (user) {
@@ -64,13 +99,14 @@ const APIKeysPage = () => {
             const response = await apiFetch(`${API_BASE_URL}/me/api-keys`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: newKeyName })
+                body: JSON.stringify({ name: newKeyName, scopes: selectedScopes })
             });
             if (response.ok) {
                 const data = await response.json();
                 setGeneratedKey(data.key);
                 setIsKeyDialogOpen(true);
                 setNewKeyName('');
+                setSelectedScopes([]);
                 fetchApiKeys();
             }
         } catch (err) {
@@ -123,24 +159,76 @@ const APIKeysPage = () => {
                                 <CardDescription className="text-[10px] font-medium uppercase tracking-wider opacity-60">Keys for external API synchronization and automation.</CardDescription>
                             </div>
                         </div>
-                        <form onSubmit={handleGenerateKey} className="flex items-center gap-2">
-                            <Input
-                                placeholder="Token identifier (e.g. Jenkins CI)"
-                                value={newKeyName}
-                                onChange={(e) => setNewKeyName(e.target.value)}
-                                className="h-11 bg-muted/20 border-border focus:bg-muted/40 transition-all rounded-xl font-bold text-xs min-w-[240px]"
-                            />
-                            <Button
-                                type="submit"
-                                disabled={isKeyLoading || !newKeyName.trim()}
-                                className="h-11 premium-gradient rounded-xl px-6 gap-2 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/20"
-                            >
-                                {isKeyLoading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
-                                Initialize
-                            </Button>
-                        </form>
+                        <Button
+                            variant="outline"
+                            onClick={() => setIsDocDialogOpen(true)}
+                            className="bg-background border-border hover:bg-muted/50 rounded-xl px-5 gap-2 text-[10px] font-black uppercase tracking-widest shadow-sm"
+                        >
+                            <Book className="w-3.5 h-3.5 text-indigo-500" />
+                            API Documentation
+                        </Button>
                     </div>
                 </CardHeader>
+                <CardContent className="p-6 border-b border-border bg-muted/2">
+                    <form onSubmit={handleGenerateKey} className="space-y-6">
+                        <div className="flex items-center gap-4">
+                            <div className="flex-1 space-y-2">
+                                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 ml-1">Token Name</label>
+                                <Input
+                                    placeholder="e.g. Jenkins CI, GitHub Actions"
+                                    value={newKeyName}
+                                    onChange={(e) => setNewKeyName(e.target.value)}
+                                    className="h-12 bg-background border-border focus:ring-2 focus:ring-primary/20 transition-all rounded-xl font-bold text-sm"
+                                />
+                            </div>
+                            <div className="pt-6">
+                                <Button
+                                    type="submit"
+                                    disabled={isKeyLoading || !newKeyName.trim()}
+                                    className="h-12 premium-gradient rounded-xl px-8 gap-3 text-[11px] font-black uppercase tracking-widest shadow-lg shadow-primary/20"
+                                >
+                                    {isKeyLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                                    Initialize Protocol
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 ml-1">Assign API Access Scopes (Optional - Defaults to All)</label>
+                                <div className="text-[9px] font-bold text-primary/60 uppercase tracking-widest">
+                                    {selectedScopes.length === 0 ? "Full Access Enabled" : `${selectedScopes.length} Scopes Restricted`}
+                                </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {AVAILABLE_SCOPES.map((scope) => {
+                                    const isSelected = selectedScopes.includes(scope.id);
+                                    return (
+                                        <button
+                                            key={scope.id}
+                                            type="button"
+                                            onClick={() => {
+                                                if (isSelected) {
+                                                    setSelectedScopes(selectedScopes.filter(s => s !== scope.id));
+                                                } else {
+                                                    setSelectedScopes([...selectedScopes, scope.id]);
+                                                }
+                                            }}
+                                            className={cn(
+                                                "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 border",
+                                                isSelected
+                                                    ? "bg-primary/10 border-primary text-primary shadow-sm"
+                                                    : "bg-muted/10 border-border text-muted-foreground/60 hover:border-primary/30 hover:text-primary/60"
+                                            )}
+                                        >
+                                            {scope.name}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </form>
+                </CardContent>
                 <CardContent className="p-6">
                     {apiKeys.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 opacity-30">
@@ -174,6 +262,15 @@ const APIKeysPage = () => {
                                                     </>
                                                 )}
                                             </div>
+                                            {key.scopes && (
+                                                <div className="flex flex-wrap gap-1 mt-2">
+                                                    {key.scopes.split(',').map((s: string) => (
+                                                        <Badge key={s} variant="outline" className="text-[7px] px-1.5 h-3.5 bg-primary/5 border-primary/20 text-primary font-bold uppercase tracking-tighter">
+                                                            {s}
+                                                        </Badge>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                     <Button
@@ -267,7 +364,61 @@ const APIKeysPage = () => {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </div>
+
+            {/* API Documentation Modal */}
+            <Dialog open={isDocDialogOpen} onOpenChange={setIsDocDialogOpen}>
+                <DialogContent className="sm:max-w-2xl bg-card border-border rounded-3xl overflow-hidden p-0 shadow-2xl">
+                    <DialogHeader className="p-8 pb-0">
+                        <div className="p-4 bg-indigo-500/10 w-fit rounded-2xl mb-6 shadow-inner">
+                            <Book className="w-8 h-8 text-indigo-500" />
+                        </div>
+                        <DialogTitle className="text-3xl font-black tracking-tighter italic uppercase text-indigo-500">API Documentation</DialogTitle>
+                        <DialogDescription className="text-xs font-black uppercase tracking-widest text-muted-foreground/60 pt-2">
+                            Integrate your external systems with our automation protocol.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="p-8 pt-6 max-h-[60vh] overflow-y-auto space-y-8">
+                        {API_DOCS.map((doc, i) => (
+                            <div key={i} className="space-y-4">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-1 h-4 bg-indigo-500 rounded-full" />
+                                    <h3 className="text-sm font-black uppercase tracking-widest">{doc.title}</h3>
+                                </div>
+                                {doc.description && (
+                                    <p className="text-xs text-muted-foreground font-medium">{doc.description}</p>
+                                )}
+                                {doc.code && (
+                                    <div className="p-4 rounded-xl bg-muted/20 border border-border font-mono text-xs text-primary font-bold">
+                                        {doc.code}
+                                    </div>
+                                )}
+                                {doc.methods && (
+                                    <div className="space-y-3">
+                                        {doc.methods.map((m, j) => (
+                                            <div key={j} className="p-4 rounded-xl bg-muted/10 border border-border/50 space-y-2 group hover:bg-muted/20 transition-all">
+                                                <div className="flex items-center gap-3">
+                                                    <Badge className="bg-indigo-500 text-white font-black text-[9px] px-2">{m.method}</Badge>
+                                                    <code className="text-[11px] font-bold text-primary">{m.path}</code>
+                                                </div>
+                                                <p className="text-[10px] text-muted-foreground font-medium ml-1">{m.desc}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                    <DialogFooter className="p-8 pt-0">
+                        <Button
+                            onClick={() => setIsDocDialogOpen(false)}
+                            className="w-full h-12 bg-foreground text-background hover:bg-foreground/90 font-black uppercase tracking-[0.2em] text-[10px] rounded-xl shadow-xl transition-all"
+                        >
+                            Close Documentation
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </div >
     );
 };
 

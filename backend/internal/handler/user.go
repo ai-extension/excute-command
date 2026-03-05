@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -286,7 +287,8 @@ func (h *UserHandler) GenerateAPIKey(c *gin.Context) {
 	}
 
 	var input struct {
-		Name string `json:"name" binding:"required"`
+		Name   string   `json:"name" binding:"required"`
+		Scopes []string `json:"scopes"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -311,12 +313,19 @@ func (h *UserHandler) GenerateAPIKey(c *gin.Context) {
 		return
 	}
 
+	// Convert scopes array to comma-separated string
+	scopesStr := ""
+	if len(input.Scopes) > 0 {
+		scopesStr = strings.Join(input.Scopes, ",")
+	}
+
 	apiKey := &domain.APIKey{
 		ID:        uuid.New(),
 		UserID:    userID,
 		Name:      input.Name,
 		KeyPrefix: prefix,
 		KeyHash:   string(hashedKey),
+		Scopes:    scopesStr,
 		CreatedAt: time.Now(),
 	}
 

@@ -82,6 +82,7 @@ type APIKey struct {
 	KeyPrefix string     `json:"key_prefix" gorm:"not null"`
 	KeyHash   string     `json:"-" gorm:"not null"`
 	LastUsed  *time.Time `json:"last_used"`
+	Scopes    string     `json:"scopes" gorm:"default:''"`
 	CreatedAt time.Time  `json:"created_at" gorm:"<-:create"`
 }
 
