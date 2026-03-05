@@ -10,6 +10,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
 import { Badge } from '../components/ui/badge';
+import { SearchableSelect } from '../components/SearchableSelect';
 import { Switch } from '../components/ui/switch';
 import { cn } from '../lib/utils';
 import { Workflow, WorkflowGroup, WorkflowStep, WorkflowInput, WorkflowVariable, Server as ServerType, Tag } from '../types';
@@ -57,13 +58,42 @@ const WorkflowDesignerPage = () => {
         setTimeout(() => setCopiedKey(null), 2000);
     };
 
+    const handleSearchServers = async (query: string) => {
+        try {
+            const url = `${API_BASE_URL}/servers?limit=50&search=${encodeURIComponent(query)}`;
+            const response = await apiFetch(url);
+            if (!response.ok) throw new Error(`Search failed: ${response.status}`);
+            const data = await response.json();
+            const items = data.items || (Array.isArray(data) ? data : []);
+            console.log(`Server search for "${query}" returned ${items.length} items`);
+
+            setAvailableServers(prev => {
+                // Preserve all current servers that are already in the list
+                // This ensures that selected items' labels don't flicker or disappear
+                const existing = new Map(prev.map(s => [s.id, s]));
+                items.forEach((s: ServerType) => existing.set(s.id, s));
+                return Array.from(existing.values());
+            });
+        } catch (error) {
+            console.error('Failed to search servers:', error);
+        }
+    };
+
     useEffect(() => {
-        const fetchServers = async () => {
+        const fetchServers = async (query?: string) => {
             try {
-                const response = await apiFetch(`${API_BASE_URL}/servers?limit=1000`);
+                let url = `${API_BASE_URL}/servers?limit=20`;
+                if (query) url += `&search=${encodeURIComponent(query)}`;
+                const response = await apiFetch(url);
                 if (!response.ok) throw new Error(`Servers fetch failed: ${response.status}`);
                 const data = await response.json();
-                setAvailableServers(data.items || (Array.isArray(data) ? data : []));
+                const items = data.items || (Array.isArray(data) ? data : []);
+
+                setAvailableServers(prev => {
+                    const existing = new Map(prev.map(s => [s.id, s]));
+                    items.forEach((s: ServerType) => existing.set(s.id, s));
+                    return Array.from(existing.values());
+                });
             } catch (error) {
                 console.error('Failed to fetch servers:', error);
             }
@@ -72,7 +102,7 @@ const WorkflowDesignerPage = () => {
         const fetchAllWorkflows = async () => {
             if (!activeNamespace) return;
             try {
-                const response = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/workflows?limit=1000`);
+                const response = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/workflows?limit=20`);
                 if (!response.ok) throw new Error(`Workflows fetch failed: ${response.status}`);
                 const data = await response.json();
                 setAllWorkflows(data.items || (Array.isArray(data) ? data : []));
@@ -149,6 +179,34 @@ const WorkflowDesignerPage = () => {
             return;
         }
         if (!name.trim()) return;
+
+        if (!defaultServerId) {
+            setError('Please select a default target resource for the workflow.');
+            setActiveTab('general');
+            return;
+        }
+
+        for (let i = 0; i < groups.length; i++) {
+            const g = groups[i];
+            if (g.is_copy_enabled && !g.copy_target_server_id) {
+                setError(`Please select a target server for Relay in Group ${i + 1}.`);
+                setActiveTab('steps');
+                setOpenSettingsGroupIdx(i);
+                return;
+            }
+
+            // Also validate command steps in each group
+            if (g.steps) {
+                for (let j = 0; j < g.steps.length; j++) {
+                    const step = g.steps[j];
+                    if ((!step.action_type || step.action_type === 'COMMAND') && !step.server_id) {
+                        setError(`Please select a target resource for Step ${j + 1} in Group ${i + 1}.`);
+                        setActiveTab('steps');
+                        return;
+                    }
+                }
+            }
+        }
 
         setIsSaving(true);
         try {
@@ -469,15 +527,19 @@ const WorkflowDesignerPage = () => {
                                                     <div className="bg-card p-6 rounded-xl border border-border">
                                                         <div className="max-w-md space-y-1.5">
                                                             <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Default Target Resource</label>
-                                                            <select
+                                                            <SearchableSelect
+                                                                options={availableServers.map(s => ({
+                                                                    label: `${s.name} (${s.host})`,
+                                                                    value: s.id,
+                                                                    searchTerms: `${s.name} ${s.host} ${s.description || ''} ${s.tags?.map(t => t.name).join(' ') || ''}`
+                                                                }))}
                                                                 value={defaultServerId || ''}
-                                                                onChange={(e) => setDefaultServerId(e.target.value || undefined)}
-                                                                className="flex h-10 w-full rounded-lg border border-border bg-background px-3 text-sm font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
-                                                            >
-                                                                {availableServers.map(s => (
-                                                                    <option key={s.id} value={s.id}>{s.name} ({s.host})</option>
-                                                                ))}
-                                                            </select>
+                                                                onValueChange={(val) => setDefaultServerId(val || undefined)}
+                                                                onSearch={handleSearchServers}
+                                                                placeholder="— Select target resource —"
+                                                                isSearchable={true}
+                                                                triggerClassName="h-10 text-sm"
+                                                            />
                                                             <p className="text-[9px] font-medium text-muted-foreground mt-2">
                                                                 Individual steps can still override this setting in the Blueprint tab.
                                                             </p>
@@ -905,20 +967,23 @@ const WorkflowDesignerPage = () => {
                                                                                                             {/* Server override */}
                                                                                                             <div className="space-y-2">
                                                                                                                 <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Server Override <span className="text-muted-foreground/50 normal-case font-medium">— run all steps on this server</span></label>
-                                                                                                                <select
+                                                                                                                <SearchableSelect
+                                                                                                                    options={availableServers.map(s => ({
+                                                                                                                        label: `${s.name} (${s.host})`,
+                                                                                                                        value: s.id,
+                                                                                                                        searchTerms: `${s.name} ${s.host} ${s.description || ''} ${s.tags?.map(t => t.name).join(' ') || ''}`
+                                                                                                                    }))}
                                                                                                                     value={group.default_server_id || ''}
-                                                                                                                    onChange={(e) => {
+                                                                                                                    onValueChange={(val) => {
                                                                                                                         const ng = [...groups];
-                                                                                                                        ng[gIdx].default_server_id = e.target.value || undefined;
+                                                                                                                        ng[gIdx].default_server_id = val || undefined;
                                                                                                                         setGroups(ng);
                                                                                                                     }}
-                                                                                                                    className="flex h-9 w-full rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
-                                                                                                                >
-                                                                                                                    <option value="">— Use workflow default —</option>
-                                                                                                                    {availableServers.map(s => (
-                                                                                                                        <option key={s.id} value={s.id}>{s.name} ({s.host})</option>
-                                                                                                                    ))}
-                                                                                                                </select>
+                                                                                                                    onSearch={handleSearchServers}
+                                                                                                                    placeholder="— Use workflow default —"
+                                                                                                                    isSearchable={true}
+                                                                                                                    triggerClassName="h-9 text-xs"
+                                                                                                                />
                                                                                                             </div>
                                                                                                             {/* Copy After Execution */}
                                                                                                             <div className="pt-4 border-t border-border/50 space-y-4">
@@ -964,19 +1029,23 @@ const WorkflowDesignerPage = () => {
                                                                                                                         <div className="grid grid-cols-2 gap-4">
                                                                                                                             <div className="space-y-2">
                                                                                                                                 <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Target Server</label>
-                                                                                                                                <select
+                                                                                                                                <SearchableSelect
+                                                                                                                                    options={availableServers.map(s => ({
+                                                                                                                                        label: `${s.name} (${s.host})`,
+                                                                                                                                        value: s.id,
+                                                                                                                                        searchTerms: `${s.name} ${s.host} ${s.description || ''} ${s.tags?.map(t => t.name).join(' ') || ''}`
+                                                                                                                                    }))}
                                                                                                                                     value={group.copy_target_server_id || ''}
-                                                                                                                                    onChange={(e) => {
+                                                                                                                                    onValueChange={(val) => {
                                                                                                                                         const ng = [...groups];
-                                                                                                                                        ng[gIdx].copy_target_server_id = e.target.value;
+                                                                                                                                        ng[gIdx].copy_target_server_id = val || '';
                                                                                                                                         setGroups(ng);
                                                                                                                                     }}
-                                                                                                                                    className="flex h-9 w-full rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
-                                                                                                                                >
-                                                                                                                                    {availableServers.map(s => (
-                                                                                                                                        <option key={s.id} value={s.id}>{s.name} ({s.host})</option>
-                                                                                                                                    ))}
-                                                                                                                                </select>
+                                                                                                                                    onSearch={handleSearchServers}
+                                                                                                                                    placeholder="— Select target resource —"
+                                                                                                                                    isSearchable={true}
+                                                                                                                                    triggerClassName="h-9 text-xs"
+                                                                                                                                />
                                                                                                                             </div>
                                                                                                                             <div className="space-y-2">
                                                                                                                                 <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Target Path</label>
@@ -1082,19 +1151,41 @@ const WorkflowDesignerPage = () => {
                                                                                                                     </select>
                                                                                                                 </div>
                                                                                                                 {(!step.action_type || step.action_type === 'COMMAND') ? (
-                                                                                                                    <div className="col-span-7 space-y-1">
-                                                                                                                        <label className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Execution Sequence</label>
-                                                                                                                        <Textarea
-                                                                                                                            value={step.command_text}
-                                                                                                                            onChange={(e) => {
-                                                                                                                                const ng = [...groups];
-                                                                                                                                ng[gIdx]!.steps![sIdx].command_text = e.target.value;
-                                                                                                                                setGroups(ng);
-                                                                                                                            }}
-                                                                                                                            className="bg-muted/50 border-border min-h-[40px] text-[11px] font-mono rounded-md px-2 py-2 resize-y"
-                                                                                                                            placeholder="Enter command sequence..."
-                                                                                                                        />
-                                                                                                                    </div>
+                                                                                                                    <>
+                                                                                                                        <div className="col-span-3 space-y-1">
+                                                                                                                            <label className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Target Resource</label>
+                                                                                                                            <SearchableSelect
+                                                                                                                                options={availableServers.map(s => ({
+                                                                                                                                    label: `${s.name} (${s.host})`,
+                                                                                                                                    value: s.id,
+                                                                                                                                    searchTerms: `${s.name} ${s.host} ${s.description || ''} ${s.tags?.map(t => t.name).join(' ') || ''}`
+                                                                                                                                }))}
+                                                                                                                                value={step.server_id || ''}
+                                                                                                                                onValueChange={(val) => {
+                                                                                                                                    const ng = [...groups];
+                                                                                                                                    ng[gIdx]!.steps![sIdx].server_id = val || undefined;
+                                                                                                                                    setGroups(ng);
+                                                                                                                                }}
+                                                                                                                                onSearch={handleSearchServers}
+                                                                                                                                placeholder="— Select —"
+                                                                                                                                isSearchable={true}
+                                                                                                                                triggerClassName="h-8 text-[11px]"
+                                                                                                                            />
+                                                                                                                        </div>
+                                                                                                                        <div className="col-span-4 space-y-1">
+                                                                                                                            <label className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Execution Sequence</label>
+                                                                                                                            <Textarea
+                                                                                                                                value={step.command_text}
+                                                                                                                                onChange={(e) => {
+                                                                                                                                    const ng = [...groups];
+                                                                                                                                    ng[gIdx]!.steps![sIdx].command_text = e.target.value;
+                                                                                                                                    setGroups(ng);
+                                                                                                                                }}
+                                                                                                                                className="bg-muted/50 border-border min-h-[40px] text-[11px] font-mono rounded-md px-2 py-2 resize-y"
+                                                                                                                                placeholder="Enter command sequence..."
+                                                                                                                            />
+                                                                                                                        </div>
+                                                                                                                    </>
                                                                                                                 ) : (
                                                                                                                     <div className="col-span-7 space-y-2">
                                                                                                                         <div className="space-y-1">

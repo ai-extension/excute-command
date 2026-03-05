@@ -117,7 +117,7 @@ const SchedulesPage = () => {
     const fetchWorkflows = async () => {
         if (!activeNamespace) return;
         try {
-            const response = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/workflows?limit=1000`);
+            const response = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/workflows?limit=20`);
             const data = await response.json();
             setWorkflows(data.items || (Array.isArray(data) ? data : []));
         } catch (error) {

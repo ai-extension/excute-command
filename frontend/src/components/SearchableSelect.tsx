@@ -17,6 +17,7 @@ import { Badge } from './ui/badge';
 export interface SelectOption {
     label: string;
     value: string;
+    searchTerms?: string;
 }
 
 interface SearchableSelectProps {
@@ -63,9 +64,12 @@ export const SearchableSelect = ({
     };
 
     const getFilteredOptions = () => {
-        if (!isSearchable || onSearch || !searchQuery) return options;
+        if (!isSearchable || !searchQuery) return options;
+        const query = searchQuery.toLowerCase().trim();
         return options.filter(opt =>
-            opt.label.toLowerCase().includes(searchQuery.toLowerCase())
+            opt.label.toLowerCase().includes(query) ||
+            opt.value.toLowerCase().includes(query) ||
+            (opt.searchTerms && opt.searchTerms.toLowerCase().includes(query))
         );
     };
 
