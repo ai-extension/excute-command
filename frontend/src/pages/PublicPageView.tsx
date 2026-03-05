@@ -9,6 +9,7 @@ import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
 import { cn } from '../lib/utils';
 import { Page, PageWidget, PageLayout, WorkflowInput } from '../types';
+import WorkflowInputDialog from '../components/WorkflowInputDialog';
 import { API_BASE_URL } from '../lib/api';
 
 // ANSI Parsing Utility
@@ -79,6 +80,9 @@ const PublicPageView = () => {
     });
     const [inputValues, setInputValues] = useState<Record<string, string>>({});
     const modalRef = useRef<HTMLDivElement>(null);
+    const closeInputModal = () => {
+        setInputModal({ isOpen: false, widget: null, workflowInputs: [] });
+    };
 
     // Log Streaming State
     const [activeExecutionId, setActiveExecutionId] = useState<string | null>(null);
@@ -507,75 +511,18 @@ const PublicPageView = () => {
                 )}
             </main>
 
-            {/* Workflow Input Modal */}
-            {inputModal.isOpen && (
-                <div
-                    className="fixed inset-0 z-[150] flex items-center justify-center p-6 bg-background/60 backdrop-blur-sm animate-in fade-in duration-300"
-                    onClick={(e) => {
-                        if (e.target === e.currentTarget) {
-                            setInputModal({ isOpen: false, widget: null, workflowInputs: [] });
-                        }
-                    }}
-                >
-                    <div
-                        ref={modalRef}
-                        className="w-full max-w-sm bg-card border border-border rounded-[2rem] shadow-[0_32px_128px_-16px_rgba(0,0,0,0.5)] overflow-hidden animate-in zoom-in-95 duration-500 slide-in-from-bottom-8"
-                    >
-                        <div className="px-6 py-4 border-b border-border bg-muted/20">
-                            <div className="flex items-center gap-4">
-                                <div className="p-2.5 rounded-[0.75rem] bg-primary/10 text-primary ring-1 ring-primary/20">
-                                    <Terminal className="w-5 h-5" />
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-black tracking-tighter uppercase">{inputModal.widget?.label || 'Config'}</h3>
-                                    <p className="text-[8px] font-bold text-muted-foreground uppercase tracking-[0.2em] leading-none opacity-50 mt-1">Parameters</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="p-6 space-y-5">
-                            {inputModal.workflowInputs.map((input, idx) => (
-                                <div key={input.id} className="space-y-1.5 animate-in fade-in slide-in-from-left-4 duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
-                                    <div className="flex items-center justify-between px-1">
-                                        <label className="text-[9px] font-black uppercase text-primary tracking-[0.2em]">{input.label || input.key}</label>
-                                        <Info className="w-2.5 h-2.5 text-muted-foreground opacity-30" />
-                                    </div>
-                                    {input.type === 'select' ? (
-                                        <div className="relative group">
-                                            <select
-                                                value={inputValues[input.key] || ''}
-                                                onChange={e => setInputValues(prev => ({ ...prev, [input.key]: e.target.value }))}
-                                                className="w-full h-10 bg-background border border-border rounded-lg px-4 text-[11px] font-bold outline-none focus:border-primary/50 focus:ring-2 ring-primary/5 transition-all appearance-none cursor-pointer"
-                                            >
-                                                {(input.default_value || '').split(',').map(opt => (
-                                                    <option key={opt.trim()} value={opt.trim()}>{opt.trim()}</option>
-                                                ))}
-                                            </select>
-                                            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none group-hover:text-primary transition-colors" />
-                                        </div>
-                                    ) : (
-                                        <Input
-                                            type={input.type === 'number' ? 'number' : 'text'}
-                                            value={inputValues[input.key] || ''}
-                                            onChange={e => setInputValues(prev => ({ ...prev, [input.key]: e.target.value }))}
-                                            className="h-10 bg-background border border-border rounded-lg px-4 text-[11px] font-bold focus:border-primary/50 focus:ring-2 ring-primary/5 transition-all"
-                                            placeholder={`Value for ${input.label.toLowerCase()}...`}
-                                        />
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                        <div className="px-6 pb-6 flex flex-col gap-2.5">
-                            <Button
-                                onClick={() => inputModal.widget && runWidget(inputModal.widget, inputValues)}
-                                className="h-11 premium-gradient text-white rounded-[0.75rem] font-black uppercase tracking-[0.3em] text-[10px] shadow-premium hover:shadow-[0_0_30px_rgba(var(--primary-rgb),0.3)] duration-300"
-                            >
-                                Confirm & Launch
-                            </Button>
-                            <Button variant="ghost" onClick={() => setInputModal({ isOpen: false, widget: null, workflowInputs: [] })} className="h-8 text-[8px] font-black uppercase tracking-[0.15em] opacity-30 hover:opacity-100 transition-all">Dismiss</Button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <WorkflowInputDialog
+                isOpen={inputModal.isOpen}
+                onOpenChange={(open) => !open && closeInputModal()}
+                inputs={inputModal.workflowInputs}
+                confirmLabel="Confirm & Launch"
+                onConfirm={(values) => {
+                    if (inputModal.widget) {
+                        runWidget(inputModal.widget, values);
+                    }
+                }}
+                onCancel={closeInputModal}
+            />
 
             {/* Bottom-Right Execution Log Terminal */}
             {activeExecutionId && (

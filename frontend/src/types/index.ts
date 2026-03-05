@@ -172,6 +172,7 @@ export interface WorkflowInput {
     label: string;
     type: 'input' | 'number' | 'select';
     default_value: string;
+    required: boolean;
     created_at: string;
     updated_at: string;
 }

@@ -550,7 +550,7 @@ const WorkflowDesignerPage = () => {
                                                         <h2 className="text-sm font-bold text-foreground uppercase tracking-tight">Runtime Variable Definitions (Inputs)</h2>
                                                     </div>
                                                     <Button
-                                                        onClick={() => setInputs([...inputs, { key: '', label: '', type: 'input', default_value: '' }])}
+                                                        onClick={() => setInputs([...inputs, { key: '', label: '', type: 'input', default_value: '', required: true }])}
                                                         className="h-8 text-[9px] font-bold uppercase tracking-widest px-4"
                                                         variant="outline"
                                                     >
@@ -568,11 +568,13 @@ const WorkflowDesignerPage = () => {
                                                     ) : (
                                                         <div className="space-y-4">
                                                             {inputs.map((input, idx) => (
-                                                                <div key={idx} className="flex flex-col gap-4 p-5 bg-background/50 rounded-xl border border-border/50 animate-in fade-in slide-in-from-bottom-1 duration-300">
+                                                                <div key={idx} className="flex flex-col gap-1 p-5 bg-background/50 rounded-xl border border-border/50 animate-in fade-in slide-in-from-bottom-1 duration-300">
                                                                     <div className="grid grid-cols-12 gap-5 items-start">
                                                                         {/* Left side: Label & Key */}
-                                                                        <div className="col-span-5 space-y-4">
-                                                                            <div className="space-y-1.5">
+
+                                                                        <div className="col-span-5">
+
+                                                                            <div className="space-y-0">
                                                                                 <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Display Label</label>
                                                                                 <Input
                                                                                     value={input.label}
@@ -587,6 +589,8 @@ const WorkflowDesignerPage = () => {
                                                                             </div>
                                                                             <div className="space-y-1.5">
                                                                                 <label className="text-[8px] font-black uppercase tracking-widest text-primary">Variable Key</label>
+
+
                                                                                 <div className="relative">
                                                                                     <Input
                                                                                         value={input.key}
@@ -607,12 +611,14 @@ const WorkflowDesignerPage = () => {
                                                                                             {copiedKey === `input-${idx}` ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
                                                                                         </button>
                                                                                     )}
+
+
                                                                                 </div>
                                                                             </div>
                                                                         </div>
 
                                                                         {/* Right side: Type & Default Value */}
-                                                                        <div className="col-span-6 space-y-4">
+                                                                        <div className="col-span-6">
                                                                             <div className="space-y-1.5">
                                                                                 <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Type</label>
                                                                                 <select
@@ -649,6 +655,7 @@ const WorkflowDesignerPage = () => {
 
                                                                         {/* Delete Button */}
                                                                         <div className="col-span-1 flex justify-end items-center h-[120px]">
+
                                                                             <Button
                                                                                 variant="ghost"
                                                                                 size="icon"

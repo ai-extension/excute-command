@@ -98,18 +98,14 @@ export const WorkflowRunner: React.FC<WorkflowRunnerProps> = ({ children, onRunC
             </Dialog>
 
             {/* Runtime Input Dialog */}
-            <Dialog open={isInputOpen} onOpenChange={setIsInputOpen}>
-                <DialogContent hideClose className="max-w-lg w-[95vw] bg-[#0a0b0e] border-[#1a1c23] border-2 rounded-2xl p-0 overflow-hidden shadow-2xl">
-                    {runningWorkflow && runningWorkflow.inputs && (
-                        <WorkflowInputDialog
-                            inputs={runningWorkflow.inputs as WorkflowInput[]}
-                            isStarting={isStarting}
-                            onConfirm={(values) => handleRunWorkflow(runningWorkflow, values)}
-                            onCancel={() => setIsInputOpen(false)}
-                        />
-                    )}
-                </DialogContent>
-            </Dialog>
+            <WorkflowInputDialog
+                isOpen={isInputOpen}
+                onOpenChange={setIsInputOpen}
+                inputs={runningWorkflow?.inputs as WorkflowInput[] || []}
+                isStarting={isStarting}
+                onConfirm={(values) => handleRunWorkflow(runningWorkflow!, values)}
+                onCancel={() => setIsInputOpen(false)}
+            />
         </>
     );
 };

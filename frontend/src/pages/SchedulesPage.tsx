@@ -871,8 +871,8 @@ const SchedulesPage = () => {
                                                 }}
                                             >
                                                 <div className="flex flex-col gap-1">
-                                                    <span className="font-bold text-sm tracking-tight text-white">{wf.name}</span>
-                                                    <span className="text-[9px] opacity-40 uppercase font-black tracking-widest">{wf.inputs?.length || 0} inputs required</span>
+                                                    <span className="font-bold text-sm tracking-tight text-foreground">{wf.name}</span>
+                                                    <span className="text-[9px] text-muted-foreground/60 uppercase font-black tracking-widest">{wf.inputs?.length || 0} inputs required</span>
                                                 </div>
                                                 <Plus className="w-4 h-4 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
                                             </div>
@@ -883,34 +883,20 @@ const SchedulesPage = () => {
                         </DialogContent>
                     </Dialog>
 
-                    <Dialog open={isInputDialogOpen} onOpenChange={setIsInputDialogOpen}>
-                        <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden bg-slate-950 border-white/10 rounded-2xl shadow-2xl">
-                            {pendingWorkflow && (
-                                <>
-                                    <DialogHeader className="p-6 border-b border-white/5 bg-slate-900/40">
-                                        <DialogTitle className="text-xl font-black uppercase tracking-tight text-white flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
-                                                <Zap className="w-4 h-4 text-indigo-400" />
-                                            </div>
-                                            Configure {pendingWorkflow.name}
-                                        </DialogTitle>
-                                    </DialogHeader>
-                                    <WorkflowInputDialog
-                                        inputs={pendingWorkflow.inputs as WorkflowInput[]}
-                                        onConfirm={(values) => {
-                                            addWorkflowToForm(pendingWorkflow, values);
-                                            setIsInputDialogOpen(false);
-                                            setPendingWorkflow(null);
-                                        }}
-                                        onCancel={() => {
-                                            setIsInputDialogOpen(false);
-                                            setPendingWorkflow(null);
-                                        }}
-                                    />
-                                </>
-                            )}
-                        </DialogContent>
-                    </Dialog>
+                    <WorkflowInputDialog
+                        isOpen={isInputDialogOpen}
+                        onOpenChange={setIsInputDialogOpen}
+                        inputs={pendingWorkflow?.inputs as WorkflowInput[] || []}
+                        onConfirm={(values) => {
+                            addWorkflowToForm(pendingWorkflow!, values);
+                            setIsInputDialogOpen(false);
+                            setPendingWorkflow(null);
+                        }}
+                        onCancel={() => {
+                            setIsInputDialogOpen(false);
+                            setPendingWorkflow(null);
+                        }}
+                    />
                 </div>
             </div >
         </>
