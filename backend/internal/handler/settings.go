@@ -50,13 +50,24 @@ func (h *SettingsHandler) UpdateSetting(c *gin.Context) {
 }
 
 func (h *SettingsHandler) GetPublicSettings(c *gin.Context) {
-	// Only return settings that are safe for public consumption
 	allowReg, _ := h.settingsService.GetSetting("allow_registration")
 	if allowReg == "" {
 		allowReg = "false"
 	}
 
+	googleEnabled, _ := h.settingsService.GetSetting("google_auth_enabled")
+	if googleEnabled == "" {
+		googleEnabled = "false"
+	}
+
+	facebookEnabled, _ := h.settingsService.GetSetting("facebook_auth_enabled")
+	if facebookEnabled == "" {
+		facebookEnabled = "false"
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"allow_registration": allowReg == "true",
+		"allow_registration":    allowReg == "true",
+		"google_auth_enabled":   googleEnabled == "true",
+		"facebook_auth_enabled": facebookEnabled == "true",
 	})
 }

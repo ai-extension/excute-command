@@ -484,19 +484,42 @@ func seedLocalServer(db *gorm.DB) {
 }
 
 func seedSystemSettings(db *gorm.DB) {
+	// Seed allow_registration
 	var count int64
 	db.Model(&domain.SystemSetting{}).Where("key = ?", "allow_registration").Count(&count)
 	if count == 0 {
-		log.Println("Seeding system settings...")
-		setting := domain.SystemSetting{
+		log.Println("Seeding system setting: allow_registration...")
+		db.Create(&domain.SystemSetting{
 			ID:    uuid.New(),
 			Key:   "allow_registration",
 			Value: "false",
-		}
-		if err := db.Create(&setting).Error; err != nil {
-			log.Println("Failed to seed system setting:", err)
-		} else {
-			log.Println("System settings seeded successfully.")
+		})
+	}
+
+	// Seed social auth settings
+	socialSettings := []string{
+		"google_auth_enabled",
+		"google_client_id",
+		"google_client_secret",
+		"facebook_auth_enabled",
+		"facebook_client_id",
+		"facebook_client_secret",
+	}
+
+	for _, key := range socialSettings {
+		var c int64
+		db.Model(&domain.SystemSetting{}).Where("key = ?", key).Count(&c)
+		if c == 0 {
+			log.Printf("Seeding system setting: %s...", key)
+			db.Create(&domain.SystemSetting{
+				ID:    uuid.New(),
+				Key:   key,
+				Value: "false", // Default to false for enabled flags, and dummy for IDs
+			})
+			// Adjusting default value for non-enabled keys to empty string
+			if key != "google_auth_enabled" && key != "facebook_auth_enabled" {
+				db.Model(&domain.SystemSetting{}).Where("key = ?", key).Update("value", "")
+			}
 		}
 	}
 }
