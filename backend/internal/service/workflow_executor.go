@@ -427,8 +427,12 @@ func (e *WorkflowExecutor) validateInputs(wf *domain.Workflow, provided map[stri
 			val = input.DefaultValue
 		}
 
+		if input.Required && strings.TrimSpace(val) == "" {
+			return fmt.Errorf("field %s is required", input.Label)
+		}
+
 		if val == "" {
-			continue // Allow empty if allowed by default
+			continue // Allow empty if not required and no default
 		}
 
 		switch input.Type {
