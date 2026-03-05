@@ -183,6 +183,8 @@ const PublicPageView = () => {
         return () => clearInterval(check);
     }, [tokenExpiresAt, isAuthorized]);
 
+    const [completionAlert, setCompletionAlert] = useState<{ show: boolean, status: string, message: string } | null>(null);
+
     // Logs Polling
     useEffect(() => {
         if (!activeExecutionId || !isAuthorized) return;
@@ -202,10 +204,25 @@ const PublicPageView = () => {
 
                 const sData = await sRes.json();
                 if (isMounted) {
-                    setExecutionStatus(sData.status);
-                    if (sData.status === 'SUCCESS' || sData.status === 'FAILED') {
+                    const prevStatus = executionStatus;
+                    const newStatus = sData.status;
+                    setExecutionStatus(newStatus);
+
+                    if (newStatus === 'SUCCESS' || newStatus === 'FAILED') {
                         setIsPollingLogs(false);
                         clearInterval(poll);
+
+                        // Show alert if we just transitioned to a final state during polling
+                        if (prevStatus === 'RUNNING' || prevStatus === 'PENDING') {
+                            setCompletionAlert({
+                                show: true,
+                                status: newStatus,
+                                message: newStatus === 'SUCCESS' ? 'Workflow executed successfully!' : 'Workflow execution failed.'
+                            });
+                            setTimeout(() => {
+                                if (isMounted) setCompletionAlert(null);
+                            }, 5000);
+                        }
                     }
                 }
                 const lRes = await fetch(`${API_BASE_URL}/public/pages/${slug}/executions/${activeExecutionId}/logs`, { headers });
@@ -214,7 +231,7 @@ const PublicPageView = () => {
             } catch (err) { }
         }, 2000);
         return () => { isMounted = false; clearInterval(poll); };
-    }, [activeExecutionId, slug, isAuthorized, pageToken]);
+    }, [activeExecutionId, slug, isAuthorized, pageToken, executionStatus]);
 
     const runWidget = async (widget: PageWidget, inputs: Record<string, string> = {}) => {
         if (widget.type !== 'ENDPOINT' || !widget.workflow_id) {
@@ -330,6 +347,31 @@ const PublicPageView = () => {
 
     return (
         <div className="min-h-screen bg-background text-foreground selection:bg-primary/20 pb-20">
+            {/* Completion Alert Toast */}
+            {completionAlert?.show && (
+                <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[150] animate-in slide-in-from-top-8 fade-in duration-300">
+                    <div className={cn(
+                        "px-6 py-4 rounded-full border shadow-2xl flex items-center gap-3 backdrop-blur-md",
+                        completionAlert.status === 'SUCCESS'
+                            ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500"
+                            : "bg-rose-500/10 border-rose-500/20 text-rose-500"
+                    )}>
+                        {completionAlert.status === 'SUCCESS' ? (
+                            <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+                        ) : (
+                            <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+                        )}
+                        <p className="text-sm font-bold tracking-wide">{completionAlert.message}</p>
+                        <button
+                            onClick={() => setCompletionAlert(null)}
+                            className="ml-4 p-1 rounded-full hover:bg-black/10 transition-colors"
+                        >
+                            <X className="w-4 h-4 opacity-70 hover:opacity-100" />
+                        </button>
+                    </div>
+                </div>
+            )}
+
             <header className="fixed top-0 left-0 right-0 h-1 bg-primary z-50 shadow-lg" />
 
             <main className="max-w-6xl mx-auto px-6 pt-24 pb-32">
