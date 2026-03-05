@@ -29,6 +29,7 @@ type WorkflowExecutor struct {
 	globalVarRepo domain.GlobalVariableRepository
 	serverService *ServerService
 	hub           *Hub
+	activeExecs   sync.Map // map[uuid.UUID]context.CancelFunc
 }
 
 func NewWorkflowExecutor(
@@ -54,7 +55,23 @@ func NewWorkflowExecutor(
 }
 
 func (e *WorkflowExecutor) Run(ctx context.Context, workflowID uuid.UUID, execID uuid.UUID, inputs map[string]string, scheduledID *uuid.UUID, pageID *uuid.UUID, triggerSource string, user *domain.User) error {
-	return e.RunWithDepth(ctx, workflowID, execID, inputs, scheduledID, pageID, triggerSource, 0, user)
+	// Create a cancellable context for this execution
+	execCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	e.activeExecs.Store(execID, cancel)
+	defer e.activeExecs.Delete(execID)
+
+	return e.RunWithDepth(execCtx, workflowID, execID, inputs, scheduledID, pageID, triggerSource, 0, user)
+}
+
+func (e *WorkflowExecutor) StopExecution(execID uuid.UUID) error {
+	if cancelVal, ok := e.activeExecs.Load(execID); ok {
+		cancel := cancelVal.(context.CancelFunc)
+		cancel()
+		return nil
+	}
+	return fmt.Errorf("execution %s not found or already finished", execID)
 }
 
 func (e *WorkflowExecutor) RunWithDepth(ctx context.Context, workflowID uuid.UUID, execID uuid.UUID, inputs map[string]string, scheduledID *uuid.UUID, pageID *uuid.UUID, triggerSource string, depth int, user *domain.User) error {
@@ -126,6 +143,13 @@ func (e *WorkflowExecutor) RunWithDepth(ctx context.Context, workflowID uuid.UUI
 	// Update with log path
 	execution.LogPath = mainLogPath
 	e.execRepo.Update(execution)
+
+	// Apply Timeout if configured (> 0)
+	if wf.TimeoutMinutes > 0 {
+		timeoutCtx, cancelTimeout := context.WithTimeout(ctx, time.Duration(wf.TimeoutMinutes)*time.Minute)
+		defer cancelTimeout()
+		return e.Execute(timeoutCtx, workflowID, execution, depth)
+	}
 
 	return e.Execute(ctx, workflowID, execution, depth)
 }
@@ -270,7 +294,7 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 		// Baseline for remote servers
 		for id := range serverSet {
 			// Get initial physical directory (resolving symlinks) on remote server without logging it
-			out, err := e.serverService.ExecuteCommand(id, "pwd -P", execution.User)
+			out, err := e.serverService.ExecuteCommand(ctx, id, "pwd -P", execution.User)
 			if err == nil {
 				workingDirs.Store(id, filepath.Clean(strings.TrimSpace(out)))
 			}
@@ -298,7 +322,7 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 		for _, path := range cleanupPaths {
 			cmdStr := fmt.Sprintf("rm -f %s", path)
 			for _, serverID := range serverIDs {
-				_, err := e.serverService.ExecuteCommand(serverID, cmdStr, nil, nil, nil) // Trusted: pass nil user
+				_, err := e.serverService.ExecuteCommand(ctx, serverID, cmdStr, nil) // Trusted: pass nil user
 				if err != nil {
 					fmt.Fprintf(logFile, "\033[1;31m✖ Failed: %s (%v)\033[0m\n", path, err)
 				}
@@ -314,13 +338,32 @@ finalize:
 	execution.FinishedAt = &finishedAt
 
 	if runErr != nil {
-		wf.Status = domain.StatusFailed
-		execution.Status = domain.StatusFailed
-		fmt.Fprintf(logFile, "\n\033[1;31m✖ WORKFLOW FAILED: %v\033[0m\n", runErr)
-		e.hub.BroadcastLog(wf.ID.String(), fmt.Sprintf("\n\033[1;31m✖ WORKFLOW FAILED: %v\033[0m", runErr))
+		if ctx.Err() == context.Canceled {
+			// Cancelled explicitly by user
+			wf.Status = domain.StatusCancelled
+			execution.Status = domain.StatusCancelled
+			fmt.Fprintf(logFile, "\n\033[1;33m⏹ WORKFLOW CANCELLED: %v\033[0m\n", runErr)
+			e.hub.BroadcastLog(wf.ID.String(), "\n\033[1;33m⏹ WORKFLOW CANCELLED\033[0m")
+			// We intentionally skip AFTER_FAILED hooks on cancellation as per requirements
+		} else if ctx.Err() == context.DeadlineExceeded {
+			// Timeout
+			wf.Status = domain.StatusFailed
+			execution.Status = domain.StatusFailed
+			fmt.Fprintf(logFile, "\n\033[1;31m✖ WORKFLOW TIMED OUT (Exceeded %d minutes)\033[0m\n", wf.TimeoutMinutes)
+			e.hub.BroadcastLog(wf.ID.String(), fmt.Sprintf("\n\033[1;31m✖ WORKFLOW TIMED OUT (Exceeded %d minutes)\033[0m", wf.TimeoutMinutes))
 
-		// Execute AFTER_FAILED hooks
-		e.RunHooks(ctx, wf.Hooks, domain.HookTypeAfterFailed, wf.NamespaceID, logFile, depth, execution.User)
+			// Execute AFTER_FAILED hooks
+			e.RunHooks(context.Background(), wf.Hooks, domain.HookTypeAfterFailed, wf.NamespaceID, logFile, depth, execution.User)
+		} else {
+			// Actual failure
+			wf.Status = domain.StatusFailed
+			execution.Status = domain.StatusFailed
+			fmt.Fprintf(logFile, "\n\033[1;31m✖ WORKFLOW FAILED: %v\033[0m\n", runErr)
+			e.hub.BroadcastLog(wf.ID.String(), fmt.Sprintf("\n\033[1;31m✖ WORKFLOW FAILED: %v\033[0m", runErr))
+
+			// Execute AFTER_FAILED hooks
+			e.RunHooks(ctx, wf.Hooks, domain.HookTypeAfterFailed, wf.NamespaceID, logFile, depth, execution.User)
+		}
 	} else {
 		wf.Status = domain.StatusSuccess
 		execution.Status = domain.StatusSuccess
@@ -529,6 +572,15 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 
 		for err := range errs {
 			if err != nil {
+				if ctx.Err() != nil {
+					group.Status = domain.StatusCancelled
+					e.groupRepo.Update(group)
+					e.hub.BroadcastStatus(group.ID.String(), "group", string(domain.StatusCancelled))
+					msg := fmt.Sprintf("\n\033[1;33m⏹ GROUP CANCELLED: %s\033[0m\n", group.Name)
+					fmt.Fprint(logFile, msg)
+					e.hub.BroadcastLog(workflowID.String(), msg)
+					return err
+				}
 				group.Status = domain.StatusFailed
 				e.groupRepo.Update(group)
 				e.hub.BroadcastStatus(group.ID.String(), "group", string(domain.StatusFailed))
@@ -544,6 +596,15 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 	} else {
 		for i := range group.Steps {
 			if err := e.runStep(ctx, &group.Steps[i], inputs, variables, groupResults, effectiveServerID, logFile, workflowID, executionID, namespaceID, user, workingDirs); err != nil {
+				if ctx.Err() != nil {
+					group.Status = domain.StatusCancelled
+					e.groupRepo.Update(group)
+					e.hub.BroadcastStatus(group.ID.String(), "group", string(domain.StatusCancelled))
+					msg := fmt.Sprintf("\n\033[1;33m⏹ GROUP CANCELLED: %s\033[0m\n", group.Name)
+					fmt.Fprint(logFile, msg)
+					e.hub.BroadcastLog(workflowID.String(), msg)
+					return err
+				}
 				group.Status = domain.StatusFailed
 				e.groupRepo.Update(group)
 				e.hub.BroadcastStatus(group.ID.String(), "group", string(domain.StatusFailed))
@@ -570,6 +631,15 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 
 		if group.CopySourcePath != "" && group.CopyTargetPath != "" {
 			if err := e.relayCopy(ctx, group, inputs, variables, groupResults, namespaceID, effectiveServerID, logFile, workflowID, user); err != nil {
+				if ctx.Err() != nil {
+					group.Status = domain.StatusCancelled
+					e.groupRepo.Update(group)
+					e.hub.BroadcastStatus(group.ID.String(), "group", string(domain.StatusCancelled))
+					msg := "\033[1;33m⏹ Relay copy cancelled\033[0m\n"
+					fmt.Fprint(logFile, msg)
+					e.hub.BroadcastLog(workflowID.String(), msg)
+					return err
+				}
 				errMsg := fmt.Sprintf("\033[1;31m✖ Relay copy failed: %v\033[0m\n", err)
 				fmt.Fprint(logFile, errMsg)
 				e.hub.BroadcastLog(workflowID.String(), errMsg)
@@ -634,11 +704,11 @@ func (e *WorkflowExecutor) relayCopy(ctx context.Context, group *domain.Workflow
 
 	// Use tar -czf to create a compressed archive. Use -C to change directory so the path in tar is relative.
 	tarCmd := fmt.Sprintf("tar -czf /tmp/%s -C %s %s", tmpTarName, strconv.Quote(sourceDir), strconv.Quote(sourceBase))
-	_, err = e.serverService.ExecuteCommand(sourceServerID, tarCmd, nil) // Trusted: pass nil user
+	_, err = e.serverService.ExecuteCommand(ctx, sourceServerID, tarCmd, nil) // Trusted: pass nil user
 	if err != nil {
 		return fmt.Errorf("failed to create tarball on source: %w", err)
 	}
-	defer e.serverService.ExecuteCommand(sourceServerID, fmt.Sprintf("rm -f /tmp/%s", tmpTarName), nil) // Trusted: pass nil user
+	defer e.serverService.ExecuteCommand(context.Background(), sourceServerID, fmt.Sprintf("rm -f /tmp/%s", tmpTarName), nil) // Trusted: pass nil user
 
 	// 2. Download tarball to backend
 	localTmpDir := filepath.Join("data", "tmp", "relay")
@@ -657,14 +727,14 @@ func (e *WorkflowExecutor) relayCopy(ctx context.Context, group *domain.Workflow
 	if err != nil {
 		return fmt.Errorf("failed to upload tarball to target: %w", err)
 	}
-	defer e.serverService.ExecuteCommand(group.CopyTargetServerID, fmt.Sprintf("rm -f /tmp/%s", tmpTarName), nil) // Trusted: pass nil user
+	defer e.serverService.ExecuteCommand(context.Background(), group.CopyTargetServerID, fmt.Sprintf("rm -f /tmp/%s", tmpTarName), nil) // Trusted: pass nil user
 
 	// 4. Extract tarball on target server
 	mkdirCmd := fmt.Sprintf("mkdir -p %s", strconv.Quote(targetPath))
-	e.serverService.ExecuteCommand(group.CopyTargetServerID, mkdirCmd, nil) // Trusted: pass nil user
+	e.serverService.ExecuteCommand(ctx, group.CopyTargetServerID, mkdirCmd, nil) // Trusted: pass nil user
 
 	extractCmd := fmt.Sprintf("tar -xzf /tmp/%s -C %s", tmpTarName, strconv.Quote(targetPath))
-	_, err = e.serverService.ExecuteCommand(group.CopyTargetServerID, extractCmd, nil) // Trusted: pass nil user
+	_, err = e.serverService.ExecuteCommand(ctx, group.CopyTargetServerID, extractCmd, nil) // Trusted: pass nil user
 	if err != nil {
 		return fmt.Errorf("failed to extract tarball on target: %w", err)
 	}
@@ -771,7 +841,7 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 				marker:     cwdMarker,
 			}
 
-			_, err = e.serverService.ExecuteCommand(targetServerID, command, nil, filter) // Trusted: pass nil user
+			_, err = e.serverService.ExecuteCommand(ctx, targetServerID, command, nil, filter) // Trusted: pass nil user
 			filter.Finalize()
 			output = out.String()
 			if filter.found {
@@ -790,9 +860,27 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 
 	step.Output = output
 	if err != nil {
+		if ctx.Err() != nil {
+			step.Status = domain.StatusCancelled
+			e.stepRepo.Update(step)
+			e.hub.BroadcastStatus(step.ID.String(), "step", string(domain.StatusCancelled))
+
+			stepExec.Status = domain.StatusCancelled
+			stepExec.Output = step.Output
+			finishedAt := time.Now()
+			stepExec.FinishedAt = &finishedAt
+			e.execRepo.CreateStepResult(stepExec)
+			return err
+		}
 		step.Status = domain.StatusFailed
 		e.stepRepo.Update(step)
 		e.hub.BroadcastStatus(step.ID.String(), "step", string(domain.StatusFailed))
+
+		stepExec.Status = domain.StatusFailed
+		stepExec.Output = step.Output
+		finishedAt := time.Now()
+		stepExec.FinishedAt = &finishedAt
+		e.execRepo.CreateStepResult(stepExec)
 		return err
 	}
 

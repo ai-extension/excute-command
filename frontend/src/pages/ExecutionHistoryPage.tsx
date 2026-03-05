@@ -34,6 +34,7 @@ import { API_BASE_URL } from '../lib/api';
 import ExecutionMonitor from '../components/ExecutionMonitor';
 import WorkflowRunner from '../components/WorkflowRunner';
 import { Pagination } from '../components/Pagination';
+import WorkflowHistory from '../components/WorkflowHistory';
 
 const ExecutionHistoryPage = () => {
     const { apiFetch } = useAuth();
@@ -259,137 +260,13 @@ const ExecutionHistoryPage = () => {
                     {/* Main Content */}
                     <div className="bg-card/30 backdrop-blur-sm rounded-3xl border border-border p-6 shadow-premium relative overflow-hidden flex-1 flex flex-col min-h-0">
                         <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
-
-                        {error ? (
-                            <div className="flex-1 flex flex-col items-center justify-center gap-6 py-20 bg-destructive/5 rounded-2xl border border-dashed border-destructive/20 animate-in fade-in zoom-in-95 duration-300">
-                                <div className="w-20 h-20 rounded-full bg-destructive/10 flex items-center justify-center">
-                                    <XCircle className="w-10 h-10 text-destructive" />
-                                </div>
-                                <div className="text-center space-y-1">
-                                    <p className="text-sm font-bold text-destructive uppercase tracking-widest">Audit Log Synchronization Failure</p>
-                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium max-w-sm mx-auto">{error}</p>
-                                </div>
-                                <Button
-                                    onClick={() => fetchHistory()}
-                                    variant="outline"
-                                    className="px-8 rounded-xl border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive font-bold uppercase tracking-widest text-[10px]"
-                                >
-                                    Retry Synchronization
-                                </Button>
-                            </div>
-                        ) : loading && executions.length === 0 ? (
-                            <div className="flex-1 flex flex-col items-center justify-center gap-4">
-                                <Loader2 className="w-10 h-10 animate-spin text-primary opacity-50" />
-                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground animate-pulse">Initializing Historical Data...</p>
-                            </div>
-                        ) : executions.length === 0 ? (
-                            <div className="flex-1 flex flex-col items-center justify-center gap-6 py-20 bg-background/5 rounded-2xl border border-dashed border-border/50">
-                                <div className="w-20 h-20 rounded-full bg-muted/30 flex items-center justify-center animate-hover">
-                                    <History className="w-10 h-10 text-muted-foreground/30" />
-                                </div>
-                                <div className="text-center space-y-1">
-                                    <p className="text-sm font-bold text-foreground">No executions discovered</p>
-                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Try refining your search or execute a workflow to begin</p>
-                                </div>
-                                <Button onClick={() => window.location.href = '/workflows'} className="h-9 px-6 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-primary/10">
-                                    Navigate to Blueprints
-                                </Button>
-                            </div>
-                        ) : (
-                            <div className="overflow-y-auto flex-1 pr-2 custom-scrollbar flex flex-col">
-                                <div className="space-y-3 flex-1">
-                                    {executions.map((exec: WorkflowExecution) => (
-                                        <Card
-                                            key={exec.id}
-                                            className="bg-card hover:bg-muted/50 border-border/50 hover:border-primary/20 transition-all duration-300 cursor-pointer group shadow-sm hover:translate-x-1"
-                                            onClick={() => fetchExecutionDetail(exec)}
-                                        >
-                                            <CardContent className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                                                <div className="flex items-center gap-5">
-                                                    <div className={cn(
-                                                        "w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border transition-all duration-300 group-hover:scale-110 shadow-inner",
-                                                        exec.status === 'SUCCESS' ? 'bg-green-500/10 border-green-500/20 text-green-500' :
-                                                            exec.status === 'FAILED' ? 'bg-red-500/10 border-red-500/20 text-red-500' :
-                                                                'bg-blue-500/10 border-blue-500/20 text-blue-500 animate-pulse'
-                                                    )}>
-                                                        <Zap className={cn("w-5 h-5", exec.status === 'RUNNING' && 'animate-spin-slow')} />
-                                                    </div>
-
-                                                    <div className="space-y-1">
-                                                        <div className="flex items-center gap-3">
-                                                            <h3 className="font-bold text-sm text-foreground tracking-tight group-hover:text-primary transition-colors">
-                                                                {exec.workflow?.name || 'TERMINATED_FLOW'}
-                                                            </h3>
-                                                            {getStatusBadge(exec.status)}
-                                                            {getTriggerBadge(exec)}
-                                                        </div>
-                                                        <div className="flex items-center gap-4 text-[10px] text-muted-foreground font-bold tracking-wider uppercase opacity-80">
-                                                            <span className="flex items-center gap-1.5 font-mono text-primary/60">
-                                                                <FileText className="w-3 h-3" />
-                                                                #{exec.id.slice(0, 8)}
-                                                            </span>
-                                                            <span className="flex items-center gap-1.5">
-                                                                <Calendar className="w-3 h-3" />
-                                                                {format(new Date(exec.started_at), 'MMM d, HH:mm:ss')}
-                                                            </span>
-                                                            <span className="flex items-center gap-1.5">
-                                                                <Clock className="w-3 h-3" />
-                                                                {getDuration(exec.started_at, exec.finished_at)}
-                                                            </span>
-                                                            {exec.user?.username && (
-                                                                <span className="flex items-center gap-1.5 text-indigo-400/70 normal-case">
-                                                                    <div className="h-3.5 w-3.5 rounded-full bg-indigo-500/20 flex items-center justify-center text-[7px] font-black text-indigo-400 uppercase">
-                                                                        {exec.user.username[0]}
-                                                                    </div>
-                                                                    {exec.user.username}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="h-9 px-4 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground group-hover:bg-primary group-hover:text-white transition-all shadow-input"
-                                                >
-                                                    InSPECT_TRaCE
-                                                    <ChevronRight className="w-3.5 h-3.5 ml-2" />
-                                                </Button>
-                                            </CardContent>
-                                        </Card>
-                                    ))}
-                                </div>
-                                <div className="mt-6 border-t border-border pt-4">
-                                    <Pagination
-                                        total={total}
-                                        offset={offset}
-                                        limit={limit}
-                                        itemName="Executions"
-                                        onPageChange={setOffset}
-                                    />
-                                </div>
-                            </div>
-                        )}
+                        <div className="overflow-y-auto flex-1 custom-scrollbar">
+                            <WorkflowHistory
+                                namespaceId={activeNamespace?.id}
+                                onReRun={(wf: any, inputs: any) => runWorkflow(wf, inputs)}
+                            />
+                        </div>
                     </div>
-
-                    {/* Log Viewer Dialog */}
-                    <Dialog open={!!selectedExec} onOpenChange={(open: boolean) => !open && setSelectedExec(null)}>
-                        <DialogContent hideClose className="max-w-5xl w-[90vw] h-[85vh] p-0 overflow-hidden bg-slate-950 border-white/10">
-                            {loadingDetail ? (
-                                <div className="h-full flex items-center justify-center">
-                                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                                </div>
-                            ) : selectedExec && (
-                                <ExecutionMonitor
-                                    mode="HISTORICAL"
-                                    execution={selectedExec}
-                                    onClose={() => setSelectedExec(null)}
-                                    onReRun={(wf, inputs) => runWorkflow({ ...wf, id: selectedExec.workflow_id }, inputs)}
-                                />
-                            )}
-                        </DialogContent>
-                    </Dialog>
                 </div>
             )
             }

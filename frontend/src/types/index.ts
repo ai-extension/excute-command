@@ -1,4 +1,4 @@
-export type Status = 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILED';
+export type Status = 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'CANCELLED';
 
 
 export interface VpnConfig {
@@ -107,6 +107,7 @@ export interface Workflow {
     description: string;
     default_server_id?: string;
     status: Status;
+    timeout_minutes?: number;
     inputs?: WorkflowInput[];
     variables?: WorkflowVariable[];
     groups?: WorkflowGroup[];

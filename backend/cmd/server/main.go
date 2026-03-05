@@ -223,6 +223,7 @@ func main() {
 
 			protected.GET("/workflows/:id/executions", middleware.RBACMiddleware(userRepo, "workflows", "READ"), workflowHandler.ListExecutions)
 			protected.GET("/executions/:id", middleware.RBACMiddleware(userRepo, "workflows", "READ"), workflowHandler.GetExecution)
+			protected.POST("/executions/:id/stop", middleware.RBACMiddleware(userRepo, "workflows", "EXECUTE"), workflowHandler.StopExecution)
 			protected.GET("/executions/:id/logs", middleware.RBACMiddleware(userRepo, "workflows", "READ"), workflowHandler.GetExecutionLogs)
 
 			// Global Variables

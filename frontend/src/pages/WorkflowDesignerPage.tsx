@@ -44,6 +44,7 @@ const WorkflowDesignerPage = () => {
     const [defaultServerId, setDefaultServerId] = useState<string | undefined>(undefined);
     const [targetFolder, setTargetFolder] = useState<string>('');
     const [cleanupFiles, setCleanupFiles] = useState<boolean>(false);
+    const [timeoutMinutes, setTimeoutMinutes] = useState<number>(15);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [openSettingsGroupIdx, setOpenSettingsGroupIdx] = useState<number | null>(null);
@@ -100,6 +101,7 @@ const WorkflowDesignerPage = () => {
                 setDefaultServerId(defaultServerIdVal);
                 setTargetFolder(data.target_folder || '');
                 setCleanupFiles(!!data.cleanup_files);
+                setTimeoutMinutes(data.timeout_minutes || 15);
                 setTags(data.tags || []);
                 setIsTemplate(!!data.is_template);
 
@@ -157,6 +159,7 @@ const WorkflowDesignerPage = () => {
                 default_server_id: defaultServerId || undefined,
                 target_folder: targetFolder,
                 cleanup_files: cleanupFiles,
+                timeout_minutes: timeoutMinutes,
                 is_template: isTemplate,
                 namespace_id: activeNamespace.id,
                 tags,
@@ -435,6 +438,17 @@ const WorkflowDesignerPage = () => {
                                                                 value={description}
                                                                 onChange={(e) => setDescription(e.target.value)}
                                                                 placeholder="What is the objective of this automation?"
+                                                                className="bg-background border-border h-10 text-sm font-medium"
+                                                            />
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Execution Timeout (Minutes)</label>
+                                                            <Input
+                                                                type="number"
+                                                                min="0"
+                                                                value={timeoutMinutes}
+                                                                onChange={(e) => setTimeoutMinutes(parseInt(e.target.value) || 0)}
+                                                                placeholder="Default: 15 (0 for unlimited)"
                                                                 className="bg-background border-border h-10 text-sm font-medium"
                                                             />
                                                         </div>

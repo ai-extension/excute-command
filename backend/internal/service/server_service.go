@@ -76,9 +76,9 @@ func (s *ServerService) DeleteServer(id uuid.UUID, user *domain.User) error {
 	return s.repo.Delete(id)
 }
 
-func (s *ServerService) ExecuteCommand(serverID uuid.UUID, commandText string, user *domain.User, writers ...io.Writer) (string, error) {
+func (s *ServerService) ExecuteCommand(ctx context.Context, serverID uuid.UUID, commandText string, user *domain.User, writers ...io.Writer) (string, error) {
 	if serverID == domain.LocalServerID || serverID == uuid.Nil {
-		return s.executeLocalCommand(commandText, writers...)
+		return s.executeLocalCommand(ctx, commandText, writers...)
 	}
 
 	var server *domain.Server
@@ -118,7 +118,26 @@ func (s *ServerService) ExecuteCommand(serverID uuid.UUID, commandText string, u
 	session.Stdout = io.MultiWriter(stdoutWriters...)
 	session.Stderr = io.MultiWriter(stderrWriters...)
 
+	// Handle context cancellation
+	done := make(chan struct{})
+	defer close(done)
+
+	go func() {
+		select {
+		case <-ctx.Done():
+			// Forcefully close session and client on cancellation
+			session.Close()
+			client.Close()
+		case <-done:
+			// Normal completion
+		}
+	}()
+
 	if err := session.Run(commandText); err != nil {
+		// If the error is due to context cancellation, return that instead of SSH error
+		if ctx.Err() != nil {
+			return stdout.String() + stderr.String(), ctx.Err()
+		}
 		return stdout.String() + stderr.String(), fmt.Errorf("failed to run command: %w", err)
 	}
 
@@ -361,8 +380,8 @@ func (s *ServerService) uploadFileViaSSH(client *ssh.Client, localFile *os.File,
 	return nil
 }
 
-func (s *ServerService) executeLocalCommand(commandText string, writers ...io.Writer) (string, error) {
-	cmd := exec.Command("sh", "-c", commandText)
+func (s *ServerService) executeLocalCommand(ctx context.Context, commandText string, writers ...io.Writer) (string, error) {
+	cmd := exec.CommandContext(ctx, "sh", "-c", commandText)
 	var stdout, stderr bytes.Buffer
 
 	stdoutWriters := append([]io.Writer{&stdout}, writers...)
@@ -424,7 +443,7 @@ func (s *ServerService) GetServerMetrics(id uuid.UUID, user *domain.User) (*doma
 		echo "$cpu|$ram|$disk|$uptime"
 	`
 
-	output, err := s.ExecuteCommand(id, monitorCmd, user)
+	output, err := s.ExecuteCommand(context.Background(), id, monitorCmd, user)
 	if err != nil {
 		return nil, err
 	}

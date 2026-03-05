@@ -508,3 +508,41 @@ func (h *WorkflowHandler) CloneWorkflow(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, clone)
 }
+
+func (h *WorkflowHandler) StopExecution(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid execution id"})
+		return
+	}
+
+	userVal, _ := c.Get("user")
+	user := userVal.(*domain.User)
+
+	execution, err := h.service.GetExecution(id, user)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "execution not found"})
+		return
+	}
+
+	// Permission check: Need EXECUTE on the workflow
+	wf, err := h.service.GetWorkflow(execution.WorkflowID, user)
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "permission denied to stop this execution"})
+		return
+	}
+	nsIDStr := wf.NamespaceID.String()
+	resIDStr := wf.ID.String()
+	if !domain.HasPermission(user, "workflows", "EXECUTE", &nsIDStr, &resIDStr, nil) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "permission denied to stop this execution"})
+		return
+	}
+
+	if err := h.executor.StopExecution(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Execution stop signal sent"})
+}

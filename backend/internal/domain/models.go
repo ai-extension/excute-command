@@ -9,10 +9,11 @@ import (
 type Status string
 
 const (
-	StatusPending Status = "PENDING"
-	StatusRunning Status = "RUNNING"
-	StatusSuccess Status = "SUCCESS"
-	StatusFailed  Status = "FAILED"
+	StatusPending   Status = "PENDING"
+	StatusRunning   Status = "RUNNING"
+	StatusSuccess   Status = "SUCCESS"
+	StatusFailed    Status = "FAILED"
+	StatusCancelled Status = "CANCELLED"
 )
 
 var LocalServerID = uuid.MustParse("00000000-0000-0000-0000-000000000001")
@@ -231,6 +232,7 @@ type Workflow struct {
 	Description       string             `json:"description"`
 	DefaultServerID   uuid.UUID          `json:"default_server_id,omitempty" gorm:"type:uuid"`
 	Status            Status             `json:"status"`
+	TimeoutMinutes    int                `json:"timeout_minutes" gorm:"default:15"`
 	IsTemplate        bool               `json:"is_template" gorm:"default:false"`
 	TriggerSource     string             `json:"trigger_source,omitempty" gorm:"size:50"` // For templates or specific defaults
 	Inputs            []WorkflowInput    `json:"inputs,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`

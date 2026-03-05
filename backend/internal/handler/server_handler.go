@@ -133,7 +133,7 @@ func (h *ServerHandler) ExecuteCommand(c *gin.Context) {
 	}
 
 	user, _ := c.Get("user")
-	output, err := h.service.ExecuteCommand(id, req.CommandText, user.(*domain.User))
+	output, err := h.service.ExecuteCommand(c.Request.Context(), id, req.CommandText, user.(*domain.User))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "output": output})
 		return

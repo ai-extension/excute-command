@@ -31,11 +31,12 @@ import { cn } from '../lib/utils';
 const PAGE_SIZE = 20;
 
 interface WorkflowHistoryProps {
-    workflowId: string;
+    workflowId?: string;
+    namespaceId?: string;
     onReRun?: (workflow: any, inputs: Record<string, string>) => void;
 }
 
-const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({ workflowId, onReRun }) => {
+const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({ workflowId, namespaceId, onReRun }) => {
     const { apiFetch } = useAuth();
     const [executions, setExecutions] = useState<WorkflowExecution[]>([]);
     const [loading, setLoading] = useState(true);
@@ -50,9 +51,16 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({ workflowId, onReRun }
         else setLoadingMore(true);
 
         try {
-            const response = await apiFetch(
-                `${API_BASE_URL}/workflows/${workflowId}/executions?limit=${PAGE_SIZE}&offset=${currentOffset}`
-            );
+            let url = '';
+            if (workflowId) {
+                url = `${API_BASE_URL}/workflows/${workflowId}/executions?limit=${PAGE_SIZE}&offset=${currentOffset}`;
+            } else if (namespaceId) {
+                url = `${API_BASE_URL}/namespaces/${namespaceId}/executions?limit=${PAGE_SIZE}&offset=${currentOffset}`;
+            } else {
+                return;
+            }
+
+            const response = await apiFetch(url);
             if (response.ok) {
                 const data = await response.json();
                 const items: WorkflowExecution[] = Array.isArray(data) ? data : (data.items || []);
@@ -77,9 +85,9 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({ workflowId, onReRun }
     };
 
     useEffect(() => {
-        if (workflowId) refresh();
+        if (workflowId || namespaceId) refresh();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [workflowId]);
+    }, [workflowId, namespaceId]);
 
     const fetchExecutionDetail = async (exec: WorkflowExecution) => {
         try {
@@ -99,6 +107,8 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({ workflowId, onReRun }
                 return <Badge className="bg-green-500/10 text-green-500 hover:bg-green-500/20 border-green-500/20"><CheckCircle2 className="w-3 h-3 mr-1" />Success</Badge>;
             case 'FAILED':
                 return <Badge variant="destructive" className="bg-red-500/10 text-red-500 border-red-500/20"><XCircle className="w-3 h-3 mr-1" />Failed</Badge>;
+            case 'CANCELLED':
+                return <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">Cancelled</Badge>;
             case 'RUNNING':
                 return <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20"><Loader2 className="w-3 h-3 mr-1 animate-spin" />Running</Badge>;
             default:
@@ -178,7 +188,7 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({ workflowId, onReRun }
             {executions.length === 0 ? (
                 <div className="text-center py-12 bg-white/5 border border-dashed rounded-lg">
                     <History className="w-8 h-8 mx-auto text-muted-foreground animate-pulse mb-2" />
-                    <p className="text-sm text-muted-foreground">No execution history found for this workflow.</p>
+                    <p className="text-sm text-muted-foreground">No execution history found.</p>
                 </div>
             ) : (
                 <div className="space-y-2 px-1">
@@ -193,7 +203,8 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({ workflowId, onReRun }
                                     <div className={cn(
                                         "w-1 h-10 rounded-full shrink-0",
                                         exec.status === 'SUCCESS' ? 'bg-green-500' :
-                                            exec.status === 'FAILED' ? 'bg-red-500' : 'bg-blue-500'
+                                            exec.status === 'FAILED' ? 'bg-red-500' :
+                                                exec.status === 'CANCELLED' ? 'bg-yellow-500' : 'bg-blue-500'
                                     )} />
                                     <div className="space-y-1">
                                         <div className="flex items-center gap-2 flex-wrap">

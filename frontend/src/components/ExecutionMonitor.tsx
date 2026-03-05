@@ -7,6 +7,14 @@ import {
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter
+} from './ui/dialog';
 import { cn } from '../lib/utils';
 import { Workflow, WorkflowGroup, WorkflowStep, WorkflowExecution } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -38,6 +46,7 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
     const [stepLogs, setStepLogs] = useState<string[]>([]);
     const [isStatusWSReady, setIsStatusWSReady] = useState(false);
     const [isTerminalReady, setIsTerminalReady] = useState(false);
+    const [showStopConfirm, setShowStopConfirm] = useState(false);
     const { apiFetch } = useAuth();
     const workflowID = workflow?.id;
 
@@ -187,6 +196,26 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
         return step?.status || 'PENDING';
     };
 
+    const handleStop = async () => {
+        const execID = (mode === 'LIVE' ? (workflow as any)?.execution_id : execution?.id);
+        if (!execID) return;
+
+        setShowStopConfirm(false);
+        try {
+            await apiFetch(`${API_BASE_URL}/executions/${execID}/stop`, {
+                method: 'POST'
+            });
+            // Status will be updated via WebSocket in Live mode
+            if (mode === 'HISTORICAL') {
+                // For historical, we just refresh if possible or show message
+                alert('Stop signal sent.');
+            }
+        } catch (err) {
+            console.error('Failed to stop execution:', err);
+            alert('Failed to stop execution');
+        }
+    };
+
     return (
         <div className="flex flex-col h-full bg-background animate-in fade-in zoom-in-95 duration-300 max-h-full overflow-hidden">
             {/* Header */}
@@ -230,7 +259,19 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                     </div>
                 </div>
                 <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 mr-2">
+                    <div className="flex items-center gap-1 mr-2">
+                        {((mode === 'LIVE' && (workflow.status === 'RUNNING' || workflow.status === 'PENDING')) ||
+                            (mode === 'HISTORICAL' && (execution?.status === 'RUNNING' || execution?.status === 'PENDING'))) && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={handleStop}
+                                    className="h-7 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest text-destructive hover:text-white hover:bg-destructive/90 border border-destructive/20 hover:border-destructive transition-all mr-1 group"
+                                >
+                                    <Square className="w-3 h-3 mr-2 fill-current opacity-50 group-hover:opacity-100 transition-opacity" />
+                                    Stop Execution
+                                </Button>
+                            )}
                         <Button
                             variant="ghost"
                             size="sm"
@@ -416,6 +457,27 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                     </div>
                 </div>
             </div>
+
+            {/* Stop Confirmation Dialog */}
+            <Dialog open={showStopConfirm} onOpenChange={setShowStopConfirm}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Stop Execution</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to forcefully stop this workflow execution?
+                            This will immediately terminate all active processes.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="mt-4">
+                        <Button variant="outline" onClick={() => setShowStopConfirm(false)}>
+                            Cancel
+                        </Button>
+                        <Button variant="destructive" onClick={handleStop}>
+                            Stop Execution
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div >
     );
 };
