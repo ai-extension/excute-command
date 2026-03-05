@@ -108,6 +108,10 @@ func (e *WorkflowExecutor) RunWithDepth(ctx context.Context, workflowID uuid.UUI
 		if user != nil {
 			execution.ExecutedBy = &user.ID
 			execution.User = user
+		} else if execution.User == nil && execution.ExecutedBy != nil {
+			// If we have an ID but still no user object (repo fallback/missing preload),
+			// and we were passed a user, use it.
+			execution.User = user
 		}
 		e.execRepo.Create(execution)
 	} else {
@@ -152,8 +156,9 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 		} else {
 			executedBy = execution.User.Username
 		}
-	} else if execution.ExecutedBy == nil {
-		executedBy = "System"
+	} else if execution.ExecutedBy != nil {
+		// Fallback to ID string if user object is still missing despite having an ID
+		executedBy = execution.ExecutedBy.String()
 	}
 
 	fmt.Fprintf(logFile, "\033[1;36m▶ WORKFLOW: %s\033[0m\n", wf.Name)

@@ -112,6 +112,7 @@ func (h *ScheduleHandler) Create(c *gin.Context) {
 		NextRunAt      string `json:"next_run_at"`
 		Retries        int    `json:"retries"`
 		Status         string `json:"status"`
+		CatchUp        bool   `json:"catch_up"`
 		Workflows      []struct {
 			ID     uuid.UUID `json:"id"`
 			Inputs string    `json:"inputs"`
@@ -137,6 +138,7 @@ func (h *ScheduleHandler) Create(c *gin.Context) {
 		CronExpression: req.CronExpression,
 		Status:         status,
 		Retries:        req.Retries,
+		CatchUp:        req.CatchUp,
 		Hooks:          req.Hooks,
 		Tags:           req.Tags,
 	}
@@ -218,6 +220,7 @@ func (h *ScheduleHandler) Update(c *gin.Context) {
 		NextRunAt      string `json:"next_run_at"`
 		Retries        int    `json:"retries"`
 		Status         string `json:"status"`
+		CatchUp        bool   `json:"catch_up"`
 		Workflows      []struct {
 			ID     uuid.UUID `json:"id"`
 			Inputs string    `json:"inputs"`
@@ -242,6 +245,7 @@ func (h *ScheduleHandler) Update(c *gin.Context) {
 	schedule.Type = domain.ScheduleType(req.Type)
 	schedule.CronExpression = req.CronExpression
 	schedule.Retries = req.Retries
+	schedule.CatchUp = req.CatchUp
 	if req.Status != "" {
 		schedule.Status = req.Status
 	}

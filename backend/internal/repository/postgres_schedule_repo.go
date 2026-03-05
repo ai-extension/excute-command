@@ -22,6 +22,7 @@ func (r *PostgresScheduleRepo) GetByID(id uuid.UUID, scope *domain.PermissionSco
 	var s domain.Schedule
 	db := applyScope(r.db, scope, "schedule_tags", "schedule_id")
 	if err := db.
+		Preload("User").
 		Preload("ScheduledWorkflows").
 		Preload("ScheduledWorkflows.Workflow").
 		Preload("Hooks", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
@@ -38,6 +39,7 @@ func (r *PostgresScheduleRepo) List(namespaceID uuid.UUID, scope *domain.Permiss
 	var ss []domain.Schedule
 	db := applyScope(r.db, scope, "schedule_tags", "schedule_id")
 	if err := db.
+		Preload("User").
 		Preload("ScheduledWorkflows").
 		Preload("ScheduledWorkflows.Workflow").
 		Preload("Hooks", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
@@ -74,6 +76,7 @@ func (r *PostgresScheduleRepo) ListPaginated(namespaceID uuid.UUID, limit, offse
 	}
 
 	if err := db.
+		Preload("User").
 		Preload("ScheduledWorkflows").
 		Preload("ScheduledWorkflows.Workflow").
 		Preload("Hooks", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
@@ -106,6 +109,7 @@ func (r *PostgresScheduleRepo) ListGlobalPaginated(limit, offset int, searchTerm
 	}
 
 	if err := db.
+		Preload("User").
 		Preload("ScheduledWorkflows").
 		Preload("ScheduledWorkflows.Workflow").
 		Preload("Hooks", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
@@ -159,6 +163,7 @@ func (r *PostgresScheduleRepo) RemoveWorkflows(scheduleID uuid.UUID) error {
 func (r *PostgresScheduleRepo) ListActive() ([]domain.Schedule, error) {
 	var schedules []domain.Schedule
 	if err := r.db.
+		Preload("User").
 		Preload("ScheduledWorkflows").
 		Preload("ScheduledWorkflows.Workflow").
 		Preload("Hooks", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).

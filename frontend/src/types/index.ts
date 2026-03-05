@@ -215,6 +215,7 @@ export interface Schedule {
     next_run_at?: string;
     status: 'ACTIVE' | 'PAUSED';
     retries: number;
+    catch_up: boolean;
     created_by?: string;
     created_by_username?: string;
     created_at: string;

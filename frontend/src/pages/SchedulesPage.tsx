@@ -39,6 +39,7 @@ import { AlertCircle } from 'lucide-react';
 import ScheduleCalendar from '../components/ScheduleCalendar';
 import HookManager from '../components/HookManager';
 import { WorkflowHook } from '../types';
+import { Switch } from '../components/ui/switch';
 
 const SchedulesPage = () => {
     const navigate = useNavigate();
@@ -68,7 +69,8 @@ const SchedulesPage = () => {
         retries: 0,
         workflows: [] as { id: string, name: string, inputs: string }[],
         hooks: [] as WorkflowHook[],
-        tags: [] as Tag[]
+        tags: [] as Tag[],
+        catch_up: false
     });
 
     const [isEditing, setIsEditing] = useState(false);
@@ -178,7 +180,7 @@ const SchedulesPage = () => {
                 setIsCreateOpen(false);
                 setIsEditing(false);
                 setEditingID(null);
-                setFormData({ name: '', type: 'ONE_TIME', cron_expression: '', next_run_at: '', status: 'ACTIVE', retries: 0, workflows: [], hooks: [], tags: [] });
+                setFormData({ name: '', type: 'ONE_TIME', cron_expression: '', next_run_at: '', status: 'ACTIVE', retries: 0, workflows: [], hooks: [], tags: [], catch_up: false });
                 setActiveDialogTab('config');
             }
         } catch (error) {
@@ -249,7 +251,8 @@ const SchedulesPage = () => {
                 inputs: sw.inputs || '{}'
             })) || [],
             hooks: schedule.hooks || [],
-            tags: schedule.tags || []
+            tags: schedule.tags || [],
+            catch_up: schedule.catch_up || false
         });
         setIsCreateOpen(true);
     };
@@ -272,10 +275,13 @@ const SchedulesPage = () => {
             retries: 0,
             workflows: [],
             hooks: [],
-            tags: []
+            tags: [],
+            catch_up: false
         });
         setIsCreateOpen(true);
     };
+
+
 
     const handleSelectWorkflow = (wf: Workflow) => {
         if (wf.inputs && wf.inputs.length > 0) {
@@ -391,13 +397,32 @@ const SchedulesPage = () => {
                                             ) : (
                                                 <>
                                                     <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Next Run (ISO)</Label>
-                                                    <Input
-                                                        type="datetime-local"
-                                                        className="h-10 bg-muted/30 border-border rounded-xl font-bold text-xs"
-                                                        value={formData.next_run_at}
-                                                        onChange={(e) => setFormData({ ...formData, next_run_at: e.target.value })}
-                                                        required
-                                                    />
+                                                    <div className="relative group/datetime">
+                                                        <style dangerouslySetInnerHTML={{
+                                                            __html: `
+                                                            input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+                                                                position: absolute;
+                                                                left: 0;
+                                                                top: 0;
+                                                                width: 100%;
+                                                                height: 100%;
+                                                                margin: 0;
+                                                                padding: 0;
+                                                                cursor: pointer;
+                                                                opacity: 0;
+                                                            }
+                                                        `}} />
+                                                        <Input
+                                                            type="datetime-local"
+                                                            className="h-12 bg-muted/30 border-border rounded-xl font-bold text-sm pl-10 pr-4 transition-all focus:bg-background cursor-pointer [color-scheme:dark]"
+                                                            value={formData.next_run_at}
+                                                            onChange={(e) => setFormData({ ...formData, next_run_at: e.target.value })}
+                                                            required
+                                                        />
+                                                        <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-primary/60 group-hover/datetime:text-primary group-focus-within/datetime:text-primary transition-colors">
+                                                            <CalendarDays className="w-5 h-5 transition-transform group-hover/datetime:scale-110" />
+                                                        </div>
+                                                    </div>
                                                 </>
                                             )}
                                         </div>
@@ -426,6 +451,17 @@ const SchedulesPage = () => {
                                                 <option value="PAUSED">PAUSED</option>
                                             </select>
                                         </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between p-3 bg-muted/30 border border-border rounded-xl">
+                                        <div className="space-y-0.5">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Catch-up</Label>
+                                            <p className="text-[9px] text-muted-foreground font-medium ml-1">Run missed jobs if server was offline.</p>
+                                        </div>
+                                        <Switch
+                                            checked={formData.catch_up}
+                                            onCheckedChange={(checked) => setFormData({ ...formData, catch_up: checked })}
+                                        />
                                     </div>
                                     <div className="space-y-2">
                                         <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Tags</Label>
@@ -522,7 +558,7 @@ const SchedulesPage = () => {
                             </DialogFooter>
                         </form>
                     </DialogContent>
-                </Dialog>
+                </Dialog >
 
                 <ConfirmDialog
                     isOpen={!!deleteTarget}
@@ -563,7 +599,7 @@ const SchedulesPage = () => {
                             onClick={() => {
                                 setIsEditing(false);
                                 setEditingID(null);
-                                setFormData({ name: '', type: 'ONE_TIME', cron_expression: '', next_run_at: '', status: 'ACTIVE', retries: 0, workflows: [], hooks: [], tags: [] });
+                                setFormData({ name: '', type: 'ONE_TIME', cron_expression: '', next_run_at: '', status: 'ACTIVE', retries: 0, workflows: [], hooks: [], tags: [], catch_up: false });
                                 setIsCreateOpen(true);
                             }}
                             className="h-9 px-4 rounded-xl premium-gradient text-[10px] font-black uppercase tracking-widest shadow-premium transition-all active:scale-95 gap-2"
@@ -876,7 +912,7 @@ const SchedulesPage = () => {
                         </DialogContent>
                     </Dialog>
                 </div>
-            </div>
+            </div >
         </>
     );
 };

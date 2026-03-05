@@ -51,6 +51,11 @@ func (s *ScheduleService) Init() {
 
 func (s *ScheduleService) Create(schedule *domain.Schedule, workflowConfigs []domain.ScheduleWorkflow, user *domain.User) error {
 	schedule.ID = uuid.New()
+	if user != nil {
+		schedule.CreatedBy = &user.ID
+		schedule.CreatedByUsername = user.Username
+	}
+
 	if err := s.repo.Create(schedule); err != nil {
 		return err
 	}
@@ -173,6 +178,20 @@ func (s *ScheduleService) GetByID(id uuid.UUID, user *domain.User) (*domain.Sche
 // Internal helpers
 
 func (s *ScheduleService) addScheduleToCron(schedule domain.Schedule) {
+	now := time.Now().UTC()
+
+	// Catch-up logic: triggers only if CatchUp flag is true
+	if schedule.CatchUp && schedule.Status == "ACTIVE" && schedule.NextRunAt != nil && schedule.NextRunAt.Before(now) {
+		log.Printf("[ScheduleService] Catch-up triggering for schedule '%s' (missed %v ago)", schedule.Name, now.Sub(*schedule.NextRunAt))
+		go s.runScheduledWorkflows(schedule.ID)
+
+		if schedule.Type == domain.ScheduleTypeOneTime {
+			// Mark as finished/paused immediately after triggering catch-up
+			s.repo.UpdateStatus(schedule.ID, "PAUSED")
+			return
+		}
+	}
+
 	if schedule.Type == domain.ScheduleTypeRecurring {
 		entryID, err := s.cron.AddFunc(schedule.CronExpression, func() {
 			s.runScheduledWorkflows(schedule.ID)
@@ -190,9 +209,7 @@ func (s *ScheduleService) addScheduleToCron(schedule domain.Schedule) {
 		s.repo.Update(&schedule)
 	} else if schedule.Type == domain.ScheduleTypeOneTime {
 		if schedule.NextRunAt != nil {
-			now := time.Now().UTC()
 			scheduledAt := schedule.NextRunAt.UTC()
-			log.Printf("[ScheduleService] OneTime schedule '%s': NextRunAt=%v, Now=%v", schedule.Name, scheduledAt, now)
 			if scheduledAt.After(now) {
 				delay := scheduledAt.Sub(now)
 				log.Printf("[ScheduleService] Scheduling '%s' to fire in %v", schedule.Name, delay)
@@ -201,13 +218,6 @@ func (s *ScheduleService) addScheduleToCron(schedule domain.Schedule) {
 					s.runScheduledWorkflows(schedule.ID)
 					s.repo.UpdateStatus(schedule.ID, "PAUSED")
 				})
-			} else if schedule.Status == "ACTIVE" {
-				// If it's active but in the past, run it immediately (catch-up)
-				log.Printf("[ScheduleService] Running missed one-time schedule: %s (was %v ago)", schedule.Name, now.Sub(scheduledAt))
-				go func() {
-					s.runScheduledWorkflows(schedule.ID)
-					s.repo.UpdateStatus(schedule.ID, "PAUSED")
-				}()
 			}
 		}
 	}

@@ -354,8 +354,10 @@ type Schedule struct {
 	NextRunAt          *time.Time         `json:"next_run_at"`
 	Status             string             `json:"status" gorm:"default:'ACTIVE'"` // ACTIVE, PAUSED
 	Retries            int                `json:"retries" gorm:"default:0"`
+	CatchUp            bool               `json:"catch_up" gorm:"default:false"`
 	CreatedBy          *uuid.UUID         `json:"created_by,omitempty" gorm:"type:uuid"`
 	CreatedByUsername  string             `json:"created_by_username,omitempty"`
+	User               *User              `json:"user,omitempty" gorm:"foreignKey:CreatedBy"`
 	CreatedAt          time.Time          `json:"created_at"`
 	UpdatedAt          time.Time          `json:"updated_at"`
 	ScheduledWorkflows []ScheduleWorkflow `json:"scheduled_workflows" gorm:"foreignKey:ScheduleID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`

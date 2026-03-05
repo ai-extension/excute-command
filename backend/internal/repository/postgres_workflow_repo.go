@@ -357,7 +357,7 @@ func (r *PostgresWorkflowExecutionRepo) GetByID(id uuid.UUID, scope *domain.Perm
 		db = db.Joins("JOIN workflows ON workflows.id = workflow_executions.workflow_id").
 			Where("workflows.namespace_id IN ? OR workflow_executions.workflow_id IN ?", scope.AllowedNamespaceIDs, scope.AllowedItemIDs)
 	}
-	if err := db.Preload("Workflow.Groups.Steps").Preload("Steps").First(&exec, "id = ?", id).Error; err != nil {
+	if err := db.Preload("User").Preload("Workflow.Groups.Steps").Preload("Steps").First(&exec, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	return &exec, nil
@@ -398,6 +398,7 @@ func (r *PostgresWorkflowExecutionRepo) ListByWorkflowIDPaginated(workflowID uui
 	// Separate paginated fetch with schedule preload
 	err := db.
 		Where("workflow_id = ?", workflowID).
+		Preload("User").
 		Preload("Schedule").
 		Order("created_at DESC").
 		Limit(limit).
@@ -414,6 +415,7 @@ func (r *PostgresWorkflowExecutionRepo) ListByNamespaceID(namespaceID uuid.UUID,
 			Where("workflows.namespace_id IN ? OR workflow_executions.workflow_id IN ?", scope.AllowedNamespaceIDs, scope.AllowedItemIDs)
 	}
 	err := db.
+		Preload("User").
 		Preload("Workflow").
 		Joins("JOIN workflows w2 ON w2.id = workflow_executions.workflow_id").
 		Where("w2.namespace_id = ?", namespaceID).
@@ -448,7 +450,7 @@ func (r *PostgresWorkflowExecutionRepo) ListByNamespaceIDPaginated(namespaceID u
 		return nil, 0, err
 	}
 
-	err := db.Preload("Workflow").Preload("Schedule").Preload("Page").
+	err := db.Preload("User").Preload("Workflow").Preload("Schedule").Preload("Page").
 		Order("workflow_executions.created_at DESC").
 		Limit(limit).Offset(offset).Find(&execs).Error
 	return execs, total, err
@@ -476,7 +478,7 @@ func (r *PostgresWorkflowExecutionRepo) ListGlobalPaginated(limit, offset int, s
 		return nil, 0, err
 	}
 
-	err := db.Preload("Workflow").Preload("Schedule").Preload("Page").
+	err := db.Preload("User").Preload("Workflow").Preload("Schedule").Preload("Page").
 		Order("workflow_executions.created_at DESC").
 		Limit(limit).Offset(offset).Find(&execs).Error
 	return execs, total, err
@@ -490,7 +492,7 @@ func (r *PostgresWorkflowExecutionRepo) ListByScheduledID(scheduledID uuid.UUID,
 			Where("workflows.namespace_id IN ? OR workflow_executions.workflow_id IN ?", scope.AllowedNamespaceIDs, scope.AllowedItemIDs)
 	}
 	err := db.
-		Preload("Workflow").Preload("Page").
+		Preload("User").Preload("Workflow").Preload("Page").
 		Where("scheduled_id = ?", scheduledID).
 		Order("created_at DESC").
 		Find(&execs).Error
