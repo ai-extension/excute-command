@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"encoding/json"
-	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -407,58 +406,66 @@ func (h *PageHandler) GetPublicExecutionLogs(c *gin.Context) {
 	}
 
 	h.sanitizeExecution(execution)
+	// Reuse log logic or implement similar
+	// For simplicity, I'll use the same logic as in WorkflowHandler
+	h.serveLogs(c, execution)
+}
 
-	// Stream Logic with Offset
-	offsetStr := c.DefaultQuery("offset", "0")
-	offset, _ := strconv.ParseInt(offsetStr, 10, 64)
-
+// serveLogs is a helper to stream logs, logic similar to WorkflowHandler.GetExecutionLogs
+func (h *PageHandler) serveLogs(c *gin.Context, execution *domain.WorkflowExecution) {
+	stepID := c.Query("step_id")
+	groupID := c.Query("group_id")
 	cwd, _ := os.Getwd()
 	execLogDir := filepath.Join(cwd, "data", "logs", "executions", execution.ID.String())
-	mainLogPath := filepath.Join(execLogDir, "workflow.log")
 
-	file, err := os.Open(mainLogPath)
-	if err != nil {
-		if execution.Status == domain.StatusRunning || execution.Status == domain.StatusPending {
-			c.JSON(http.StatusOK, gin.H{"logs": "", "offset": offset, "finished": false})
+	if stepID != "" {
+		path := filepath.Join(execLogDir, stepID+".log")
+		if _, err := os.Stat(path); err == nil {
+			c.File(path)
 			return
 		}
-		c.JSON(http.StatusNotFound, gin.H{"error": "log file not found"})
-		return
-	}
-	defer file.Close()
+	} else if groupID != "" {
+		groupUUID, err := uuid.Parse(groupID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid group id"})
+			return
+		}
 
-	stat, err := file.Stat()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to stat log file"})
+		workflow, err := h.workflowService.GetWorkflow(execution.WorkflowID, nil)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "workflow not found"})
+			return
+		}
+
+		var logs string
+		for _, group := range workflow.Groups {
+			if group.ID == groupUUID {
+				for _, step := range group.Steps {
+					stepLogPath := filepath.Join(execLogDir, step.ID.String()+".log")
+					if content, err := os.ReadFile(stepLogPath); err == nil {
+						logs += string(content) + "\n"
+					}
+				}
+				break
+			}
+		}
+		c.String(http.StatusOK, logs)
 		return
+	} else {
+		mainLogPath := filepath.Join(execLogDir, "workflow.log")
+		if _, err := os.Stat(mainLogPath); err == nil {
+			c.File(mainLogPath)
+			return
+		}
+
+		// If running/pending and workflow.log not created yet, return empty
+		if execution.Status == domain.StatusRunning || execution.Status == domain.StatusPending {
+			c.String(http.StatusOK, "")
+			return
+		}
 	}
 
-	if offset >= stat.Size() {
-		c.JSON(http.StatusOK, gin.H{
-			"logs":     "",
-			"offset":   stat.Size(),
-			"finished": execution.Status == domain.StatusSuccess || execution.Status == domain.StatusFailed,
-		})
-		return
-	}
-
-	_, err = file.Seek(offset, 0)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to seek log file"})
-		return
-	}
-
-	content, err := io.ReadAll(file)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read log file"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"logs":     string(content),
-		"offset":   stat.Size(),
-		"finished": execution.Status == domain.StatusSuccess || execution.Status == domain.StatusFailed,
-	})
+	c.JSON(http.StatusNotFound, gin.H{"error": "log file not found"})
 }
 
 func (h *PageHandler) sanitizePage(page *domain.Page) {
