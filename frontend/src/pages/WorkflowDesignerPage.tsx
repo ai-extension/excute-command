@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { LOCAL_SERVER_ID } from '../lib/constants';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     Zap, Save, ChevronLeft, Layout,
@@ -126,7 +127,7 @@ const WorkflowDesignerPage = () => {
                 const data = await response.json();
                 setName(data.name);
                 setDescription(data.description);
-                const defaultServerIdVal = data.default_server_id === '00000000-0000-0000-0000-000000000000' ? '' : (data.default_server_id || '');
+                const defaultServerIdVal = data.default_server_id === LOCAL_SERVER_ID ? '' : (data.default_server_id || '');
                 setDefaultServerId(defaultServerIdVal);
                 setTargetFolder(data.target_folder || '');
                 setCleanupFiles(!!data.cleanup_files);
@@ -136,13 +137,13 @@ const WorkflowDesignerPage = () => {
 
                 const cleanGroups = (data.groups || []).map((g: any) => {
                     const cleanedGroup = { ...g };
-                    if (cleanedGroup.default_server_id === '00000000-0000-0000-0000-000000000000') {
+                    if (cleanedGroup.default_server_id === LOCAL_SERVER_ID) {
                         cleanedGroup.default_server_id = undefined;
                     }
                     if (cleanedGroup.steps) {
                         cleanedGroup.steps = cleanedGroup.steps.map((s: any) => {
                             const cleanedStep = { ...s };
-                            if (cleanedStep.server_id === '00000000-0000-0000-0000-000000000000') {
+                            if (cleanedStep.server_id === LOCAL_SERVER_ID) {
                                 cleanedStep.server_id = undefined;
                             }
                             return cleanedStep;
@@ -203,7 +204,7 @@ const WorkflowDesignerPage = () => {
                 groups: groups.map((g, gIdx) => ({
                     ...g,
                     default_server_id: g.default_server_id || undefined,
-                    copy_target_server_id: g.copy_target_server_id || '00000000-0000-0000-0000-000000000000',
+                    copy_target_server_id: g.copy_target_server_id || LOCAL_SERVER_ID,
                     order: gIdx,
                     steps: g.steps?.map((s, sIdx) => ({
                         ...s,
@@ -995,7 +996,7 @@ const WorkflowDesignerPage = () => {
                                                                                                                             ng[gIdx].is_copy_enabled = checked;
                                                                                                                             if (checked) {
                                                                                                                                 if (!ng[gIdx].copy_target_server_id) {
-                                                                                                                                    ng[gIdx].copy_target_server_id = '00000000-0000-0000-0000-000000000001';
+                                                                                                                                    ng[gIdx].copy_target_server_id = LOCAL_SERVER_ID;
                                                                                                                                 }
                                                                                                                             } else {
                                                                                                                                 ng[gIdx].copy_source_path = '';

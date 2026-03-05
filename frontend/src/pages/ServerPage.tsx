@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, ChevronRight, Server as ServerIcon, Shield, Key, Terminal, MoreHorizontal, Settings, Trash2, Edit2, Play, CheckCircle2, XCircle, Network } from 'lucide-react';
+import { LOCAL_SERVER_ID } from '../lib/constants';
 import {
     Table,
     TableBody,
@@ -31,9 +32,6 @@ import { API_BASE_URL } from '../lib/api';
 import { Server, VpnConfig } from '../types';
 import { Pagination } from '../components/Pagination';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-
-const LOCAL_SERVER_ID = "00000000-0000-0000-0000-000000000001";
-
 
 const ServerPage = () => {
     const { apiFetch } = useAuth();
@@ -84,7 +82,7 @@ const ServerPage = () => {
             if (currentAuthType !== 'ALL') url += `&auth_type=${currentAuthType}`;
             if (currentVpn !== 'ALL') {
                 if (currentVpn === 'NONE') {
-                    url += `&vpn_id=00000000-0000-0000-0000-000000000000`;
+                    url += `&vpn_id=${LOCAL_SERVER_ID}`;
                 } else {
                     url += `&vpn_id=${currentVpn}`;
                 }

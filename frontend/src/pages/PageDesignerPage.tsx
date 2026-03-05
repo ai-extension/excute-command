@@ -15,6 +15,7 @@ import { useNamespace } from '../context/NamespaceContext';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../lib/api';
 import { SearchableSelect } from '../components/SearchableSelect';
+import { LOCAL_SERVER_ID } from '../lib/constants';
 
 const generateId = () => Math.random().toString(36).slice(2, 10);
 
@@ -181,7 +182,7 @@ const PageDesignerPage = () => {
         const w: PageWidget = {
             id: generateId(), type: 'TERMINAL',
             title: 'Terminal', size: 'full',
-            server_id: servers[0]?.id || '00000000-0000-0000-0000-000000000001',
+            server_id: servers[0]?.id || LOCAL_SERVER_ID,
             command: 'echo "Hello World"', reload_interval: 'realtime',
         };
         setWidgets(prev => [...prev, w]);
