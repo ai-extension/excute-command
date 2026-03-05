@@ -126,6 +126,12 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({ workflowId, onReRun }
                         <Zap className="w-3 h-3 mr-1" /> Hook
                     </Badge>
                 );
+            case 'STEP':
+                return (
+                    <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 font-black text-[8px] uppercase tracking-widest px-2 py-0.5">
+                        <Zap className="w-3 h-3 mr-1" /> Step Action
+                    </Badge>
+                );
             default:
                 return (
                     <Badge variant="outline" className="bg-slate-500/10 text-slate-400 border-slate-500/20 font-black text-[8px] uppercase tracking-widest px-2 py-0.5">
