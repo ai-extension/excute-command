@@ -22,7 +22,7 @@ type Namespace struct {
 	ID          uuid.UUID `json:"id"`
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
-	CreatedAt   time.Time `json:"created_at"`
+	CreatedAt   time.Time `json:"created_at" gorm:"<-:create"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
@@ -30,7 +30,7 @@ type SystemSetting struct {
 	ID        uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
 	Key       string    `json:"key" gorm:"uniqueIndex;not null"`
 	Value     string    `json:"value" gorm:"not null"`
-	CreatedAt time.Time `json:"created_at"`
+	CreatedAt time.Time `json:"created_at" gorm:"<-:create"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
@@ -45,7 +45,7 @@ type User struct {
 	AvatarURL      string       `json:"avatar_url"`
 	Roles          []Role       `json:"roles" gorm:"many2many:user_roles;"`
 	Permissions    []Permission `json:"permissions" gorm:"many2many:user_permissions;"`
-	CreatedAt      time.Time    `json:"created_at"`
+	CreatedAt      time.Time    `json:"created_at" gorm:"<-:create"`
 	UpdatedAt      time.Time    `json:"updated_at"`
 }
 
@@ -54,7 +54,7 @@ type Role struct {
 	Name        string           `json:"name" gorm:"uniqueIndex;not null"`
 	Description string           `json:"description"`
 	Permissions []RolePermission `json:"permissions" gorm:"foreignKey:RoleID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	CreatedAt   time.Time        `json:"created_at"`
+	CreatedAt   time.Time        `json:"created_at" gorm:"<-:create"`
 	UpdatedAt   time.Time        `json:"updated_at"`
 }
 
@@ -71,7 +71,7 @@ type Permission struct {
 	Name      string    `json:"name" gorm:"uniqueIndex;not null"`
 	Type      string    `json:"type" gorm:"not null"`   // FUNCTION or RESOURCE
 	Action    string    `json:"action" gorm:"not null"` // READ, WRITE, EXECUTE
-	CreatedAt time.Time `json:"created_at"`
+	CreatedAt time.Time `json:"created_at" gorm:"<-:create"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
@@ -82,7 +82,7 @@ type APIKey struct {
 	KeyPrefix string     `json:"key_prefix" gorm:"not null"`
 	KeyHash   string     `json:"-" gorm:"not null"`
 	LastUsed  *time.Time `json:"last_used"`
-	CreatedAt time.Time  `json:"created_at"`
+	CreatedAt time.Time  `json:"created_at" gorm:"<-:create"`
 }
 
 type PermissionScope struct {
@@ -154,7 +154,7 @@ type Server struct {
 	HostKeyFingerprint string     `json:"host_key_fingerprint,omitempty"` // For strict host key checking (TOFU or manual)
 	CreatedBy          *uuid.UUID `json:"created_by,omitempty" gorm:"type:uuid"`
 	CreatedByUsername  string     `json:"created_by_username,omitempty"`
-	CreatedAt          time.Time  `json:"created_at"`
+	CreatedAt          time.Time  `json:"created_at" gorm:"<-:create"`
 	UpdatedAt          time.Time  `json:"updated_at"`
 }
 
@@ -191,7 +191,7 @@ type VpnConfig struct {
 	HostKeyFingerprint string     `json:"host_key_fingerprint,omitempty"` // For strict host key checking (TOFU or manual)
 	CreatedBy          *uuid.UUID `json:"created_by,omitempty" gorm:"type:uuid"`
 	CreatedByUsername  string     `json:"created_by_username,omitempty"`
-	CreatedAt          time.Time  `json:"created_at"`
+	CreatedAt          time.Time  `json:"created_at" gorm:"<-:create"`
 	UpdatedAt          time.Time  `json:"updated_at"`
 }
 
@@ -245,7 +245,7 @@ type Workflow struct {
 	Hooks             []WorkflowHook     `json:"hooks,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	CreatedBy         *uuid.UUID         `json:"created_by,omitempty" gorm:"type:uuid"`
 	CreatedByUsername string             `json:"created_by_username,omitempty"`
-	CreatedAt         time.Time          `json:"created_at"`
+	CreatedAt         time.Time          `json:"created_at" gorm:"<-:create"`
 	UpdatedAt         time.Time          `json:"updated_at"`
 }
 
@@ -256,7 +256,7 @@ type WorkflowFile struct {
 	FileSize   int64     `json:"file_size" gorm:"not null"`
 	LocalPath  string    `json:"local_path" gorm:"not null"`
 	TargetPath string    `json:"target_path" gorm:"not null"`
-	CreatedAt  time.Time `json:"created_at"`
+	CreatedAt  time.Time `json:"created_at" gorm:"<-:create"`
 	UpdatedAt  time.Time `json:"updated_at"`
 }
 
@@ -276,7 +276,7 @@ type WorkflowGroup struct {
 	CopyTargetServerID uuid.UUID      `json:"copy_target_server_id,omitempty" gorm:"type:uuid"`
 	CopyTargetPath     string         `json:"copy_target_path,omitempty" gorm:"default:''"`
 	ContinueOnFailure  bool           `json:"continue_on_failure" gorm:"default:false"`
-	CreatedAt          time.Time      `json:"created_at"`
+	CreatedAt          time.Time      `json:"created_at" gorm:"<-:create"`
 	UpdatedAt          time.Time      `json:"updated_at"`
 }
 
@@ -293,7 +293,7 @@ type WorkflowStep struct {
 	Order                int        `json:"order"`
 	Status               Status     `json:"status"`
 	Output               string     `json:"output"`
-	CreatedAt            time.Time  `json:"created_at"`
+	CreatedAt            time.Time  `json:"created_at" gorm:"<-:create"`
 	UpdatedAt            time.Time  `json:"updated_at"`
 }
 
@@ -305,7 +305,7 @@ type WorkflowInput struct {
 	Type         string    `json:"type" gorm:"not null;default:'input'"` // input, number, or select
 	DefaultValue string    `json:"default_value"`
 	Required     bool      `json:"required" gorm:"default:false"`
-	CreatedAt    time.Time `json:"created_at"`
+	CreatedAt    time.Time `json:"created_at" gorm:"<-:create"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
@@ -314,7 +314,7 @@ type WorkflowVariable struct {
 	WorkflowID uuid.UUID `json:"workflow_id" gorm:"type:uuid;index"`
 	Key        string    `json:"key" gorm:"not null"`
 	Value      string    `json:"value"`
-	CreatedAt  time.Time `json:"created_at"`
+	CreatedAt  time.Time `json:"created_at" gorm:"<-:create"`
 	UpdatedAt  time.Time `json:"updated_at"`
 }
 
@@ -326,7 +326,7 @@ type GlobalVariable struct {
 	Description       string     `json:"description"`
 	CreatedBy         *uuid.UUID `json:"created_by,omitempty" gorm:"type:uuid"`
 	CreatedByUsername string     `json:"created_by_username,omitempty"`
-	CreatedAt         time.Time  `json:"created_at"`
+	CreatedAt         time.Time  `json:"created_at" gorm:"<-:create"`
 	UpdatedAt         time.Time  `json:"updated_at"`
 }
 
@@ -337,7 +337,7 @@ type Tag struct {
 	Color             string     `json:"color" gorm:"not null;default:'#6366f1'"`
 	CreatedBy         *uuid.UUID `json:"created_by,omitempty" gorm:"type:uuid"`
 	CreatedByUsername string     `json:"created_by_username,omitempty"`
-	CreatedAt         time.Time  `json:"created_at"`
+	CreatedAt         time.Time  `json:"created_at" gorm:"<-:create"`
 	UpdatedAt         time.Time  `json:"updated_at"`
 }
 
@@ -361,7 +361,7 @@ type Schedule struct {
 	CreatedBy          *uuid.UUID         `json:"created_by,omitempty" gorm:"type:uuid"`
 	CreatedByUsername  string             `json:"created_by_username,omitempty"`
 	User               *User              `json:"user,omitempty" gorm:"foreignKey:CreatedBy"`
-	CreatedAt          time.Time          `json:"created_at"`
+	CreatedAt          time.Time          `json:"created_at" gorm:"<-:create"`
 	UpdatedAt          time.Time          `json:"updated_at"`
 	ScheduledWorkflows []ScheduleWorkflow `json:"scheduled_workflows" gorm:"foreignKey:ScheduleID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Hooks              []WorkflowHook     `json:"hooks,omitempty" gorm:"foreignKey:ScheduleID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
@@ -392,7 +392,7 @@ type WorkflowExecution struct {
 	LogPath       string                  `json:"log_path"`
 	StartedAt     time.Time               `json:"started_at"`
 	FinishedAt    *time.Time              `json:"finished_at,omitempty"`
-	CreatedAt     time.Time               `json:"created_at"`
+	CreatedAt     time.Time               `json:"created_at" gorm:"<-:create"`
 	UpdatedAt     time.Time               `json:"updated_at"`
 	Workflow      *Workflow               `json:"workflow,omitempty" gorm:"foreignKey:WorkflowID"`
 	Schedule      *Schedule               `json:"schedule,omitempty" gorm:"foreignKey:ScheduledID"`
@@ -409,7 +409,7 @@ type WorkflowExecutionStep struct {
 	Output      string     `json:"output"`
 	StartedAt   time.Time  `json:"started_at"`
 	FinishedAt  *time.Time `json:"finished_at,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
+	CreatedAt   time.Time  `json:"created_at" gorm:"<-:create"`
 	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
@@ -509,7 +509,7 @@ type Page struct {
 	ExpiresAt       *time.Time     `json:"expires_at" gorm:"index"`
 	Layout          string         `json:"layout" gorm:"type:text"`
 	Workflows       []PageWorkflow `json:"workflows,omitempty" gorm:"foreignKey:PageID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	CreatedAt       time.Time      `json:"created_at"`
+	CreatedAt       time.Time      `json:"created_at" gorm:"<-:create"`
 	UpdatedAt       time.Time      `json:"updated_at"`
 }
 
