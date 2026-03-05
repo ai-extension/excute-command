@@ -5,11 +5,14 @@ import './index.css'
 
 import { NamespaceProvider } from './context/NamespaceContext'
 import { AuthProvider } from './context/AuthContext'
+import { ThemeProvider } from './context/ThemeContext'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
     <AuthProvider>
         <NamespaceProvider>
-            <App />
+            <ThemeProvider>
+                <App />
+            </ThemeProvider>
         </NamespaceProvider>
     </AuthProvider>,
 )

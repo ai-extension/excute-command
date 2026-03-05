@@ -4,6 +4,7 @@ import Sidebar from './Sidebar';
 import { Moon, Sun, Command as CmdIcon, Search, LogOut, User as UserIcon, Settings, Key } from 'lucide-react';
 import { Button } from './ui/button';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -15,18 +16,10 @@ import {
 
 const Layout = () => {
     const { logout, user } = useAuth();
+    const { isDark, toggleTheme } = useTheme();
     const navigate = useNavigate();
-    const [isDark, setIsDark] = useState(true); // Default to dark for premium feel
     const [isCollapsed, setIsCollapsed] = useState(false);
     const location = useLocation();
-
-    useEffect(() => {
-        if (isDark) {
-            document.documentElement.classList.add('dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-        }
-    }, [isDark]);
 
     const getPageTitle = () => {
         const path = location.pathname;
@@ -67,7 +60,7 @@ const Layout = () => {
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => setIsDark(!isDark)}
+                                onClick={toggleTheme}
                                 className="rounded-xl hover:bg-muted text-foreground/60 hover:text-foreground transition-all"
                             >
                                 {isDark ? (
