@@ -133,7 +133,7 @@ export const WorkflowFilesTab: React.FC<WorkflowFilesTabProps> = ({ workflowId, 
                             className="bg-background border-border h-10 text-sm font-medium"
                         />
                         <p className="text-[9px] font-medium text-muted-foreground mt-2 italic">
-                            All uploaded files will be copied to this folder on target servers.
+                            All uploaded files will be copied to this folder on target servers. (Default: <span className="text-primary font-bold">/tmp/</span> if empty)
                         </p>
                     </div>
                     <div className="flex items-center gap-3 mt-4">
@@ -203,7 +203,7 @@ export const WorkflowFilesTab: React.FC<WorkflowFilesTabProps> = ({ workflowId, 
                         className="bg-background border-border h-10 text-sm font-medium focus:ring-1 focus:ring-primary/30"
                     />
                     <p className="text-[9px] font-medium text-muted-foreground mt-2">
-                        Directory on the remote servers where files will be copied.
+                        Directory on the remote servers where files will be copied. (Default: <span className="text-primary font-bold">/tmp/</span> if empty)
                     </p>
                 </div>
                 <div className="flex items-center gap-3 mt-4">
