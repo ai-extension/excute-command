@@ -7,6 +7,7 @@ import { WorkflowFile } from '../types';
 import { ConfirmDialog } from './ConfirmDialog';
 
 import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from '../lib/api';
 
 interface WorkflowFilesTabProps {
     workflowId: string;
@@ -16,7 +17,6 @@ interface WorkflowFilesTabProps {
     setCleanupFiles: (val: boolean) => void;
 }
 
-const API_BASE_URL = 'http://localhost:8080/api';
 
 export const WorkflowFilesTab: React.FC<WorkflowFilesTabProps> = ({ workflowId, targetFolder, setTargetFolder, cleanupFiles, setCleanupFiles }) => {
     const { apiFetch } = useAuth();

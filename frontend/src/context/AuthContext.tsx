@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { AlertCircle, CheckCircle, XCircle, Info, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { TAGGABLE_RESOURCES, NAMESPACE_SCOPED_RESOURCES } from '../config/permissions';
+import { API_BASE_URL } from '../lib/api';
 
 function getCookie(name: string) {
     const value = `; ${document.cookie}`;
@@ -50,7 +51,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const logout = useCallback(async () => {
         // Call backend to clear the HttpOnly cookie
         try {
-            await fetch('/api/logout', { method: 'POST' });
+            await fetch(`${API_BASE_URL}/logout`, { method: 'POST' });
         } catch (e) {
             console.error("Logout request failed", e);
         }
@@ -76,7 +77,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const hasCookie = !!getCookie('auth_token');
             if (hasCookie) {
                 try {
-                    const response = await fetch('/api/me', {
+                    const response = await fetch(`${API_BASE_URL}/me`, {
                         headers: { 'Accept': 'application/json' },
                         credentials: 'include'
                     });
