@@ -39,10 +39,15 @@ func (s *GlobalVariableService) ListPaginated(namespaceID uuid.UUID, limit, offs
 
 func (s *GlobalVariableService) Update(gv *domain.GlobalVariable, user *domain.User) error {
 	scope := domain.GetPermissionScope(user, "namespaces", "WRITE")
-	_, err := s.repo.GetByID(gv.ID, &scope)
+	existing, err := s.repo.GetByID(gv.ID, &scope)
 	if err != nil {
 		return err
 	}
+
+	gv.CreatedBy = existing.CreatedBy
+	gv.CreatedByUsername = existing.CreatedByUsername
+	gv.CreatedAt = existing.CreatedAt
+
 	return s.repo.Update(gv)
 }
 

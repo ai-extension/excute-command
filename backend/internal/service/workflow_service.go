@@ -93,10 +93,15 @@ func (s *WorkflowService) ListWorkflowsPaginated(namespaceID uuid.UUID, limit, o
 
 func (s *WorkflowService) UpdateWorkflow(wf *domain.Workflow, user *domain.User) error {
 	scope := domain.GetPermissionScope(user, "workflows", "WRITE")
-	_, err := s.repo.GetByID(wf.ID, &scope)
+	existing, err := s.repo.GetByID(wf.ID, &scope)
 	if err != nil {
 		return err
 	}
+
+	// Preserve non-updatable fields
+	wf.CreatedBy = existing.CreatedBy
+	wf.CreatedByUsername = existing.CreatedByUsername
+	wf.CreatedAt = existing.CreatedAt
 
 	// Recursively assign IDs to new inputs, variables, groups and steps
 	for i := range wf.Inputs {

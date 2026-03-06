@@ -84,6 +84,16 @@ func (s *ScheduleService) Create(schedule *domain.Schedule, workflowConfigs []do
 }
 
 func (s *ScheduleService) Update(schedule *domain.Schedule, workflowConfigs []domain.ScheduleWorkflow, user *domain.User) error {
+	scope := domain.GetPermissionScope(user, "schedules", "WRITE")
+	existing, err := s.repo.GetByID(schedule.ID, &scope)
+	if err != nil {
+		return err
+	}
+
+	schedule.CreatedBy = existing.CreatedBy
+	schedule.CreatedByUsername = existing.CreatedByUsername
+	schedule.CreatedAt = existing.CreatedAt
+
 	if err := s.repo.Update(schedule); err != nil {
 		return err
 	}
@@ -101,7 +111,7 @@ func (s *ScheduleService) Update(schedule *domain.Schedule, workflowConfigs []do
 	}
 
 	// Reload and sync cron
-	scope := domain.GetPermissionScope(user, "schedules", "READ")
+	scope = domain.GetPermissionScope(user, "schedules", "READ")
 	reloaded, err := s.repo.GetByID(schedule.ID, &scope)
 	if err != nil {
 		return err

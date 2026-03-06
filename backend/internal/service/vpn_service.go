@@ -58,10 +58,15 @@ func (s *VpnConfigService) Update(vpn *domain.VpnConfig, user *domain.User) erro
 	} else {
 		scope = domain.GetPermissionScope(user, "vpns", "WRITE")
 	}
-	_, err := s.repo.GetByID(vpn.ID, &scope)
+	existing, err := s.repo.GetByID(vpn.ID, &scope)
 	if err != nil {
 		return err
 	}
+
+	vpn.CreatedBy = existing.CreatedBy
+	vpn.CreatedByUsername = existing.CreatedByUsername
+	vpn.CreatedAt = existing.CreatedAt
+
 	return s.repo.Update(vpn)
 }
 

@@ -169,8 +169,8 @@ type Server struct {
 	VpnID              *uuid.UUID     `json:"vpn_id,omitempty" gorm:"type:uuid"`
 	Vpn                *VpnConfig     `json:"vpn,omitempty" gorm:"foreignKey:VpnID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
 	HostKeyFingerprint string         `json:"host_key_fingerprint,omitempty"` // For strict host key checking (TOFU or manual)
-	CreatedBy          *uuid.UUID     `json:"created_by,omitempty" gorm:"type:uuid"`
-	CreatedByUsername  string         `json:"created_by_username,omitempty"`
+	CreatedBy          *uuid.UUID     `json:"created_by,omitempty" gorm:"type:uuid;<-:create"`
+	CreatedByUsername  string         `json:"created_by_username,omitempty" gorm:"<-:create"`
 	CreatedAt          time.Time      `json:"created_at" gorm:"<-:create"`
 	UpdatedAt          time.Time      `json:"updated_at"`
 }
@@ -206,8 +206,8 @@ type VpnConfig struct {
 	PublicKey          string     `json:"public_key,omitempty"`           // For WireGuard
 	SharedKey          string     `json:"shared_key,omitempty"`           // For WireGuard
 	HostKeyFingerprint string     `json:"host_key_fingerprint,omitempty"` // For strict host key checking (TOFU or manual)
-	CreatedBy          *uuid.UUID `json:"created_by,omitempty" gorm:"type:uuid"`
-	CreatedByUsername  string     `json:"created_by_username,omitempty"`
+	CreatedBy          *uuid.UUID `json:"created_by,omitempty" gorm:"type:uuid;<-:create"`
+	CreatedByUsername  string     `json:"created_by_username,omitempty" gorm:"<-:create"`
 	CreatedAt          time.Time  `json:"created_at" gorm:"<-:create"`
 	UpdatedAt          time.Time  `json:"updated_at"`
 }
@@ -260,8 +260,8 @@ type Workflow struct {
 	TargetFolder      string             `json:"target_folder,omitempty" gorm:"default:''"`
 	CleanupFiles      bool               `json:"cleanup_files,omitempty" gorm:"default:false"`
 	Hooks             []WorkflowHook     `json:"hooks,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	CreatedBy         *uuid.UUID         `json:"created_by,omitempty" gorm:"type:uuid"`
-	CreatedByUsername string             `json:"created_by_username,omitempty"`
+	CreatedBy         *uuid.UUID         `json:"created_by,omitempty" gorm:"type:uuid;<-:create"`
+	CreatedByUsername string             `json:"created_by_username,omitempty" gorm:"<-:create"`
 	CreatedAt         time.Time          `json:"created_at" gorm:"<-:create"`
 	UpdatedAt         time.Time          `json:"updated_at"`
 }
@@ -345,8 +345,8 @@ type GlobalVariable struct {
 	Key               string     `json:"key" gorm:"not null"`
 	Value             string     `json:"value"`
 	Description       string     `json:"description"`
-	CreatedBy         *uuid.UUID `json:"created_by,omitempty" gorm:"type:uuid"`
-	CreatedByUsername string     `json:"created_by_username,omitempty"`
+	CreatedBy         *uuid.UUID `json:"created_by,omitempty" gorm:"type:uuid;<-:create"`
+	CreatedByUsername string     `json:"created_by_username,omitempty" gorm:"<-:create"`
 	CreatedAt         time.Time  `json:"created_at" gorm:"<-:create"`
 	UpdatedAt         time.Time  `json:"updated_at"`
 }
@@ -356,8 +356,8 @@ type Tag struct {
 	NamespaceID       uuid.UUID  `json:"namespace_id" gorm:"type:uuid;index"`
 	Name              string     `json:"name" gorm:"not null"`
 	Color             string     `json:"color" gorm:"not null;default:'#6366f1'"`
-	CreatedBy         *uuid.UUID `json:"created_by,omitempty" gorm:"type:uuid"`
-	CreatedByUsername string     `json:"created_by_username,omitempty"`
+	CreatedBy         *uuid.UUID `json:"created_by,omitempty" gorm:"type:uuid;<-:create"`
+	CreatedByUsername string     `json:"created_by_username,omitempty" gorm:"<-:create"`
 	CreatedAt         time.Time  `json:"created_at" gorm:"<-:create"`
 	UpdatedAt         time.Time  `json:"updated_at"`
 }
@@ -379,8 +379,8 @@ type Schedule struct {
 	Status             string             `json:"status" gorm:"default:'ACTIVE'"` // ACTIVE, PAUSED
 	Retries            int                `json:"retries" gorm:"default:0"`
 	CatchUp            bool               `json:"catch_up" gorm:"default:false"`
-	CreatedBy          *uuid.UUID         `json:"created_by,omitempty" gorm:"type:uuid"`
-	CreatedByUsername  string             `json:"created_by_username,omitempty"`
+	CreatedBy          *uuid.UUID         `json:"created_by,omitempty" gorm:"type:uuid;<-:create"`
+	CreatedByUsername  string             `json:"created_by_username,omitempty" gorm:"<-:create"`
 	User               *User              `json:"user,omitempty" gorm:"foreignKey:CreatedBy"`
 	CreatedAt          time.Time          `json:"created_at" gorm:"<-:create"`
 	UpdatedAt          time.Time          `json:"updated_at"`
@@ -530,8 +530,8 @@ type Page struct {
 	ExpiresAt         *time.Time     `json:"expires_at" gorm:"index"`
 	Layout            string         `json:"layout" gorm:"type:text"`
 	Workflows         []PageWorkflow `json:"workflows,omitempty" gorm:"foreignKey:PageID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	CreatedBy         *uuid.UUID     `json:"created_by,omitempty" gorm:"type:uuid"`
-	CreatedByUsername string         `json:"created_by_username,omitempty"`
+	CreatedBy         *uuid.UUID     `json:"created_by,omitempty" gorm:"type:uuid;<-:create"`
+	CreatedByUsername string         `json:"created_by_username,omitempty" gorm:"<-:create"`
 	CreatedAt         time.Time      `json:"created_at" gorm:"<-:create"`
 	UpdatedAt         time.Time      `json:"updated_at"`
 }

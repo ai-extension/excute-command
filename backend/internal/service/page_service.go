@@ -93,6 +93,11 @@ func (s *PageService) UpdatePage(page *domain.Page, user *domain.User) error {
 		page.Password = existing.Password
 	}
 
+	// Preserve non-updatable fields
+	page.CreatedBy = existing.CreatedBy
+	page.CreatedByUsername = existing.CreatedByUsername
+	page.CreatedAt = existing.CreatedAt
+
 	// Regenerate IDs for workflows to simplify repo implementation (delete/create)
 	for i := range page.Workflows {
 		if page.Workflows[i].ID == uuid.Nil {

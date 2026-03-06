@@ -50,10 +50,15 @@ func (s *ServerService) ListServersPaginated(limit, offset int, searchTerm strin
 func (s *ServerService) UpdateServer(server *domain.Server, user *domain.User) error {
 
 	scope := domain.GetPermissionScope(user, "servers", "WRITE")
-	_, err := s.repo.GetByID(server.ID, &scope)
+	existing, err := s.repo.GetByID(server.ID, &scope)
 	if err != nil {
 		return err
 	}
+
+	server.CreatedBy = existing.CreatedBy
+	server.CreatedByUsername = existing.CreatedByUsername
+	server.CreatedAt = existing.CreatedAt
+
 	return s.repo.Update(server)
 }
 
