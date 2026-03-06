@@ -530,4 +530,16 @@ func seedSystemSettings(db *gorm.DB) {
 			}
 		}
 	}
+
+	// Seed token_expiration
+	var tokenExpCount int64
+	db.Model(&domain.SystemSetting{}).Where("key = ?", "token_expiration").Count(&tokenExpCount)
+	if tokenExpCount == 0 {
+		log.Println("Seeding system setting: token_expiration...")
+		db.Create(&domain.SystemSetting{
+			ID:    uuid.New(),
+			Key:   "token_expiration",
+			Value: "24",
+		})
+	}
 }

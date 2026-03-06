@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -78,10 +79,17 @@ func (s *AuthService) Login(username, password string) (string, *domain.User, er
 		return "", nil, errors.New("invalid credentials")
 	}
 
+	expirationHours := 24
+	if setting, err := s.settingsRepo.GetByKey("token_expiration"); err == nil {
+		if val, err := strconv.Atoi(setting.Value); err == nil && val > 0 {
+			expirationHours = val
+		}
+	}
+
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id":  user.ID,
 		"username": user.Username,
-		"exp":      time.Now().Add(time.Hour * 24).Unix(),
+		"exp":      time.Now().Add(time.Hour * time.Duration(expirationHours)).Unix(),
 	})
 
 	tokenString, err := token.SignedString(jwtKey)
@@ -135,10 +143,17 @@ func (s *AuthService) SocialLogin(provider, socialID, email, fullName, avatarURL
 	}
 
 	// Generate token
+	expirationHours := 24
+	if setting, err := s.settingsRepo.GetByKey("token_expiration"); err == nil {
+		if val, err := strconv.Atoi(setting.Value); err == nil && val > 0 {
+			expirationHours = val
+		}
+	}
+
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id":  user.ID,
 		"username": user.Username,
-		"exp":      time.Now().Add(time.Hour * 24).Unix(),
+		"exp":      time.Now().Add(time.Hour * time.Duration(expirationHours)).Unix(),
 	})
 
 	tokenString, err := token.SignedString(jwtKey)

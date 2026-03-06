@@ -489,6 +489,35 @@ const SettingsPage = () => {
                                         </div>
                                     </div>
                                 </div>
+
+                                <div className="space-y-4 pt-6 border-t border-border">
+                                    <div className="flex items-center justify-between p-4 bg-muted/20 border border-border/50 rounded-2xl">
+                                        <div className="space-y-1">
+                                            <div className="flex items-center gap-2">
+                                                <Label htmlFor="token-expiration" className="text-sm font-black tracking-tight cursor-pointer">Token Expiration (Hours)</Label>
+                                                <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 border-primary/20 text-primary">Session Policy</Badge>
+                                            </div>
+                                            <p className="text-[10px] font-medium opacity-60">Duration in hours before a user session expires. Default is 24h.</p>
+                                        </div>
+                                        <div className="flex gap-2 min-w-[120px]">
+                                            <Input
+                                                id="token-expiration"
+                                                type="number"
+                                                value={systemSettings.token_expiration || '24'}
+                                                onChange={(e) => setSystemSettings(prev => ({ ...prev, token_expiration: e.target.value }))}
+                                                className="h-9 bg-background/50 border-border/50 text-[11px] font-medium"
+                                                min="1"
+                                            />
+                                            <Button
+                                                onClick={() => updateSetting('token_expiration', systemSettings.token_expiration || '24')}
+                                                className="premium-gradient px-3 font-black uppercase tracking-widest text-[8px] h-9"
+                                                disabled={isSettingsLoading}
+                                            >
+                                                Save
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
                             </CardContent>
                         </Card>
                     </div>
