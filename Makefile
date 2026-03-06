@@ -27,6 +27,15 @@ db-init: ## Re-initialize database (clear all data)
 	echo "Initializing database in container: $$CONTAINER"; \
 	docker exec -i $$CONTAINER psql -U root -d csm_db -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
 
+db-init2: ## Re-initialize database (clear all data)
+	@CONTAINER=$$(docker ps --filter "publish=5432" --format "{{.Names}}" | head -n 1); \
+	if [ -z "$$CONTAINER" ]; then \
+		echo "No running container found on port 5432. Using csm-db as fallback."; \
+		CONTAINER="csm-db"; \
+	fi; \
+	echo "Initializing database in container: $$CONTAINER"; \
+	docker exec -i $$CONTAINER psql -U csm_user -d csm_db -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+
 
 
 run-be: ## Run backend server
