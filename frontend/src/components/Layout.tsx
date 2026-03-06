@@ -6,6 +6,7 @@ import { Button } from './ui/button';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { APP_VERSION } from '../config/version';
+import GlobalSearch from './GlobalSearch';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -20,6 +21,7 @@ const Layout = () => {
     const { isDark, toggleTheme } = useTheme();
     const navigate = useNavigate();
     const [isCollapsed, setIsCollapsed] = useState(false);
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
     const location = useLocation();
 
     const getPageTitle = () => {
@@ -45,7 +47,10 @@ const Layout = () => {
             <div className="flex-1 flex flex-col min-w-0">
                 <header className="h-16 border-b border-border bg-[var(--header-bg)] backdrop-blur-xl sticky top-0 z-50 flex items-center justify-between px-6 gap-6">
                     <div className="flex items-center gap-4 flex-1">
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/40 rounded-md border border-border/50 text-muted-foreground/60 focus-within:bg-muted/60 transition-all duration-300">
+                        <div
+                            onClick={() => setIsSearchOpen(true)}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-muted/40 rounded-md border border-border/50 text-muted-foreground/60 focus-within:bg-muted/60 transition-all duration-300 cursor-pointer hover:bg-muted/60"
+                        >
                             <Search className="w-3.5 h-3.5" />
                             <span className="text-[11px] font-bold uppercase tracking-widest leading-none">Global Search</span>
                             <div className="ml-4 flex items-center gap-1 opacity-40">
@@ -129,6 +134,7 @@ const Layout = () => {
                     </div>
                 </main>
             </div>
+            <GlobalSearch open={isSearchOpen} onOpenChange={setIsSearchOpen} />
         </div>
     );
 };
