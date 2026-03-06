@@ -39,8 +39,15 @@ func (h *GlobalVariableHandler) List(c *gin.Context) {
 	}
 	searchTerm := c.Query("search")
 
+	var createdBy *uuid.UUID
+	if cb := c.Query("created_by"); cb != "" {
+		if id, err := uuid.Parse(cb); err == nil {
+			createdBy = &id
+		}
+	}
+
 	user, _ := c.Get("user")
-	gvs, total, err := h.service.ListPaginated(nsID, limit, offset, searchTerm, user.(*domain.User))
+	gvs, total, err := h.service.ListPaginated(nsID, limit, offset, searchTerm, createdBy, user.(*domain.User))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

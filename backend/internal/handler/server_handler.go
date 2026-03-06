@@ -42,8 +42,15 @@ func (h *ServerHandler) ListServers(c *gin.Context) {
 		}
 	}
 
+	var createdBy *uuid.UUID
+	if cb := c.Query("created_by"); cb != "" {
+		if id, err := uuid.Parse(cb); err == nil {
+			createdBy = &id
+		}
+	}
+
 	userVal, _ := c.Get("user")
-	servers, total, err := h.service.ListServersPaginated(limit, offset, searchTerm, authType, vpnID, userVal.(*domain.User))
+	servers, total, err := h.service.ListServersPaginated(limit, offset, searchTerm, authType, vpnID, createdBy, userVal.(*domain.User))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

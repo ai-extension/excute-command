@@ -64,7 +64,14 @@ func (h *WorkflowHandler) ListWorkflows(c *gin.Context) {
 	currentUser, _ := c.Get("user")
 	user, _ := currentUser.(*domain.User)
 
-	wfs, total, err := h.service.ListWorkflowsPaginated(nsID, limit, offset, searchTerm, tagIDs, isTemplate, user)
+	var createdBy *uuid.UUID
+	if cb := c.Query("created_by"); cb != "" {
+		if id, err := uuid.Parse(cb); err == nil {
+			createdBy = &id
+		}
+	}
+
+	wfs, total, err := h.service.ListWorkflowsPaginated(nsID, limit, offset, searchTerm, tagIDs, isTemplate, createdBy, user)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

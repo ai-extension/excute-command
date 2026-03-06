@@ -103,7 +103,7 @@ func (r *PostgresVpnConfigRepo) List(scope *domain.PermissionScope) ([]domain.Vp
 	return vpns, nil
 }
 
-func (r *PostgresVpnConfigRepo) ListPaginated(limit, offset int, searchTerm string, vpnType string, authType string, scope *domain.PermissionScope) ([]domain.VpnConfig, int64, error) {
+func (r *PostgresVpnConfigRepo) ListPaginated(limit, offset int, searchTerm string, vpnType string, authType string, createdBy *uuid.UUID, scope *domain.PermissionScope) ([]domain.VpnConfig, int64, error) {
 	var vpns []domain.VpnConfig
 	var total int64
 	db := applyScope(r.db, scope, "", "")
@@ -119,6 +119,10 @@ func (r *PostgresVpnConfigRepo) ListPaginated(limit, offset int, searchTerm stri
 
 	if authType != "" && authType != "ALL" {
 		db = db.Where("auth_type = ?", authType)
+	}
+
+	if createdBy != nil {
+		db = db.Where("created_by = ?", createdBy)
 	}
 
 	if err := db.Model(&domain.VpnConfig{}).Count(&total).Error; err != nil {

@@ -84,7 +84,7 @@ func (r *PostgresServerRepo) List(scope *domain.PermissionScope) ([]domain.Serve
 	return servers, nil
 }
 
-func (r *PostgresServerRepo) ListPaginated(limit, offset int, searchTerm string, authType string, vpnID *uuid.UUID, scope *domain.PermissionScope) ([]domain.Server, int64, error) {
+func (r *PostgresServerRepo) ListPaginated(limit, offset int, searchTerm string, authType string, vpnID *uuid.UUID, createdBy *uuid.UUID, scope *domain.PermissionScope) ([]domain.Server, int64, error) {
 	var servers []domain.Server
 	var total int64
 	db := applyScope(r.db, scope, "server_tags", "server_id")
@@ -100,6 +100,10 @@ func (r *PostgresServerRepo) ListPaginated(limit, offset int, searchTerm string,
 
 	if vpnID != nil {
 		db = db.Where("vpn_id = ?", vpnID)
+	}
+
+	if createdBy != nil {
+		db = db.Where("created_by = ?", createdBy)
 	}
 
 	if err := db.Model(&domain.Server{}).Count(&total).Error; err != nil {

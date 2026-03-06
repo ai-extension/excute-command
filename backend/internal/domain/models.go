@@ -186,7 +186,7 @@ type ServerRepository interface {
 	Create(server *Server) error
 	GetByID(id uuid.UUID, scope *PermissionScope) (*Server, error)
 	List(scope *PermissionScope) ([]Server, error)
-	ListPaginated(limit, offset int, searchTerm string, authType string, vpnID *uuid.UUID, scope *PermissionScope) ([]Server, int64, error)
+	ListPaginated(limit, offset int, searchTerm string, authType string, vpnID *uuid.UUID, createdBy *uuid.UUID, scope *PermissionScope) ([]Server, int64, error)
 	Update(server *Server) error
 	Delete(id uuid.UUID) error
 }
@@ -216,7 +216,7 @@ type VpnConfigRepository interface {
 	Create(vpn *VpnConfig) error
 	GetByID(id uuid.UUID, scope *PermissionScope) (*VpnConfig, error)
 	List(scope *PermissionScope) ([]VpnConfig, error)
-	ListPaginated(limit, offset int, searchTerm string, vpnType string, authType string, scope *PermissionScope) ([]VpnConfig, int64, error)
+	ListPaginated(limit, offset int, searchTerm string, vpnType string, authType string, createdBy *uuid.UUID, scope *PermissionScope) ([]VpnConfig, int64, error)
 	Update(vpn *VpnConfig) error
 	Delete(id uuid.UUID) error
 }
@@ -437,7 +437,7 @@ type WorkflowRepository interface {
 	Create(wf *Workflow) error
 	GetByID(id uuid.UUID, scope *PermissionScope) (*Workflow, error)
 	List(namespaceID uuid.UUID, scope *PermissionScope) ([]Workflow, error)
-	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, tagIDs []uuid.UUID, isTemplate *bool, scope *PermissionScope) ([]Workflow, int64, error)
+	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, tagIDs []uuid.UUID, isTemplate *bool, createdBy *uuid.UUID, scope *PermissionScope) ([]Workflow, int64, error)
 	ListGlobalPaginated(limit, offset int, searchTerm string, isTemplate *bool, scope *PermissionScope) ([]Workflow, int64, error)
 	Update(wf *Workflow) error
 	Delete(id uuid.UUID) error
@@ -489,7 +489,7 @@ type GlobalVariableRepository interface {
 	Create(gv *GlobalVariable) error
 	GetByID(id uuid.UUID, scope *PermissionScope) (*GlobalVariable, error)
 	List(namespaceID uuid.UUID, scope *PermissionScope) ([]GlobalVariable, error)
-	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, scope *PermissionScope) ([]GlobalVariable, int64, error)
+	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, createdBy *uuid.UUID, scope *PermissionScope) ([]GlobalVariable, int64, error)
 	ListGlobalPaginated(limit, offset int, searchTerm string, scope *PermissionScope) ([]GlobalVariable, int64, error)
 	Update(gv *GlobalVariable) error
 	Delete(id uuid.UUID) error
@@ -499,7 +499,7 @@ type ScheduleRepository interface {
 	Create(s *Schedule) error
 	GetByID(id uuid.UUID, scope *PermissionScope) (*Schedule, error)
 	List(namespaceID uuid.UUID, scope *PermissionScope) ([]Schedule, error)
-	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, tagIDs []uuid.UUID, scope *PermissionScope) ([]Schedule, int64, error)
+	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, tagIDs []uuid.UUID, createdBy *uuid.UUID, scope *PermissionScope) ([]Schedule, int64, error)
 	ListGlobalPaginated(limit, offset int, searchTerm string, scope *PermissionScope) ([]Schedule, int64, error)
 	Update(s *Schedule) error
 	Delete(id uuid.UUID) error
@@ -518,19 +518,21 @@ type WorkflowFileRepository interface {
 }
 
 type Page struct {
-	ID              uuid.UUID      `json:"id" gorm:"type:uuid;primaryKey"`
-	NamespaceID     uuid.UUID      `json:"namespace_id" gorm:"type:uuid;index"`
-	Title           string         `json:"title" gorm:"not null"`
-	Description     string         `json:"description"`
-	Slug            string         `json:"slug" gorm:"uniqueIndex;not null"`
-	IsPublic        bool           `json:"is_public" gorm:"default:false"`
-	Password        string         `json:"password,omitempty" gorm:"column:password"`
-	TokenTTLMinutes int            `json:"token_ttl_minutes" gorm:"default:15"`
-	ExpiresAt       *time.Time     `json:"expires_at" gorm:"index"`
-	Layout          string         `json:"layout" gorm:"type:text"`
-	Workflows       []PageWorkflow `json:"workflows,omitempty" gorm:"foreignKey:PageID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	CreatedAt       time.Time      `json:"created_at" gorm:"<-:create"`
-	UpdatedAt       time.Time      `json:"updated_at"`
+	ID                uuid.UUID      `json:"id" gorm:"type:uuid;primaryKey"`
+	NamespaceID       uuid.UUID      `json:"namespace_id" gorm:"type:uuid;index"`
+	Title             string         `json:"title" gorm:"not null"`
+	Description       string         `json:"description"`
+	Slug              string         `json:"slug" gorm:"uniqueIndex;not null"`
+	IsPublic          bool           `json:"is_public" gorm:"default:false"`
+	Password          string         `json:"password,omitempty" gorm:"column:password"`
+	TokenTTLMinutes   int            `json:"token_ttl_minutes" gorm:"default:15"`
+	ExpiresAt         *time.Time     `json:"expires_at" gorm:"index"`
+	Layout            string         `json:"layout" gorm:"type:text"`
+	Workflows         []PageWorkflow `json:"workflows,omitempty" gorm:"foreignKey:PageID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	CreatedBy         *uuid.UUID     `json:"created_by,omitempty" gorm:"type:uuid"`
+	CreatedByUsername string         `json:"created_by_username,omitempty"`
+	CreatedAt         time.Time      `json:"created_at" gorm:"<-:create"`
+	UpdatedAt         time.Time      `json:"updated_at"`
 }
 
 type PageWorkflow struct {
@@ -549,7 +551,7 @@ type PageRepository interface {
 	GetByID(id uuid.UUID, scope *PermissionScope) (*Page, error)
 	GetBySlug(slug string) (*Page, error) // Public slug lookup doesn't need scope
 	List(namespaceID uuid.UUID, scope *PermissionScope) ([]Page, error)
-	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, isPublic *bool, scope *PermissionScope) ([]Page, int64, error)
+	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, isPublic *bool, createdBy *uuid.UUID, scope *PermissionScope) ([]Page, int64, error)
 	ListGlobalPaginated(limit, offset int, searchTerm string, isPublic *bool, scope *PermissionScope) ([]Page, int64, error)
 	Update(page *Page) error
 	Delete(id uuid.UUID) error
@@ -559,7 +561,7 @@ type TagRepository interface {
 	Create(tag *Tag) error
 	GetByID(id uuid.UUID, scope *PermissionScope) (*Tag, error)
 	ListByNamespace(namespaceID uuid.UUID, scope *PermissionScope) ([]Tag, error)
-	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, scope *PermissionScope) ([]Tag, int64, error)
+	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, createdBy *uuid.UUID, scope *PermissionScope) ([]Tag, int64, error)
 	ListGlobalPaginated(limit, offset int, searchTerm string, scope *PermissionScope) ([]Tag, int64, error)
 	Update(tag *Tag) error
 	Delete(id uuid.UUID) error

@@ -60,7 +60,7 @@ func (r *PostgresWorkflowRepo) List(namespaceID uuid.UUID, scope *domain.Permiss
 	return wfs, nil
 }
 
-func (r *PostgresWorkflowRepo) ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, tagIDs []uuid.UUID, isTemplate *bool, scope *domain.PermissionScope) ([]domain.Workflow, int64, error) {
+func (r *PostgresWorkflowRepo) ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, tagIDs []uuid.UUID, isTemplate *bool, createdBy *uuid.UUID, scope *domain.PermissionScope) ([]domain.Workflow, int64, error) {
 	var wfs []domain.Workflow
 	var total int64
 
@@ -69,6 +69,10 @@ func (r *PostgresWorkflowRepo) ListPaginated(namespaceID uuid.UUID, limit, offse
 
 	if isTemplate != nil {
 		db = db.Where("is_template = ?", *isTemplate)
+	}
+
+	if createdBy != nil {
+		db = db.Where("created_by = ?", createdBy)
 	}
 
 	if searchTerm != "" {

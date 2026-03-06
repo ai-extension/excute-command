@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../lib/api';
 import { Server, VpnConfig } from '../types';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { useUsers } from '../hooks/useUsers';
 
 // Extracted Components
 import { ServerHeader } from '../components/servers/ServerHeader';
@@ -37,6 +38,8 @@ const ServerPage = () => {
     });
     const [authTypeFilter, setAuthTypeFilter] = useState<string>('ALL');
     const [vpnFilter, setVpnFilter] = useState<string>('ALL');
+    const [selectedCreatedBy, setSelectedCreatedBy] = useState<string | undefined>(undefined);
+    const { users: availableUsers, fetchUsers } = useUsers();
 
     const [limit, setLimit] = useState(20);
     const [offset, setOffset] = useState(0);
@@ -59,12 +62,14 @@ const ServerPage = () => {
             const currentSearch = searchOverride !== undefined ? searchOverride : searchTerm;
             const currentAuthType = filtersOverride?.authType !== undefined ? filtersOverride.authType : authTypeFilter;
             const currentVpn = filtersOverride?.vpn !== undefined ? filtersOverride.vpn : vpnFilter;
+            const currentCreatedBy = filtersOverride?.createdBy !== undefined ? filtersOverride.createdBy : selectedCreatedBy;
 
             let url = `${API_BASE_URL}/servers?limit=${limit}&offset=${offset}`;
             if (currentAuthType !== 'ALL') url += `&auth_type=${currentAuthType}`;
             if (currentVpn !== 'ALL' && currentVpn !== 'NONE') {
                 url += `&vpn_id=${currentVpn}`;
             }
+            if (currentCreatedBy) url += `&created_by=${currentCreatedBy}`;
             if (currentSearch) url += `&search=${encodeURIComponent(currentSearch)}`;
 
             const response = await apiFetch(url);
@@ -117,7 +122,7 @@ const ServerPage = () => {
 
     useEffect(() => {
         fetchServers();
-    }, [offset, limit]);
+    }, [offset, limit, selectedCreatedBy]);
 
     useEffect(() => {
         if (servers.length > 0) {
@@ -131,6 +136,7 @@ const ServerPage = () => {
         setSearchTerm(search);
         if (filters.authType) setAuthTypeFilter(filters.authType);
         if (filters.vpn) setVpnFilter(filters.vpn);
+        setSelectedCreatedBy(filters.createdBy);
         setOffset(0);
         fetchServers(search, filters);
     };
@@ -234,6 +240,9 @@ const ServerPage = () => {
                 onApplyFilter={handleApplyFilter}
                 onNewServer={() => handleOpenForm()}
                 onFetchVpns={fetchVpns}
+                selectedCreatedBy={selectedCreatedBy}
+                availableUsers={availableUsers}
+                onFetchUsers={fetchUsers}
             />
 
             {error ? (

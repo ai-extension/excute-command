@@ -59,8 +59,15 @@ func (h *PageHandler) ListPages(c *gin.Context) {
 		isPublic = &p
 	}
 
+	var createdBy *uuid.UUID
+	if cb := c.Query("created_by"); cb != "" {
+		if id, err := uuid.Parse(cb); err == nil {
+			createdBy = &id
+		}
+	}
+
 	user, _ := c.Get("user")
-	pages, total, err := h.service.ListPagesPaginated(nsID, limit, offset, searchTerm, isPublic, user.(*domain.User))
+	pages, total, err := h.service.ListPagesPaginated(nsID, limit, offset, searchTerm, isPublic, createdBy, user.(*domain.User))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -96,7 +103,7 @@ func (h *PageHandler) CreatePage(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.CreatePage(&page); err != nil {
+	if err := h.service.CreatePage(&page, userObj); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

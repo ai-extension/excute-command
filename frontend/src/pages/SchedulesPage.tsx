@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Calendar, ChevronRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNamespace } from '../context/NamespaceContext';
@@ -11,6 +10,7 @@ import { ScheduleHeader } from '../components/schedules/ScheduleHeader';
 import { ScheduleTable } from '../components/schedules/ScheduleTable';
 import { ScheduleFormDialog } from '../components/schedules/ScheduleFormDialog';
 import { WorkflowPickerDialog } from '../components/WorkflowPickerDialog';
+import { useUsers } from '../hooks/useUsers';
 
 const SchedulesPage = () => {
     const { apiFetch } = useAuth();
@@ -24,6 +24,8 @@ const SchedulesPage = () => {
     const [appliedTagIds, setAppliedTagIds] = useState<string[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+    const [selectedCreatedBy, setSelectedCreatedBy] = useState<string | undefined>(undefined);
+    const { users: availableUsers, fetchUsers } = useUsers();
 
     const [limit, setLimit] = useState(20);
     const [offset, setOffset] = useState(0);
@@ -61,6 +63,7 @@ const SchedulesPage = () => {
                     url += `&tag_ids=${id}`;
                 });
             }
+            if (selectedCreatedBy) url += `&created_by=${selectedCreatedBy}`;
             const response = await apiFetch(url);
             const data = await response.json();
             setSchedules(data.items || []);
@@ -86,7 +89,7 @@ const SchedulesPage = () => {
     useEffect(() => {
         fetchSchedules();
         fetchWorkflows();
-    }, [activeNamespace, offset, limit, appliedSearchTerm, appliedTagIds]);
+    }, [activeNamespace, offset, limit, appliedSearchTerm, appliedTagIds, selectedCreatedBy]);
 
     const handleSaveSchedule = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -235,6 +238,16 @@ const SchedulesPage = () => {
                 viewMode={viewMode}
                 setViewMode={setViewMode}
                 onNewSchedule={() => handleOpenForm()}
+                searchTerm={searchTerm}
+                setSearchTerm={setSearchTerm}
+                onApplyFilter={(search: string, filters: { [key: string]: any }) => {
+                    setAppliedSearchTerm(search);
+                    setSelectedCreatedBy(filters.createdBy);
+                    setOffset(0);
+                }}
+                selectedCreatedBy={selectedCreatedBy}
+                availableUsers={availableUsers}
+                onFetchUsers={fetchUsers}
             />
 
             {viewMode === 'list' ? (

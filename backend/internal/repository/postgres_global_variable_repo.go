@@ -36,12 +36,16 @@ func (r *PostgresGlobalVariableRepo) List(namespaceID uuid.UUID, scope *domain.P
 	return gvs, nil
 }
 
-func (r *PostgresGlobalVariableRepo) ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, scope *domain.PermissionScope) ([]domain.GlobalVariable, int64, error) {
+func (r *PostgresGlobalVariableRepo) ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, createdBy *uuid.UUID, scope *domain.PermissionScope) ([]domain.GlobalVariable, int64, error) {
 	var gvs []domain.GlobalVariable
 	var total int64
 
 	db := applyScope(r.db, scope, "", "")
 	db = db.Model(&domain.GlobalVariable{}).Where("namespace_id = ?", namespaceID)
+
+	if createdBy != nil {
+		db = db.Where("created_by = ?", createdBy)
+	}
 
 	if searchTerm != "" {
 		db = db.Where("key ILIKE ? OR description ILIKE ?", "%"+searchTerm+"%", "%"+searchTerm+"%")

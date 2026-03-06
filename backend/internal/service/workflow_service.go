@@ -86,9 +86,9 @@ func (s *WorkflowService) ListWorkflows(namespaceID uuid.UUID, user *domain.User
 	return s.repo.List(namespaceID, &scope)
 }
 
-func (s *WorkflowService) ListWorkflowsPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, tagIDs []uuid.UUID, isTemplate *bool, user *domain.User) ([]domain.Workflow, int64, error) {
+func (s *WorkflowService) ListWorkflowsPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, tagIDs []uuid.UUID, isTemplate *bool, createdBy *uuid.UUID, user *domain.User) ([]domain.Workflow, int64, error) {
 	scope := domain.GetPermissionScope(user, "workflows", "READ")
-	return s.repo.ListPaginated(namespaceID, limit, offset, searchTerm, tagIDs, isTemplate, &scope)
+	return s.repo.ListPaginated(namespaceID, limit, offset, searchTerm, tagIDs, isTemplate, createdBy, &scope)
 }
 
 func (s *WorkflowService) UpdateWorkflow(wf *domain.Workflow, user *domain.User) error {

@@ -27,6 +27,7 @@ import { API_BASE_URL } from '../lib/api';
 import { VpnConfig } from '../types';
 import { Pagination } from '../components/Pagination';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { useUsers } from '../hooks/useUsers';
 
 const VpnPage = () => {
     const { apiFetch } = useAuth();
@@ -38,6 +39,8 @@ const VpnPage = () => {
     const [authTypeFilter, setAuthTypeFilter] = useState<string>('ALL');
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingVpn, setEditingVpn] = useState<VpnConfig | null>(null);
+    const [selectedCreatedBy, setSelectedCreatedBy] = useState<string | undefined>(undefined);
+    const { users: availableUsers, fetchUsers } = useUsers();
 
     // Delete VPN state
     const [deleteTarget, setDeleteTarget] = useState<VpnConfig | null>(null);
@@ -66,9 +69,11 @@ const VpnPage = () => {
         try {
             const currentSearch = searchOverride !== undefined ? searchOverride : searchTerm;
             const currentAuthType = filtersOverride?.authType !== undefined ? filtersOverride.authType : authTypeFilter;
+            const currentCreatedBy = filtersOverride?.createdBy !== undefined ? filtersOverride.createdBy : selectedCreatedBy;
 
             let url = `${API_BASE_URL}/vpns?limit=${limit}&offset=${offset}`;
             if (currentAuthType !== 'ALL') url += `&auth_type=${currentAuthType}`;
+            if (currentCreatedBy) url += `&created_by=${currentCreatedBy}`;
             if (currentSearch) url += `&search=${encodeURIComponent(currentSearch)}`;
 
             const response = await apiFetch(url);
@@ -102,6 +107,7 @@ const VpnPage = () => {
     const handleApplyFilter = (search: string, filters: { [key: string]: any }) => {
         setSearchTerm(search);
         if (filters.authType) setAuthTypeFilter(filters.authType);
+        setSelectedCreatedBy(filters.createdBy);
         setOffset(0);
         fetchVpns(search, filters);
     };
@@ -199,7 +205,7 @@ const VpnPage = () => {
                 searchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
                 onApply={handleApplyFilter}
-                filters={{ authType: authTypeFilter }}
+                filters={{ authType: authTypeFilter, createdBy: selectedCreatedBy }}
                 filterConfigs={[
                     {
                         key: 'vpnType',
@@ -223,6 +229,18 @@ const VpnPage = () => {
                         ],
                         width: 'w-48',
                         isSearchable: true
+                    },
+                    {
+                        key: 'createdBy',
+                        placeholder: 'CREATED BY',
+                        type: 'single',
+                        isSearchable: true,
+                        onSearch: (query) => fetchUsers(query),
+                        options: [
+                            { label: 'ALL CREATORS', value: '' },
+                            ...availableUsers.map(u => ({ label: u.username.toUpperCase(), value: u.id }))
+                        ],
+                        width: 'w-48'
                     }
                 ]}
                 searchPlaceholder="Filter by name, ip..."
@@ -267,6 +285,7 @@ const VpnPage = () => {
                             <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Protocol</TableHead>
                             <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Authentication / Config</TableHead>
                             <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Endpoint</TableHead>
+                            <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Created By</TableHead>
                             <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground text-right px-6">Operations</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -314,6 +333,18 @@ const VpnPage = () => {
                                 </TableCell>
                                 <TableCell className="font-mono text-[11px] text-muted-foreground tracking-tight">
                                     {vpn.host}:{vpn.port}
+                                </TableCell>
+                                <TableCell>
+                                    {vpn.created_by_username ? (
+                                        <div className="flex items-center gap-1.5">
+                                            <div className="h-5 w-5 rounded-full bg-primary/20 flex items-center justify-center text-[8px] font-black text-primary uppercase shrink-0">
+                                                {vpn.created_by_username[0]}
+                                            </div>
+                                            <span className="text-[10px] font-semibold text-muted-foreground">{vpn.created_by_username}</span>
+                                        </div>
+                                    ) : (
+                                        <span className="text-[10px] text-muted-foreground/40 italic">—</span>
+                                    )}
                                 </TableCell>
                                 <TableCell className="text-right px-6">
                                     <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0">

@@ -23,9 +23,13 @@ func NewPageService(repo domain.PageRepository) *PageService {
 	return &PageService{repo: repo}
 }
 
-func (s *PageService) CreatePage(page *domain.Page) error {
+func (s *PageService) CreatePage(page *domain.Page, user *domain.User) error {
 	if page.ID == uuid.Nil {
 		page.ID = uuid.New()
+	}
+	if user != nil {
+		page.CreatedBy = &user.ID
+		page.CreatedByUsername = user.Username
 	}
 
 	// Always generate IDs for workflows if they don't exist
@@ -62,9 +66,9 @@ func (s *PageService) ListPages(namespaceID uuid.UUID, user *domain.User) ([]dom
 	return s.repo.List(namespaceID, &scope)
 }
 
-func (s *PageService) ListPagesPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, isPublic *bool, user *domain.User) ([]domain.Page, int64, error) {
+func (s *PageService) ListPagesPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, isPublic *bool, createdBy *uuid.UUID, user *domain.User) ([]domain.Page, int64, error) {
 	scope := domain.GetPermissionScope(user, "pages", "READ")
-	return s.repo.ListPaginated(namespaceID, limit, offset, searchTerm, isPublic, &scope)
+	return s.repo.ListPaginated(namespaceID, limit, offset, searchTerm, isPublic, createdBy, &scope)
 }
 
 func (s *PageService) UpdatePage(page *domain.Page, user *domain.User) error {

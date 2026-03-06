@@ -56,7 +56,7 @@ func (r *PostgresScheduleRepo) List(namespaceID uuid.UUID, scope *domain.Permiss
 	return ss, nil
 }
 
-func (r *PostgresScheduleRepo) ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, tagIDs []uuid.UUID, scope *domain.PermissionScope) ([]domain.Schedule, int64, error) {
+func (r *PostgresScheduleRepo) ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, tagIDs []uuid.UUID, createdBy *uuid.UUID, scope *domain.PermissionScope) ([]domain.Schedule, int64, error) {
 	var ss []domain.Schedule
 	var total int64
 
@@ -69,6 +69,10 @@ func (r *PostgresScheduleRepo) ListPaginated(namespaceID uuid.UUID, limit, offse
 
 	if len(tagIDs) > 0 {
 		db = db.Where("id IN (SELECT schedule_id FROM schedule_tags WHERE tag_id IN ?)", tagIDs)
+	}
+
+	if createdBy != nil {
+		db = db.Where("created_by = ?", createdBy)
 	}
 
 	if err := db.Count(&total).Error; err != nil {

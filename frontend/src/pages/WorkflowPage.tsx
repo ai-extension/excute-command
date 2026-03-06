@@ -31,6 +31,7 @@ import { TagSelector } from '../components/TagSelector';
 import { Pagination } from '../components/Pagination';
 import { ResourceFilters } from '../components/ResourceFilters';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { useUsers } from '../hooks/useUsers';
 
 const WorkflowPage = () => {
     const navigate = useNavigate();
@@ -47,6 +48,8 @@ const WorkflowPage = () => {
     const [offset, setOffset] = useState(0);
     const [availableTags, setAvailableTags] = useState<Tag[]>([]);
     const [showTemplates, setShowTemplates] = useState(false);
+    const [selectedCreatedBy, setSelectedCreatedBy] = useState<string | undefined>(undefined);
+    const { users: availableUsers, fetchUsers } = useUsers();
 
     // Create workflow dialog state
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -68,9 +71,11 @@ const WorkflowPage = () => {
             const currentSearch = searchOverride !== undefined ? searchOverride : searchTerm;
             const currentTagIds = tagIdsOverride !== undefined ? tagIdsOverride : selectedTagIds;
             const currentShowTemplates = templatesOverride !== undefined ? templatesOverride : showTemplates;
+            const currentCreatedBy = selectedCreatedBy;
 
             let url = `${API_BASE_URL}/namespaces/${activeNamespace.id}/workflows?limit=${limit}&offset=${offset}&is_template=${currentShowTemplates}`;
             if (currentSearch) url += `&search=${encodeURIComponent(currentSearch)}`;
+            if (currentCreatedBy) url += `&created_by=${currentCreatedBy}`;
             if (currentTagIds.length > 0) {
                 currentTagIds.forEach(id => {
                     url += `&tag_ids=${id}`;
@@ -225,6 +230,7 @@ const WorkflowPage = () => {
     const handleApplyFilter = (search: string, filters: { [key: string]: any }) => {
         setSearchTerm(search);
         setSelectedTagIds(filters.tags || []);
+        setSelectedCreatedBy(filters.createdBy);
         setOffset(0);
     };
 
@@ -355,7 +361,7 @@ const WorkflowPage = () => {
                                 searchTerm={searchTerm}
                                 onSearchChange={setSearchTerm}
                                 onApply={handleApplyFilter}
-                                filters={{ tags: selectedTagIds }}
+                                filters={{ tags: selectedTagIds, createdBy: selectedCreatedBy }}
                                 filterConfigs={[
                                     {
                                         key: 'tags',
@@ -371,6 +377,17 @@ const WorkflowPage = () => {
                                                 .catch(err => console.error('Failed to search tags:', err));
                                         },
                                         options: availableTags.map(t => ({ label: t.name, value: t.id }))
+                                    },
+                                    {
+                                        key: 'createdBy',
+                                        placeholder: 'Created By',
+                                        type: 'single',
+                                        isSearchable: true,
+                                        onSearch: (query) => fetchUsers(query),
+                                        options: [
+                                            { label: 'All Creators', value: '' },
+                                            ...availableUsers.map(u => ({ label: u.username, value: u.id }))
+                                        ]
                                     }
                                 ]}
                                 searchPlaceholder={showTemplates ? "Search blueprint library..." : "Search workflows by name or description..."}

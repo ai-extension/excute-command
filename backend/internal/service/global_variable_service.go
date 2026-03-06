@@ -32,9 +32,9 @@ func (s *GlobalVariableService) List(namespaceID uuid.UUID, user *domain.User) (
 	return s.repo.List(namespaceID, &scope)
 }
 
-func (s *GlobalVariableService) ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, user *domain.User) ([]domain.GlobalVariable, int64, error) {
+func (s *GlobalVariableService) ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, createdBy *uuid.UUID, user *domain.User) ([]domain.GlobalVariable, int64, error) {
 	scope := domain.GetPermissionScope(user, "namespaces", "READ")
-	return s.repo.ListPaginated(namespaceID, limit, offset, searchTerm, &scope)
+	return s.repo.ListPaginated(namespaceID, limit, offset, searchTerm, createdBy, &scope)
 }
 
 func (s *GlobalVariableService) Update(gv *domain.GlobalVariable, user *domain.User) error {

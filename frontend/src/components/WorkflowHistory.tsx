@@ -34,9 +34,19 @@ interface WorkflowHistoryProps {
     workflowId?: string;
     namespaceId?: string;
     onReRun?: (workflow: any, inputs: Record<string, string>) => void;
+    status?: string;
+    createdBy?: string;
+    search?: string;
 }
 
-const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({ workflowId, namespaceId, onReRun }) => {
+const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
+    workflowId,
+    namespaceId,
+    onReRun,
+    status,
+    createdBy,
+    search
+}) => {
     const { apiFetch } = useAuth();
     const [executions, setExecutions] = useState<WorkflowExecution[]>([]);
     const [loading, setLoading] = useState(true);
@@ -59,6 +69,10 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({ workflowId, namespace
             } else {
                 return;
             }
+
+            if (status && status !== 'ALL') url += `&status=${status}`;
+            if (createdBy) url += `&created_by=${createdBy}`;
+            if (search) url += `&search=${encodeURIComponent(search)}`;
 
             const response = await apiFetch(url);
             if (response.ok) {
@@ -87,7 +101,7 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({ workflowId, namespace
     useEffect(() => {
         if (workflowId || namespaceId) refresh();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [workflowId, namespaceId]);
+    }, [workflowId, namespaceId, status, createdBy, search]);
 
     const fetchExecutionDetail = async (exec: WorkflowExecution) => {
         try {

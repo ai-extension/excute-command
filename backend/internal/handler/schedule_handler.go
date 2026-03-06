@@ -49,8 +49,15 @@ func (h *ScheduleHandler) List(c *gin.Context) {
 		}
 	}
 
+	var createdBy *uuid.UUID
+	if cb := c.Query("created_by"); cb != "" {
+		if id, err := uuid.Parse(cb); err == nil {
+			createdBy = &id
+		}
+	}
+
 	user, _ := c.Get("user")
-	schedules, total, err := h.service.ListPaginated(nsID, limit, offset, searchTerm, tagIDs, user.(*domain.User))
+	schedules, total, err := h.service.ListPaginated(nsID, limit, offset, searchTerm, tagIDs, createdBy, user.(*domain.User))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

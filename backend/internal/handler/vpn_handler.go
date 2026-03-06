@@ -36,8 +36,15 @@ func (h *VpnConfigHandler) List(c *gin.Context) {
 	authType := c.Query("auth_type")
 	vpnType := c.Query("vpn_type")
 
+	var createdBy *uuid.UUID
+	if cb := c.Query("created_by"); cb != "" {
+		if id, err := uuid.Parse(cb); err == nil {
+			createdBy = &id
+		}
+	}
+
 	userVal, _ := c.Get("user")
-	vpns, total, err := h.service.ListPaginated(limit, offset, searchTerm, vpnType, authType, userVal.(*domain.User))
+	vpns, total, err := h.service.ListPaginated(limit, offset, searchTerm, vpnType, authType, createdBy, userVal.(*domain.User))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -165,9 +165,9 @@ func (s *ScheduleService) List(namespaceID uuid.UUID, user *domain.User) ([]doma
 	return s.repo.List(namespaceID, &scope)
 }
 
-func (s *ScheduleService) ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, tagIDs []uuid.UUID, user *domain.User) ([]domain.Schedule, int64, error) {
+func (s *ScheduleService) ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, tagIDs []uuid.UUID, createdBy *uuid.UUID, user *domain.User) ([]domain.Schedule, int64, error) {
 	scope := domain.GetPermissionScope(user, "schedules", "READ")
-	return s.repo.ListPaginated(namespaceID, limit, offset, searchTerm, tagIDs, &scope)
+	return s.repo.ListPaginated(namespaceID, limit, offset, searchTerm, tagIDs, createdBy, &scope)
 }
 
 func (s *ScheduleService) GetByID(id uuid.UUID, user *domain.User) (*domain.Schedule, error) {

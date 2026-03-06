@@ -135,7 +135,7 @@ func (h *PermissionHandler) ListResourceItems(c *gin.Context) {
 	case "tags":
 		items, total, err = h.tagRepo.ListGlobalPaginated(limit, offset, searchTerm, &scope)
 	case "servers":
-		items, total, err = h.serverRepo.ListPaginated(limit, offset, searchTerm, "", nil, &scope)
+		items, total, err = h.serverRepo.ListPaginated(limit, offset, searchTerm, "", nil, nil, &scope)
 	case "history", "executions":
 		items, total, err = h.execRepo.ListGlobalPaginated(limit, offset, "", nil, &scope)
 	case "users":
@@ -143,7 +143,7 @@ func (h *PermissionHandler) ListResourceItems(c *gin.Context) {
 	case "roles":
 		items, total, err = h.roleRepo.ListPaginated(limit, offset, searchTerm)
 	case "vpns":
-		items, total, err = h.vpnRepo.ListPaginated(limit, offset, searchTerm, "", "", &scope)
+		items, total, err = h.vpnRepo.ListPaginated(limit, offset, searchTerm, "", "", nil, &scope)
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported resource type: " + resourceType})
 		return

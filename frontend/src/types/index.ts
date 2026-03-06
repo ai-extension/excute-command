@@ -283,6 +283,17 @@ export interface Page {
     expires_at?: string;
     layout: string;
     workflows?: PageWorkflow[];
+    created_by?: string;
+    created_by_username?: string;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface User {
+    id: string;
+    username: string;
+    email?: string;
+    full_name?: string;
     created_at?: string;
     updated_at?: string;
 }

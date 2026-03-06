@@ -43,7 +43,14 @@ func (h *TagHandler) List(c *gin.Context) {
 	currentUser, _ := c.Get("user")
 	user, _ := currentUser.(*domain.User)
 
-	tags, total, err := h.service.ListPaginated(namespaceID, limit, offset, searchTerm, user)
+	var createdBy *uuid.UUID
+	if cb := c.Query("created_by"); cb != "" {
+		if id, err := uuid.Parse(cb); err == nil {
+			createdBy = &id
+		}
+	}
+
+	tags, total, err := h.service.ListPaginated(namespaceID, limit, offset, searchTerm, createdBy, user)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

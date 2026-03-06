@@ -61,7 +61,7 @@ func (r *PostgresPageRepo) List(namespaceID uuid.UUID, scope *domain.PermissionS
 	return pages, nil
 }
 
-func (r *PostgresPageRepo) ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, isPublic *bool, scope *domain.PermissionScope) ([]domain.Page, int64, error) {
+func (r *PostgresPageRepo) ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, isPublic *bool, createdBy *uuid.UUID, scope *domain.PermissionScope) ([]domain.Page, int64, error) {
 	var pages []domain.Page
 	var total int64
 	db := applyScope(r.db, scope, "", "").Where("namespace_id = ?", namespaceID)
@@ -73,6 +73,10 @@ func (r *PostgresPageRepo) ListPaginated(namespaceID uuid.UUID, limit, offset in
 
 	if isPublic != nil {
 		db = db.Where("is_public = ?", *isPublic)
+	}
+
+	if createdBy != nil {
+		db = db.Where("created_by = ?", createdBy)
 	}
 
 	if err := db.Model(&domain.Page{}).Count(&total).Error; err != nil {

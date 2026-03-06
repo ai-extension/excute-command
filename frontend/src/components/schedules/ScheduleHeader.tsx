@@ -2,17 +2,30 @@ import React from 'react';
 import { Calendar, ChevronRight, Plus, LayoutList, CalendarDays } from 'lucide-react';
 import { Button } from '../ui/button';
 import { cn } from '../../lib/utils';
+import { ResourceFilters } from '../ResourceFilters';
 
 interface ScheduleHeaderProps {
     viewMode: 'list' | 'calendar';
     setViewMode: (mode: 'list' | 'calendar') => void;
     onNewSchedule: () => void;
+    searchTerm: string;
+    setSearchTerm: (term: string) => void;
+    onApplyFilter: (search: string, filters: { [key: string]: any }) => void;
+    selectedCreatedBy?: string;
+    availableUsers: any[];
+    onFetchUsers: (query: string) => Promise<void>;
 }
 
 export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
     viewMode,
     setViewMode,
     onNewSchedule,
+    searchTerm,
+    setSearchTerm,
+    onApplyFilter,
+    selectedCreatedBy,
+    availableUsers,
+    onFetchUsers
 }) => {
     return (
         <div className="space-y-6">
@@ -57,6 +70,28 @@ export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
                         <Plus className="w-4 h-4" /> New Schedule
                     </Button>
                 </div>
+
+                <ResourceFilters
+                    searchTerm={searchTerm}
+                    onSearchChange={setSearchTerm}
+                    onApply={onApplyFilter}
+                    filters={{ createdBy: selectedCreatedBy }}
+                    filterConfigs={[
+                        {
+                            key: 'createdBy',
+                            placeholder: 'CREATED BY',
+                            type: 'single',
+                            isSearchable: true,
+                            onSearch: onFetchUsers,
+                            options: [
+                                { label: 'ALL CREATORS', value: '' },
+                                ...availableUsers.map(u => ({ label: u.username.toUpperCase(), value: u.id }))
+                            ],
+                            width: 'w-48'
+                        }
+                    ]}
+                    searchPlaceholder="Search schedules by name..."
+                />
             </div>
         </div>
     );

@@ -12,6 +12,7 @@ import { API_BASE_URL } from '../lib/api';
 import { Pagination } from '../components/Pagination';
 import { ResourceFilters } from '../components/ResourceFilters';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { useUsers } from '../hooks/useUsers';
 
 const PagesListPage = () => {
     const navigate = useNavigate();
@@ -24,6 +25,8 @@ const PagesListPage = () => {
     const [error, setError] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [visibilityFilter, setVisibilityFilter] = useState<string>('ALL');
+    const [selectedCreatedBy, setSelectedCreatedBy] = useState<string | undefined>(undefined);
+    const { users: availableUsers, fetchUsers } = useUsers();
 
     const [limit, setLimit] = useState(21);
     const [offset, setOffset] = useState(0);
@@ -43,6 +46,7 @@ const PagesListPage = () => {
             } else if (visibilityFilter === 'PRIVATE') {
                 url += `&is_public=false`;
             }
+            if (selectedCreatedBy) url += `&created_by=${selectedCreatedBy}`;
             if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
 
             const response = await apiFetch(url);
@@ -62,11 +66,13 @@ const PagesListPage = () => {
 
     useEffect(() => {
         fetchPages();
-    }, [activeNamespace, offset, limit]);
+    }, [activeNamespace, offset, limit, visibilityFilter, selectedCreatedBy]);
 
-    const handleApplyFilter = () => {
+    const handleApplyFilter = (search: string, filters: { [key: string]: any }) => {
+        setSearchQuery(search);
+        setVisibilityFilter(filters.visibility || 'ALL');
+        setSelectedCreatedBy(filters.createdBy);
         setOffset(0);
-        fetchPages();
     };
 
     const handleCreatePage = async () => {
@@ -110,6 +116,7 @@ const PagesListPage = () => {
             });
             if (response.ok) {
                 setPages(pages.filter(p => p.id !== deleteTarget.id));
+                setTotal(prev => prev - 1);
             }
         } catch (error) {
             console.error('Failed to delete page:', error);
@@ -118,15 +125,6 @@ const PagesListPage = () => {
             setDeleteTarget(null);
         }
     };
-
-    const filteredPages = pages.filter(p => {
-        const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            p.slug.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesVisibility = visibilityFilter === 'ALL' ||
-            (visibilityFilter === 'PUBLIC' && p.is_public) ||
-            (visibilityFilter === 'PRIVATE' && !p.is_public);
-        return matchesSearch && matchesVisibility;
-    });
 
     return (
         <div className="flex flex-col h-full space-y-5 animate-in fade-in duration-500">
@@ -143,15 +141,8 @@ const PagesListPage = () => {
             <ResourceFilters
                 searchTerm={searchQuery}
                 onSearchChange={setSearchQuery}
-                onApply={(search: string, filters: { [key: string]: any }) => {
-                    setSearchQuery(search);
-                    setVisibilityFilter(filters.visibility || 'ALL');
-                    setOffset(0);
-                    // fetchPages will be triggered by useEffect because of offset or visibility change
-                    // but we call it explicitly here for completeness if needed after state updates
-                    setTimeout(() => fetchPages(), 10);
-                }}
-                filters={{ visibility: visibilityFilter }}
+                onApply={handleApplyFilter}
+                filters={{ visibility: visibilityFilter, createdBy: selectedCreatedBy }}
                 filterConfigs={[
                     {
                         key: 'visibility',
@@ -163,13 +154,34 @@ const PagesListPage = () => {
                         ],
                         width: 'w-40',
                         isSearchable: true
+                    },
+                    {
+                        key: 'createdBy',
+                        placeholder: 'CREATED BY',
+                        type: 'single',
+                        isSearchable: true,
+                        onSearch: (query: string) => fetchUsers(query),
+                        options: [
+                            { label: 'ALL CREATORS', value: '' },
+                            ...availableUsers.map(u => ({ label: u.username.toUpperCase(), value: u.id }))
+                        ],
+                        width: 'w-48'
                     }
                 ]}
                 searchPlaceholder="Search pages by title or slug..."
                 isLoading={isLoading}
+                primaryAction={
+                    <Button
+                        onClick={handleCreatePage}
+                        className="px-4 rounded-xl premium-gradient font-black uppercase tracking-widest text-[10px] shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
+                    >
+                        <Plus className="w-3.5 h-3.5" />
+                        New Page
+                    </Button>
+                }
             />
 
-            {isLoading ? (
+            {isLoading && pages.length === 0 ? (
                 <div className="flex-1 flex items-center justify-center italic text-muted-foreground opacity-50">
                     Loading your interfaces...
                 </div>
@@ -185,7 +197,7 @@ const PagesListPage = () => {
                         </p>
                     </div>
                     <Button
-                        onClick={() => window.location.reload()}
+                        onClick={() => fetchPages()}
                         variant="outline"
                         className="rounded-xl px-8 h-12 font-bold uppercase tracking-widest text-[11px] border-destructive/20 hover:bg-destructive/10"
                     >
@@ -202,10 +214,10 @@ const PagesListPage = () => {
                 <div className="space-y-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {pages.map(page => (
-                            <div key={page.id} className="group bg-card border border-border rounded-2xl p-5 hover:border-primary/50 transition-all duration-300 shadow-sm hover:shadow-xl hover:shadow-primary/5 relative overflow-hidden flex flex-col">
+                            <div key={page.id} className="group bg-card border border-border rounded-2xl p-5 hover:border-primary/50 transition-all duration-300 shadow-sm hover:shadow-xl hover:shadow-primary/5 relative overflow-hidden flex flex-col min-h-[220px]">
                                 <div className="flex items-start justify-between mb-4">
                                     <div className="flex flex-col gap-1">
-                                        <h3 className="text-lg font-bold group-hover:text-primary transition-colors">{page.title}</h3>
+                                        <h3 className="text-lg font-bold group-hover:text-primary transition-colors line-clamp-1">{page.title}</h3>
                                         <div className="flex items-center gap-2">
                                             <Badge variant="outline" className="text-[10px] font-mono py-0 h-5 lowercase bg-muted/50">
                                                 /{page.slug}
@@ -231,14 +243,24 @@ const PagesListPage = () => {
                                     </div>
                                 </div>
 
-                                <p className="text-sm text-muted-foreground line-clamp-2 mb-6 h-10">
+                                <p className="text-sm text-muted-foreground line-clamp-2 mb-6 flex-1">
                                     {page.description || 'No description provided.'}
                                 </p>
 
                                 <div className="mt-auto flex items-center justify-between pt-4 border-t border-border/50">
-                                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                                        {page.workflows?.length || 0} Workflows
-                                    </span>
+                                    <div className="flex flex-col gap-1">
+                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                                            {page.workflows?.length || 0} Workflows
+                                        </span>
+                                        {page.created_by_username && (
+                                            <div className="flex items-center gap-1.5 grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100 transition-all">
+                                                <div className="h-4 w-4 rounded-full bg-primary/20 flex items-center justify-center text-[7px] font-black text-primary uppercase">
+                                                    {page.created_by_username[0]}
+                                                </div>
+                                                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">{page.created_by_username}</span>
+                                            </div>
+                                        )}
+                                    </div>
                                     <div className="flex gap-2">
                                         {page.is_public && (
                                             <Button
@@ -247,11 +269,11 @@ const PagesListPage = () => {
                                                 className="h-8 px-3 text-[10px] font-bold uppercase tracking-widest rounded-lg"
                                                 onClick={() => window.open(`/public/pages/${page.slug}`, '_blank')}
                                             >
-                                                <ExternalLink className="w-3 h-3 mr-2" /> View
+                                                <ExternalLink className="w-3 h-3" />
                                             </Button>
                                         )}
                                         <Button
-                                            className="px-4 text-[10px] font-bold uppercase tracking-widest rounded-lg premium-gradient text-white"
+                                            className="px-4 h-8 text-[10px] font-bold uppercase tracking-widest rounded-lg premium-gradient text-white"
                                             onClick={() => navigate(`/pages/${page.id}/edit`)}
                                         >
                                             Design <ChevronRight className="w-3 h-3 ml-1" />

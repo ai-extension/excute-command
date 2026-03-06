@@ -35,9 +35,9 @@ func (s *TagService) ListByNamespace(namespaceID uuid.UUID, user *domain.User) (
 	return s.repo.ListByNamespace(namespaceID, &scope)
 }
 
-func (s *TagService) ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, user *domain.User) ([]domain.Tag, int64, error) {
+func (s *TagService) ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, createdBy *uuid.UUID, user *domain.User) ([]domain.Tag, int64, error) {
 	scope := domain.GetPermissionScope(user, "tags", "READ")
-	return s.repo.ListPaginated(namespaceID, limit, offset, searchTerm, &scope)
+	return s.repo.ListPaginated(namespaceID, limit, offset, searchTerm, createdBy, &scope)
 }
 
 func (s *TagService) Update(tag *domain.Tag, user *domain.User) error {

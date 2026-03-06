@@ -20,6 +20,7 @@ import { API_BASE_URL } from '../lib/api';
 import { GlobalVariable } from '../types';
 import { Pagination } from '../components/Pagination';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { useUsers } from '../hooks/useUsers';
 
 import {
     Dialog,
@@ -44,6 +45,8 @@ const GlobalVariablesPage = () => {
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [selectedVar, setSelectedVar] = useState<GlobalVariable | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedCreatedBy, setSelectedCreatedBy] = useState<string | undefined>(undefined);
+    const { users: availableUsers, fetchUsers } = useUsers();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -70,13 +73,13 @@ const GlobalVariablesPage = () => {
         description: ''
     });
 
-    const fetchVariables = async (searchOverride?: string) => {
+    const fetchVariables = async () => {
         if (!activeNamespace) return;
         setIsLoading(true);
         try {
-            const currentSearch = searchOverride !== undefined ? searchOverride : searchTerm;
             let url = `${API_BASE_URL}/namespaces/${activeNamespace.id}/global-variables?limit=${limit}&offset=${offset}`;
-            if (currentSearch) url += `&search=${encodeURIComponent(currentSearch)}`;
+            if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
+            if (selectedCreatedBy) url += `&created_by=${selectedCreatedBy}`;
             const response = await apiFetch(url);
             const data = await response.json();
             setVariables(data.items || []);
@@ -90,12 +93,12 @@ const GlobalVariablesPage = () => {
 
     useEffect(() => {
         fetchVariables();
-    }, [activeNamespace, offset, limit]);
+    }, [activeNamespace, offset, limit, selectedCreatedBy]);
 
-    const handleApplyFilter = (search: string) => {
+    const handleApplyFilter = (search: string, filters: { [key: string]: any }) => {
         setSearchTerm(search);
+        setSelectedCreatedBy(filters.createdBy);
         setOffset(0);
-        fetchVariables(search);
     };
 
     const handleCreate = async (e: React.FormEvent) => {
@@ -175,8 +178,6 @@ const GlobalVariablesPage = () => {
         setIsEditOpen(true);
     };
 
-
-
     return (
         <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-700">
             {/* Breadcrumb */}
@@ -193,6 +194,21 @@ const GlobalVariablesPage = () => {
                 searchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
                 onApply={handleApplyFilter}
+                filters={{ createdBy: selectedCreatedBy }}
+                filterConfigs={[
+                    {
+                        key: 'createdBy',
+                        placeholder: 'CREATED BY',
+                        type: 'single',
+                        isSearchable: true,
+                        onSearch: (query: string) => fetchUsers(query),
+                        options: [
+                            { label: 'ALL CREATORS', value: '' },
+                            ...availableUsers.map(u => ({ label: u.username.toUpperCase(), value: u.id }))
+                        ],
+                        width: 'w-48'
+                    }
+                ]}
                 searchPlaceholder="Search by key or description..."
                 isLoading={isLoading}
                 primaryAction={
@@ -269,9 +285,9 @@ const GlobalVariablesPage = () => {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {isLoading ? (
+                        {isLoading && variables.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={4} className="h-48 text-center bg-transparent">
+                                <TableCell colSpan={5} className="h-48 text-center bg-transparent">
                                     <div className="flex flex-col items-center justify-center gap-3">
                                         <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
                                         <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40">Loading global registry...</p>
@@ -358,7 +374,7 @@ const GlobalVariablesPage = () => {
                             </TableRow>
                         )) : (
                             <TableRow>
-                                <TableCell colSpan={4} className="h-48 text-center bg-transparent">
+                                <TableCell colSpan={5} className="h-48 text-center bg-transparent">
                                     <div className="flex flex-col items-center justify-center gap-4 opacity-40">
                                         <Database className="w-10 h-10" />
                                         <div className="space-y-1">

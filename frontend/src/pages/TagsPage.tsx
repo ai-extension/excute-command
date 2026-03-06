@@ -19,6 +19,7 @@ import { Tag } from '../types';
 import { Pagination } from '../components/Pagination';
 import { ResourceFilters } from '../components/ResourceFilters';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { useUsers } from '../hooks/useUsers';
 
 import {
     Dialog,
@@ -40,6 +41,8 @@ const TagsPage = () => {
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [selectedTag, setSelectedTag] = useState<Tag | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedCreatedBy, setSelectedCreatedBy] = useState<string | undefined>(undefined);
+    const { users: availableUsers, fetchUsers } = useUsers();
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Delete tag state
@@ -60,8 +63,10 @@ const TagsPage = () => {
         setIsLoading(true);
         try {
             const currentSearch = searchOverride !== undefined ? searchOverride : searchTerm;
+            const currentCreatedBy = selectedCreatedBy;
             let url = `${API_BASE_URL}/namespaces/${activeNamespace.id}/tags?limit=${limit}&offset=${offset}`;
             if (currentSearch) url += `&search=${encodeURIComponent(currentSearch)}`;
+            if (currentCreatedBy) url += `&created_by=${currentCreatedBy}`;
             const response = await apiFetch(url);
             const data = await response.json();
             setTags(data.items || []);
@@ -77,8 +82,9 @@ const TagsPage = () => {
         fetchTags();
     }, [activeNamespace, offset, limit]);
 
-    const handleApplyFilter = (search: string) => {
+    const handleApplyFilter = (search: string, filters: { [key: string]: any }) => {
         setSearchTerm(search);
+        setSelectedCreatedBy(filters.createdBy);
         setOffset(0);
         fetchTags(search);
     };
@@ -181,6 +187,21 @@ const TagsPage = () => {
                 searchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
                 onApply={handleApplyFilter}
+                filters={{ createdBy: selectedCreatedBy }}
+                filterConfigs={[
+                    {
+                        key: 'createdBy',
+                        placeholder: 'CREATED BY',
+                        type: 'single',
+                        isSearchable: true,
+                        onSearch: (query: string) => fetchUsers(query),
+                        options: [
+                            { label: 'ALL CREATORS', value: '' },
+                            ...availableUsers.map(u => ({ label: u.username.toUpperCase(), value: u.id }))
+                        ],
+                        width: 'w-48'
+                    }
+                ]}
                 searchPlaceholder="Search tags..."
                 isLoading={isLoading}
                 primaryAction={

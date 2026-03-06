@@ -32,12 +32,16 @@ func (r *PostgresTagRepo) ListByNamespace(namespaceID uuid.UUID, scope *domain.P
 	return tags, err
 }
 
-func (r *PostgresTagRepo) ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, scope *domain.PermissionScope) ([]domain.Tag, int64, error) {
+func (r *PostgresTagRepo) ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, createdBy *uuid.UUID, scope *domain.PermissionScope) ([]domain.Tag, int64, error) {
 	var tags []domain.Tag
 	var total int64
 
 	db := applyScope(r.db, scope, "", "")
 	db = db.Model(&domain.Tag{}).Where("namespace_id = ?", namespaceID)
+
+	if createdBy != nil {
+		db = db.Where("created_by = ?", createdBy)
+	}
 
 	if searchTerm != "" {
 		db = db.Where("name ILIKE ?", "%"+searchTerm+"%")
