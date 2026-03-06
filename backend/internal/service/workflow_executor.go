@@ -544,9 +544,6 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 	msg := fmt.Sprintf("\n\n\033[1;35m❖ GROUP START: %s\033[0m \033[90m[Parallel: %v]\033[0m\n", group.Name, group.IsParallel)
 	fmt.Fprint(logFile, msg)
 	e.hub.BroadcastLog(group.WorkflowID.String(), msg)
-	group.Status = domain.StatusRunning
-	e.groupRepo.Update(group)
-	e.hub.BroadcastStatus(group.ID.String(), "group", string(domain.StatusRunning))
 
 	// Group-level server override: use group's server if set, otherwise fall back to workflow default
 	effectiveServerID := defaultServerID
@@ -554,6 +551,79 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 		effectiveServerID = group.DefaultServerID
 	}
 
+	maxAttempts := 1
+	if group.RetryEnabled && group.RetryLimit > 0 {
+		maxAttempts = group.RetryLimit + 1
+	}
+
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if attempt > 1 {
+			msg := fmt.Sprintf("\n\033[1;33m↻ GROUP RETRY ATTEMPT %d/%d (Delay: %ds): %s\033[0m\n", attempt-1, group.RetryLimit, group.RetryDelay, group.Name)
+			fmt.Fprint(logFile, msg)
+			e.hub.BroadcastLog(group.WorkflowID.String(), msg)
+
+			if group.RetryDelay > 0 {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(time.Duration(group.RetryDelay) * time.Second):
+				}
+			}
+
+			// Reset step statuses for visual clarity in UI
+			for i := range group.Steps {
+				group.Steps[i].Status = domain.StatusPending
+				e.stepRepo.Update(&group.Steps[i])
+				e.hub.BroadcastStatus(group.Steps[i].ID.String(), "step", string(domain.StatusPending))
+			}
+		}
+
+		group.Status = domain.StatusRunning
+		e.groupRepo.Update(group)
+		e.hub.BroadcastStatus(group.ID.String(), "group", string(domain.StatusRunning))
+
+		lastErr = e.runGroupAttempt(ctx, group, inputs, variables, groupResults, effectiveServerID, logFile, workflowID, executionID, namespaceID, user, workingDirs)
+
+		if lastErr == nil {
+			group.Status = domain.StatusSuccess
+			e.hub.BroadcastStatus(group.ID.String(), "group", string(domain.StatusSuccess))
+			return e.groupRepo.Update(group)
+		}
+
+		// Handle cancellation immediately
+		if ctx.Err() != nil {
+			group.Status = domain.StatusCancelled
+			e.groupRepo.Update(group)
+			e.hub.BroadcastStatus(group.ID.String(), "group", string(domain.StatusCancelled))
+			msg := fmt.Sprintf("\n\033[1;33m⏹ GROUP CANCELLED: %s\033[0m\n", group.Name)
+			fmt.Fprint(logFile, msg)
+			e.hub.BroadcastLog(workflowID.String(), msg)
+			return lastErr
+		}
+
+		if attempt < maxAttempts {
+			continue
+		}
+
+		// Final failure after all retries
+		group.Status = domain.StatusFailed
+		e.groupRepo.Update(group)
+		e.hub.BroadcastStatus(group.ID.String(), "group", string(domain.StatusFailed))
+
+		if group.ContinueOnFailure {
+			msg := fmt.Sprintf("\n\033[1;33m⚠ GROUP FAILED AFTER %d ATTEMPTS BUT CONTINUING:\033[0m %s (Continue on Failure enabled)\n", attempt, group.Name)
+			fmt.Fprint(logFile, msg)
+			e.hub.BroadcastLog(workflowID.String(), msg)
+			return nil
+		}
+		return fmt.Errorf("group %q failed after %d attempts: %w", group.Name, attempt, lastErr)
+	}
+
+	return nil
+}
+
+func (e *WorkflowExecutor) runGroupAttempt(ctx context.Context, group *domain.WorkflowGroup, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, effectiveServerID uuid.UUID, logFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, namespaceID uuid.UUID, user *domain.User, workingDirs *sync.Map) error {
 	if group.IsParallel {
 		var wg sync.WaitGroup
 		errs := make(chan error, len(group.Steps))
@@ -573,58 +643,22 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 
 		for err := range errs {
 			if err != nil {
-				if ctx.Err() != nil {
-					group.Status = domain.StatusCancelled
-					e.groupRepo.Update(group)
-					e.hub.BroadcastStatus(group.ID.String(), "group", string(domain.StatusCancelled))
-					msg := fmt.Sprintf("\n\033[1;33m⏹ GROUP CANCELLED: %s\033[0m\n", group.Name)
-					fmt.Fprint(logFile, msg)
-					e.hub.BroadcastLog(workflowID.String(), msg)
-					return err
-				}
-				group.Status = domain.StatusFailed
-				e.groupRepo.Update(group)
-				e.hub.BroadcastStatus(group.ID.String(), "group", string(domain.StatusFailed))
-				if group.ContinueOnFailure {
-					msg := fmt.Sprintf("\n\033[1;33m⚠ GROUP FAILED BUT CONTINUING:\033[0m %s (Continue on Failure enabled)\n", group.Name)
-					fmt.Fprint(logFile, msg)
-					e.hub.BroadcastLog(workflowID.String(), msg)
-					return nil
-				}
 				return err
 			}
 		}
 	} else {
 		for i := range group.Steps {
 			if err := e.runStep(ctx, &group.Steps[i], inputs, variables, groupResults, effectiveServerID, logFile, workflowID, executionID, namespaceID, user, workingDirs); err != nil {
-				if ctx.Err() != nil {
-					group.Status = domain.StatusCancelled
-					e.groupRepo.Update(group)
-					e.hub.BroadcastStatus(group.ID.String(), "group", string(domain.StatusCancelled))
-					msg := fmt.Sprintf("\n\033[1;33m⏹ GROUP CANCELLED: %s\033[0m\n", group.Name)
-					fmt.Fprint(logFile, msg)
-					e.hub.BroadcastLog(workflowID.String(), msg)
-					return err
-				}
-				group.Status = domain.StatusFailed
-				e.groupRepo.Update(group)
-				e.hub.BroadcastStatus(group.ID.String(), "group", string(domain.StatusFailed))
-				if group.ContinueOnFailure {
-					msg := fmt.Sprintf("\n\033[1;33m⚠ GROUP FAILED BUT CONTINUING:\033[0m %s (Continue on Failure enabled)\n", group.Name)
-					fmt.Fprint(logFile, msg)
-					e.hub.BroadcastLog(workflowID.String(), msg)
-					return nil
-				}
 				return err
 			}
 			// Sequential Step Delay: 200ms gap between steps to prevent race conditions
-			// or overwhelming the target server.
 			if i < len(group.Steps)-1 {
 				time.Sleep(200 * time.Millisecond)
 			}
 		}
 	}
-	// Perform relay copy if configured before marking group as SUCCESS
+
+	// Perform relay copy if configured
 	if group.IsCopyEnabled {
 		msg := fmt.Sprintf("\033[90m⚙ Relay copy enabled for group %q\033[0m\n", group.Name)
 		fmt.Fprint(logFile, msg)
@@ -632,27 +666,6 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 
 		if group.CopySourcePath != "" && group.CopyTargetPath != "" {
 			if err := e.relayCopy(ctx, group, inputs, variables, groupResults, namespaceID, effectiveServerID, logFile, workflowID, user); err != nil {
-				if ctx.Err() != nil {
-					group.Status = domain.StatusCancelled
-					e.groupRepo.Update(group)
-					e.hub.BroadcastStatus(group.ID.String(), "group", string(domain.StatusCancelled))
-					msg := "\033[1;33m⏹ Relay copy cancelled\033[0m\n"
-					fmt.Fprint(logFile, msg)
-					e.hub.BroadcastLog(workflowID.String(), msg)
-					return err
-				}
-				errMsg := fmt.Sprintf("\033[1;31m✖ Relay copy failed: %v\033[0m\n", err)
-				fmt.Fprint(logFile, errMsg)
-				e.hub.BroadcastLog(workflowID.String(), errMsg)
-				group.Status = domain.StatusFailed
-				e.groupRepo.Update(group)
-				e.hub.BroadcastStatus(group.ID.String(), "group", string(domain.StatusFailed))
-				if group.ContinueOnFailure {
-					msg := fmt.Sprintf("\033[1;33m⚠ RELAY COPY FAILED BUT CONTINUING:\033[0m %s (Continue on Failure enabled)\n", group.Name)
-					fmt.Fprint(logFile, msg)
-					e.hub.BroadcastLog(workflowID.String(), msg)
-					return nil
-				}
 				return fmt.Errorf("relay copy failed: %w", err)
 			}
 		} else {
@@ -666,10 +679,7 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 		e.hub.BroadcastLog(workflowID.String(), msg)
 	}
 
-	group.Status = domain.StatusSuccess
-	e.hub.BroadcastStatus(group.ID.String(), "group", string(domain.StatusSuccess))
-
-	return e.groupRepo.Update(group)
+	return nil
 }
 
 func (e *WorkflowExecutor) relayCopy(ctx context.Context, group *domain.WorkflowGroup, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, namespaceID uuid.UUID, sourceServerID uuid.UUID, logFile *os.File, workflowID uuid.UUID, user *domain.User) error {
@@ -816,45 +826,33 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 			if val, ok := workingDirs.Load(targetServerID); ok {
 				startingDir = val.(string)
 				if startingDir != "" {
-					// Use curly braces for grouping in the same shell context.
-					// Note: Semicolon after the command is required before the closing brace.
 					command = fmt.Sprintf("cd %s && { %s; }", strconv.Quote(startingDir), command)
 				}
 			}
-			// Use -P to resolve physical path (essential for Mac/Unix symlink consistency)
 			command = fmt.Sprintf("%s; printf '%s' && pwd -P", command, cwdMarker)
 		}
 
 		if targetServerID != uuid.Nil {
-			// Run on remote server via ServerService with real-time streaming
 			var out bytes.Buffer
-
-			// Multi-writer for all destinations we want cleaned
 			mw := io.MultiWriter(
 				&wsWriter{hub: e.hub, targetID: step.ID.String(), buffer: &out},
 				&wsWriter{hub: e.hub, targetID: workflowID.String(), buffer: mainLogFile},
 				&fileWriter{file: stepLogFile},
 			)
-
-			// Filter out the CWD marker and capture the directory
 			filter := &cwdFilteredWriter{
 				underlying: mw,
 				marker:     cwdMarker,
 			}
-
-			_, err = e.serverService.ExecuteCommand(ctx, targetServerID, command, nil, filter) // Trusted: pass nil user
+			_, err = e.serverService.ExecuteCommand(ctx, targetServerID, command, nil, filter)
 			filter.Finalize()
 			output = out.String()
 			if filter.found {
 				newDir := filepath.Clean(strings.TrimSpace(filter.cwdBuffer.String()))
-				// Heuristic: only update the shared state if the directory actually changed.
-				// This prevents parallel "passive" steps from overwriting intentional directory changes.
 				if newDir != "" && newDir != filepath.Clean(startingDir) {
 					workingDirs.Store(targetServerID, newDir)
 				}
 			}
 		} else {
-			// Run locally
 			output, err = e.runLocalStep(ctx, step, command, mainLogFile, stepLogFile, workflowID, workingDirs)
 		}
 	}

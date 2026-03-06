@@ -293,6 +293,9 @@ type WorkflowGroup struct {
 	CopyTargetServerID uuid.UUID      `json:"copy_target_server_id,omitempty" gorm:"type:uuid"`
 	CopyTargetPath     string         `json:"copy_target_path,omitempty" gorm:"default:''"`
 	ContinueOnFailure  bool           `json:"continue_on_failure" gorm:"default:false"`
+	RetryEnabled       bool           `json:"retry_enabled" gorm:"default:false"`
+	RetryLimit         int            `json:"retry_limit" gorm:"default:0"`
+	RetryDelay         int            `json:"retry_delay" gorm:"default:0"`
 	CreatedAt          time.Time      `json:"created_at" gorm:"<-:create"`
 	UpdatedAt          time.Time      `json:"updated_at"`
 }
@@ -309,7 +312,7 @@ type WorkflowStep struct {
 	WaitToFinish         *bool      `json:"wait_to_finish" gorm:"default:true"`
 	Order                int        `json:"order"`
 	Status               Status     `json:"status"`
-	Output               string     `json:"output"`
+	Output               string     `json:"output" gorm:"type:text"`
 	CreatedAt            time.Time  `json:"created_at" gorm:"<-:create"`
 	UpdatedAt            time.Time  `json:"updated_at"`
 }

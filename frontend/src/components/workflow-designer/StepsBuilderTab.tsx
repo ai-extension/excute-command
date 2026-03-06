@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Layers, Plus, GripVertical, AlertCircle, Server, SlidersHorizontal, File, Trash2 } from 'lucide-react';
+import { Layers, Plus, GripVertical, AlertCircle, Server, SlidersHorizontal, File, Trash2, RefreshCw } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
@@ -95,8 +95,13 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                     </div>
                                                     <div className="flex items-center gap-2">
                                                         {/* Active config badges */}
-                                                        {(group.condition || group.default_server_id || group.continue_on_failure || group.is_copy_enabled) && (
+                                                        {(group.condition || group.default_server_id || group.continue_on_failure || group.is_copy_enabled || group.retry_enabled) && (
                                                             <div className="flex items-center gap-2 mr-2 pr-4 border-r border-border/50">
+                                                                {group.retry_enabled && (
+                                                                    <Badge variant="outline" className="h-5 px-2 text-[8px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-500 border-amber-500/20 whitespace-nowrap">
+                                                                        <RefreshCw className="w-3 h-3 mr-1" /> Retry
+                                                                    </Badge>
+                                                                )}
                                                                 {group.continue_on_failure && (
                                                                     <Badge variant="outline" className="h-5 px-2 text-[8px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-500 border-amber-500/20 whitespace-nowrap">
                                                                         <AlertCircle className="w-3 h-3 mr-1" /> Continue
@@ -159,7 +164,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                         onClick={() => setOpenSettingsGroupIdx(null)}
                                                                     />
                                                                     {/* Popup card */}
-                                                                    <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[520px] bg-card border border-primary/20 rounded-xl shadow-2xl shadow-black/40 animate-in fade-in zoom-in-95 duration-150">
+                                                                    <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[520px] max-h-[90vh] overflow-y-auto bg-card border border-primary/20 rounded-xl shadow-2xl shadow-black/40 animate-in fade-in zoom-in-95 duration-150">
                                                                         <div className="px-5 pt-4 pb-2 flex items-center justify-between border-b border-border/50">
                                                                             <div className="flex items-center gap-2">
                                                                                 <SlidersHorizontal className="w-3.5 h-3.5 text-primary" />
@@ -184,8 +189,67 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                 />
                                                                             </div>
 
+                                                                            {/* Retry Policy */}
+                                                                            <div className="pt-4 border-t border-border/50">
+                                                                                <div className="flex items-center justify-between gap-5">
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <RefreshCw className="w-3.5 h-3.5 text-amber-500" />
+                                                                                        <div className="flex flex-col">
+                                                                                            <span className="text-[8px] font-black uppercase tracking-widest text-amber-500">Retry Policy</span>
+                                                                                            <span className="text-[8px] text-muted-foreground/50 lowercase italic leading-none text-left">Auto-retry entire group on failure</span>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                    <Switch
+                                                                                        checked={group.retry_enabled || false}
+                                                                                        onCheckedChange={(checked) => {
+                                                                                            const ng = [...groups];
+                                                                                            ng[gIdx].retry_enabled = checked;
+                                                                                            if (checked) {
+                                                                                                if (!ng[gIdx].retry_limit) ng[gIdx].retry_limit = 3;
+                                                                                                if (!ng[gIdx].retry_delay) ng[gIdx].retry_delay = 5;
+                                                                                            }
+                                                                                            setGroups(ng);
+                                                                                        }}
+                                                                                    />
+                                                                                </div>
+
+                                                                                {group.retry_enabled && (
+                                                                                    <div className="mt-4 grid grid-cols-2 gap-5 animate-in fade-in slide-in-from-top-1 duration-200">
+                                                                                        <div className="space-y-2 text-left">
+                                                                                            <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground block mb-1">Retry Limit</label>
+                                                                                            <Input
+                                                                                                type="number"
+                                                                                                value={group.retry_limit || 0}
+                                                                                                onChange={(e) => {
+                                                                                                    const ng = [...groups];
+                                                                                                    ng[gIdx].retry_limit = parseInt(e.target.value) || 0;
+                                                                                                    setGroups(ng);
+                                                                                                }}
+                                                                                                className="h-9 text-[11px] font-mono"
+                                                                                                min={1}
+                                                                                                max={10}
+                                                                                            />
+                                                                                        </div>
+                                                                                        <div className="space-y-2 text-left">
+                                                                                            <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground block mb-1">Delay (s)</label>
+                                                                                            <Input
+                                                                                                type="number"
+                                                                                                value={group.retry_delay || 0}
+                                                                                                onChange={(e) => {
+                                                                                                    const ng = [...groups];
+                                                                                                    ng[gIdx].retry_delay = parseInt(e.target.value) || 0;
+                                                                                                    setGroups(ng);
+                                                                                                }}
+                                                                                                className="h-9 text-[11px] font-mono"
+                                                                                                min={0}
+                                                                                            />
+                                                                                        </div>
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+
                                                                             {/* Condition */}
-                                                                            <div className="space-y-2">
+                                                                            <div className="space-y-2 text-left">
                                                                                 <label className="text-[8px] font-black uppercase tracking-widest text-amber-500">Condition <span className="text-muted-foreground/50 normal-case font-medium">— skip this group unless condition is true</span></label>
                                                                                 <input
                                                                                     type="text"
@@ -195,14 +259,13 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                         ng[gIdx].condition = e.target.value;
                                                                                         setGroups(ng);
                                                                                     }}
-                                                                                    placeholder={`{{step.${group.key || 'group_1'}.status}} == "SUCCESS"  &&  {{variable.env}} != "staging"`}
+                                                                                    placeholder={`{{step.${group.key || 'group_1'}.status}} == "SUCCESS"`}
                                                                                     className="w-full h-9 px-3 text-[11px] font-mono rounded-lg border border-border bg-background text-amber-500 placeholder:text-muted-foreground/25 outline-none focus:ring-1 focus:ring-amber-500/30 focus:border-amber-500/30"
-                                                                                    autoFocus
                                                                                 />
                                                                             </div>
                                                                             {/* Server override */}
-                                                                            <div className="space-y-2">
-                                                                                <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Server Override <span className="text-muted-foreground/50 normal-case font-medium">— run all steps on this server</span></label>
+                                                                            <div className="space-y-2 text-left">
+                                                                                <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Server Override</label>
                                                                                 <SearchableSelect
                                                                                     options={[
                                                                                         { label: '— Use workflow default —', value: '' },
@@ -220,39 +283,26 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                     triggerClassName="h-9 text-xs"
                                                                                 />
                                                                             </div>
-                                                                            {/* Copy After Execution */}
+                                                                            {/* Relay (Copy) */}
                                                                             <div className="pt-4 border-t border-border/50 space-y-4">
                                                                                 <div className="flex items-center justify-between gap-2">
                                                                                     <div className="flex items-center gap-2">
                                                                                         <File className="w-3.5 h-3.5 text-emerald-500" />
-                                                                                        <span className="text-[8px] font-black uppercase tracking-widest text-emerald-500">Copy After Execution (Relay)</span>
+                                                                                        <span className="text-[8px] font-black uppercase tracking-widest text-emerald-500">Relay After Execution</span>
                                                                                     </div>
                                                                                     <Switch
                                                                                         checked={group.is_copy_enabled}
                                                                                         onCheckedChange={(checked) => {
                                                                                             const ng = [...groups];
                                                                                             ng[gIdx].is_copy_enabled = checked;
-                                                                                            if (checked) {
-                                                                                                if (!ng[gIdx].copy_target_server_id) {
-                                                                                                    // Default to the first available server if none is selected
-                                                                                                    if (availableServers.length > 0) {
-                                                                                                        ng[gIdx].copy_target_server_id = availableServers[0].id;
-                                                                                                    }
-                                                                                                }
-                                                                                            } else {
-                                                                                                ng[gIdx].copy_source_path = '';
-                                                                                                ng[gIdx].copy_target_server_id = undefined;
-                                                                                                ng[gIdx].copy_target_path = '';
-                                                                                            }
                                                                                             setGroups(ng);
                                                                                         }}
                                                                                     />
                                                                                 </div>
-
                                                                                 {group.is_copy_enabled && (
                                                                                     <div className="grid grid-cols-1 gap-4 animate-in fade-in slide-in-from-top-1 duration-200">
-                                                                                        <div className="space-y-2">
-                                                                                            <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Source Path <span className="text-muted-foreground/50 normal-case font-medium">— file or directory on execution server</span></label>
+                                                                                        <div className="space-y-2 text-left">
+                                                                                            <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground block mb-1">Source Path</label>
                                                                                             <Input
                                                                                                 value={group.copy_source_path || ''}
                                                                                                 onChange={(e) => {
@@ -265,26 +315,23 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                             />
                                                                                         </div>
                                                                                         <div className="grid grid-cols-2 gap-4">
-                                                                                            <div className="space-y-2">
-                                                                                                <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Target Server</label>
+                                                                                            <div className="space-y-2 text-left">
+                                                                                                <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground block mb-1">Target Server</label>
                                                                                                 <SearchableSelect
-                                                                                                    options={[
-                                                                                                        ...availableServers.map(s => ({ label: `${s.name} (${s.host})`, value: s.id }))
-                                                                                                    ]}
+                                                                                                    options={availableServers.map(s => ({ label: s.name, value: s.id }))}
                                                                                                     value={group.copy_target_server_id || ''}
                                                                                                     onValueChange={(val) => {
                                                                                                         const ng = [...groups];
-                                                                                                        ng[gIdx].copy_target_server_id = val || '';
+                                                                                                        ng[gIdx].copy_target_server_id = val;
                                                                                                         setGroups(ng);
                                                                                                     }}
                                                                                                     onSearch={handleSearchServers}
-                                                                                                    placeholder="— Select target resource —"
-                                                                                                    isSearchable={true}
+                                                                                                    placeholder="Server"
                                                                                                     triggerClassName="h-9 text-xs"
                                                                                                 />
                                                                                             </div>
-                                                                                            <div className="space-y-2">
-                                                                                                <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Target Path</label>
+                                                                                            <div className="space-y-2 text-left">
+                                                                                                <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground block mb-1">Target Path</label>
                                                                                                 <Input
                                                                                                     value={group.copy_target_path || ''}
                                                                                                     onChange={(e) => {
@@ -301,10 +348,10 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                 )}
                                                                             </div>
                                                                         </div>
-                                                                        <div className="px-5 pb-4 flex justify-end">
+                                                                        <div className="px-5 pb-5 border-t border-border/50 pt-4 flex justify-end">
                                                                             <Button
                                                                                 onClick={() => setOpenSettingsGroupIdx(null)}
-                                                                                className="h-8 text-[10px] font-bold uppercase tracking-widest px-6 premium-gradient text-white shadow-premium"
+                                                                                className="h-8 text-[10px] font-bold uppercase tracking-widest px-6 premium-gradient text-white"
                                                                             >
                                                                                 Confirm
                                                                             </Button>
@@ -386,10 +433,9 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                         <option value="WORKFLOW">Workflow</option>
                                                                                     </select>
                                                                                 </div>
-                                                                                {(!step.action_type || step.action_type === 'COMMAND') ? (
-                                                                                    <>
-
-                                                                                        <div className="col-span-7 space-y-1">
+                                                                                <div className="col-span-7 space-y-3">
+                                                                                    {(!step.action_type || step.action_type === 'COMMAND') ? (
+                                                                                        <div className="space-y-1">
                                                                                             <label className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Execution Sequence</label>
                                                                                             <Textarea
                                                                                                 value={step.command_text}
@@ -402,72 +448,72 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                 placeholder="Enter command sequence..."
                                                                                             />
                                                                                         </div>
-                                                                                    </>
-                                                                                ) : (
-                                                                                    <div className="col-span-7 space-y-2">
-                                                                                        <div className="space-y-1">
-                                                                                            <label className="text-[8px] font-bold uppercase tracking-widest text-indigo-500">Target Workflow</label>
-                                                                                            <select
-                                                                                                value={step.target_workflow_id || ''}
-                                                                                                onChange={(e) => {
-                                                                                                    const ng = [...groups];
-                                                                                                    ng[gIdx]!.steps![sIdx].target_workflow_id = e.target.value || undefined;
-                                                                                                    ng[gIdx]!.steps![sIdx].target_workflow_inputs = undefined;
-                                                                                                    setGroups(ng);
-                                                                                                }}
-                                                                                                className="h-8 px-2 w-full text-[11px] font-semibold border border-indigo-500/30 rounded-md bg-background text-foreground outline-none focus:ring-1 focus:ring-indigo-500/30 cursor-pointer"
-                                                                                            >
-                                                                                                <option value="">— Select workflow —</option>
-                                                                                                {allWorkflows.filter(w => w.id !== id).map(w => (
-                                                                                                    <option key={w.id} value={w.id}>{w.name}</option>
-                                                                                                ))}
-                                                                                            </select>
-                                                                                        </div>
-                                                                                        {/* Dynamic inputs for selected target workflow */}
-                                                                                        {(() => {
-                                                                                            const targetWf = allWorkflows.find(w => w.id === step.target_workflow_id);
-                                                                                            if (!targetWf?.inputs?.length) return null;
-                                                                                            const parsedInputs: Record<string, string> = (() => {
-                                                                                                try { return JSON.parse(step.target_workflow_inputs || '{}'); } catch { return {}; }
-                                                                                            })();
-                                                                                            return (
-                                                                                                <div className="space-y-1.5 bg-indigo-500/5 border border-indigo-500/20 rounded-lg p-3">
-                                                                                                    <label className="text-[8px] font-bold uppercase tracking-widest text-indigo-500">Workflow Inputs</label>
-                                                                                                    {targetWf.inputs.map(inp => (
-                                                                                                        <div key={inp.key} className="flex items-center gap-2">
-                                                                                                            <span className="text-[10px] font-mono text-muted-foreground w-24 truncate shrink-0">{inp.label || inp.key}</span>
-                                                                                                            <Input
-                                                                                                                value={parsedInputs[inp.key] || ''}
-                                                                                                                onChange={(e) => {
-                                                                                                                    const ng = [...groups];
-                                                                                                                    const updated = { ...parsedInputs, [inp.key]: e.target.value };
-                                                                                                                    ng[gIdx]!.steps![sIdx].target_workflow_inputs = JSON.stringify(updated);
-                                                                                                                    setGroups(ng);
-                                                                                                                }}
-                                                                                                                placeholder={`{{variable.x}} or value`}
-                                                                                                                className="h-7 text-[10px] font-mono border-indigo-500/20 bg-background flex-1"
-                                                                                                            />
-                                                                                                        </div>
+                                                                                    ) : (
+                                                                                        <div className="space-y-2">
+                                                                                            <div className="space-y-1">
+                                                                                                <label className="text-[8px] font-bold uppercase tracking-widest text-indigo-500">Target Workflow</label>
+                                                                                                <select
+                                                                                                    value={step.target_workflow_id || ''}
+                                                                                                    onChange={(e) => {
+                                                                                                        const ng = [...groups];
+                                                                                                        ng[gIdx]!.steps![sIdx].target_workflow_id = e.target.value || undefined;
+                                                                                                        ng[gIdx]!.steps![sIdx].target_workflow_inputs = undefined;
+                                                                                                        setGroups(ng);
+                                                                                                    }}
+                                                                                                    className="h-8 px-2 w-full text-[11px] font-semibold border border-indigo-500/30 rounded-md bg-background text-foreground outline-none focus:ring-1 focus:ring-indigo-500/30 cursor-pointer"
+                                                                                                >
+                                                                                                    <option value="">— Select workflow —</option>
+                                                                                                    {allWorkflows.filter(w => w.id !== id).map(w => (
+                                                                                                        <option key={w.id} value={w.id}>{w.name}</option>
                                                                                                     ))}
-                                                                                                </div>
-                                                                                            );
-                                                                                        })()}
-                                                                                        <div className="flex items-center justify-between gap-2 pt-1">
-                                                                                            <div>
-                                                                                                <span className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Wait for completion</span>
-                                                                                                <p className="text-[8px] text-muted-foreground/50">Off = run asynchronously</p>
+                                                                                                </select>
                                                                                             </div>
-                                                                                            <Switch
-                                                                                                checked={step.wait_to_finish !== false}
-                                                                                                onCheckedChange={(checked) => {
-                                                                                                    const ng = [...groups];
-                                                                                                    ng[gIdx]!.steps![sIdx].wait_to_finish = checked;
-                                                                                                    setGroups(ng);
-                                                                                                }}
-                                                                                            />
+                                                                                            {/* Dynamic inputs for selected target workflow */}
+                                                                                            {(() => {
+                                                                                                const targetWf = allWorkflows.find(w => w.id === step.target_workflow_id);
+                                                                                                if (!targetWf?.inputs?.length) return null;
+                                                                                                const parsedInputs: Record<string, string> = (() => {
+                                                                                                    try { return JSON.parse(step.target_workflow_inputs || '{}'); } catch { return {}; }
+                                                                                                })();
+                                                                                                return (
+                                                                                                    <div className="space-y-1.5 bg-indigo-500/5 border border-indigo-500/20 rounded-lg p-3">
+                                                                                                        <label className="text-[8px] font-bold uppercase tracking-widest text-indigo-500">Workflow Inputs</label>
+                                                                                                        {targetWf.inputs.map(inp => (
+                                                                                                            <div key={inp.key} className="flex items-center gap-2">
+                                                                                                                <span className="text-[10px] font-mono text-muted-foreground w-24 truncate shrink-0">{inp.label || inp.key}</span>
+                                                                                                                <Input
+                                                                                                                    value={parsedInputs[inp.key] || ''}
+                                                                                                                    onChange={(e) => {
+                                                                                                                        const ng = [...groups];
+                                                                                                                        const updated = { ...parsedInputs, [inp.key]: e.target.value };
+                                                                                                                        ng[gIdx]!.steps![sIdx].target_workflow_inputs = JSON.stringify(updated);
+                                                                                                                        setGroups(ng);
+                                                                                                                    }}
+                                                                                                                    placeholder={`{{variable.x}} or value`}
+                                                                                                                    className="h-7 text-[10px] font-mono border-indigo-500/20 bg-background flex-1"
+                                                                                                                />
+                                                                                                            </div>
+                                                                                                        ))}
+                                                                                                    </div>
+                                                                                                );
+                                                                                            })()}
+                                                                                            <div className="flex items-center justify-between gap-2 pt-1">
+                                                                                                <div>
+                                                                                                    <span className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Wait for completion</span>
+                                                                                                    <p className="text-[8px] text-muted-foreground/50">Off = run asynchronously</p>
+                                                                                                </div>
+                                                                                                <Switch
+                                                                                                    checked={step.wait_to_finish !== false}
+                                                                                                    onCheckedChange={(checked) => {
+                                                                                                        const ng = [...groups];
+                                                                                                        ng[gIdx]!.steps![sIdx].wait_to_finish = checked;
+                                                                                                        setGroups(ng);
+                                                                                                    }}
+                                                                                                />
+                                                                                            </div>
                                                                                         </div>
-                                                                                    </div>
-                                                                                )}
+                                                                                    )}
+                                                                                </div>
                                                                             </div>
                                                                             <Button
                                                                                 variant="ghost"

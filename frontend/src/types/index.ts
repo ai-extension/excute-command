@@ -73,6 +73,9 @@ export interface WorkflowGroup {
     copy_target_server_id?: string;
     copy_target_path?: string;
     continue_on_failure: boolean;
+    retry_enabled: boolean;
+    retry_limit: number;
+    retry_delay: number;
     created_at: string;
     updated_at: string;
 }
