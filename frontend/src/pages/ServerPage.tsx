@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { XCircle } from 'lucide-react';
+import { APP_VERSION } from '../config/version';
 
 import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
@@ -299,7 +300,7 @@ const ServerPage = () => {
             {/* Footer Status */}
             <div className="flex justify-center pt-8 border-t border-border mt-auto">
                 <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.4em] opacity-40">
-                    Fleet Management v2.1.0 • CSM APP ENGINE
+                    Fleet Management {APP_VERSION} • CSM APP ENGINE
                 </p>
             </div>
         </div>

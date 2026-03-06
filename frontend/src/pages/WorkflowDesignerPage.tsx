@@ -20,6 +20,7 @@ import { cn } from '../lib/utils';
 import { useNamespace } from '../context/NamespaceContext';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../lib/api';
+import { APP_VERSION } from '../config/version';
 
 import {
     Workflow,
@@ -562,7 +563,7 @@ const WorkflowDesignerPage = () => {
                                     </div>
                                 </div>
                                 <p className="text-[9px] font-bold text-muted-foreground/50 uppercase tracking-[0.2em]">
-                                    CSM APP DESIGNER V2.1
+                                    CSM APP DESIGNER {APP_VERSION.split('-')[0]}
                                 </p>
                             </div>
                         </>

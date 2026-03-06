@@ -5,6 +5,7 @@ import { Moon, Sun, Command as CmdIcon, Search, LogOut, User as UserIcon, Settin
 import { Button } from './ui/button';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { APP_VERSION } from '../config/version';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -78,7 +79,7 @@ const Layout = () => {
                                 <button className="flex items-center gap-3 hover:opacity-80 transition-opacity outline-none group text-left">
                                     <div className="flex flex-col items-end">
                                         <span className="text-[11px] font-black text-foreground tracking-tight uppercase group-hover:text-primary transition-colors">{user?.username || 'Identity'}</span>
-                                        <span className="text-[9px] font-bold text-green-500 uppercase tracking-widest">v4.2-stable</span>
+                                        <span className="text-[9px] font-bold text-green-500 uppercase tracking-widest">{APP_VERSION}</span>
                                     </div>
                                     <div className="w-10 h-10 rounded-2xl premium-gradient p-[1px] shadow-lg shadow-indigo-500/10 group-hover:scale-105 transition-transform">
                                         <div className="w-full h-full rounded-2xl bg-card flex items-center justify-center font-black text-xs uppercase">
