@@ -59,7 +59,7 @@ export const NamespaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         } finally {
             setIsLoading(false);
         }
-    }, [isAuthenticated, token]);
+    }, [isAuthenticated, apiFetch]);
 
     const setActiveNamespace = useCallback((ns: Namespace) => {
         setActiveNamespaceState(prev => {
@@ -77,7 +77,7 @@ export const NamespaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             setActiveNamespaceState(null);
             setIsLoading(false);
         }
-    }, [isAuthenticated, token]);
+    }, [isAuthenticated, refreshNamespaces]);
 
     return (
         <NamespaceContext.Provider value={{ namespaces, activeNamespace, setActiveNamespace, isLoading, refreshNamespaces }}>
