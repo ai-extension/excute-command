@@ -1,0 +1,16 @@
+.git
+.gitignore
+node_modules
+dist
+backend/vendor
+backend/tmp
+backend/data
+backend/server
+backend/csm-backend
+**/*.log
+.DS_Store
+.vscode
+.idea
+.env
+frontend/.env
+backend/.env

@@ -19,6 +19,9 @@ backend/go.work
 backend/data/
 backend/.env
 backend/tmp/
+backend/server
+backend/csm-backend
+backend/api-server
 
 # Frontend (Node/React/Vite)
 frontend/node_modules/
@@ -31,11 +34,12 @@ frontend/npm-debug.log*
 frontend/yarn-debug.log*
 frontend/yarn-error.log*
 frontend/pnpm-debug.log*
+frontend/.cache/
 
 # Docker / Data
 docker/data/
 .docker-data/
-
+*.log
 
 # IDEs
 .idea/
@@ -43,3 +47,7 @@ docker/data/
 *.swp
 *.swo
 .DS_Store
+
+# Temporary files
+cookies.txt
+/tmp/
