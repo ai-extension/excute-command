@@ -211,47 +211,32 @@ const Dashboard = () => {
         setLoading(true);
         try {
             const nsId = activeNamespace.id;
-            const [wfRes, execRes, schRes, srvRes, vpnRes, userRes, analyticsRes] = await Promise.allSettled([
-                apiFetch(`${API_BASE_URL}/namespaces/${nsId}/workflows?limit=100`),
-                apiFetch(`${API_BASE_URL}/namespaces/${nsId}/executions?limit=20`),
-                apiFetch(`${API_BASE_URL}/namespaces/${nsId}/schedules?limit=100`),
-                apiFetch(`${API_BASE_URL}/servers?limit=100`),
-                apiFetch(`${API_BASE_URL}/vpns?limit=100`),
-                apiFetch(`${API_BASE_URL}/users?limit=100`),
-                apiFetch(`${API_BASE_URL}/namespaces/${nsId}/analytics/executions?days=7`),
-            ]);
+            const res = await apiFetch(`${API_BASE_URL}/namespaces/${nsId}/dashboard-stats`);
+            if (res.ok) {
+                const data = await res.json();
 
-            const parse = async (r: PromiseSettledResult<Response>) => {
-                if (r.status === 'fulfilled' && r.value.ok) {
-                    return await r.value.json();
-                }
-                return r.status === 'fulfilled' && r.value.status === 404 ? [] : { items: [], total: 0 };
-            };
-
-            const [wf, exec, sch, srv, vpn, usr, analytics] = await Promise.all([
-                parse(wfRes), parse(execRes), parse(schRes), parse(srvRes), parse(vpnRes), parse(userRes), parse(analyticsRes)
-            ]);
-
-            const execItems: any[] = exec?.items || [];
-            setStats({
-                workflows: { total: wf?.total || 0, items: wf?.items || [] },
-                executions: {
-                    total: exec?.total || 0,
-                    success: execItems.filter((e: any) => e.status === 'SUCCESS').length,
-                    failed: execItems.filter((e: any) => e.status === 'FAILED').length,
-                    running: execItems.filter((e: any) => e.status === 'RUNNING').length,
-                    items: execItems,
-                },
-                schedules: {
-                    total: sch?.total || 0,
-                    active: (sch?.items || []).filter((s: any) => s.status === 'ACTIVE').length,
-                    items: (sch?.items || []).slice(0, 5),
-                },
-                servers: { total: srv?.total || 0, items: (srv?.items || []).slice(0, 5) },
-                vpns: { total: vpn?.total || 0, items: vpn?.items || [] },
-                users: { total: usr?.total || 0, items: usr?.items || [] },
-                analytics: Array.isArray(analytics) ? analytics : [],
-            });
+                // Ensure items arrays fallback to empty arrays directly from API payload
+                // but the backend API should already provide structured stats
+                setStats({
+                    workflows: { total: data.workflows?.total || 0, items: data.workflows?.items || [] },
+                    executions: {
+                        total: data.executions?.total || 0,
+                        success: data.executions?.success || 0,
+                        failed: data.executions?.failed || 0,
+                        running: data.executions?.running || 0,
+                        items: data.executions?.items || [],
+                    },
+                    schedules: {
+                        total: data.schedules?.total || 0,
+                        active: data.schedules?.active || 0,
+                        items: data.schedules?.items || [],
+                    },
+                    servers: { total: data.servers?.total || 0, items: data.servers?.items || [] },
+                    vpns: { total: data.vpns?.total || 0, items: data.vpns?.items || [] },
+                    users: { total: data.users?.total || 0, items: data.users?.items || [] },
+                    analytics: Array.isArray(data.analytics) ? data.analytics : [],
+                });
+            }
             setLastRefresh(new Date());
         } catch (err) {
             console.error('Dashboard fetch error:', err);

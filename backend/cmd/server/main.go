@@ -113,6 +113,7 @@ func main() {
 	vpnService := service.NewVpnConfigService(vpnRepo)
 	pageService := service.NewPageService(pageRepo)
 	settingsService := service.NewSettingsService(settingRepo)
+	dashboardService := service.NewDashboardService(workflowRepo, execRepo, scheduleRepo, serverRepo, vpnRepo, userRepo)
 
 	// Initialize scheduling engine
 	scheduleService.Init()
@@ -134,6 +135,7 @@ func main() {
 	vpnHandler := handler.NewVpnConfigHandler(vpnService)
 	pageHandler := handler.NewPageHandler(pageService, workflowService, workflowExecutor, terminalService)
 	settingsHandler := handler.NewSettingsHandler(settingsService)
+	dashboardHandler := handler.NewDashboardHandler(dashboardService)
 
 	// Initialize Router
 	r := gin.Default()
@@ -209,6 +211,8 @@ func main() {
 			protected.POST("/namespaces/:ns_id/workflows", middleware.RBACMiddleware(userRepo, "workflows", "WRITE"), workflowHandler.CreateWorkflow)
 			protected.GET("/namespaces/:ns_id/analytics/executions", middleware.RBACMiddleware(userRepo, "workflows", "READ"), workflowHandler.GetExecutionAnalytics)
 			protected.GET("/namespaces/:ns_id/executions", middleware.RBACMiddleware(userRepo, "history", "READ"), workflowHandler.ListAllExecutions)
+			protected.GET("/namespaces/:ns_id/dashboard-stats", middleware.RBACMiddleware(userRepo, "dashboard", "READ"), dashboardHandler.GetStats)
+
 			protected.GET("/workflows/:id", middleware.RBACMiddleware(userRepo, "workflows", "READ"), workflowHandler.GetWorkflow)
 			protected.PUT("/workflows/:id", middleware.RBACMiddleware(userRepo, "workflows", "WRITE"), workflowHandler.UpdateWorkflow)
 			protected.POST("/workflows/:id/run", middleware.RBACMiddleware(userRepo, "workflows", "EXECUTE"), workflowHandler.RunWorkflow)
