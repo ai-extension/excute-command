@@ -26,7 +26,10 @@ func (r *PostgresWorkflowRepo) GetByID(id uuid.UUID, scope *domain.PermissionSco
 	err := db.
 		Preload("Inputs", func(db *gorm.DB) *gorm.DB { return db.Order("\"created_at\" ASC") }).
 		Preload("Variables", func(db *gorm.DB) *gorm.DB { return db.Order("\"created_at\" ASC") }).
+		Preload("DefaultServer").
 		Preload("Groups", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
+		Preload("Groups.DefaultServer").
+		Preload("Groups.CopyTargetServer").
 		Preload("Groups.Steps", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
 		Preload("Hooks", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
 		Preload("Hooks.TargetWorkflow").
@@ -45,7 +48,10 @@ func (r *PostgresWorkflowRepo) List(namespaceID uuid.UUID, scope *domain.Permiss
 	err := db.
 		Preload("Inputs").
 		Preload("Variables").
+		Preload("DefaultServer").
 		Preload("Groups", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
+		Preload("Groups.DefaultServer").
+		Preload("Groups.CopyTargetServer").
 		Preload("Groups.Steps", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
 		Preload("Hooks", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
 		Preload("Hooks.TargetWorkflow").
@@ -92,7 +98,10 @@ func (r *PostgresWorkflowRepo) ListPaginated(namespaceID uuid.UUID, limit, offse
 	err := db.
 		Preload("Inputs").
 		Preload("Variables").
+		Preload("DefaultServer").
 		Preload("Groups", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
+		Preload("Groups.DefaultServer").
+		Preload("Groups.CopyTargetServer").
 		Preload("Groups.Steps", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
 		Preload("Hooks", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
 		Preload("Hooks.TargetWorkflow").
@@ -130,7 +139,10 @@ func (r *PostgresWorkflowRepo) ListGlobalPaginated(limit, offset int, searchTerm
 	err := db.
 		Preload("Inputs").
 		Preload("Variables").
+		Preload("DefaultServer").
 		Preload("Groups", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
+		Preload("Groups.DefaultServer").
+		Preload("Groups.CopyTargetServer").
 		Preload("Groups.Steps", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
 		Preload("Hooks", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
 		Preload("Hooks.TargetWorkflow").

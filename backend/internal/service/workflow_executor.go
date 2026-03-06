@@ -232,8 +232,8 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 
 	// 1. Transfer files to servers
 	// Per user request: ONLY upload to the primary Workflow Default Server to avoid unintentional "local Mac" targeting
-	if wf.DefaultServerID != uuid.Nil {
-		transferServerIDs = []uuid.UUID{wf.DefaultServerID}
+	if wf.DefaultServerID != nil {
+		transferServerIDs = []uuid.UUID{*wf.DefaultServerID}
 	} else {
 		runErr = fmt.Errorf("no target server specified for workflow files")
 		goto finalize
@@ -295,12 +295,12 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 	}
 
 	// Get all unique servers in this workflow for execution
-	if wf.DefaultServerID != uuid.Nil {
-		serverSet[wf.DefaultServerID] = true
+	if wf.DefaultServerID != nil {
+		serverSet[*wf.DefaultServerID] = true
 	}
 	for _, g := range wf.Groups {
-		if g.DefaultServerID != uuid.Nil {
-			serverSet[g.DefaultServerID] = true
+		if g.DefaultServerID != nil {
+			serverSet[*g.DefaultServerID] = true
 		}
 		for _, s := range g.Steps {
 			if s.ServerID != uuid.Nil {
@@ -334,7 +334,18 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 		// Inputs already parsed as inputsMap above
 
 		for i := range wf.Groups {
-			err := e.runGroup(ctx, &wf.Groups[i], inputsMap, wf.Variables, groupResults, wf.DefaultServerID, logFile, workflowID, execution.ID, wf.NamespaceID, execution.User, workingDirs)
+			g := wf.Groups[i]
+			// Default server ID fallback:
+			// 1. Group default server
+			// 2. Workflow default server
+			var groupDefaultServerID uuid.UUID
+			if g.DefaultServerID != nil {
+				groupDefaultServerID = *g.DefaultServerID
+			} else if wf.DefaultServerID != nil {
+				groupDefaultServerID = *wf.DefaultServerID
+			}
+
+			err := e.runGroup(ctx, &g, inputsMap, wf.Variables, groupResults, groupDefaultServerID, logFile, workflowID, execution.ID, wf.NamespaceID, execution.User, workingDirs)
 			groupResults[wf.Groups[i].Key] = string(wf.Groups[i].Status)
 			if err != nil {
 				runErr = err
@@ -577,10 +588,9 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 	fmt.Fprint(logFile, msg)
 	e.hub.BroadcastLog(group.WorkflowID.String(), msg)
 
-	// Group-level server override: use group's server if set, otherwise fall back to workflow default
 	effectiveServerID := defaultServerID
-	if group.DefaultServerID != uuid.Nil {
-		effectiveServerID = group.DefaultServerID
+	if group.DefaultServerID != nil {
+		effectiveServerID = *group.DefaultServerID
 	}
 
 	maxAttempts := 1
@@ -764,18 +774,18 @@ func (e *WorkflowExecutor) relayCopy(ctx context.Context, group *domain.Workflow
 	defer os.Remove(localTarPath)
 
 	// 3. Upload tarball to target server
-	err = e.serverService.UploadFileToServers(ctx, []uuid.UUID{group.CopyTargetServerID}, localTarPath, "/tmp/"+tmpTarName, nil) // Trusted: pass nil user
+	err = e.serverService.UploadFileToServers(ctx, []uuid.UUID{*group.CopyTargetServerID}, localTarPath, "/tmp/"+tmpTarName, nil) // Trusted: pass nil user
 	if err != nil {
 		return fmt.Errorf("failed to upload tarball to target: %w", err)
 	}
-	defer e.serverService.ExecuteCommand(context.Background(), group.CopyTargetServerID, fmt.Sprintf("rm -f /tmp/%s", tmpTarName), nil) // Trusted: pass nil user
+	defer e.serverService.ExecuteCommand(context.Background(), *group.CopyTargetServerID, fmt.Sprintf("rm -f /tmp/%s", tmpTarName), nil) // Trusted: pass nil user
 
 	// 4. Extract tarball on target server
 	mkdirCmd := fmt.Sprintf("mkdir -p %s", strconv.Quote(targetPath))
-	e.serverService.ExecuteCommand(ctx, group.CopyTargetServerID, mkdirCmd, nil) // Trusted: pass nil user
+	e.serverService.ExecuteCommand(ctx, *group.CopyTargetServerID, mkdirCmd, nil) // Trusted: pass nil user
 
 	extractCmd := fmt.Sprintf("tar -xzf /tmp/%s -C %s", tmpTarName, strconv.Quote(targetPath))
-	_, err = e.serverService.ExecuteCommand(ctx, group.CopyTargetServerID, extractCmd, nil) // Trusted: pass nil user
+	_, err = e.serverService.ExecuteCommand(ctx, *group.CopyTargetServerID, extractCmd, nil) // Trusted: pass nil user
 	if err != nil {
 		return fmt.Errorf("failed to extract tarball on target: %w", err)
 	}

@@ -120,7 +120,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                 {group.default_server_id && (
                                                                     <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-bold text-emerald-500">
                                                                         <Server className="w-3 h-3" />
-                                                                        {availableServers.find(s => s.id === group.default_server_id)?.name || 'Server'}
+                                                                        {group.default_server?.name || availableServers.find(s => s.id === group.default_server_id)?.name || group.default_server_id}
                                                                     </span>
                                                                 )}
                                                             </div>
@@ -269,6 +269,9 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                 <SearchableSelect
                                                                                     options={[
                                                                                         { label: '— Use workflow default —', value: '' },
+                                                                                        ...(group.default_server && !availableServers.some(s => s.id === group.default_server_id)
+                                                                                            ? [{ label: `${group.default_server.name} (${group.default_server.host || group.default_server.id})`, value: group.default_server_id as string }]
+                                                                                            : []),
                                                                                         ...availableServers.map(s => ({ label: `${s.name} (${s.host})`, value: s.id }))
                                                                                     ]}
                                                                                     value={group.default_server_id || ''}
@@ -318,7 +321,12 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                             <div className="space-y-2 text-left">
                                                                                                 <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground block mb-1">Target Server</label>
                                                                                                 <SearchableSelect
-                                                                                                    options={availableServers.map(s => ({ label: s.name, value: s.id }))}
+                                                                                                    options={[
+                                                                                                        ...(group.copy_target_server && !availableServers.some(s => s.id === group.copy_target_server_id)
+                                                                                                            ? [{ label: group.copy_target_server.name, value: group.copy_target_server_id as string }]
+                                                                                                            : []),
+                                                                                                        ...availableServers.map(s => ({ label: s.name, value: s.id }))
+                                                                                                    ]}
                                                                                                     value={group.copy_target_server_id || ''}
                                                                                                     onValueChange={(val) => {
                                                                                                         const ng = [...groups];

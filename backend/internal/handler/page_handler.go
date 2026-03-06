@@ -482,7 +482,7 @@ func (h *PageHandler) sanitizePage(page *domain.Page) {
 	page.Password = "" // Never return the hash to public users
 	for i := range page.Workflows {
 		if page.Workflows[i].Workflow != nil {
-			page.Workflows[i].Workflow.DefaultServerID = uuid.Nil // Hide internal server IDs
+			page.Workflows[i].Workflow.DefaultServerID = nil // Hide internal server IDs
 		}
 	}
 }
@@ -492,7 +492,7 @@ func (h *PageHandler) sanitizeExecution(execution *domain.WorkflowExecution) {
 		return
 	}
 	if execution.Workflow != nil {
-		execution.Workflow.DefaultServerID = uuid.Nil
+		execution.Workflow.DefaultServerID = nil
 	}
 	if execution.User != nil {
 		execution.User.PasswordHash = ""

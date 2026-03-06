@@ -247,7 +247,8 @@ type Workflow struct {
 	NamespaceID       uuid.UUID          `json:"namespace_id" gorm:"type:uuid;index"`
 	Name              string             `json:"name" gorm:"not null"`
 	Description       string             `json:"description"`
-	DefaultServerID   uuid.UUID          `json:"default_server_id,omitempty" gorm:"type:uuid"`
+	DefaultServerID   *uuid.UUID         `json:"default_server_id,omitempty" gorm:"type:uuid"`
+	DefaultServer     *Server            `json:"default_server,omitempty" gorm:"foreignKey:DefaultServerID;"`
 	Status            Status             `json:"status"`
 	TimeoutMinutes    int                `json:"timeout_minutes" gorm:"default:15"`
 	IsTemplate        bool               `json:"is_template" gorm:"default:false"`
@@ -284,14 +285,16 @@ type WorkflowGroup struct {
 	Name               string         `json:"name" gorm:"not null"`
 	Key                string         `json:"key" gorm:"not null;default:''"`
 	Condition          string         `json:"condition" gorm:"default:''"`
-	DefaultServerID    uuid.UUID      `json:"default_server_id,omitempty" gorm:"type:uuid"`
+	DefaultServerID    *uuid.UUID     `json:"default_server_id,omitempty" gorm:"type:uuid"`
+	DefaultServer      *Server        `json:"default_server,omitempty" gorm:"foreignKey:DefaultServerID;"`
 	Order              int            `json:"order"`
 	IsParallel         bool           `json:"is_parallel"`
 	Status             Status         `json:"status"`
 	Steps              []WorkflowStep `json:"steps,omitempty" gorm:"foreignKey:GroupID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	IsCopyEnabled      bool           `json:"is_copy_enabled" gorm:"default:false"`
 	CopySourcePath     string         `json:"copy_source_path,omitempty" gorm:"default:''"`
-	CopyTargetServerID uuid.UUID      `json:"copy_target_server_id,omitempty" gorm:"type:uuid"`
+	CopyTargetServerID *uuid.UUID     `json:"copy_target_server_id,omitempty" gorm:"type:uuid"`
+	CopyTargetServer   *Server        `json:"copy_target_server,omitempty" gorm:"foreignKey:CopyTargetServerID;"`
 	CopyTargetPath     string         `json:"copy_target_path,omitempty" gorm:"default:''"`
 	ContinueOnFailure  bool           `json:"continue_on_failure" gorm:"default:false"`
 	RetryEnabled       bool           `json:"retry_enabled" gorm:"default:false"`

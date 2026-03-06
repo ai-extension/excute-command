@@ -62,6 +62,7 @@ export interface WorkflowGroup {
     key: string;
     condition?: string;
     default_server_id?: string;
+    default_server?: Server;
     order: number;
     is_parallel: boolean;
     status: Status;
@@ -69,6 +70,7 @@ export interface WorkflowGroup {
     is_copy_enabled: boolean;
     copy_source_path?: string;
     copy_target_server_id?: string;
+    copy_target_server?: Server;
     copy_target_path?: string;
     continue_on_failure: boolean;
     retry_enabled: boolean;
@@ -108,6 +110,7 @@ export interface Workflow {
     name: string;
     description: string;
     default_server_id?: string;
+    default_server?: Server;
     status: Status;
     timeout_minutes?: number;
     inputs?: WorkflowInput[];
