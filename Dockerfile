@@ -16,8 +16,10 @@ COPY backend/ .
 RUN go build -o main cmd/server/main.go
 
 # Final Stage
-FROM alpine:latest
-RUN apk add --no-cache ca-certificates tzdata nginx
+FROM ubuntu:22.04
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates tzdata nginx bash \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
