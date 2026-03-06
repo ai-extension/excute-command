@@ -1,8 +1,6 @@
 package service
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"log"
 	"os"
@@ -22,13 +20,11 @@ func init() {
 		jwtKey = []byte(secret)
 		log.Println("JWT schema loaded from environment variable")
 	} else {
-		// Generate a strong, secure random key on startup if no secret is provided
-		bytes := make([]byte, 32)
-		if _, err := rand.Read(bytes); err != nil {
-			log.Fatalf("Failed to generate random JWT secret: %v", err)
-		}
-		jwtKey = []byte(hex.EncodeToString(bytes))
-		log.Println("WARNING: JWT_SECRET environment variable not set. Generated a random secret for this session. Tokens will invalidate on restart.")
+		// Use a hardcoded default key if no secret is provided in the environment
+		// This prevents tokens from invalidating on every restart during development
+		defaultSecret := "default-insecure-jwt-secret-key-for-local-development"
+		jwtKey = []byte(defaultSecret)
+		log.Println("WARNING: JWT_SECRET environment variable not set. Using default insecure secret. Do NOT use this in production!")
 	}
 }
 

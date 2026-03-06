@@ -37,11 +37,10 @@ func init() {
 		}
 		log.Println("Data encryption key loaded from environment")
 	} else {
-		log.Println("WARNING: DATA_ENCRYPTION_KEY not set. Generating a random key for this session. Encrypted data WILL BE LOST on restart!")
+		log.Println("WARNING: DATA_ENCRYPTION_KEY not set. Using default insecure key for local development. Do NOT use this in production!")
+		defaultFallbackKey := "default-insecure-data-encryption-key-local"
 		defaultKey = make([]byte, 32)
-		if _, err := io.ReadFull(rand.Reader, defaultKey); err != nil {
-			log.Fatalf("Failed to generate random encryption key: %v", err)
-		}
+		copy(defaultKey, []byte(defaultFallbackKey))
 	}
 }
 
