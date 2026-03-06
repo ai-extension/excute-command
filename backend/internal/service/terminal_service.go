@@ -16,6 +16,7 @@ type TerminalSession struct {
 	ID        uuid.UUID
 	SSHClient *ssh.Client
 	Session   *ssh.Session
+	LocalCmd  *exec.Cmd
 	Stdin     io.WriteCloser
 	Stdout    io.Reader
 	Stderr    io.Reader
@@ -46,7 +47,7 @@ func (s *TerminalService) StartSession(serverID uuid.UUID, user *domain.User) (s
 	}
 
 	if server.ID == domain.LocalServerID {
-		return "", fmt.Errorf("terminal session is not supported for the local server")
+		return s.startLocalSession(user)
 	}
 
 	client, err := ConnectSSH(server, s.vpnConnector)
@@ -128,10 +129,67 @@ func (s *TerminalService) CloseSession(sessionID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if ts, ok := s.sessions[sessionID]; ok {
-		ts.Session.Close()
-		ts.SSHClient.Close()
+		if ts.Session != nil {
+			ts.Session.Close()
+		}
+		if ts.SSHClient != nil {
+			ts.SSHClient.Close()
+		}
+		if ts.LocalCmd != nil && ts.LocalCmd.Process != nil {
+			ts.LocalCmd.Process.Kill()
+		}
 		delete(s.sessions, sessionID)
 	}
+}
+
+func (s *TerminalService) startLocalSession(user *domain.User) (string, error) {
+	// Use 'script' command to create a pseudo-terminal on macOS/Linux
+	// This avoids needing a CGO or external pty library
+	cmd := exec.Command("script", "-q", "/dev/null", "/bin/zsh")
+
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return "", fmt.Errorf("failed to get local stdin: %w", err)
+	}
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return "", fmt.Errorf("failed to get local stdout: %w", err)
+	}
+
+	if err := cmd.Start(); err != nil {
+		return "", fmt.Errorf("failed to start local shell: %w", err)
+	}
+
+	sessionID := uuid.New().String()
+	ts := &TerminalSession{
+		ID:       uuid.MustParse(sessionID),
+		LocalCmd: cmd,
+		Stdin:    stdin,
+		Stdout:   stdout,
+	}
+
+	s.mu.Lock()
+	s.sessions[sessionID] = ts
+	s.mu.Unlock()
+
+	// Stream output to Hub
+	go func() {
+		buf := make([]byte, 1024)
+		for {
+			n, err := stdout.Read(buf)
+			if n > 0 {
+				s.hub.BroadcastLog(sessionID, string(buf[:n]))
+			}
+			if err != nil {
+				s.CloseSession(sessionID)
+				break
+			}
+		}
+		cmd.Wait()
+	}()
+
+	return sessionID, nil
 }
 
 func (s *TerminalService) HandleInput(sessionID string, input string) error {
