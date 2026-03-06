@@ -20,7 +20,7 @@ import { cn } from '../lib/utils';
 import { useNamespace } from '../context/NamespaceContext';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../lib/api';
-import { LOCAL_SERVER_ID } from '../lib/constants';
+
 import {
     Workflow,
     Tag,
@@ -211,7 +211,7 @@ const WorkflowDesignerPage = () => {
                 groups: groups.map((g, gIdx) => ({
                     ...g,
                     default_server_id: g.default_server_id || undefined,
-                    copy_target_server_id: g.copy_target_server_id || LOCAL_SERVER_ID,
+                    copy_target_server_id: g.copy_target_server_id || undefined,
                     order: gIdx,
                     steps: g.steps?.map((s, sIdx) => ({
                         ...s,

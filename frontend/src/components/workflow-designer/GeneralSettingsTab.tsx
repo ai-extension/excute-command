@@ -5,7 +5,7 @@ import { TagSelector } from '../TagSelector';
 import { SearchableSelect } from '../SearchableSelect';
 import { Switch } from '../ui/switch';
 import { Server as ServerType, Tag } from '../../types';
-import { LOCAL_SERVER_ID } from '../../lib/constants';
+
 
 interface GeneralSettingsTabProps {
     name: string;
@@ -89,8 +89,8 @@ export const GeneralSettingsTab: React.FC<GeneralSettingsTabProps> = ({
                             <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Default Target Resource</label>
                             <SearchableSelect
                                 options={[
-                                    { label: 'Local Host', value: LOCAL_SERVER_ID },
-                                    ...availableServers.filter(s => s.id !== LOCAL_SERVER_ID).map(s => ({ label: `${s.name} (${s.host})`, value: s.id }))
+                                    { label: '— Select target resource —', value: '' },
+                                    ...availableServers.map(s => ({ label: `${s.name} (${s.host})`, value: s.id }))
                                 ]}
                                 value={defaultServerId || ''}
                                 onValueChange={(val) => setDefaultServerId(val || undefined)}

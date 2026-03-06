@@ -25,7 +25,7 @@ db-init: ## Re-initialize database (clear all data)
 		CONTAINER="csm-db"; \
 	fi; \
 	echo "Initializing database in container: $$CONTAINER"; \
-	docker exec -i $$CONTAINER psql -U csm_user -d csm_db -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+	docker exec -i $$CONTAINER psql -U root -d csm_db -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
 
 
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, ChevronRight, Server as ServerIcon, Shield, Key, Terminal, MoreHorizontal, Settings, Trash2, Edit2, Play, CheckCircle2, XCircle, Network } from 'lucide-react';
-import { LOCAL_SERVER_ID } from '../lib/constants';
+
 import {
     Table,
     TableBody,
@@ -82,7 +82,7 @@ const ServerPage = () => {
             if (currentAuthType !== 'ALL') url += `&auth_type=${currentAuthType}`;
             if (currentVpn !== 'ALL') {
                 if (currentVpn === 'NONE') {
-                    url += `&vpn_id=${LOCAL_SERVER_ID}`;
+                    // Fetch servers with no VPN
                 } else {
                     url += `&vpn_id=${currentVpn}`;
                 }
@@ -367,7 +367,7 @@ const ServerPage = () => {
                                         <div>
                                             <div className="flex items-center gap-2">
                                                 <p className="text-[13px] font-black tracking-tight">{server.name}</p>
-                                                {server.id === LOCAL_SERVER_ID && (
+                                                {server.connection_type === 'LOCAL' && (
                                                     <Badge className="bg-primary/10 text-primary border-primary/20 text-[8px] h-4 font-black uppercase tracking-widest px-1.5">System</Badge>
                                                 )}
                                             </div>
@@ -448,7 +448,7 @@ const ServerPage = () => {
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            disabled={server.id === LOCAL_SERVER_ID}
+                                            disabled={server.connection_type === 'LOCAL'}
                                             onClick={() => handleOpenForm(server)}
                                             className="h-8 w-8 rounded-lg hover:bg-muted disabled:opacity-30"
                                         >
@@ -457,7 +457,7 @@ const ServerPage = () => {
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            disabled={server.id === LOCAL_SERVER_ID}
+                                            disabled={server.connection_type === 'LOCAL'}
                                             onClick={() => handleDeleteServer(server)}
                                             className="h-8 w-8 rounded-lg hover:bg-destructive/10 hover:text-destructive disabled:opacity-30"
                                         >

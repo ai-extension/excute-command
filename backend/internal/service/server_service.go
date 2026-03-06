@@ -1,21 +1,14 @@
 package service
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
-	"log"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/pkg/sftp"
 	"github.com/user/csm-backend/internal/domain"
-	"golang.org/x/crypto/ssh"
 )
 
 type ServerService struct {
@@ -65,382 +58,104 @@ func (s *ServerService) UpdateServer(server *domain.Server, user *domain.User) e
 }
 
 func (s *ServerService) DeleteServer(id uuid.UUID, user *domain.User) error {
-	if id == domain.LocalServerID {
-		return fmt.Errorf("cannot delete the default local server")
-	}
 	scope := domain.GetPermissionScope(user, "servers", "DELETE")
-	_, err := s.repo.GetByID(id, &scope)
+	server, err := s.repo.GetByID(id, &scope)
 	if err != nil {
 		return err
+	}
+	if server.ConnectionType == domain.ConnectionTypeLocal {
+		return fmt.Errorf("cannot delete the local server")
 	}
 	return s.repo.Delete(id)
 }
 
-func (s *ServerService) ExecuteCommand(ctx context.Context, serverID uuid.UUID, commandText string, user *domain.User, writers ...io.Writer) (string, error) {
-	if serverID == domain.LocalServerID || serverID == uuid.Nil {
-		return s.executeLocalCommand(ctx, commandText, writers...)
-	}
-
+func (s *ServerService) getConnection(ctx context.Context, serverID uuid.UUID, user *domain.User, action string) (domain.ServerConnection, *domain.Server, error) {
 	var server *domain.Server
 	var err error
 
 	if user == nil {
-		// Internal system request: bypass RBAC
 		scope := domain.PermissionScope{IsGlobal: true}
 		server, err = s.repo.GetByID(serverID, &scope)
 	} else {
-		scope := domain.GetPermissionScope(user, "servers", "EXECUTE")
+		scope := domain.GetPermissionScope(user, "servers", action)
 		server, err = s.repo.GetByID(serverID, &scope)
 	}
 
 	if err != nil {
-		return "", fmt.Errorf("failed to get server: %w", err)
+		return nil, nil, err
 	}
 
-	client, err := ConnectSSH(server, s.vpnConnector)
+	conn, err := GetServerConnection(server, s.vpnConnector)
 	if err != nil {
-		return "", fmt.Errorf("failed to connect to server: %w", err)
+		return nil, nil, err
 	}
-	defer client.Close()
 
-	session, err := client.NewSession()
+	return conn, server, nil
+}
+
+func (s *ServerService) ExecuteCommand(ctx context.Context, serverID uuid.UUID, commandText string, user *domain.User, writers ...io.Writer) (string, error) {
+	conn, _, err := s.getConnection(ctx, serverID, user, "EXECUTE")
 	if err != nil {
-		return "", fmt.Errorf("failed to create session: %w", err)
+		return "", err
 	}
-	defer session.Close()
+	defer conn.Close()
 
-	var stdout, stderr bytes.Buffer
-
-	// Create multiwriters for capturing AND streaming
-	stdoutWriters := append([]io.Writer{&stdout}, writers...)
-	stderrWriters := append([]io.Writer{&stderr}, writers...)
-
-	session.Stdout = io.MultiWriter(stdoutWriters...)
-	session.Stderr = io.MultiWriter(stderrWriters...)
-
-	// Handle context cancellation
-	done := make(chan struct{})
-	defer close(done)
-
-	go func() {
-		select {
-		case <-ctx.Done():
-			// Forcefully close session and client on cancellation
-			session.Close()
-			client.Close()
-		case <-done:
-			// Normal completion
-		}
-	}()
-
-	if err := session.Run(commandText); err != nil {
-		// If the error is due to context cancellation, return that instead of SSH error
-		if ctx.Err() != nil {
-			return stdout.String() + stderr.String(), ctx.Err()
-		}
-		return stdout.String() + stderr.String(), fmt.Errorf("failed to run command: %w", err)
-	}
-
-	return stdout.String(), nil
+	return conn.Execute(ctx, commandText, writers...)
 }
 
 func (s *ServerService) DownloadFileFromServer(ctx context.Context, serverID uuid.UUID, remotePath, localPath string, user *domain.User) error {
-	if serverID == domain.LocalServerID || serverID == uuid.Nil {
-		return s.copyFileLocally(remotePath, localPath)
-	}
-
-	var server *domain.Server
-	var err error
-	var cleanup func()
-
-	if user == nil {
-		// Internal system request: bypass RBAC
-		scope := domain.PermissionScope{IsGlobal: true}
-		server, err = s.repo.GetByID(serverID, &scope)
-	} else {
-		scope := domain.GetPermissionScope(user, "servers", "READ")
-		server, err = s.repo.GetByID(serverID, &scope)
-		if err == nil && server.Vpn != nil {
-			var ifID string
-			ifID, cleanup, err = s.vpnConnector.Connect(server.Vpn)
-			if err != nil {
-				return fmt.Errorf("failed to establish %s connection: %w", server.Vpn.VpnType, err)
-			}
-			_ = ifID // Reserved for future routing table adjustments
-		}
-	}
-
+	conn, _, err := s.getConnection(ctx, serverID, user, "READ")
 	if err != nil {
-		return fmt.Errorf("failed to get server %s: %w", serverID, err)
+		return err
 	}
+	defer conn.Close()
 
-	client, err := ConnectSSH(server, s.vpnConnector)
-	if cleanup != nil {
-		defer cleanup()
-	}
-	if err != nil {
-		return fmt.Errorf("failed to connect to server: %w", err)
-	}
-	defer client.Close()
-
-	sftpClient, err := sftp.NewClient(client)
-	if err != nil {
-		// Fallback: Try downloading via SSH cat
-		log.Printf("SFTP failed for server %s during download, attempting SSH fallback: %v", server.Name, err)
-		return s.downloadFileViaSSH(client, remotePath, localPath)
-	}
-	defer sftpClient.Close()
-
-	remoteFile, err := sftpClient.Open(remotePath)
-	if err != nil {
-		return fmt.Errorf("server %s, failed to open remote file %s: %w", server.Name, remotePath, err)
-	}
-	defer remoteFile.Close()
-
-	// Ensure local directory exists
-	localDir := filepath.Dir(localPath)
-	if err := os.MkdirAll(localDir, 0755); err != nil {
-		return fmt.Errorf("failed to create local directory %s: %w", localDir, err)
-	}
-
-	localFile, err := os.Create(localPath)
-	if err != nil {
-		return fmt.Errorf("failed to create local file %s: %w", localDir, err)
-	}
-	defer localFile.Close()
-
-	_, err = io.Copy(localFile, remoteFile)
-	if err != nil {
-		return fmt.Errorf("server %s, failed to download data from remote file: %w", server.Name, err)
-	}
-
-	return nil
+	return conn.Download(ctx, remotePath, localPath)
 }
 
 func (s *ServerService) UploadFileToServers(ctx context.Context, serverIDs []uuid.UUID, localPath, remotePath string, user *domain.User) error {
-	localFile, err := os.Open(localPath)
-	if err != nil {
-		return fmt.Errorf("failed to open local file %s: %w", localPath, err)
-	}
-	defer localFile.Close()
-
-	fileInfo, err := localFile.Stat()
-	if err != nil {
-		return fmt.Errorf("failed to stat local file: %w", err)
-	}
-
 	for _, serverID := range serverIDs {
 		// Stop if context cancelled
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 
-		if serverID == domain.LocalServerID || serverID == uuid.Nil {
-			if err := s.copyFileLocally(localPath, remotePath); err != nil {
-				return fmt.Errorf("local server, failed to copy file: %w", err)
+		err := func() error {
+			conn, _, err := s.getConnection(ctx, serverID, user, "WRITE")
+			if err != nil {
+				return err
 			}
-			continue
-		}
+			defer conn.Close()
 
-		var server *domain.Server
-		var err error
-		var cleanup func()
-
-		if user == nil {
-			// Internal system request: bypass RBAC
-			scope := domain.PermissionScope{IsGlobal: true}
-			server, err = s.repo.GetByID(serverID, &scope)
-		} else {
-			scope := domain.GetPermissionScope(user, "servers", "WRITE")
-			server, err = s.repo.GetByID(serverID, &scope)
-			if err == nil && server.Vpn != nil {
-				var ifID string
-				ifID, cleanup, err = s.vpnConnector.Connect(server.Vpn)
-				if err != nil {
-					return fmt.Errorf("failed to establish %s connection: %w", server.Vpn.VpnType, err)
-				}
-				_ = ifID // Reserved for future routing table adjustments
-			}
-		}
+			return conn.Upload(ctx, localPath, remotePath)
+		}()
 
 		if err != nil {
-			return fmt.Errorf("failed to get server %s: %w", serverID, err)
+			return fmt.Errorf("failed to upload to server %s: %w", serverID, err)
 		}
-
-		client, err := ConnectSSH(server, s.vpnConnector)
-		if cleanup != nil {
-			defer cleanup()
-		}
-		if err != nil {
-			return fmt.Errorf("failed to connect to server: %w", err)
-		}
-
-		sftpClient, err := sftp.NewClient(client)
-		if err != nil {
-			// Fallback: Try uploading via SSH cat if SFTP subsystem is missing
-			log.Printf("SFTP failed for server %s, attempting SSH fallback: %v", server.Name, err)
-			localFile.Seek(0, 0)
-			if fallbackErr := s.uploadFileViaSSH(client, localFile, remotePath); fallbackErr != nil {
-				client.Close()
-				return fmt.Errorf("server %s, sftp failed and ssh fallback failed: %w", server.Name, fallbackErr)
-			}
-			client.Close()
-			continue
-		}
-
-		// Ensure remote directory exists
-		remoteDir := filepath.Dir(remotePath)
-		if err := sftpClient.MkdirAll(remoteDir); err != nil {
-			sftpClient.Close()
-			client.Close()
-			return fmt.Errorf("server %s, failed to create remote directory %s: %w", server.Name, remoteDir, err)
-		}
-
-		remoteFile, err := sftpClient.Create(remotePath)
-		if err != nil {
-			sftpClient.Close()
-			client.Close()
-			return fmt.Errorf("server %s, failed to create remote file %s: %w", server.Name, remotePath, err)
-		}
-
-		// Rewind local file for each server
-		localFile.Seek(0, 0)
-		_, err = io.Copy(remoteFile, localFile)
-
-		// Attempt to set permissions similar to local or just 0644
-		sftpClient.Chmod(remotePath, fileInfo.Mode())
-
-		remoteFile.Close()
-		sftpClient.Close()
-		client.Close()
-
-		if err != nil {
-			return fmt.Errorf("server %s, failed to copy data to remote file: %w", server.Name, err)
-		}
-	}
-
-	return nil
-}
-
-func (s *ServerService) downloadFileViaSSH(client *ssh.Client, remotePath, localPath string) error {
-	session, err := client.NewSession()
-	if err != nil {
-		return err
-	}
-	defer session.Close()
-
-	// Ensure local directory exists
-	localDir := filepath.Dir(localPath)
-	if err := os.MkdirAll(localDir, 0755); err != nil {
-		return fmt.Errorf("failed to create local directory: %w", err)
-	}
-
-	localFile, err := os.Create(localPath)
-	if err != nil {
-		return fmt.Errorf("failed to create local file: %w", err)
-	}
-	defer localFile.Close()
-
-	session.Stdout = localFile
-	cmd := fmt.Sprintf("cat %s", strconv.Quote(remotePath))
-	if err := session.Run(cmd); err != nil {
-		return fmt.Errorf("failed to download file via ssh cat: %w", err)
-	}
-
-	return nil
-}
-
-func (s *ServerService) uploadFileViaSSH(client *ssh.Client, localFile *os.File, remotePath string) error {
-	session, err := client.NewSession()
-	if err != nil {
-		return err
-	}
-	defer session.Close()
-
-	// Ensure remote directory exists
-	remoteDir := filepath.Dir(remotePath)
-	mkdirCmd := fmt.Sprintf("mkdir -p %s", strconv.Quote(remoteDir))
-	if err := session.Run(mkdirCmd); err != nil {
-		return fmt.Errorf("failed to create remote directory via ssh: %w", err)
-	}
-
-	// Create a new session for the actual transfer
-	session, err = client.NewSession()
-	if err != nil {
-		return err
-	}
-	defer session.Close()
-
-	session.Stdin = localFile
-	cmd := fmt.Sprintf("cat > %s", strconv.Quote(remotePath))
-	if err := session.Run(cmd); err != nil {
-		return fmt.Errorf("failed to upload file via ssh cat: %w", err)
-	}
-
-	return nil
-}
-
-func (s *ServerService) executeLocalCommand(ctx context.Context, commandText string, writers ...io.Writer) (string, error) {
-	cmd := exec.CommandContext(ctx, "sh", "-c", commandText)
-	var stdout, stderr bytes.Buffer
-
-	stdoutWriters := append([]io.Writer{&stdout}, writers...)
-	stderrWriters := append([]io.Writer{&stderr}, writers...)
-
-	cmd.Stdout = io.MultiWriter(stdoutWriters...)
-	cmd.Stderr = io.MultiWriter(stderrWriters...)
-
-	if err := cmd.Run(); err != nil {
-		return stdout.String() + stderr.String(), fmt.Errorf("failed to run local command: %w", err)
-	}
-
-	return stdout.String(), nil
-}
-
-func (s *ServerService) copyFileLocally(localPath, remotePath string) error {
-	sourceFile, err := os.Open(localPath)
-	if err != nil {
-		return err
-	}
-	defer sourceFile.Close()
-
-	// Ensure remote directory exists
-	remoteDir := filepath.Dir(remotePath)
-	if err := os.MkdirAll(remoteDir, 0755); err != nil {
-		return err
-	}
-
-	destFile, err := os.Create(remotePath)
-	if err != nil {
-		return err
-	}
-	defer destFile.Close()
-
-	_, err = io.Copy(destFile, sourceFile)
-	if err != nil {
-		return err
-	}
-
-	sourceInfo, err := os.Stat(localPath)
-	if err == nil {
-		os.Chmod(remotePath, sourceInfo.Mode())
 	}
 
 	return nil
 }
 
 func (s *ServerService) GetServerMetrics(id uuid.UUID, user *domain.User) (*domain.ServerMetrics, error) {
-	// Standard monitoring command for Linux
-	// CPU: load avg or custom awk
-	// RAM: free -m
-	// Disk: df
-	// Uptime: uptime -p
+	// OS-aware monitoring command for Linux and macOS
 	monitorCmd := `
-		cpu=$(top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1}')
-		ram=$(free -m | awk 'NR==2{printf "%.2f", $3*100/$2 }')
-		disk=$(df -h / | awk 'NR==2{print $5}' | sed 's/%//')
-		uptime=$(uptime -p)
-		echo "$cpu|$ram|$disk|$uptime"
+		if [[ "$(uname)" == "Darwin" ]]; then
+			# macOS
+			cpu=$(top -l 1 | grep "CPU usage" | head -n1 | awk '{print $3}' | sed 's/%//')
+			ram=$(ps -A -o %mem | awk '{s+=$1} END {print s}')
+			disk=$(df -h / | awk 'NR==2{print $5}' | sed 's/%//')
+			uptime=$(uptime | awk -F'up ' '{print $2}' | awk -F', ' '{print $1}')
+			echo "$cpu|$ram|$disk|$uptime"
+		else
+			# Linux
+			cpu=$(top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1}')
+			ram=$(free -m | awk 'NR==2{printf "%.2f", $3*100/$2 }')
+			disk=$(df -h / | awk 'NR==2{print $5}' | sed 's/%//')
+			uptime=$(uptime -p)
+			echo "$cpu|$ram|$disk|$uptime"
+		fi
 	`
 
 	output, err := s.ExecuteCommand(context.Background(), id, monitorCmd, user)

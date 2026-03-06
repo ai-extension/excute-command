@@ -366,21 +366,22 @@ func seedAdmin(db *gorm.DB) {
 	var perms []domain.Permission
 	for _, def := range permDefs {
 		var p domain.Permission
-		err := db.Where("name = ?", def.Name).First(&p).Error
+		// Use Limit(1).Find to avoid scary "record not found" logs during seeding
+		err := db.Where("name = ?", def.Name).Limit(1).Find(&p).Error
 		if err != nil {
-			if err == gorm.ErrRecordNotFound {
-				p = domain.Permission{
-					ID:     uuid.New(),
-					Name:   def.Name,
-					Type:   def.Type,
-					Action: def.Action,
-				}
-				if err := db.Create(&p).Error; err != nil {
-					log.Printf("Failed to create permission %s: %v", def.Name, err)
-					continue
-				}
-			} else {
-				log.Printf("Error checking permission %s: %v", def.Name, err)
+			log.Printf("Error checking permission %s: %v", def.Name, err)
+			continue
+		}
+
+		if p.ID == uuid.Nil {
+			p = domain.Permission{
+				ID:     uuid.New(),
+				Name:   def.Name,
+				Type:   def.Type,
+				Action: def.Action,
+			}
+			if err := db.Create(&p).Error; err != nil {
+				log.Printf("Failed to create permission %s: %v", def.Name, err)
 				continue
 			}
 		} else {
@@ -393,8 +394,8 @@ func seedAdmin(db *gorm.DB) {
 	}
 
 	var adminRole domain.Role
-	err := db.Where("name = ?", "admin").First(&adminRole).Error
-	if err == gorm.ErrRecordNotFound {
+	err := db.Where("name = ?", "admin").Limit(1).Find(&adminRole).Error
+	if err == nil && adminRole.ID == uuid.Nil {
 		adminRole = domain.Role{
 			ID:          uuid.New(),
 			Name:        "admin",
@@ -417,8 +418,8 @@ func seedAdmin(db *gorm.DB) {
 	}
 
 	var adminUser domain.User
-	err = db.Where("username = ?", "admin").First(&adminUser).Error
-	if err == gorm.ErrRecordNotFound {
+	err = db.Where("username = ?", "admin").Limit(1).Find(&adminUser).Error
+	if err == nil && adminUser.ID == uuid.Nil {
 		log.Println("Seeding admin user...")
 		adminPassword := os.Getenv("ADMIN_PASSWORD")
 		if adminPassword == "" {
@@ -462,24 +463,30 @@ func seedDefaultNamespace(db *gorm.DB) {
 }
 
 func seedLocalServer(db *gorm.DB) {
-	var count int64
-	db.Model(&domain.Server{}).Where("id = ?", domain.LocalServerID).Count(&count)
-	if count == 0 {
+	var localServer domain.Server
+	err := db.Where("name = ?", "Local Engine Orchestrator").Limit(1).Find(&localServer).Error
+	if err == nil && localServer.ID == uuid.Nil {
 		log.Println("Seeding local server...")
-		localServer := domain.Server{
-			ID: domain.LocalServerID,
-
-			Name:        "Local Engine Orchestrator",
-			Description: "The local system where the engine is running.",
-			Host:        "localhost",
-			Port:        0,
-			User:        "system",
-			AuthType:    "NONE",
+		localServer = domain.Server{
+			ID:             uuid.New(),
+			Name:           "Local Engine Orchestrator",
+			Description:    "The local system where the engine is running.",
+			ConnectionType: domain.ConnectionTypeLocal,
+			Host:           "localhost",
+			Port:           0,
+			User:           "system",
+			AuthType:       "NONE",
 		}
 		if err := db.Create(&localServer).Error; err != nil {
 			log.Println("Failed to seed local server:", err)
 		} else {
 			log.Println("Local server seeded successfully.")
+		}
+	} else if err == nil {
+		// Ensure connection type is correct even for existing seeded server
+		if localServer.ConnectionType != domain.ConnectionTypeLocal {
+			localServer.ConnectionType = domain.ConnectionTypeLocal
+			db.Save(&localServer)
 		}
 	}
 }

@@ -8,7 +8,7 @@ import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 import { SearchableSelect } from '../SearchableSelect';
 import { cn } from '../../lib/utils';
-import { LOCAL_SERVER_ID } from '../../lib/constants';
+
 import { WorkflowGroup, WorkflowStep, Server as ServerType, Workflow } from '../../types';
 
 interface StepsBuilderTabProps {
@@ -206,8 +206,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                 <SearchableSelect
                                                                                     options={[
                                                                                         { label: '— Use workflow default —', value: '' },
-                                                                                        { label: 'Local Host', value: LOCAL_SERVER_ID },
-                                                                                        ...availableServers.filter(s => s.id !== LOCAL_SERVER_ID).map(s => ({ label: `${s.name} (${s.host})`, value: s.id }))
+                                                                                        ...availableServers.map(s => ({ label: `${s.name} (${s.host})`, value: s.id }))
                                                                                     ]}
                                                                                     value={group.default_server_id || ''}
                                                                                     onValueChange={(val) => {
@@ -235,7 +234,10 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                             ng[gIdx].is_copy_enabled = checked;
                                                                                             if (checked) {
                                                                                                 if (!ng[gIdx].copy_target_server_id) {
-                                                                                                    ng[gIdx].copy_target_server_id = LOCAL_SERVER_ID;
+                                                                                                    // Default to the first available server if none is selected
+                                                                                                    if (availableServers.length > 0) {
+                                                                                                        ng[gIdx].copy_target_server_id = availableServers[0].id;
+                                                                                                    }
                                                                                                 }
                                                                                             } else {
                                                                                                 ng[gIdx].copy_source_path = '';
@@ -267,8 +269,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                 <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Target Server</label>
                                                                                                 <SearchableSelect
                                                                                                     options={[
-                                                                                                        { label: 'Local Host', value: LOCAL_SERVER_ID },
-                                                                                                        ...availableServers.filter(s => s.id !== LOCAL_SERVER_ID).map(s => ({ label: `${s.name} (${s.host})`, value: s.id }))
+                                                                                                        ...availableServers.map(s => ({ label: `${s.name} (${s.host})`, value: s.id }))
                                                                                                     ]}
                                                                                                     value={group.copy_target_server_id || ''}
                                                                                                     onValueChange={(val) => {

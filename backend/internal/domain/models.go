@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"context"
+	"io"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,8 +17,6 @@ const (
 	StatusFailed    Status = "FAILED"
 	StatusCancelled Status = "CANCELLED"
 )
-
-var LocalServerID = uuid.MustParse("00000000-0000-0000-0000-000000000001")
 
 type Namespace struct {
 	ID          uuid.UUID `json:"id"`
@@ -140,23 +140,39 @@ type NamespaceRepository interface {
 	Delete(id uuid.UUID) error
 }
 
+type ConnectionType string
+
+const (
+	ConnectionTypeSSH   ConnectionType = "SSH"
+	ConnectionTypeLocal ConnectionType = "LOCAL"
+)
+
+type ServerConnection interface {
+	Execute(ctx context.Context, command string, writers ...io.Writer) (string, error)
+	Upload(ctx context.Context, localPath, remotePath string) error
+	Download(ctx context.Context, remotePath, localPath string) error
+	StartTerminal(ctx context.Context) (io.WriteCloser, io.Reader, io.Reader, error)
+	Close() error
+}
+
 type Server struct {
-	ID                 uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey"`
-	Name               string     `json:"name" gorm:"not null"`
-	Description        string     `json:"description"`
-	Host               string     `json:"host" gorm:"not null"`
-	Port               int        `json:"port" gorm:"default:22"`
-	User               string     `json:"user" gorm:"not null"`
-	AuthType           string     `json:"auth_type" gorm:"not null"` // PASSWORD or PUBLIC_KEY
-	Password           string     `json:"password,omitempty"`
-	PrivateKey         string     `json:"private_key,omitempty"`
-	VpnID              *uuid.UUID `json:"vpn_id,omitempty" gorm:"type:uuid"`
-	Vpn                *VpnConfig `json:"vpn,omitempty" gorm:"foreignKey:VpnID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
-	HostKeyFingerprint string     `json:"host_key_fingerprint,omitempty"` // For strict host key checking (TOFU or manual)
-	CreatedBy          *uuid.UUID `json:"created_by,omitempty" gorm:"type:uuid"`
-	CreatedByUsername  string     `json:"created_by_username,omitempty"`
-	CreatedAt          time.Time  `json:"created_at" gorm:"<-:create"`
-	UpdatedAt          time.Time  `json:"updated_at"`
+	ID                 uuid.UUID      `json:"id" gorm:"type:uuid;primaryKey"`
+	Name               string         `json:"name" gorm:"not null"`
+	Description        string         `json:"description"`
+	ConnectionType     ConnectionType `json:"connection_type" gorm:"not null;default:'SSH'"`
+	Host               string         `json:"host" gorm:"not null"`
+	Port               int            `json:"port" gorm:"default:22"`
+	User               string         `json:"user" gorm:"not null"`
+	AuthType           string         `json:"auth_type" gorm:"not null"` // PASSWORD, PUBLIC_KEY, or NONE
+	Password           string         `json:"password,omitempty"`
+	PrivateKey         string         `json:"private_key,omitempty"`
+	VpnID              *uuid.UUID     `json:"vpn_id,omitempty" gorm:"type:uuid"`
+	Vpn                *VpnConfig     `json:"vpn,omitempty" gorm:"foreignKey:VpnID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
+	HostKeyFingerprint string         `json:"host_key_fingerprint,omitempty"` // For strict host key checking (TOFU or manual)
+	CreatedBy          *uuid.UUID     `json:"created_by,omitempty" gorm:"type:uuid"`
+	CreatedByUsername  string         `json:"created_by_username,omitempty"`
+	CreatedAt          time.Time      `json:"created_at" gorm:"<-:create"`
+	UpdatedAt          time.Time      `json:"updated_at"`
 }
 
 type ServerMetrics struct {

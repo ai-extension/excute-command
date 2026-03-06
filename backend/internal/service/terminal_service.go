@@ -1,28 +1,21 @@
 package service
 
 import (
-	"bytes"
+	"context"
 	"fmt"
 	"io"
-	"os"
-	"os/exec"
-	"runtime"
 	"sync"
 
-	"github.com/creack/pty"
 	"github.com/google/uuid"
 	"github.com/user/csm-backend/internal/domain"
-	"golang.org/x/crypto/ssh"
 )
 
 type TerminalSession struct {
-	ID        uuid.UUID
-	SSHClient *ssh.Client
-	Session   *ssh.Session
-	LocalCmd  *exec.Cmd
-	Stdin     io.WriteCloser
-	Stdout    io.Reader
-	Stderr    io.Reader
+	ID     uuid.UUID
+	Conn   domain.ServerConnection
+	Stdin  io.WriteCloser
+	Stdout io.Reader
+	Stderr io.Reader
 }
 
 type TerminalService struct {
@@ -49,69 +42,33 @@ func (s *TerminalService) StartSession(serverID uuid.UUID, user *domain.User) (s
 		return "", fmt.Errorf("failed to get server: %w", err)
 	}
 
-	if server.ID == domain.LocalServerID {
-		return s.startLocalSession(user)
-	}
-
-	client, err := ConnectSSH(server, s.vpnConnector)
-
+	conn, err := GetServerConnection(server, s.vpnConnector)
 	if err != nil {
 		return "", err
 	}
 
-	session, err := client.NewSession()
+	stdin, stdout, stderr, err := conn.StartTerminal(context.Background())
 	if err != nil {
-		client.Close()
-		return "", fmt.Errorf("failed to create session: %w", err)
-	}
-
-	// Request PTY
-	modes := ssh.TerminalModes{
-		ssh.ECHO:          1,
-		ssh.TTY_OP_ISPEED: 14400,
-		ssh.TTY_OP_OSPEED: 14400,
-	}
-	if err := session.RequestPty("xterm-256color", 40, 80, modes); err != nil {
-		session.Close()
-		client.Close()
-		return "", fmt.Errorf("failed to request pty: %w", err)
-	}
-
-	stdin, err := session.StdinPipe()
-	if err != nil {
-		session.Close()
-		client.Close()
-		return "", fmt.Errorf("failed to get stdin: %w", err)
-	}
-
-	stdout, err := session.StdoutPipe()
-	if err != nil {
-		session.Close()
-		client.Close()
-		return "", fmt.Errorf("failed to get stdout: %w", err)
+		conn.Close()
+		return "", err
 	}
 
 	sessionID := uuid.New().String()
 	ts := &TerminalSession{
-		ID:        uuid.MustParse(sessionID),
-		SSHClient: client,
-		Session:   session,
-		Stdin:     stdin,
-		Stdout:    stdout,
+		ID:     uuid.MustParse(sessionID),
+		Conn:   conn,
+		Stdin:  stdin,
+		Stdout: stdout,
+		Stderr: stderr,
 	}
 
 	s.mu.Lock()
 	s.sessions[sessionID] = ts
 	s.mu.Unlock()
 
-	// Start shell
-	if err := session.Shell(); err != nil {
-		s.CloseSession(sessionID)
-		return "", fmt.Errorf("failed to start shell: %w", err)
-	}
-
 	// Stream output to Hub
 	go func() {
+		defer s.CloseSession(sessionID)
 		buf := make([]byte, 1024)
 		for {
 			n, err := stdout.Read(buf)
@@ -119,7 +76,6 @@ func (s *TerminalService) StartSession(serverID uuid.UUID, user *domain.User) (s
 				s.hub.BroadcastLog(sessionID, string(buf[:n]))
 			}
 			if err != nil {
-				s.CloseSession(sessionID)
 				break
 			}
 		}
@@ -132,67 +88,11 @@ func (s *TerminalService) CloseSession(sessionID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if ts, ok := s.sessions[sessionID]; ok {
-		if ts.Session != nil {
-			ts.Session.Close()
-		}
-		if ts.SSHClient != nil {
-			ts.SSHClient.Close()
-		}
-		if ts.Stdin != nil {
-			ts.Stdin.Close()
-		}
-		if ts.LocalCmd != nil && ts.LocalCmd.Process != nil {
-			ts.LocalCmd.Process.Kill()
+		if ts.Conn != nil {
+			ts.Conn.Close()
 		}
 		delete(s.sessions, sessionID)
 	}
-}
-
-func (s *TerminalService) startLocalSession(user *domain.User) (string, error) {
-	shell := "/bin/bash"
-	if runtime.GOOS == "darwin" {
-		shell = "/bin/zsh"
-	} else if os.Getenv("SHELL") != "" {
-		shell = os.Getenv("SHELL")
-	}
-
-	cmd := exec.Command(shell)
-
-	// Start the command with a pty
-	ptmx, err := pty.Start(cmd)
-	if err != nil {
-		return "", fmt.Errorf("failed to start local pty: %w", err)
-	}
-
-	sessionID := uuid.New().String()
-	ts := &TerminalSession{
-		ID:       uuid.MustParse(sessionID),
-		LocalCmd: cmd,
-		Stdin:    ptmx,
-		Stdout:   ptmx,
-	}
-
-	s.mu.Lock()
-	s.sessions[sessionID] = ts
-	s.mu.Unlock()
-
-	// Stream output to Hub
-	go func() {
-		defer s.CloseSession(sessionID)
-		buf := make([]byte, 1024)
-		for {
-			n, err := ptmx.Read(buf)
-			if n > 0 {
-				s.hub.BroadcastLog(sessionID, string(buf[:n]))
-			}
-			if err != nil {
-				break
-			}
-		}
-		cmd.Wait()
-	}()
-
-	return sessionID, nil
 }
 
 func (s *TerminalService) HandleInput(sessionID string, input string) error {
@@ -208,46 +108,21 @@ func (s *TerminalService) HandleInput(sessionID string, input string) error {
 	return err
 }
 
-// RunCommandOnServer connects to a server, runs the given command, and returns its combined output.
-// It supports the local server (running command locally via /bin/sh) as well as remote SSH servers.
+// RunCommandOnServer returns a function to run commands on a given server.
+// It now uses the unified ServerConnection interface.
 func (s *TerminalService) RunCommandOnServer(serverID uuid.UUID) func(command string) (string, error) {
 	return func(command string) (string, error) {
-		// Local server: run via /bin/sh
-		if serverID == domain.LocalServerID {
-			session := &localCmdSession{}
-			return session.Run(command)
-		}
-
 		server, err := s.repo.GetByID(serverID, nil)
 		if err != nil {
 			return "", fmt.Errorf("server not found: %w", err)
 		}
 
-		client, err := ConnectSSH(server, s.vpnConnector)
+		conn, err := GetServerConnection(server, s.vpnConnector)
 		if err != nil {
-			return "", fmt.Errorf("ssh connect failed: %w", err)
+			return "", err
 		}
-		defer client.Close()
+		defer conn.Close()
 
-		sess, err := client.NewSession()
-		if err != nil {
-			return "", fmt.Errorf("ssh session failed: %w", err)
-		}
-		defer sess.Close()
-
-		out, err := sess.CombinedOutput(command)
-		return string(out), err
+		return conn.Execute(context.Background(), command)
 	}
-}
-
-// localCmdSession is a helper to run a command on the local machine.
-type localCmdSession struct{}
-
-func (l *localCmdSession) Run(command string) (string, error) {
-	var buf bytes.Buffer
-	cmd := exec.Command("/bin/sh", "-c", command)
-	cmd.Stdout = &buf
-	cmd.Stderr = &buf
-	_ = cmd.Run() // Ignore exit code; return combined output
-	return buf.String(), nil
 }

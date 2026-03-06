@@ -230,7 +230,8 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 	if wf.DefaultServerID != uuid.Nil {
 		transferServerIDs = []uuid.UUID{wf.DefaultServerID}
 	} else {
-		transferServerIDs = []uuid.UUID{domain.LocalServerID}
+		runErr = fmt.Errorf("no target server specified for workflow files")
+		goto finalize
 	}
 
 	if len(wf.Files) > 0 {
@@ -261,8 +262,6 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 	// Get all unique servers in this workflow for execution
 	if wf.DefaultServerID != uuid.Nil {
 		serverSet[wf.DefaultServerID] = true
-	} else {
-		serverSet[domain.LocalServerID] = true
 	}
 	for _, g := range wf.Groups {
 		if g.DefaultServerID != uuid.Nil {
@@ -271,8 +270,6 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 		for _, s := range g.Steps {
 			if s.ServerID != uuid.Nil {
 				serverSet[s.ServerID] = true
-			} else {
-				serverSet[domain.LocalServerID] = true
 			}
 		}
 	}

@@ -25,6 +25,7 @@ export interface Server {
     id: string;
     name: string;
     description: string;
+    connection_type: 'SSH' | 'LOCAL';
     host: string;
     port: number;
     user: string;
