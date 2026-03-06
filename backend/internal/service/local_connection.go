@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 
 	"github.com/creack/pty"
 	"github.com/user/csm-backend/internal/domain"
@@ -49,12 +48,7 @@ func (c *LocalConnection) Download(ctx context.Context, remotePath, localPath st
 }
 
 func (c *LocalConnection) StartTerminal(ctx context.Context) (io.WriteCloser, io.Reader, io.Reader, error) {
-	shell := "/bin/bash"
-	if runtime.GOOS == "darwin" {
-		shell = "/bin/zsh"
-	} else if os.Getenv("SHELL") != "" {
-		shell = os.Getenv("SHELL")
-	}
+	shell := detectShell()
 
 	cmd := exec.Command(shell)
 	homeDir, err := os.UserHomeDir()
@@ -72,6 +66,22 @@ func (c *LocalConnection) StartTerminal(ctx context.Context) (io.WriteCloser, io
 
 func (c *LocalConnection) Close() error {
 	return nil
+}
+
+// detectShell tìm shell khả dụng trên hệ thống hiện tại.
+// Ưu tiên: $SHELL env → bash → zsh → sh
+func detectShell() string {
+	if envShell := os.Getenv("SHELL"); envShell != "" {
+		if _, err := exec.LookPath(envShell); err == nil {
+			return envShell
+		}
+	}
+	for _, sh := range []string{"bash", "zsh", "sh"} {
+		if path, err := exec.LookPath(sh); err == nil {
+			return path
+		}
+	}
+	return "/bin/sh"
 }
 
 func (c *LocalConnection) copyFileLocally(src, dst string) error {
