@@ -25,8 +25,31 @@ import RegisterPage from './pages/RegisterPage';
 import { useAuth } from './context/AuthContext';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, isLoading } = useAuth();
     const location = useLocation();
+
+    if (isLoading) {
+        return (
+            <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#050505] relative overflow-hidden">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-primary/20 blur-[120px] rounded-full animate-pulse" />
+                <div className="relative z-10 flex flex-col items-center gap-6">
+                    <div className="h-16 w-16 rounded-2xl premium-gradient p-[1px] animate-bounce duration-1000 shadow-[0_0_40px_rgba(99,102,241,0.4)]">
+                        <div className="w-full h-full rounded-2xl bg-[#050505] flex items-center justify-center">
+                            <div className="w-8 h-8 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
+                        </div>
+                    </div>
+                    <div className="flex flex-col items-center gap-2">
+                        <h2 className="text-xl font-black tracking-tighter text-white uppercase italic">Initializing System</h2>
+                        <div className="flex gap-1.5">
+                            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse delay-75" />
+                            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse delay-150" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     if (!isAuthenticated) {
         return <Navigate to="/login" state={{ from: location }} replace />;

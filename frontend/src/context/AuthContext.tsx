@@ -24,6 +24,7 @@ interface AuthContextType {
     login: (token: string, user: User) => void;
     logout: () => void;
     isAuthenticated: boolean;
+    isLoading: boolean;
     apiFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
     hasPermission: (type: string, action: string, resourceId?: string | null, namespaceId?: string | null, tagIds?: string[]) => boolean;
     showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
@@ -46,11 +47,72 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return getCookie('auth_token');
     });
 
-    // Hydrate token state on mount
+    const logout = useCallback(async () => {
+        // Call backend to clear the HttpOnly cookie
+        try {
+            await fetch('/api/logout', { method: 'POST' });
+        } catch (e) {
+            console.error("Logout request failed", e);
+        }
+
+        setToken(null);
+        setUser(null);
+        localStorage.removeItem('auth_user');
+    }, []);
+
+    const login = useCallback((newToken: string, newUser: User) => {
+        // newToken is passed from the API response to indicate successful login.
+        // The actual token is stored in the HttpOnly cookie by the browser.
+        setToken(newToken);
+        setUser(newUser);
+        localStorage.setItem('auth_user', JSON.stringify(newUser));
+    }, []);
+
+    const [isLoading, setIsLoading] = useState(true);
+
+    // Initial auth check on mount
+    useEffect(() => {
+        const verifyAuth = async () => {
+            const hasCookie = !!getCookie('auth_token');
+            if (hasCookie) {
+                try {
+                    const response = await fetch('/api/me', {
+                        headers: { 'Accept': 'application/json' },
+                        credentials: 'include'
+                    });
+                    if (response.ok) {
+                        const userData = await response.json();
+                        setUser(userData);
+                        setToken('cookie_managed'); // Mark as being managed by cookies
+                        localStorage.setItem('auth_user', JSON.stringify(userData));
+                    } else {
+                        // Cookie exists but invalid session
+                        await logout();
+                    }
+                } catch (err) {
+                    console.error("Auth verification failed", err);
+                    await logout();
+                }
+            } else {
+                // No cookie, definitely not logged in
+                setUser(null);
+                setToken(null);
+                localStorage.removeItem('auth_user');
+            }
+            setIsLoading(false);
+        };
+
+        verifyAuth();
+    }, [logout]);
+
+    // Hydrate token state on cookie changes (subset of verifyAuth logic)
     useEffect(() => {
         const cookieToken = getCookie('auth_token');
-        if (cookieToken && token !== cookieToken) {
+        if (cookieToken && !token) {
             setToken(cookieToken);
+        } else if (!cookieToken && token) {
+            setToken(null);
+            setUser(null);
         }
     }, [token]);
 
@@ -68,26 +130,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setToasts(prev => prev.filter(t => t.id !== id));
     };
 
-    const login = useCallback((newToken: string, newUser: User) => {
-        // newToken is passed from the API response to indicate successful login.
-        // The actual token is stored in the HttpOnly cookie by the browser.
-        setToken(newToken);
-        setUser(newUser);
-        localStorage.setItem('auth_user', JSON.stringify(newUser));
-    }, []);
-
-    const logout = useCallback(async () => {
-        // Call backend to clear the HttpOnly cookie
-        try {
-            await fetch('/api/logout', { method: 'POST' });
-        } catch (e) {
-            console.error("Logout request failed", e);
-        }
-
-        setToken(null);
-        setUser(null);
-        localStorage.removeItem('auth_user');
-    }, []);
 
     const apiFetch = useCallback(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
         const headers = new Headers(init?.headers);
@@ -201,7 +243,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, [user]);
 
     return (
-        <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!token, apiFetch, hasPermission, showToast }}>
+        <AuthContext.Provider value={{ user, token, login, logout, isLoading, isAuthenticated: !!token && !isLoading, apiFetch, hasPermission, showToast }}>
             {children}
             {/* Custom Toast Container */}
             <div className="fixed top-6 right-6 z-[9999] flex flex-col gap-3 pointer-events-none w-full max-w-sm">
