@@ -134,6 +134,7 @@ export interface WorkflowFile {
     file_size: number;
     local_path?: string;
     target_path: string;
+    use_variable_substitution: boolean;
     created_at?: string;
     updated_at?: string;
 }

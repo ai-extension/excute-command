@@ -218,6 +218,13 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 		}
 	}
 
+	// Initialize containers for interpolation
+	groupResults := make(map[string]string)
+	var inputsMap map[string]string
+	if execution.Inputs != "" {
+		json.Unmarshal([]byte(execution.Inputs), &inputsMap)
+	}
+
 	// 0. Execute BEFORE hooks
 	if err := e.RunHooks(ctx, wf.Hooks, domain.HookTypeBefore, wf.NamespaceID, logFile, depth, execution.User); err != nil {
 		runErr = fmt.Errorf("before hook failed: %w", err)
@@ -246,7 +253,37 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 			fmt.Fprintf(logFile, "\033[34m→ %s: \033[0m", f.FileName)
 			e.hub.BroadcastLog(workflowID.String(), fmt.Sprintf("\033[34m→ Transferring %s\033[0m", f.FileName))
 
-			err := e.serverService.UploadFileToServers(ctx, transferServerIDs, f.LocalPath, targetPath, nil)
+			sourcePath := f.LocalPath
+			if f.UseVariableSubstitution {
+				fmt.Fprintf(logFile, "\033[90m(Substitutions enabled)\033[0m ")
+				// 1. Read file
+				content, err := os.ReadFile(f.LocalPath)
+				if err != nil {
+					runErr = fmt.Errorf("failed to read file for substitution %s: %w", f.FileName, err)
+					break
+				}
+
+				// 2. Render
+				pcontext := e.getInterpolationContext(inputsMap, wf.Variables, groupResults, wf.NamespaceID, execution.User)
+				rendered, err := e.renderTemplate(string(content), pcontext)
+				if err != nil {
+					runErr = fmt.Errorf("failed to substitute variables in %s: %w", f.FileName, err)
+					break
+				}
+
+				// 3. Create temp file
+				tmpDir := filepath.Join("data", "tmp", "substitutions")
+				os.MkdirAll(tmpDir, 0755)
+				tmpPath := filepath.Join(tmpDir, f.ID.String()+"_"+f.FileName)
+				if err := os.WriteFile(tmpPath, []byte(rendered), 0644); err != nil {
+					runErr = fmt.Errorf("failed to write substituted content for %s: %w", f.FileName, err)
+					break
+				}
+				sourcePath = tmpPath
+				defer os.Remove(tmpPath)
+			}
+
+			err := e.serverService.UploadFileToServers(ctx, transferServerIDs, sourcePath, targetPath, nil)
 			if err != nil {
 				runErr = fmt.Errorf("failed to transfer file %s: %w", f.FileName, err)
 				fmt.Fprintf(logFile, "\033[1;31m✖ FAILED\033[0m\n")
@@ -280,7 +317,6 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 
 	// 2. Execute workflow groups
 	if runErr == nil {
-		groupResults := make(map[string]string) // key -> status string
 		workingDirs := &sync.Map{}
 
 		// Initialize baseline directories to prevent parallel race conditions in the first group
@@ -297,9 +333,7 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 			}
 		}
 
-		// Re-parse inputs from execution.Inputs for runGroup
-		var inputsMap map[string]string
-		json.Unmarshal([]byte(execution.Inputs), &inputsMap)
+		// Inputs already parsed as inputsMap above
 
 		for i := range wf.Groups {
 			err := e.runGroup(ctx, &wf.Groups[i], inputsMap, wf.Variables, groupResults, wf.DefaultServerID, logFile, workflowID, execution.ID, wf.NamespaceID, execution.User, workingDirs)

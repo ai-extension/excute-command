@@ -218,7 +218,8 @@ func main() {
 
 			protected.GET("/workflows/:id/files", middleware.RBACMiddleware(userRepo, "workflows", "READ"), workflowFileHandler.List)
 			protected.POST("/workflows/:id/files", middleware.RBACMiddleware(userRepo, "workflows", "WRITE"), workflowFileHandler.Upload)
-			protected.PUT("/workflow-files/:file_id", middleware.RBACMiddleware(userRepo, "workflows", "WRITE"), workflowFileHandler.UpdateTargetPath)
+			protected.PUT("/workflow-files/:file_id/target-path", middleware.RBACMiddleware(userRepo, "workflows", "WRITE"), workflowFileHandler.UpdateTargetPath)
+			protected.PUT("/workflow-files/:file_id/substitution", middleware.RBACMiddleware(userRepo, "workflows", "WRITE"), workflowFileHandler.UpdateSubstitution)
 			protected.DELETE("/workflow-files/:file_id", middleware.RBACMiddleware(userRepo, "workflows", "DELETE"), workflowFileHandler.Delete)
 
 			protected.GET("/workflows/:id/executions", middleware.RBACMiddleware(userRepo, "workflows", "READ"), workflowHandler.ListExecutions)

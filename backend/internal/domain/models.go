@@ -267,14 +267,15 @@ type Workflow struct {
 }
 
 type WorkflowFile struct {
-	ID         uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
-	WorkflowID uuid.UUID `json:"workflow_id" gorm:"type:uuid;index"`
-	FileName   string    `json:"file_name" gorm:"not null"`
-	FileSize   int64     `json:"file_size" gorm:"not null"`
-	LocalPath  string    `json:"local_path" gorm:"not null"`
-	TargetPath string    `json:"target_path" gorm:"not null"`
-	CreatedAt  time.Time `json:"created_at" gorm:"<-:create"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	ID                      uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
+	WorkflowID              uuid.UUID `json:"workflow_id" gorm:"type:uuid;index"`
+	FileName                string    `json:"file_name" gorm:"not null"`
+	FileSize                int64     `json:"file_size" gorm:"not null"`
+	LocalPath               string    `json:"local_path" gorm:"not null"`
+	TargetPath              string    `json:"target_path" gorm:"not null"`
+	UseVariableSubstitution bool      `json:"use_variable_substitution" gorm:"default:false"`
+	CreatedAt               time.Time `json:"created_at" gorm:"<-:create"`
+	UpdatedAt               time.Time `json:"updated_at"`
 }
 
 type WorkflowGroup struct {

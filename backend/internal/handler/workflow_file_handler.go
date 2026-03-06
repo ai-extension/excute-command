@@ -99,3 +99,28 @@ func (h *WorkflowFileHandler) UpdateTargetPath(c *gin.Context) {
 
 	c.JSON(http.StatusOK, updatedFile)
 }
+func (h *WorkflowFileHandler) UpdateSubstitution(c *gin.Context) {
+	fileID, err := uuid.Parse(c.Param("file_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid file id"})
+		return
+	}
+
+	var req struct {
+		UseSubstitution bool `json:"use_variable_substitution"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	user, _ := c.Get("user")
+	updatedFile, err := h.service.UpdateSubstitution(fileID, req.UseSubstitution, user.(*domain.User))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, updatedFile)
+}

@@ -117,3 +117,20 @@ func (s *WorkflowFileService) UpdateTargetPath(fileID uuid.UUID, newTargetPath s
 
 	return file, nil
 }
+
+func (s *WorkflowFileService) UpdateSubstitution(fileID uuid.UUID, useSubstitution bool, user *domain.User) (*domain.WorkflowFile, error) {
+	scope := domain.GetPermissionScope(user, "workflows", "WRITE")
+	file, err := s.repo.GetByID(fileID, &scope)
+	if err != nil {
+		return nil, err
+	}
+
+	file.UseVariableSubstitution = useSubstitution
+	file.UpdatedAt = time.Now()
+
+	if err := s.repo.Update(file); err != nil {
+		return nil, err
+	}
+
+	return file, nil
+}

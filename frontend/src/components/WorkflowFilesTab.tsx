@@ -243,9 +243,29 @@ export const WorkflowFilesTab: React.FC<WorkflowFilesTabProps> = ({ workflowId, 
                                         <p className="text-sm font-medium truncate" title={f.file_name}>
                                             {f.file_name}
                                         </p>
-                                        <span className="text-xs text-muted-foreground ml-2 shrink-0">
-                                            {formatBytes(f.file_size)}
-                                        </span>
+                                        <div className="flex items-center gap-4 ml-4">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest">Substitution</span>
+                                                <Switch
+                                                    checked={f.use_variable_substitution}
+                                                    onCheckedChange={async (checked) => {
+                                                        try {
+                                                            const response = await apiFetch(`${API_BASE_URL}/workflow-files/${f.id}/substitution`, {
+                                                                method: 'PUT',
+                                                                body: JSON.stringify({ use_variable_substitution: checked })
+                                                            });
+                                                            if (!response.ok) throw new Error('Failed to update substitution');
+                                                            fetchFiles();
+                                                        } catch (error: any) {
+                                                            alert(error.message || 'An error occurred');
+                                                        }
+                                                    }}
+                                                />
+                                            </div>
+                                            <span className="text-xs text-muted-foreground shrink-0">
+                                                {formatBytes(f.file_size)}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
 
