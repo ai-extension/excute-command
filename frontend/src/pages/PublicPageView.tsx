@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import {
-    Zap, Loader2, Monitor, Terminal, Clock
+    Zap, Loader2, Monitor, Terminal, Clock, Sun, Moon, Copy, Check
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Page, PageWidget, PageLayout, WorkflowInput } from '../types';
+import { Button } from '../components/ui/button';
 import WorkflowInputDialog from '../components/WorkflowInputDialog';
 import { API_BASE_URL } from '../lib/api';
 
@@ -55,6 +56,42 @@ const PublicPageView = () => {
     const [executionStatus, setExecutionStatus] = useState<string | null>(null);
     const [isPollingLogs, setIsPollingLogs] = useState(false);
     const [terminalState, setTerminalState] = useState<'normal' | 'minimized' | 'maximized'>('normal');
+    const [publicTheme, setPublicTheme] = useState<'light' | 'dark'>(() => {
+        return (localStorage.getItem('public-theme') as 'light' | 'dark') || 'dark';
+    });
+    const [isCopied, setIsCopied] = useState(false);
+
+    useEffect(() => {
+        localStorage.setItem('public-theme', publicTheme);
+        // Direct manipulation of document element to override global ThemeProvider
+        if (publicTheme === 'dark') {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    }, [publicTheme]);
+
+    // Restore admin theme when leaving public page
+    useEffect(() => {
+        const originalTheme = localStorage.getItem('theme') || 'dark';
+        return () => {
+            if (originalTheme === 'dark') {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        };
+    }, []);
+
+    const togglePublicTheme = () => {
+        setPublicTheme(prev => prev === 'light' ? 'dark' : 'light');
+    };
+
+    const copyPublicUrl = () => {
+        navigator.clipboard.writeText(window.location.href);
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2000);
+    };
 
     const fetchPageContent = useCallback(async () => {
         setIsLoading(true);
@@ -310,96 +347,120 @@ const PublicPageView = () => {
     }
 
     return (
-        <div className="min-h-screen bg-background text-foreground selection:bg-primary/20 pb-20">
-            <header className="fixed top-0 left-0 right-0 h-1 bg-primary z-50 shadow-lg" />
+        <div className="min-h-screen transition-colors duration-300">
+            <div className="min-h-screen bg-background text-foreground selection:bg-primary/20 pb-20">
+                <header className="fixed top-0 left-0 right-0 h-1 bg-primary z-50 shadow-lg" />
 
-            <main className="max-w-6xl mx-auto px-6 pt-24 pb-32">
-                <div className="flex flex-col items-center text-center mb-16 space-y-4">
-                    <h1 className="text-5xl md:text-7xl font-black tracking-tighter">{page?.title}</h1>
-                    <p className="text-lg text-muted-foreground font-medium italic opacity-70">
-                        {page?.description || "Interactive control center."}
-                    </p>
+                {/* Floating Navigation / Auth / Theme Tools */}
+                <div className="fixed top-6 right-6 z-50 flex items-center gap-2">
+                    <Button
+                        variant="secondary"
+                        size="icon"
+                        className="h-10 w-10 rounded-xl glass shadow-premium border-white/10"
+                        onClick={copyPublicUrl}
+                        title="Copy Public Link"
+                    >
+                        {isCopied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                    </Button>
+                    <Button
+                        variant="secondary"
+                        size="icon"
+                        className="h-10 w-10 rounded-xl glass shadow-premium border-white/10"
+                        onClick={togglePublicTheme}
+                        title={`Switch to ${publicTheme === 'dark' ? 'light' : 'dark'} mode`}
+                    >
+                        {publicTheme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-400" />}
+                    </Button>
+                </div>
 
-                    <div className="flex items-center gap-6 pt-2">
-                        <div className="flex items-center gap-2">
-                            <Zap className="w-4 h-4 text-primary" />
-                            <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
-                                {widgets.filter(w => w.type === 'ENDPOINT').length} Endpoints
-                            </span>
+                <main className="max-w-6xl mx-auto px-6 pt-24 pb-32">
+                    <div className="flex flex-col items-center text-center mb-16 space-y-4">
+                        <h1 className="text-5xl md:text-7xl font-black tracking-tighter">{page?.title}</h1>
+                        <p className="text-lg text-muted-foreground font-medium italic opacity-70">
+                            {page?.description || "Interactive control center."}
+                        </p>
+
+                        <div className="flex items-center gap-6 pt-2">
+                            <div className="flex items-center gap-2">
+                                <Zap className="w-4 h-4 text-primary" />
+                                <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
+                                    {widgets.filter(w => w.type === 'ENDPOINT').length} Endpoints
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Terminal className="w-4 h-4 text-emerald-500" />
+                                <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
+                                    {widgets.filter(w => w.type === 'TERMINAL').length} Terminals
+                                </span>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <Terminal className="w-4 h-4 text-emerald-500" />
-                            <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
-                                {widgets.filter(w => w.type === 'TERMINAL').length} Terminals
-                            </span>
-                        </div>
+
+                        {tokenExpiresAt && (
+                            <div className="flex items-center gap-2 pt-1 opacity-50">
+                                <Clock className="w-3 h-3 text-muted-foreground" />
+                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                                    Session expires at {tokenExpiresAt.toLocaleTimeString()}
+                                </span>
+                            </div>
+                        )}
                     </div>
 
-                    {tokenExpiresAt && (
-                        <div className="flex items-center gap-2 pt-1 opacity-50">
-                            <Clock className="w-3 h-3 text-muted-foreground" />
-                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                                Session expires at {tokenExpiresAt.toLocaleTimeString()}
-                            </span>
+                    <div className="flex flex-wrap gap-8">
+                        {widgets.map(widget => {
+                            if (widget.type === 'ENDPOINT') {
+                                return (
+                                    <EndpointWidget
+                                        key={widget.id}
+                                        widget={widget}
+                                        isRunning={runningWidgets[widget.id]}
+                                        result={executionResults[widget.id]}
+                                        onRun={runWidget}
+                                    />
+                                );
+                            } else if (widget.type === 'TERMINAL') {
+                                return (
+                                    <TerminalWidget
+                                        key={widget.id}
+                                        widget={widget}
+                                        slug={slug || ''}
+                                        pageToken={pageToken}
+                                    />
+                                );
+                            }
+                            return null;
+                        })}
+                    </div>
+
+                    {widgets.length === 0 && (
+                        <div className="py-32 text-center opacity-30">
+                            <Monitor className="w-12 h-12 mx-auto mb-4" />
+                            <p className="text-sm font-bold uppercase tracking-widest">No nodes deployed</p>
                         </div>
                     )}
-                </div>
+                </main>
 
-                <div className="flex flex-wrap gap-8">
-                    {widgets.map(widget => {
-                        if (widget.type === 'ENDPOINT') {
-                            return (
-                                <EndpointWidget
-                                    key={widget.id}
-                                    widget={widget}
-                                    isRunning={runningWidgets[widget.id]}
-                                    result={executionResults[widget.id]}
-                                    onRun={runWidget}
-                                />
-                            );
-                        } else if (widget.type === 'TERMINAL') {
-                            return (
-                                <TerminalWidget
-                                    key={widget.id}
-                                    widget={widget}
-                                    slug={slug || ''}
-                                    pageToken={pageToken}
-                                />
-                            );
+                <WorkflowInputDialog
+                    isOpen={inputModal.isOpen}
+                    onOpenChange={(open) => !open && closeInputModal()}
+                    inputs={inputModal.workflowInputs}
+                    confirmLabel="Confirm & Launch"
+                    onConfirm={(values) => {
+                        if (inputModal.widget) {
+                            runWidget(inputModal.widget, values);
                         }
-                        return null;
-                    })}
-                </div>
+                    }}
+                    onCancel={closeInputModal}
+                />
 
-                {widgets.length === 0 && (
-                    <div className="py-32 text-center opacity-30">
-                        <Monitor className="w-12 h-12 mx-auto mb-4" />
-                        <p className="text-sm font-bold uppercase tracking-widest">No nodes deployed</p>
-                    </div>
-                )}
-            </main>
-
-            <WorkflowInputDialog
-                isOpen={inputModal.isOpen}
-                onOpenChange={(open) => !open && closeInputModal()}
-                inputs={inputModal.workflowInputs}
-                confirmLabel="Confirm & Launch"
-                onConfirm={(values) => {
-                    if (inputModal.widget) {
-                        runWidget(inputModal.widget, values);
-                    }
-                }}
-                onCancel={closeInputModal}
-            />
-
-            <PageExecutionTerminal
-                activeExecutionId={activeExecutionId}
-                executionStatus={executionStatus}
-                executionLogs={executionLogs}
-                terminalState={terminalState}
-                setTerminalState={setTerminalState}
-                onClose={() => setActiveExecutionId(null)}
-            />
+                <PageExecutionTerminal
+                    activeExecutionId={activeExecutionId}
+                    executionStatus={executionStatus}
+                    executionLogs={executionLogs}
+                    terminalState={terminalState}
+                    setTerminalState={setTerminalState}
+                    onClose={() => setActiveExecutionId(null)}
+                />
+            </div>
         </div>
     );
 };
