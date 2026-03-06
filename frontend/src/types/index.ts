@@ -259,10 +259,12 @@ export interface PageWidget {
     size: PageWidgetSize;
     // TERMINAL-specific
     server_id?: string;
+    server_name?: string;
     command?: string;
     reload_interval?: PageWidgetReload;
     // ENDPOINT-specific
     workflow_id?: string;
+    workflow_name?: string;
     label?: string;
     style?: string;
     show_log?: boolean;

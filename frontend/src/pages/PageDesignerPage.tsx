@@ -171,6 +171,7 @@ const PageDesignerPage = () => {
             id: generateId(), type: 'ENDPOINT',
             title: 'New Endpoint', size: 'half',
             workflow_id: availableWorkflows[0]?.id || '',
+            workflow_name: availableWorkflows[0]?.name || '',
             label: availableWorkflows[0]?.name || 'Run',
             style: 'premium-gradient', show_log: false,
         };
@@ -179,10 +180,12 @@ const PageDesignerPage = () => {
     };
 
     const addTerminalWidget = () => {
+        const defaultServer = servers.find(s => s.connection_type === 'LOCAL') || servers[0];
         const w: PageWidget = {
             id: generateId(), type: 'TERMINAL',
             title: 'Terminal', size: 'full',
-            server_id: servers.find(s => s.connection_type === 'LOCAL')?.id || servers[0]?.id || '',
+            server_id: defaultServer?.id || '',
+            server_name: defaultServer?.name || '',
             command: 'echo "Hello World"', reload_interval: 'realtime',
         };
         setWidgets(prev => [...prev, w]);
@@ -486,11 +489,20 @@ const PageDesignerPage = () => {
                                             <Zap className="w-3 h-3 text-primary" /> Target Workflow
                                         </label>
                                         <SearchableSelect
-                                            options={availableWorkflows.map(wf => ({ label: wf.name, value: wf.id }))}
+                                            options={[
+                                                ...(activeWidget.workflow_id && activeWidget.workflow_name && !availableWorkflows.some(w => w.id === activeWidget.workflow_id)
+                                                    ? [{ label: activeWidget.workflow_name, value: activeWidget.workflow_id }]
+                                                    : []),
+                                                ...availableWorkflows.map(wf => ({ label: wf.name, value: wf.id }))
+                                            ]}
                                             value={activeWidget.workflow_id || ''}
                                             onValueChange={(val) => {
                                                 const wf = availableWorkflows.find(w => w.id === val);
-                                                updateWidget(activeWidget.id, { workflow_id: val, label: wf?.name || activeWidget.label });
+                                                updateWidget(activeWidget.id, {
+                                                    workflow_id: val,
+                                                    workflow_name: wf?.name || activeWidget.workflow_name,
+                                                    label: wf?.name || activeWidget.label
+                                                });
                                             }}
                                             onSearch={fetchWorkflows}
                                             placeholder="Select workflow..."
@@ -543,9 +555,20 @@ const PageDesignerPage = () => {
                                             <ServerIcon className="w-3 h-3 text-emerald-500" /> Target Server
                                         </label>
                                         <SearchableSelect
-                                            options={servers.map(s => ({ label: `${s.name} (${s.host})`, value: s.id }))}
+                                            options={[
+                                                ...(activeWidget.server_id && activeWidget.server_name && !servers.some(s => s.id === activeWidget.server_id)
+                                                    ? [{ label: activeWidget.server_name, value: activeWidget.server_id }]
+                                                    : []),
+                                                ...servers.map(s => ({ label: `${s.name} (${s.host})`, value: s.id }))
+                                            ]}
                                             value={activeWidget.server_id || ''}
-                                            onValueChange={(val) => updateWidget(activeWidget.id, { server_id: val })}
+                                            onValueChange={(val) => {
+                                                const srv = servers.find(s => s.id === val);
+                                                updateWidget(activeWidget.id, {
+                                                    server_id: val,
+                                                    server_name: srv?.name || activeWidget.server_name
+                                                });
+                                            }}
                                             onSearch={fetchServers}
                                             placeholder="Select server..."
                                             isSearchable
