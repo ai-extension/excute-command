@@ -476,10 +476,10 @@ type WorkflowExecutionRepository interface {
 	Create(exec *WorkflowExecution) error
 	GetByID(id uuid.UUID, scope *PermissionScope) (*WorkflowExecution, error)
 	ListByWorkflowID(workflowID uuid.UUID, scope *PermissionScope) ([]WorkflowExecution, error)
-	ListByWorkflowIDPaginated(workflowID uuid.UUID, limit, offset int, scope *PermissionScope) ([]WorkflowExecution, int64, error)
+	ListByWorkflowIDPaginated(workflowID uuid.UUID, limit, offset int, executedBy *uuid.UUID, scope *PermissionScope) ([]WorkflowExecution, int64, error)
 	ListByNamespaceID(namespaceID uuid.UUID, scope *PermissionScope) ([]WorkflowExecution, error)
-	ListByNamespaceIDPaginated(namespaceID uuid.UUID, limit, offset int, status string, workflowID *uuid.UUID, scope *PermissionScope) ([]WorkflowExecution, int64, error)
-	ListGlobalPaginated(limit, offset int, status string, workflowID *uuid.UUID, scope *PermissionScope) ([]WorkflowExecution, int64, error)
+	ListByNamespaceIDPaginated(namespaceID uuid.UUID, limit, offset int, status string, workflowID *uuid.UUID, executedBy *uuid.UUID, scope *PermissionScope) ([]WorkflowExecution, int64, error)
+	ListGlobalPaginated(limit, offset int, status string, workflowID *uuid.UUID, executedBy *uuid.UUID, scope *PermissionScope) ([]WorkflowExecution, int64, error)
 	ListByScheduledID(scheduledID uuid.UUID, scope *PermissionScope) ([]WorkflowExecution, error)
 	Update(exec *WorkflowExecution) error
 	CreateStepResult(stepExec *WorkflowExecutionStep) error

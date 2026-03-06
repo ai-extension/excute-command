@@ -137,7 +137,7 @@ func (h *PermissionHandler) ListResourceItems(c *gin.Context) {
 	case "servers":
 		items, total, err = h.serverRepo.ListPaginated(limit, offset, searchTerm, "", nil, nil, &scope)
 	case "history", "executions":
-		items, total, err = h.execRepo.ListGlobalPaginated(limit, offset, "", nil, &scope)
+		items, total, err = h.execRepo.ListGlobalPaginated(limit, offset, "", nil, nil, &scope)
 	case "users":
 		items, total, err = h.userRepo.ListPaginated(limit, offset, searchTerm, nil)
 	case "roles":

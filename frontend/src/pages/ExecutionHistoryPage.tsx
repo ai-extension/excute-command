@@ -40,9 +40,7 @@ import { useUsers } from '../hooks/useUsers';
 const ExecutionHistoryPage = () => {
     const { apiFetch } = useAuth();
     const { activeNamespace } = useNamespace();
-    const [executions, setExecutions] = useState<WorkflowExecution[]>([]);
-    const [total, setTotal] = useState(0);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [selectedExec, setSelectedExec] = useState<WorkflowExecution | null>(null);
     const [loadingDetail, setLoadingDetail] = useState(false);
@@ -50,18 +48,14 @@ const ExecutionHistoryPage = () => {
     const [statusFilter, setStatusFilter] = useState<string>('ALL');
     const [workflowFilter, setWorkflowFilter] = useState<string>('ALL');
     const [workflows, setWorkflows] = useState<Workflow[]>([]);
-    const [selectedCreatedBy, setSelectedCreatedBy] = useState<string | undefined>(undefined);
+    const [selectedExecutedBy, setSelectedExecutedBy] = useState<string | undefined>(undefined);
     const { users: availableUsers, fetchUsers } = useUsers();
-
-    const [limit, setLimit] = useState(20);
-    const [offset, setOffset] = useState(0);
 
     useEffect(() => {
         if (activeNamespace) {
-            fetchHistory();
             fetchWorkflows();
         }
-    }, [activeNamespace, offset, limit]);
+    }, [activeNamespace]);
 
     const fetchWorkflows = async (search?: string) => {
         if (!activeNamespace) return;
@@ -76,38 +70,6 @@ const ExecutionHistoryPage = () => {
         }
     };
 
-    const fetchHistory = async (searchOverride?: string, statusOverride?: string, workflowOverride?: string, createdByOverride?: string) => {
-        if (!activeNamespace) return;
-        try {
-            setLoading(true);
-            setError(null);
-
-            const search = searchOverride !== undefined ? searchOverride : searchQuery;
-            const status = statusOverride !== undefined ? statusOverride : statusFilter;
-            const workflowId = workflowOverride !== undefined ? workflowOverride : workflowFilter;
-            const createdBy = createdByOverride !== undefined ? createdByOverride : selectedCreatedBy;
-
-            let url = `${API_BASE_URL}/namespaces/${activeNamespace.id}/executions?limit=${limit}&offset=${offset}`;
-            if (status !== 'ALL') url += `&status=${status}`;
-            if (workflowId !== 'ALL') url += `&workflow_id=${workflowId}`;
-            if (createdBy) url += `&created_by=${createdBy}`;
-            if (search) url += `&search=${encodeURIComponent(search)}`;
-
-            const response = await apiFetch(url);
-            if (!response.ok) {
-                const data = await response.json().catch(() => ({}));
-                throw new Error(data.error || `Server error: ${response.status}`);
-            }
-            const data = await response.json();
-            setExecutions(data.items || []);
-            setTotal(data.total || 0);
-        } catch (error) {
-            console.error('Failed to fetch history:', error);
-            setError(error instanceof Error ? error.message : 'Failed to retrieve execution records');
-        } finally {
-            setLoading(false);
-        }
-    };
 
     const fetchExecutionDetail = async (exec: WorkflowExecution) => {
         try {
@@ -190,11 +152,7 @@ const ExecutionHistoryPage = () => {
         setSearchQuery(search);
         setStatusFilter(filters.status || 'ALL');
         setWorkflowFilter(filters.workflowId || 'ALL');
-        setSelectedCreatedBy(filters.createdBy);
-        setOffset(0);
-        // fetchHistory is mostly used for total count in this page,
-        // actual items are managed by WorkflowHistory component
-        fetchHistory(search, filters.status, filters.workflowId, filters.createdBy);
+        setSelectedExecutedBy(filters.executedBy);
     };
 
     return (
@@ -215,7 +173,7 @@ const ExecutionHistoryPage = () => {
                         searchTerm={searchQuery}
                         onSearchChange={setSearchQuery}
                         onApply={handleApplyFilter}
-                        filters={{ status: statusFilter, workflowId: workflowFilter, createdBy: selectedCreatedBy }}
+                        filters={{ status: statusFilter, workflowId: workflowFilter, executedBy: selectedExecutedBy }}
                         filterConfigs={[
                             {
                                 key: 'status',
@@ -241,13 +199,13 @@ const ExecutionHistoryPage = () => {
                                 onSearch: (query) => fetchWorkflows(query)
                             },
                             {
-                                key: 'createdBy',
-                                placeholder: 'CREATED BY',
+                                key: 'executedBy',
+                                placeholder: 'EXECUTED BY',
                                 type: 'single',
                                 isSearchable: true,
                                 onSearch: (query) => fetchUsers(query),
                                 options: [
-                                    { label: 'ALL CREATORS', value: '' },
+                                    { label: 'ALL EXECUTORS', value: '' },
                                     ...availableUsers.map(u => ({ label: u.username.toUpperCase(), value: u.id }))
                                 ],
                                 width: 'w-48'
@@ -263,11 +221,7 @@ const ExecutionHistoryPage = () => {
                                     setSearchQuery('');
                                     setStatusFilter('ALL');
                                     setWorkflowFilter('ALL');
-                                    setSelectedCreatedBy(undefined);
-                                    setOffset(0);
-                                    // fetchHistory will be triggered by useEffect because some state might change
-                                    // but actually we should just call it to be sure
-                                    fetchHistory('', 'ALL', 'ALL', '');
+                                    setSelectedExecutedBy(undefined);
                                 }}
                                 disabled={loading}
                                 className="h-9 px-4 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 bg-card hover:bg-muted"
@@ -286,7 +240,7 @@ const ExecutionHistoryPage = () => {
                                 namespaceId={activeNamespace?.id}
                                 status={statusFilter}
                                 workflowId={workflowFilter !== 'ALL' ? workflowFilter : undefined}
-                                createdBy={selectedCreatedBy}
+                                executedBy={selectedExecutedBy}
                                 search={searchQuery}
                                 onReRun={(wf: any, inputs: any) => runWorkflow(wf, inputs)}
                             />

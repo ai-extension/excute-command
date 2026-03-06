@@ -384,7 +384,7 @@ func (r *PostgresWorkflowExecutionRepo) ListByWorkflowID(workflowID uuid.UUID, s
 	return execs, nil
 }
 
-func (r *PostgresWorkflowExecutionRepo) ListByWorkflowIDPaginated(workflowID uuid.UUID, limit, offset int, scope *domain.PermissionScope) ([]domain.WorkflowExecution, int64, error) {
+func (r *PostgresWorkflowExecutionRepo) ListByWorkflowIDPaginated(workflowID uuid.UUID, limit, offset int, executedBy *uuid.UUID, scope *domain.PermissionScope) ([]domain.WorkflowExecution, int64, error) {
 	var execs []domain.WorkflowExecution
 	var total int64
 
@@ -395,13 +395,22 @@ func (r *PostgresWorkflowExecutionRepo) ListByWorkflowIDPaginated(workflowID uui
 	}
 
 	// Separate count query
-	if err := db.Model(&domain.WorkflowExecution{}).Where("workflow_id = ?", workflowID).Count(&total).Error; err != nil {
+	dbCount := r.db.Model(&domain.WorkflowExecution{}).Where("workflow_id = ?", workflowID)
+	if executedBy != nil {
+		dbCount = dbCount.Where("executed_by = ?", executedBy)
+	}
+
+	if err := dbCount.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
 	// Separate paginated fetch with schedule preload
-	err := db.
-		Where("workflow_id = ?", workflowID).
+	dbFetch := db.Where("workflow_id = ?", workflowID)
+	if executedBy != nil {
+		dbFetch = dbFetch.Where("executed_by = ?", executedBy)
+	}
+
+	err := dbFetch.
 		Preload("User").
 		Preload("Schedule").
 		Order("created_at DESC").
@@ -431,7 +440,7 @@ func (r *PostgresWorkflowExecutionRepo) ListByNamespaceID(namespaceID uuid.UUID,
 	return execs, nil
 }
 
-func (r *PostgresWorkflowExecutionRepo) ListByNamespaceIDPaginated(namespaceID uuid.UUID, limit, offset int, status string, workflowID *uuid.UUID, scope *domain.PermissionScope) ([]domain.WorkflowExecution, int64, error) {
+func (r *PostgresWorkflowExecutionRepo) ListByNamespaceIDPaginated(namespaceID uuid.UUID, limit, offset int, status string, workflowID *uuid.UUID, executedBy *uuid.UUID, scope *domain.PermissionScope) ([]domain.WorkflowExecution, int64, error) {
 	var execs []domain.WorkflowExecution
 	var total int64
 	db := r.db.Model(&domain.WorkflowExecution{}).
@@ -450,6 +459,10 @@ func (r *PostgresWorkflowExecutionRepo) ListByNamespaceIDPaginated(namespaceID u
 		db = db.Where("workflow_executions.workflow_id = ?", workflowID)
 	}
 
+	if executedBy != nil {
+		db = db.Where("workflow_executions.executed_by = ?", executedBy)
+	}
+
 	if err := db.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
@@ -460,7 +473,7 @@ func (r *PostgresWorkflowExecutionRepo) ListByNamespaceIDPaginated(namespaceID u
 	return execs, total, err
 }
 
-func (r *PostgresWorkflowExecutionRepo) ListGlobalPaginated(limit, offset int, status string, workflowID *uuid.UUID, scope *domain.PermissionScope) ([]domain.WorkflowExecution, int64, error) {
+func (r *PostgresWorkflowExecutionRepo) ListGlobalPaginated(limit, offset int, status string, workflowID *uuid.UUID, executedBy *uuid.UUID, scope *domain.PermissionScope) ([]domain.WorkflowExecution, int64, error) {
 	var execs []domain.WorkflowExecution
 	var total int64
 	db := r.db.Model(&domain.WorkflowExecution{}).
@@ -476,6 +489,10 @@ func (r *PostgresWorkflowExecutionRepo) ListGlobalPaginated(limit, offset int, s
 
 	if workflowID != nil {
 		db = db.Where("workflow_executions.workflow_id = ?", workflowID)
+	}
+
+	if executedBy != nil {
+		db = db.Where("workflow_executions.executed_by = ?", executedBy)
 	}
 
 	if err := db.Count(&total).Error; err != nil {
