@@ -182,7 +182,6 @@ func (s *WorkflowService) CreateStep(step *domain.WorkflowStep) error {
 	if step.ID == uuid.Nil {
 		step.ID = uuid.New()
 	}
-	step.Status = domain.StatusPending
 	return s.stepRepo.Create(step)
 }
 

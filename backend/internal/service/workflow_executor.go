@@ -212,8 +212,6 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 		e.groupRepo.Update(&wf.Groups[i])
 		e.hub.BroadcastStatus(wf.Groups[i].ID.String(), "group", string(domain.StatusPending))
 		for j := range wf.Groups[i].Steps {
-			wf.Groups[i].Steps[j].Status = domain.StatusPending
-			e.stepRepo.Update(&wf.Groups[i].Steps[j])
 			e.hub.BroadcastStatus(wf.Groups[i].Steps[j].ID.String(), "step", string(domain.StatusPending))
 		}
 	}
@@ -607,8 +605,6 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 
 			// Reset step statuses for visual clarity in UI
 			for i := range group.Steps {
-				group.Steps[i].Status = domain.StatusPending
-				e.stepRepo.Update(&group.Steps[i])
 				e.hub.BroadcastStatus(group.Steps[i].ID.String(), "step", string(domain.StatusPending))
 			}
 		}
@@ -791,8 +787,6 @@ func (e *WorkflowExecutor) relayCopy(ctx context.Context, group *domain.Workflow
 }
 
 func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowStep, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, defaultServerID uuid.UUID, mainLogFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, namespaceID uuid.UUID, user *domain.User, workingDirs *sync.Map) error {
-	step.Status = domain.StatusRunning
-	e.stepRepo.Update(step)
 	e.hub.BroadcastStatus(step.ID.String(), "step", string(domain.StatusRunning))
 
 	// Create execution step record
@@ -832,8 +826,6 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 			emptyMsg := "\033[90m(No command to execute)\033[0m\n"
 			fmt.Fprint(mainLogFile, emptyMsg)
 			fmt.Fprint(stepLogFile, emptyMsg)
-			step.Status = domain.StatusSuccess
-			e.stepRepo.Update(step)
 			e.hub.BroadcastStatus(step.ID.String(), "step", string(domain.StatusSuccess))
 			return nil
 		}
@@ -891,43 +883,37 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 		}
 	}
 
-	step.Output = output
 	if err != nil {
 		if ctx.Err() != nil {
-			step.Status = domain.StatusCancelled
-			e.stepRepo.Update(step)
 			e.hub.BroadcastStatus(step.ID.String(), "step", string(domain.StatusCancelled))
 
 			stepExec.Status = domain.StatusCancelled
-			stepExec.Output = step.Output
+			stepExec.Output = output
 			finishedAt := time.Now()
 			stepExec.FinishedAt = &finishedAt
 			e.execRepo.CreateStepResult(stepExec)
 			return err
 		}
-		step.Status = domain.StatusFailed
-		e.stepRepo.Update(step)
 		e.hub.BroadcastStatus(step.ID.String(), "step", string(domain.StatusFailed))
 
 		stepExec.Status = domain.StatusFailed
-		stepExec.Output = step.Output
+		stepExec.Output = output
 		finishedAt := time.Now()
 		stepExec.FinishedAt = &finishedAt
 		e.execRepo.CreateStepResult(stepExec)
 		return err
 	}
 
-	step.Status = domain.StatusSuccess
 	e.hub.BroadcastStatus(step.ID.String(), "step", string(domain.StatusSuccess))
 
 	// Finalize execution step record
-	stepExec.Status = step.Status
-	stepExec.Output = step.Output
+	stepExec.Status = domain.StatusSuccess
+	stepExec.Output = output
 	finishedAt := time.Now()
 	stepExec.FinishedAt = &finishedAt
 	e.execRepo.CreateStepResult(stepExec)
 
-	return e.stepRepo.Update(step)
+	return nil
 }
 
 // runWorkflowStep handles a step of action_type=WORKFLOW, running a target workflow either

@@ -312,8 +312,6 @@ type WorkflowStep struct {
 	TargetWorkflowInputs string     `json:"target_workflow_inputs,omitempty"` // JSON string of inputs for the target workflow
 	WaitToFinish         *bool      `json:"wait_to_finish" gorm:"default:true"`
 	Order                int        `json:"order"`
-	Status               Status     `json:"status"`
-	Output               string     `json:"output" gorm:"type:text"`
 	CreatedAt            time.Time  `json:"created_at" gorm:"<-:create"`
 	UpdatedAt            time.Time  `json:"updated_at"`
 }

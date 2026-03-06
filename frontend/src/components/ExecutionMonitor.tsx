@@ -191,9 +191,9 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
             const stepResult = execution.steps.find(s => s.step_id === stepID);
             return stepResult?.status || 'PENDING';
         }
-        // For live, we use the status in the workflow object which is updated by WS
+        // For live, we use the status dynamically patched into the workflow object by WS
         const step = workflow.groups?.flatMap(g => g.steps || []).find(s => s.id === stepID);
-        return step?.status || 'PENDING';
+        return (step as any)?.status || 'PENDING';
     };
 
     const handleStop = async () => {

@@ -51,8 +51,6 @@ export interface WorkflowStep {
     target_workflow_inputs?: string; // JSON string
     wait_to_finish: boolean;
     order: number;
-    status: Status;
-    output: string;
     created_at: string;
     updated_at: string;
 }
