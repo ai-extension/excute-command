@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
+	"runtime"
 	"sync"
 
+	"github.com/creack/pty"
 	"github.com/google/uuid"
 	"github.com/user/csm-backend/internal/domain"
 	"golang.org/x/crypto/ssh"
@@ -135,6 +138,9 @@ func (s *TerminalService) CloseSession(sessionID string) {
 		if ts.SSHClient != nil {
 			ts.SSHClient.Close()
 		}
+		if ts.Stdin != nil {
+			ts.Stdin.Close()
+		}
 		if ts.LocalCmd != nil && ts.LocalCmd.Process != nil {
 			ts.LocalCmd.Process.Kill()
 		}
@@ -143,30 +149,27 @@ func (s *TerminalService) CloseSession(sessionID string) {
 }
 
 func (s *TerminalService) startLocalSession(user *domain.User) (string, error) {
-	// Use 'script' command to create a pseudo-terminal on macOS/Linux
-	// This avoids needing a CGO or external pty library
-	cmd := exec.Command("script", "-q", "/dev/null", "/bin/zsh")
-
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return "", fmt.Errorf("failed to get local stdin: %w", err)
+	shell := "/bin/bash"
+	if runtime.GOOS == "darwin" {
+		shell = "/bin/zsh"
+	} else if os.Getenv("SHELL") != "" {
+		shell = os.Getenv("SHELL")
 	}
 
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return "", fmt.Errorf("failed to get local stdout: %w", err)
-	}
+	cmd := exec.Command(shell)
 
-	if err := cmd.Start(); err != nil {
-		return "", fmt.Errorf("failed to start local shell: %w", err)
+	// Start the command with a pty
+	ptmx, err := pty.Start(cmd)
+	if err != nil {
+		return "", fmt.Errorf("failed to start local pty: %w", err)
 	}
 
 	sessionID := uuid.New().String()
 	ts := &TerminalSession{
 		ID:       uuid.MustParse(sessionID),
 		LocalCmd: cmd,
-		Stdin:    stdin,
-		Stdout:   stdout,
+		Stdin:    ptmx,
+		Stdout:   ptmx,
 	}
 
 	s.mu.Lock()
@@ -175,14 +178,14 @@ func (s *TerminalService) startLocalSession(user *domain.User) (string, error) {
 
 	// Stream output to Hub
 	go func() {
+		defer s.CloseSession(sessionID)
 		buf := make([]byte, 1024)
 		for {
-			n, err := stdout.Read(buf)
+			n, err := ptmx.Read(buf)
 			if n > 0 {
 				s.hub.BroadcastLog(sessionID, string(buf[:n]))
 			}
 			if err != nil {
-				s.CloseSession(sessionID)
 				break
 			}
 		}
