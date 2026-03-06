@@ -19,7 +19,7 @@ interface NamespaceContextType {
 const NamespaceContext = createContext<NamespaceContextType | undefined>(undefined);
 
 export const NamespaceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const { token, isAuthenticated } = useAuth();
+    const { apiFetch, isAuthenticated } = useAuth();
     const [namespaces, setNamespaces] = useState<Namespace[]>([]);
     const [activeNamespace, setActiveNamespaceState] = useState<Namespace | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -31,11 +31,7 @@ export const NamespaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             return;
         }
         try {
-            const response = await fetch(`${API_BASE_URL}/namespaces`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
+            const response = await apiFetch(`${API_BASE_URL}/namespaces`);
             if (response.status === 401) {
                 // Token expired or invalid
                 return;
