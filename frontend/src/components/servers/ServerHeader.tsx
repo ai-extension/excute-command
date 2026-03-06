@@ -14,7 +14,7 @@ interface ServerHeaderProps {
     onApplyFilter: (search: string, filters: { [key: string]: any }) => void;
     onNewServer: () => void;
     onFetchVpns: (query?: string) => void;
-    selectedCreatedBy?: string;
+    selectedUser?: string;
     availableUsers: any[];
     onFetchUsers: (query: string) => Promise<void>;
 }
@@ -29,7 +29,7 @@ export const ServerHeader: React.FC<ServerHeaderProps> = ({
     onApplyFilter,
     onNewServer,
     onFetchVpns,
-    selectedCreatedBy,
+    selectedUser,
     availableUsers,
     onFetchUsers
 }) => {
@@ -48,7 +48,7 @@ export const ServerHeader: React.FC<ServerHeaderProps> = ({
                 searchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
                 onApply={onApplyFilter}
-                filters={{ authType: authTypeFilter, vpn: vpnFilter, createdBy: selectedCreatedBy }}
+                filters={{ authType: authTypeFilter, vpn: vpnFilter, user: selectedUser }}
                 filterConfigs={[
                     {
                         key: 'authType',
@@ -74,13 +74,13 @@ export const ServerHeader: React.FC<ServerHeaderProps> = ({
                         onSearch: onFetchVpns
                     },
                     {
-                        key: 'createdBy',
-                        placeholder: 'CREATED BY',
+                        key: 'user',
+                        placeholder: 'USER',
                         type: 'single',
                         isSearchable: true,
                         onSearch: onFetchUsers,
                         options: [
-                            { label: 'ALL CREATORS', value: '' },
+                            { label: 'ALL USERS', value: '' },
                             ...availableUsers.map(u => ({ label: u.username.toUpperCase(), value: u.id }))
                         ],
                         width: 'w-48'

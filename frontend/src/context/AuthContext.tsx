@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { AlertCircle, CheckCircle, XCircle, Info, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { TAGGABLE_RESOURCES, NAMESPACE_SCOPED_RESOURCES } from '../config/permissions';
@@ -37,7 +37,7 @@ interface AuthContextType {
     isLoading: boolean;
     settings: UserSettings;
     refreshSettings: () => Promise<void>;
-    apiFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+    apiFetch: (url: string, init?: RequestInit & { skipToast?: boolean }) => Promise<Response>;
     hasPermission: (type: string, action: string, resourceId?: string | null, namespaceId?: string | null, tagIds?: string[]) => boolean;
     showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
@@ -56,16 +56,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return savedUser ? JSON.parse(savedUser) : null;
     });
     const [token, setToken] = useState<string | null>(() => {
-        return getCookie('auth_token');
+        // If we have an auth cookie, we treat it as logged in immediately
+        return getCookie('auth_token') ? 'cookie_managed' : null;
     });
-    const [settings, setSettings] = useState<UserSettings>({});
+    const [settings, setSettings] = useState<UserSettings>(() => {
+        const savedSettings = localStorage.getItem('auth_settings');
+        return savedSettings ? JSON.parse(savedSettings) : {};
+    });
 
     const refreshSettings = useCallback(async () => {
         try {
-            // First try to fetch protected settings if we have a token
-            const isAuth = !!getCookie('auth_token') || !!token;
-            const endpoint = isAuth ? `${API_BASE_URL}/settings` : `${API_BASE_URL}/settings/public`;
-            
+            // Use current cookie state to determine which endpoint to call
+            const hasAuth = !!getCookie('auth_token');
+            const endpoint = hasAuth ? `${API_BASE_URL}/settings` : `${API_BASE_URL}/settings/public`;
+
             const response = await fetch(endpoint, {
                 headers: { 'Accept': 'application/json' },
                 credentials: 'include'
@@ -73,20 +77,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             if (response.ok) {
                 const data = await response.json();
-                // Handle both array/map from /settings and the object from /settings/public
+                let mapped: UserSettings = {};
                 if (Array.isArray(data)) {
-                    const mapped: UserSettings = {};
                     data.forEach((s: any) => { mapped[s.key] = s.value; });
-                    setSettings(mapped);
                 } else {
-                    // It's already a map or object
-                    setSettings(data);
+                    mapped = data;
                 }
+                setSettings(mapped);
+                localStorage.setItem('auth_settings', JSON.stringify(mapped));
             }
         } catch (err) {
             console.error("Failed to fetch settings", err);
         }
-    }, [token]);
+    }, []); // Settings fetch shouldn't strictly depend on token state if it uses getCookie internally
 
     const logout = useCallback(async () => {
         // Call backend to clear the HttpOnly cookie
@@ -99,12 +102,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setToken(null);
         setUser(null);
         localStorage.removeItem('auth_user');
+        localStorage.removeItem('auth_settings');
     }, []);
 
     const login = useCallback((newToken: string, newUser: User) => {
         // newToken is passed from the API response to indicate successful login.
         // The actual token is stored in the HttpOnly cookie by the browser.
-        setToken(newToken);
+        setToken(newToken || 'cookie_managed');
         setUser(newUser);
         localStorage.setItem('auth_user', JSON.stringify(newUser));
     }, []);
@@ -113,50 +117,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Initial auth check on mount
     useEffect(() => {
+        let isMounted = true;
         const verifyAuth = async () => {
             const hasCookie = !!getCookie('auth_token');
+            const hasCachedUser = !!user;
+
             if (hasCookie) {
-                try {
-                    const response = await fetch(`${API_BASE_URL}/me`, {
-                        headers: { 'Accept': 'application/json' },
-                        credentials: 'include'
-                    });
-                    if (response.ok) {
-                        const userData = await response.json();
-                        setUser(userData);
-                        setToken('cookie_managed'); // Mark as being managed by cookies
-                        localStorage.setItem('auth_user', JSON.stringify(userData));
-                    } else {
-                        // Cookie exists but invalid session
-                        await logout();
+                // Skip call if we already have a cached user to avoid redundant network traffic on every load
+                if (!hasCachedUser) {
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/me`, {
+                            headers: { 'Accept': 'application/json' },
+                            credentials: 'include'
+                        });
+                        if (response.ok) {
+                            const userData = await response.json();
+                            if (isMounted) {
+                                setUser(userData);
+                                setToken('cookie_managed');
+                                localStorage.setItem('auth_user', JSON.stringify(userData));
+                            }
+                        } else if (isMounted) {
+                            await logout();
+                        }
+                    } catch (err) {
+                        console.error("Auth verification failed", err);
+                        if (isMounted) await logout();
                     }
-                } catch (err) {
-                    console.error("Auth verification failed", err);
-                    await logout();
                 }
-            } else {
-                // No cookie, definitely not logged in
+            } else if (isMounted) {
                 setUser(null);
                 setToken(null);
                 localStorage.removeItem('auth_user');
+                localStorage.removeItem('auth_settings');
             }
-            setIsLoading(false);
-            await refreshSettings();
+
+            if (isMounted) {
+                setIsLoading(false);
+            }
         };
 
         verifyAuth();
-    }, [logout, refreshSettings]);
+        return () => { isMounted = false; };
+    }, [logout]);
 
-    // Hydrate token state on cookie changes (subset of verifyAuth logic)
+    const settingsInitialized = useRef(false);
     useEffect(() => {
-        const cookieToken = getCookie('auth_token');
-        if (cookieToken && !token) {
-            setToken(cookieToken);
-        } else if (!cookieToken && token) {
-            setToken(null);
-            setUser(null);
+        // Fetch settings on mount or when token changes
+        // But skip if we already have settings in localStorage and it's just the initial mount
+        const hasSettings = Object.keys(settings).length > 0;
+
+        if (!hasSettings || settingsInitialized.current) {
+            refreshSettings();
         }
-    }, [token]);
+
+        settingsInitialized.current = true;
+    }, [token, refreshSettings]);
 
     const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
@@ -173,7 +189,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
 
-    const apiFetch = useCallback(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const apiFetch = useCallback(async (url: string, init?: RequestInit & { skipToast?: boolean }): Promise<Response> => {
         const headers = new Headers(init?.headers);
         const currentToken = getCookie('auth_token') || token;
 
@@ -187,23 +203,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             credentials: 'include', // Ensure cookies are sent (especially auth_token)
         };
 
-        const response = await fetch(input, fetchInit);
+        const response = await fetch(url, fetchInit);
 
         if (!response.ok) {
             if (response.status === 401) {
+                setToken(null);
+                setUser(null);
+                setSettings({});
+                localStorage.removeItem('auth_user');
+                localStorage.removeItem('auth_settings');
+                return response;
+            }
+
+            // Only show toast if skipToast is NOT explicitly set to true
+            const shouldSkipToast = init && (init as any).skipToast === true;
+            if (!shouldSkipToast) {
                 const data = await response.clone().json().catch(() => ({}));
-                if (data.error && (data.error.includes('expired') || data.error.includes('invalid') || data.error.includes('Authentication'))) {
-                    logout();
-                }
-            } else {
-                const data = await response.clone().json().catch(() => ({}));
-                const message = data.error || data.message || `Error: ${response.status} ${response.statusText}`;
-                showToast(message, 'error');
+                showToast(data.error || data.message || `Error: ${response.status} ${response.statusText}`, 'error');
             }
         }
 
         return response;
-    }, [token, logout, showToast]);
+    }, [token, showToast]);
 
     const hasPermission = useCallback((type: string, action: string, resourceId: string | null = null, namespaceId: string | null = null, tagIds: string[] = []): boolean => {
         if (!user || !user.username) return false;

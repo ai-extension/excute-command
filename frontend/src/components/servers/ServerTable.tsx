@@ -75,7 +75,12 @@ export const ServerTable: React.FC<ServerTableProps> = ({
                             </TableCell>
                             <TableCell>
                                 <div className="flex flex-col gap-2 min-w-[140px]">
-                                    {metrics[server.id] ? (
+                                    {metrics[server.id]?.error ? (
+                                        <div className="flex items-center gap-1.5 py-1 px-2 rounded-lg bg-destructive/10 border border-destructive/20 w-fit">
+                                            <div className="h-1.5 w-1.5 rounded-full bg-destructive animate-pulse" />
+                                            <span className="text-[9px] font-black uppercase tracking-widest text-destructive">{metrics[server.id].error}</span>
+                                        </div>
+                                    ) : metrics[server.id] ? (
                                         <>
                                             <div className="flex flex-col gap-1">
                                                 <div className="flex justify-between items-center text-[8px] font-black uppercase tracking-widest text-muted-foreground/60">

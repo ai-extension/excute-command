@@ -43,7 +43,14 @@ func (h *ServerHandler) ListServers(c *gin.Context) {
 	}
 
 	var createdBy *uuid.UUID
-	if cb := c.Query("created_by"); cb != "" {
+	if cb := c.Query("user"); cb == "" {
+		cb = c.Query("created_by") // Fallback
+		if cb != "" {
+			if id, err := uuid.Parse(cb); err == nil {
+				createdBy = &id
+			}
+		}
+	} else {
 		if id, err := uuid.Parse(cb); err == nil {
 			createdBy = &id
 		}

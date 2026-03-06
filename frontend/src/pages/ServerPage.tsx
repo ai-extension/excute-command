@@ -38,7 +38,7 @@ const ServerPage = () => {
     });
     const [authTypeFilter, setAuthTypeFilter] = useState<string>('ALL');
     const [vpnFilter, setVpnFilter] = useState<string>('ALL');
-    const [selectedCreatedBy, setSelectedCreatedBy] = useState<string | undefined>(undefined);
+    const [selectedUser, setSelectedUser] = useState<string | undefined>(undefined);
     const { users: availableUsers, fetchUsers } = useUsers();
 
     const [limit, setLimit] = useState(20);
@@ -62,14 +62,14 @@ const ServerPage = () => {
             const currentSearch = searchOverride !== undefined ? searchOverride : searchTerm;
             const currentAuthType = filtersOverride?.authType !== undefined ? filtersOverride.authType : authTypeFilter;
             const currentVpn = filtersOverride?.vpn !== undefined ? filtersOverride.vpn : vpnFilter;
-            const currentCreatedBy = filtersOverride?.createdBy !== undefined ? filtersOverride.createdBy : selectedCreatedBy;
+            const currentUser = filtersOverride?.user !== undefined ? filtersOverride.user : selectedUser;
 
             let url = `${API_BASE_URL}/servers?limit=${limit}&offset=${offset}`;
             if (currentAuthType !== 'ALL') url += `&auth_type=${currentAuthType}`;
             if (currentVpn !== 'ALL' && currentVpn !== 'NONE') {
                 url += `&vpn_id=${currentVpn}`;
             }
-            if (currentCreatedBy) url += `&created_by=${currentCreatedBy}`;
+            if (currentUser) url += `&user=${currentUser}`;
             if (currentSearch) url += `&search=${encodeURIComponent(currentSearch)}`;
 
             const response = await apiFetch(url);
@@ -88,18 +88,34 @@ const ServerPage = () => {
         }
     };
 
-    const fetchMetrics = async () => {
-        for (const server of servers) {
-            try {
-                const response = await apiFetch(`${API_BASE_URL}/servers/${server.id}/metrics`);
-                if (response.ok) {
-                    const data = await response.json();
-                    setMetrics(prev => ({ ...prev, [server.id]: data }));
-                }
-            } catch (error) {
-                console.error(`Failed to fetch metrics for server ${server.id}:`, error);
+    const fetchSingleServerMetrics = async (serverId: string) => {
+        try {
+            const response = await apiFetch(`${API_BASE_URL}/servers/${serverId}/metrics`, { skipToast: true });
+            if (!response.ok) {
+                setMetrics(prev => ({
+                    ...prev,
+                    [serverId]: { error: 'OFFLINE' }
+                }));
+                return;
             }
+            const data = await response.json();
+            setMetrics(prev => ({
+                ...prev,
+                [serverId]: data
+            }));
+        } catch (error: any) {
+            console.error(`Failed to fetch metrics for ${serverId}:`, error);
+            setMetrics(prev => ({
+                ...prev,
+                [serverId]: { error: 'OFFLINE' }
+            }));
         }
+    };
+
+    const fetchMetrics = async () => {
+        if (servers.length === 0) return;
+        // Fetch all in parallel for better performance
+        await Promise.all(servers.map(server => fetchSingleServerMetrics(server.id)));
     };
 
     const fetchVpns = async (search?: string) => {
@@ -122,7 +138,7 @@ const ServerPage = () => {
 
     useEffect(() => {
         fetchServers();
-    }, [offset, limit, selectedCreatedBy]);
+    }, [offset, limit, selectedUser]);
 
     useEffect(() => {
         if (servers.length > 0) {
@@ -136,7 +152,7 @@ const ServerPage = () => {
         setSearchTerm(search);
         if (filters.authType) setAuthTypeFilter(filters.authType);
         if (filters.vpn) setVpnFilter(filters.vpn);
-        setSelectedCreatedBy(filters.createdBy);
+        setSelectedUser(filters.user);
         setOffset(0);
         fetchServers(search, filters);
     };
@@ -240,7 +256,7 @@ const ServerPage = () => {
                 onApplyFilter={handleApplyFilter}
                 onNewServer={() => handleOpenForm()}
                 onFetchVpns={fetchVpns}
-                selectedCreatedBy={selectedCreatedBy}
+                selectedUser={selectedUser}
                 availableUsers={availableUsers}
                 onFetchUsers={fetchUsers}
             />
