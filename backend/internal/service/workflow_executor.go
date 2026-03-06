@@ -285,8 +285,8 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 
 		// Initialize baseline directories to prevent parallel race conditions in the first group
 		// Baseline for local server (Nil UUID)
-		if gwd, err := os.Getwd(); err == nil {
-			workingDirs.Store(uuid.Nil, gwd)
+		if homeDir, err := os.UserHomeDir(); err == nil {
+			workingDirs.Store(uuid.Nil, homeDir)
 		}
 		// Baseline for remote servers
 		for id := range serverSet {

@@ -57,6 +57,11 @@ func (c *LocalConnection) StartTerminal(ctx context.Context) (io.WriteCloser, io
 	}
 
 	cmd := exec.Command(shell)
+	homeDir, err := os.UserHomeDir()
+	if err == nil {
+		cmd.Dir = homeDir
+	}
+
 	ptmx, err := pty.Start(cmd)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to start local pty: %w", err)
