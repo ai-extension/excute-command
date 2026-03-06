@@ -14,7 +14,9 @@ import {
     Globe,
     Lock,
     Eye,
-    EyeOff
+    EyeOff,
+    Upload,
+    Image as ImageIcon
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -37,7 +39,7 @@ import {
 } from "../components/ui/dialog";
 
 const SettingsPage = () => {
-    const { apiFetch, user } = useAuth();
+    const { apiFetch, user, refreshSettings } = useAuth();
     const { refreshNamespaces, namespaces } = useNamespace();
     const [activeTab, setActiveTab] = useState<'namespaces' | 'general' | 'auth'>('general');
     const [isLoading, setIsLoading] = useState(false);
@@ -93,6 +95,7 @@ const SettingsPage = () => {
             });
             if (response.ok) {
                 setSystemSettings(prev => ({ ...prev, [key]: value }));
+                await refreshSettings();
                 setSuccess('Setting updated successfully');
                 setTimeout(() => setSuccess(''), 3000);
             } else {
@@ -184,6 +187,23 @@ const SettingsPage = () => {
         setIsEditOpen(true);
     };
 
+    const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (file.size > 512 * 1024) { // 512KB limit for Base64 storage
+            setError('Logo file too large. Please use an image under 512KB.');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const base64String = reader.result as string;
+            updateSetting('site_logo', base64String);
+        };
+        reader.readAsDataURL(file);
+    };
+
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
             {/* Header */}
@@ -241,19 +261,96 @@ const SettingsPage = () => {
             {/* Content Area */}
             <div className="grid gap-6">
                 {activeTab === 'general' && (
-                    <div className="grid gap-6">
+                    <div className="grid gap-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
                         <Card className="bg-card border-border shadow-card overflow-hidden">
                             <CardHeader className="border-b border-border bg-muted/10 p-6">
-                                <CardTitle className="text-xl font-black tracking-tight">General Configuration</CardTitle>
-                                <CardDescription className="text-xs font-medium opacity-70">Global system parameters and environmental defaults.</CardDescription>
+                                <CardTitle className="text-xl font-black tracking-tight">System Identity</CardTitle>
+                                <CardDescription className="text-xs font-medium opacity-70">Customize the look and feel of your execution engine.</CardDescription>
                             </CardHeader>
-                            <CardContent className="p-12 flex flex-col items-center justify-center text-center space-y-4">
-                                <div className="w-16 h-16 rounded-full bg-primary/5 border border-primary/10 flex items-center justify-center">
-                                    <Globe className="w-8 h-8 text-primary/40" />
+                            <CardContent className="p-6 space-y-8">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    {/* Site Title */}
+                                    <div className="space-y-4">
+                                        <div className="space-y-1">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest text-primary/60">Application Title</Label>
+                                            <p className="text-[10px] font-medium text-muted-foreground/60">This name appears in the sidebar and browser tab.</p>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Input
+                                                value={systemSettings.site_title || ''}
+                                                onChange={(e) => setSystemSettings(prev => ({ ...prev, site_title: e.target.value }))}
+                                                placeholder="CSM APP"
+                                                className="h-11 bg-muted/20 border-border/50 text-sm font-bold"
+                                            />
+                                            <Button
+                                                onClick={() => updateSetting('site_title', systemSettings.site_title || '')}
+                                                className="premium-gradient px-6 font-black uppercase tracking-widest text-[9px] h-11"
+                                                disabled={isSettingsLoading}
+                                            >
+                                                Apply
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    {/* Site Logo */}
+                                    <div className="space-y-4">
+                                        <div className="space-y-1">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest text-primary/60">System Logo</Label>
+                                            <p className="text-[10px] font-medium text-muted-foreground/60">Upload a square image (SVG, PNG, or JPG).</p>
+                                        </div>
+                                        <div className="flex items-center gap-6 p-4 bg-muted/20 border border-border/50 rounded-2xl">
+                                            <div className="w-16 h-16 rounded-xl premium-gradient p-[1px] shadow-premium shrink-0">
+                                                <div className="w-full h-full rounded-xl bg-card flex items-center justify-center overflow-hidden">
+                                                    {systemSettings.site_logo ? (
+                                                        <img src={systemSettings.site_logo} alt="Preview" className="w-10 h-10 object-contain" />
+                                                    ) : (
+                                                        <ImageIcon className="w-6 h-6 text-muted-foreground/20" />
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col gap-2 flex-1">
+                                                <input
+                                                    type="file"
+                                                    id="logo-upload"
+                                                    className="hidden"
+                                                    accept="image/*"
+                                                    onChange={handleLogoUpload}
+                                                />
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={() => document.getElementById('logo-upload')?.click()}
+                                                    className="h-10 border-border/50 font-black uppercase tracking-widest text-[9px] gap-2"
+                                                    disabled={isSettingsLoading}
+                                                >
+                                                    <Upload className="w-3.5 h-3.5" /> Upload Image
+                                                </Button>
+                                                {systemSettings.site_logo && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        onClick={() => updateSetting('site_logo', '')}
+                                                        className="h-8 text-destructive hover:text-destructive hover:bg-destructive/5 font-black uppercase tracking-widest text-[8px]"
+                                                        disabled={isSettingsLoading}
+                                                    >
+                                                        Remove Logo
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="space-y-1">
-                                    <h3 className="font-black text-sm tracking-tight text-white/50">Coming Soon</h3>
-                                    <p className="text-[10px] font-medium text-muted-foreground/40 max-w-[200px]">Advanced cluster metrics and environmental scaling controls are in development.</p>
+
+                                <div className="pt-6 border-t border-border">
+                                    <div className="p-4 bg-primary/5 border border-primary/10 rounded-2xl flex items-start gap-4">
+                                        <div className="p-2 rounded-lg bg-primary/10">
+                                            <Globe className="w-4 h-4 text-primary" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <h4 className="text-xs font-black uppercase tracking-widest text-primary">Deployment Note</h4>
+                                            <p className="text-[10px] font-medium text-muted-foreground opacity-80 max-w-2xl">
+                                                These changes are applied globally across all namespaces and clusters. Users may need to refresh their session to see large asset updates.
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
                             </CardContent>
                         </Card>

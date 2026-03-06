@@ -121,7 +121,7 @@ const RegisterPage = () => {
                     </div>
                     <div className="text-center space-y-1">
                         <h1 className="text-4xl font-black tracking-tighter text-white drop-shadow-2xl">
-                            ANTIGRAVITY
+                            CSM APP
                         </h1>
                         <div className="flex items-center justify-center gap-2">
                             <div className="h-[1px] w-8 bg-gradient-to-r from-transparent to-primary/50" />

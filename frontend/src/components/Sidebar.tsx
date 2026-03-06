@@ -14,9 +14,12 @@ interface SidebarProps {
 }
 
 const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
-    const { logout, user, hasPermission } = useAuth();
+    const { logout, user, hasPermission, settings } = useAuth();
     const { activeNamespace } = useNamespace();
     const navigate = useNavigate();
+
+    const siteTitle = settings.site_title || "CSM APP";
+    const siteLogo = settings.site_logo;
 
     const globalNavItems = [
         { name: 'Servers', path: '/servers', icon: Server, type: 'servers' },
@@ -78,12 +81,16 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
             )}
         >
             <div className={cn("flex items-center gap-2.5 px-1 relative w-full mb-2", isCollapsed && "justify-center px-0")}>
-                <div className="premium-gradient p-2 rounded-lg shadow-premium rotate-3 hover:rotate-0 transition-transform duration-300 shrink-0">
-                    <Zap className="w-5 h-5 text-white" />
+                <div className="premium-gradient p-2 rounded-lg shadow-premium rotate-2 hover:rotate-0 transition-all duration-300 shrink-0 flex items-center justify-center min-w-[36px] min-h-[36px]">
+                    {siteLogo ? (
+                        <img src={siteLogo} alt="Logo" className="w-5 h-5 object-contain" />
+                    ) : (
+                        <Zap className="w-5 h-5 text-white" />
+                    )}
                 </div>
                 {!isCollapsed && (
                     <div className="flex flex-col animate-in fade-in slide-in-from-left-2 duration-500">
-                        <span className="text-lg font-black tracking-tighter leading-none">ANTIGRAVITY</span>
+                        <span className="text-lg font-black tracking-tighter leading-none truncate max-w-[180px]">{siteTitle}</span>
                         <span className="text-[9px] font-bold text-primary tracking-[0.2em] uppercase mt-0.5 opacity-80">Execution Engine</span>
                     </div>
                 )}

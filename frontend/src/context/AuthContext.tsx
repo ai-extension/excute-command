@@ -19,6 +19,15 @@ interface User {
     roles: any[];
 }
 
+interface UserSettings {
+    site_title?: string;
+    site_logo?: string;
+    allow_registration?: string;
+    google_auth_enabled?: string;
+    facebook_auth_enabled?: string;
+    [key: string]: string | undefined;
+}
+
 interface AuthContextType {
     user: User | null;
     token: string | null;
@@ -26,6 +35,8 @@ interface AuthContextType {
     logout: () => void;
     isAuthenticated: boolean;
     isLoading: boolean;
+    settings: UserSettings;
+    refreshSettings: () => Promise<void>;
     apiFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
     hasPermission: (type: string, action: string, resourceId?: string | null, namespaceId?: string | null, tagIds?: string[]) => boolean;
     showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
@@ -47,6 +58,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [token, setToken] = useState<string | null>(() => {
         return getCookie('auth_token');
     });
+    const [settings, setSettings] = useState<UserSettings>({});
+
+    const refreshSettings = useCallback(async () => {
+        try {
+            // First try to fetch protected settings if we have a token
+            const isAuth = !!getCookie('auth_token') || !!token;
+            const endpoint = isAuth ? `${API_BASE_URL}/settings` : `${API_BASE_URL}/settings/public`;
+            
+            const response = await fetch(endpoint, {
+                headers: { 'Accept': 'application/json' },
+                credentials: 'include'
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                // Handle both array/map from /settings and the object from /settings/public
+                if (Array.isArray(data)) {
+                    const mapped: UserSettings = {};
+                    data.forEach((s: any) => { mapped[s.key] = s.value; });
+                    setSettings(mapped);
+                } else {
+                    // It's already a map or object
+                    setSettings(data);
+                }
+            }
+        } catch (err) {
+            console.error("Failed to fetch settings", err);
+        }
+    }, [token]);
 
     const logout = useCallback(async () => {
         // Call backend to clear the HttpOnly cookie
@@ -101,10 +141,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 localStorage.removeItem('auth_user');
             }
             setIsLoading(false);
+            await refreshSettings();
         };
 
         verifyAuth();
-    }, [logout]);
+    }, [logout, refreshSettings]);
 
     // Hydrate token state on cookie changes (subset of verifyAuth logic)
     useEffect(() => {
@@ -244,7 +285,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, [user]);
 
     return (
-        <AuthContext.Provider value={{ user, token, login, logout, isLoading, isAuthenticated: !!token && !isLoading, apiFetch, hasPermission, showToast }}>
+        <AuthContext.Provider value={{ user, token, login, logout, isLoading, isAuthenticated: !!token && !isLoading, settings, refreshSettings, apiFetch, hasPermission, showToast }}>
             {children}
             {/* Custom Toast Container */}
             <div className="fixed top-6 right-6 z-[9999] flex flex-col gap-3 pointer-events-none w-full max-w-sm">

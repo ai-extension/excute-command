@@ -241,6 +241,7 @@ const ServerPage = () => {
                         <XCircle className="w-8 h-8" />
                     </div>
                     <h3 className="text-lg font-black uppercase tracking-tight text-destructive mb-2">Fleet Synchronization Failed</h3>
+                    <p className="text-[10px] font-bold text-muted-foreground/40 leading-tight">Your servers are isolated and managed through the CSM App secure networking layer.</p>
                     <p className="text-sm font-medium text-muted-foreground mb-6 max-w-md mx-auto">{error}</p>
                     <Button
                         onClick={() => fetchServers()}
@@ -298,7 +299,7 @@ const ServerPage = () => {
             {/* Footer Status */}
             <div className="flex justify-center pt-8 border-t border-border mt-auto">
                 <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.4em] opacity-40">
-                    Fleet Management v2.1.0 • ANTIGRAVITY ENGINE
+                    Fleet Management v2.1.0 • CSM APP ENGINE
                 </p>
             </div>
         </div>

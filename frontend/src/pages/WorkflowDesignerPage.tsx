@@ -562,7 +562,7 @@ const WorkflowDesignerPage = () => {
                                     </div>
                                 </div>
                                 <p className="text-[9px] font-bold text-muted-foreground/50 uppercase tracking-[0.2em]">
-                                    ANTIGRAVITY DESIGNER V2.1
+                                    CSM APP DESIGNER V2.1
                                 </p>
                             </div>
                         </>
