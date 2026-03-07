@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
 
@@ -17,15 +18,26 @@ type LogEntry struct {
 type LogStream struct {
 	Buffer       []LogEntry
 	Ch           chan string
+	PageID       *uuid.UUID // Associated page if this is a public execution
 	LastActivity time.Time
 	mu           sync.Mutex
 }
 
+type AccessContext struct {
+	IsAdmin bool
+	PageID  *uuid.UUID // Which page this client is authorized to view (if public)
+}
+
+type Client struct {
+	Conn   *websocket.Conn
+	Access AccessContext
+}
+
 type Hub struct {
-	clients    map[*websocket.Conn]bool
+	clients    map[*Client]bool
 	broadcast  chan []byte
-	register   chan *websocket.Conn
-	unregister chan *websocket.Conn
+	register   chan *Client
+	unregister chan *Client
 	streams    map[string]*LogStream // Key: executionID
 	mu         sync.Mutex
 }
@@ -38,20 +50,21 @@ type terminalMessage struct {
 
 func NewHub() *Hub {
 	return &Hub{
-		clients:    make(map[*websocket.Conn]bool),
+		clients:    make(map[*Client]bool),
 		broadcast:  make(chan []byte, 1024), // Larger buffer for non-blocking reliability
-		register:   make(chan *websocket.Conn),
-		unregister: make(chan *websocket.Conn),
+		register:   make(chan *Client),
+		unregister: make(chan *Client),
 		streams:    make(map[string]*LogStream),
 	}
 }
 
-func (h *Hub) CreateStream(executionID string) *LogStream {
+func (h *Hub) CreateStream(executionID string, pageID *uuid.UUID) *LogStream {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	stream := &LogStream{
 		Buffer:       make([]LogEntry, 0),
 		Ch:           make(chan string, 100),
+		PageID:       pageID,
 		LastActivity: time.Now(),
 	}
 	h.streams[executionID] = stream
@@ -104,13 +117,13 @@ func (h *Hub) Run() {
 			h.mu.Lock()
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
-				client.Close()
+				client.Conn.Close()
 			}
 			h.mu.Unlock()
 		case message := <-h.broadcast:
-			h.broadcastToAll(message)
+			h.processBroadcast(message)
 		case <-ticker.C:
-			h.broadcastToAll([]byte(`{"type":"ping"}`))
+			h.processBroadcast([]byte(`{"type":"ping"}`))
 		case <-cleanupTicker.C:
 			h.cleanupOrphanedStreams()
 		}
@@ -133,15 +146,45 @@ func (h *Hub) cleanupOrphanedStreams() {
 	}
 }
 
-func (h *Hub) broadcastToAll(message []byte) {
+func (h *Hub) processBroadcast(message []byte) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+
+	// Parse message partially to find execution_id if it's a log/status update
+	var meta struct {
+		Type        string `json:"type"`
+		ExecutionID string `json:"execution_id"`
+	}
+	json.Unmarshal(message, &meta)
+
+	var streamPageID *uuid.UUID
+	if meta.ExecutionID != "" {
+		if s, ok := h.streams[meta.ExecutionID]; ok {
+			streamPageID = s.PageID
+		}
+	}
+
 	for client := range h.clients {
-		err := client.WriteMessage(websocket.TextMessage, message)
-		if err != nil {
-			log.Printf("websocket write error: %v", err)
-			client.Close()
-			delete(h.clients, client)
+		// Security Check:
+		// 1. Admins see everything.
+		// 2. Public users only see messages with execution_id matching their authorized PageID.
+		// 3. Pings are sent to everyone.
+		isAllowed := false
+		if meta.Type == "ping" || client.Access.IsAdmin {
+			isAllowed = true
+		} else if meta.ExecutionID != "" && streamPageID != nil && client.Access.PageID != nil {
+			if streamPageID.String() == client.Access.PageID.String() {
+				isAllowed = true
+			}
+		}
+
+		if isAllowed {
+			err := client.Conn.WriteMessage(websocket.TextMessage, message)
+			if err != nil {
+				log.Printf("websocket write error: %v", err)
+				client.Conn.Close()
+				delete(h.clients, client)
+			}
 		}
 	}
 }
@@ -205,10 +248,10 @@ func (h *Hub) BroadcastStatus(targetID string, executionID string, targetType st
 	}
 }
 
-func (h *Hub) Register(conn *websocket.Conn) {
-	h.register <- conn
+func (h *Hub) Register(conn *websocket.Conn, access AccessContext) {
+	h.register <- &Client{Conn: conn, Access: access}
 }
 
-func (h *Hub) Unregister(conn *websocket.Conn) {
-	h.unregister <- conn
+func (h *Hub) Unregister(client *Client) {
+	h.unregister <- client
 }

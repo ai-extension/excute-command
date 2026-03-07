@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -19,24 +20,70 @@ var upgrader = websocket.Upgrader{
 type WSHandler struct {
 	hub             *service.Hub
 	terminalService *service.TerminalService
+	authService     *service.AuthService
+	pageService     *service.PageService
 }
 
-func NewWSHandler(hub *service.Hub, terminalService *service.TerminalService) *WSHandler {
-	return &WSHandler{hub: hub, terminalService: terminalService}
+func NewWSHandler(hub *service.Hub, terminalService *service.TerminalService, authService *service.AuthService, pageService *service.PageService) *WSHandler {
+	return &WSHandler{
+		hub:             hub,
+		terminalService: terminalService,
+		authService:     authService,
+		pageService:     pageService,
+	}
 }
 
 func (h *WSHandler) HandleWS(c *gin.Context) {
+	token := c.Query("token")
+	// If token is "cookie_managed" or empty, try to get it from cookie
+	if token == "" || token == "cookie_managed" {
+		if cookie, err := c.Cookie("auth_token"); err == nil {
+			token = cookie
+		}
+	}
+	slug := c.Query("slug")
+
+	var access service.AccessContext
+
+	// 1. Try Admin JWT Token
+	if claims, err := h.authService.ValidateToken(token); err == nil && claims != nil {
+		access.IsAdmin = true
+	} else if slug != "" {
+		// 2. Try Public Page Token
+		page, err := h.pageService.GetPageBySlug(slug)
+		if err == nil && page.IsPublic {
+			// Check expiration
+			if page.ExpiresAt == nil || page.ExpiresAt.After(time.Now()) {
+				// If page has no password, access granted
+				if page.Password == "" {
+					access.PageID = &page.ID
+				} else if token != "" {
+					// Validate page token
+					if err := h.pageService.ValidatePageToken(page, token); err == nil {
+						access.PageID = &page.ID
+					}
+				}
+			}
+		}
+	}
+
+	if !access.IsAdmin && access.PageID == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		log.Printf("Failed to upgrade to websocket: %v", err)
 		return
 	}
 
-	h.hub.Register(conn)
+	client := &service.Client{Conn: conn, Access: access}
+	h.hub.Register(conn, access)
 
 	// Keep connection alive until client closes it
 	go func() {
-		defer h.hub.Unregister(conn)
+		defer h.hub.Unregister(client)
 		for {
 			_, message, err := conn.ReadMessage()
 			if err != nil {

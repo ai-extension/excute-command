@@ -112,12 +112,13 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
         }
     }, [isStatusWSReady, isTerminalReady, mode, onReady]);
 
+    const { token } = useAuth();
     // Effect for WebSocket (Live Mode)
     useEffect(() => {
         if (mode !== 'LIVE' || !workflowID) return;
 
         console.log('Establishing Status WebSocket connection...');
-        const ws = new WebSocket(`ws://${window.location.host.split(':')[0]}:8080/api/ws`);
+        const ws = new WebSocket(`ws://${window.location.hostname}:8080/api/ws?token=${token || ''}`);
 
         ws.onmessage = (event) => {
             const msg = JSON.parse(event.data);

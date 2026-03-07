@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Terminal } from 'xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import 'xterm/css/xterm.css';
+import { useAuth } from '../context/AuthContext';
 
 interface XTerminalProps {
     sessionID: string;
@@ -13,6 +14,7 @@ const XTerminal: React.FC<XTerminalProps> = ({ sessionID, isActive, className })
     const terminalRef = useRef<HTMLDivElement>(null);
     const xtermRef = useRef<Terminal | null>(null);
     const socketRef = useRef<WebSocket | null>(null);
+    const { token } = useAuth();
 
     useEffect(() => {
         if (!terminalRef.current || !isActive) return;
@@ -46,7 +48,7 @@ const XTerminal: React.FC<XTerminalProps> = ({ sessionID, isActive, className })
         xtermRef.current = term;
 
         // Connect WebSocket
-        const wsUrl = `ws://${window.location.hostname}:8080/api/ws`;
+        const wsUrl = `ws://${window.location.hostname}:8080/api/ws?token=${token || ''}`;
         const socket = new WebSocket(wsUrl);
         socketRef.current = socket;
 

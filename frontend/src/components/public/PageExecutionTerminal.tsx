@@ -1,25 +1,99 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, ChevronDown, Maximize2, ChevronUp } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import AnsiText from '../AnsiText';
+import { API_BASE_URL } from '../../lib/api';
 
 interface PageExecutionTerminalProps {
     activeExecutionId: string | null;
-    executionStatus: string | null;
-    executionLogs: string;
+    slug: string;
+    pageToken: string | null;
     terminalState: 'normal' | 'minimized' | 'maximized';
     setTerminalState: (state: 'normal' | 'minimized' | 'maximized') => void;
     onClose: () => void;
+    onStatusChange?: (status: string) => void;
 }
 
 const PageExecutionTerminal: React.FC<PageExecutionTerminalProps> = ({
     activeExecutionId,
-    executionStatus,
-    executionLogs,
+    slug,
+    pageToken,
     terminalState,
     setTerminalState,
-    onClose
+    onClose,
+    onStatusChange
 }) => {
+    const [logs, setLogs] = useState<string[]>([]);
+    const [status, setStatus] = useState<string | null>(null);
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const onStatusChangeRef = useRef(onStatusChange);
+    useEffect(() => { onStatusChangeRef.current = onStatusChange; });
+
+    useEffect(() => {
+        if (!activeExecutionId) return;
+
+        setLogs([]);
+        setStatus('RUNNING');
+
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        let baseUrl = API_BASE_URL;
+        if (baseUrl.startsWith('/')) {
+            baseUrl = `${window.location.host}${baseUrl}`;
+        } else {
+            baseUrl = baseUrl.replace(/^http(s)?:\/\//, '');
+        }
+
+        const wsUrl = `${protocol}//${baseUrl}/ws?token=${pageToken || ''}&slug=${slug || ''}`;
+        const socket = new WebSocket(wsUrl);
+
+        socket.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.execution_id === activeExecutionId) {
+                    if (data.type === 'log' && data.content) {
+                        const newLines = data.content.split('\n').filter((l: string) => l.length > 0);
+                        setLogs(prev => {
+                            // Deduplication logic: If the first new line matches the last existing line, avoid duplication
+                            if (prev.length > 0 && newLines.length > 0 && prev[prev.length - 1] === newLines[0]) {
+                                return [...prev, ...newLines.slice(1)];
+                            }
+                            // Also check if we already have these lines (simple check for catch-up vs initial fetch)
+                            if (prev.length >= newLines.length) {
+                                const tail = prev.slice(-newLines.length);
+                                if (JSON.stringify(tail) === JSON.stringify(newLines)) {
+                                    return prev;
+                                }
+                            }
+                            return [...prev, ...newLines];
+                        });
+                    } else if (data.type === 'status' && data.target_type === 'workflow') {
+                        setStatus(data.status);
+                        if (onStatusChangeRef.current) onStatusChangeRef.current(data.status);
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to parse WS message:', err);
+            }
+        };
+
+        socket.onopen = () => {
+            socket.send(JSON.stringify({
+                type: 'request_catchup',
+                execution_id: activeExecutionId
+            }));
+        };
+
+        return () => {
+            socket.close();
+        };
+    }, [activeExecutionId, slug, pageToken]);
+
+    useEffect(() => {
+        if (scrollRef.current) {
+            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
+    }, [logs]);
+
     if (!activeExecutionId) return null;
 
     return (
@@ -56,10 +130,10 @@ const PageExecutionTerminal: React.FC<PageExecutionTerminalProps> = ({
                         </div>
                         <div className="flex items-center gap-2" onClick={() => terminalState === 'minimized' && setTerminalState('normal')}>
                             <div className={cn("w-1.5 h-1.5 rounded-full",
-                                executionStatus === 'RUNNING' ? "bg-primary animate-pulse shadow-[0_0_10px_rgba(var(--primary-rgb),0.8)]" :
-                                    executionStatus === 'SUCCESS' ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" :
+                                status === 'RUNNING' ? "bg-primary animate-pulse shadow-[0_0_10px_rgba(var(--primary-rgb),0.8)]" :
+                                    status === 'SUCCESS' ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" :
                                         "bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.5)]")} />
-                            <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-400">Trace: {executionStatus || 'POLLING'}</h3>
+                            <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-400">Trace: {status || 'CONNECTING'}</h3>
                         </div>
                     </div>
                     {terminalState === 'minimized' && (
@@ -72,8 +146,8 @@ const PageExecutionTerminal: React.FC<PageExecutionTerminalProps> = ({
                 {/* Terminal Body */}
                 {terminalState !== 'minimized' && (
                     <div className="flex-1 flex flex-col min-h-0 bg-black/40">
-                        <div className="flex-1 overflow-y-auto p-8 font-mono text-[12px] leading-relaxed scrollbar-thin selection:bg-primary/40 selection:text-white">
-                            {executionLogs ? executionLogs.split('\n').filter((l, i, arr) => l !== '' || i < arr.length - 1).map((line, i) => (
+                        <div ref={scrollRef} className="flex-1 overflow-y-auto p-8 font-mono text-[12px] leading-relaxed scrollbar-thin selection:bg-primary/40 selection:text-white">
+                            {logs.length > 0 ? logs.map((line, i) => (
                                 <div key={i} className="whitespace-pre-wrap min-h-[1.2rem]">
                                     <AnsiText text={line} />
                                 </div>

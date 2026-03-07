@@ -201,49 +201,7 @@ const PublicPageView = () => {
         }
     }, [completionAlert]);
 
-    // Logs Polling
-    useEffect(() => {
-        if (!activeExecutionId || !isAuthorized) return;
-        let isMounted = true;
-        const poll = setInterval(async () => {
-            try {
-                const headers: Record<string, string> = {};
-                if (pageToken) headers['X-Page-Token'] = pageToken;
-                const sRes = await fetch(`${API_BASE_URL}/public/pages/${slug}/executions/${activeExecutionId}`, { headers });
-
-                if (sRes.status === 401) {
-                    setTokenExpired(true);
-                    setIsAuthorized(false);
-                    setIsPollingLogs(false);
-                    return;
-                }
-
-                const sData = await sRes.json();
-                if (isMounted) {
-                    const prevStatus = executionStatus;
-                    const newStatus = sData.status;
-                    setExecutionStatus(newStatus);
-
-                    if (newStatus === 'SUCCESS' || newStatus === 'FAILED') {
-                        setIsPollingLogs(false);
-                        clearInterval(poll);
-
-                        if (prevStatus === 'RUNNING' || prevStatus === 'PENDING') {
-                            setCompletionAlert({
-                                show: true,
-                                status: newStatus,
-                                message: newStatus === 'SUCCESS' ? 'Workflow executed successfully!' : 'Workflow execution failed.'
-                            });
-                        }
-                    }
-                }
-                const lRes = await fetch(`${API_BASE_URL}/public/pages/${slug}/executions/${activeExecutionId}/logs`, { headers });
-                const lData = await lRes.text();
-                if (isMounted) setExecutionLogs(lData);
-            } catch (err) { }
-        }, 2000);
-        return () => { isMounted = false; clearInterval(poll); };
-    }, [activeExecutionId, slug, isAuthorized, pageToken, executionStatus]);
+    // Logs Polling replaced by WebSocket in PageExecutionTerminal
 
     const runWidget = async (widget: PageWidget, inputs: Record<string, string> = {}) => {
         if (widget.type !== 'ENDPOINT' || !widget.workflow_id) {
@@ -454,11 +412,21 @@ const PublicPageView = () => {
 
                 <PageExecutionTerminal
                     activeExecutionId={activeExecutionId}
-                    executionStatus={executionStatus}
-                    executionLogs={executionLogs}
+                    slug={slug || ''}
+                    pageToken={pageToken}
                     terminalState={terminalState}
                     setTerminalState={setTerminalState}
                     onClose={() => setActiveExecutionId(null)}
+                    onStatusChange={(status: string) => {
+                        setExecutionStatus(status);
+                        if (status === 'SUCCESS' || status === 'FAILED') {
+                            setCompletionAlert({
+                                show: true,
+                                status: status,
+                                message: status === 'SUCCESS' ? 'Workflow executed successfully!' : 'Workflow execution failed.'
+                            });
+                        }
+                    }}
                 />
             </div>
         </div>

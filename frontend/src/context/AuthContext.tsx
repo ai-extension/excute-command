@@ -57,7 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
     const [token, setToken] = useState<string | null>(() => {
         // If we have an auth cookie, we treat it as logged in immediately
-        return getCookie('auth_token') ? 'cookie_managed' : null;
+        return getCookie('auth_token');
     });
     const [settings, setSettings] = useState<UserSettings>(() => {
         const savedSettings = localStorage.getItem('auth_settings');
@@ -106,9 +106,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     const login = useCallback((newToken: string, newUser: User) => {
-        // newToken is passed from the API response to indicate successful login.
-        // The actual token is stored in the HttpOnly cookie by the browser.
-        setToken(newToken || 'cookie_managed');
+        // newToken is the real JWT from the API response. Store it directly.
+        // getCookie is only a fallback in case the server returns an empty token.
+        setToken(newToken || getCookie('auth_token'));
         setUser(newUser);
         localStorage.setItem('auth_user', JSON.stringify(newUser));
     }, []);
@@ -134,15 +134,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                             const userData = await response.json();
                             if (isMounted) {
                                 setUser(userData);
-                                setToken('cookie_managed');
+                                setToken(getCookie('auth_token'));
                                 localStorage.setItem('auth_user', JSON.stringify(userData));
                             }
-                        } else if (isMounted) {
+                        } else if (response.status === 401 && isMounted) {
+                            // Only log out if the token is explicitly rejected
                             await logout();
                         }
+                        // On other errors (503, 502, etc.) - keep the session alive
                     } catch (err) {
-                        console.error("Auth verification failed", err);
-                        if (isMounted) await logout();
+                        // Network error (backend offline/restarting) - keep session alive
+                        // The user will be able to continue when the backend comes back
+                        console.warn("Auth verification failed (network error), keeping session:", err);
+                        if (isMounted) {
+                            // Restore user from localStorage if available
+                            const savedUser = localStorage.getItem('auth_user');
+                            if (savedUser) setUser(JSON.parse(savedUser));
+                            setToken(getCookie('auth_token'));
+                        }
                     }
                 }
             } else if (isMounted) {

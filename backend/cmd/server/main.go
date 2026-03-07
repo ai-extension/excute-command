@@ -125,7 +125,7 @@ func main() {
 	roleHandler := handler.NewRoleHandler(roleRepo, permRepo)
 	permHandler := handler.NewPermissionHandler(permRepo, workflowRepo, globalVarRepo, scheduleRepo, pageRepo, tagRepo, serverRepo, namespaceRepo, execRepo, userRepo, roleRepo, vpnRepo)
 	serverHandler := handler.NewServerHandler(serverService, terminalService)
-	wsHandler := handler.NewWSHandler(hub, terminalService)
+	wsHandler := handler.NewWSHandler(hub, terminalService, authService, pageService)
 	workflowHandler := handler.NewWorkflowHandler(workflowService, workflowExecutor)
 	globalVarHandler := handler.NewGlobalVariableHandler(globalVarService)
 	scheduleHandler := handler.NewScheduleHandler(scheduleService)
@@ -278,8 +278,6 @@ func main() {
 		api.GET("/public/pages/:slug", pageHandler.GetPublicPage)
 		api.POST("/public/pages/:slug/verify", middleware.LoginRateLimiter(), pageHandler.VerifyPublicPage)
 		api.POST("/public/pages/:slug/run/:workflow_id", middleware.LoginRateLimiter(), pageHandler.RunPublicWorkflow)
-		api.GET("/public/pages/:slug/executions/:exec_id", middleware.LoginRateLimiter(), pageHandler.GetPublicExecutionStatus)
-		api.GET("/public/pages/:slug/executions/:exec_id/logs", middleware.LoginRateLimiter(), pageHandler.GetPublicExecutionLogs)
 		api.GET("/public/pages/:slug/widgets/:widget_id/run", middleware.LoginRateLimiter(), pageHandler.RunPublicWidgetCommand)
 	}
 

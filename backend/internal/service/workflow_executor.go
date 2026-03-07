@@ -167,7 +167,7 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 	}
 
 	// Create a log stream for this execution
-	e.hub.CreateStream(execution.ID.String())
+	e.hub.CreateStream(execution.ID.String(), execution.PageID)
 	defer e.hub.CloseStream(execution.ID.String())
 
 	logFile, err := os.OpenFile(execution.LogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)

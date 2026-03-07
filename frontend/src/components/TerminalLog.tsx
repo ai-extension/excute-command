@@ -78,10 +78,12 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
         }
     }, [initialLogs, isLive]);
 
+    const { token } = useAuth();
+
     useEffect(() => {
         if (!isActive || !isLive) return;
 
-        const wsUrl = `ws://${window.location.hostname}:8080/api/ws`;
+        const wsUrl = `ws://${window.location.hostname}:8080/api/ws?token=${token || ''}`;
         const socket = new WebSocket(wsUrl);
 
         socket.onmessage = (event) => {
