@@ -52,10 +52,26 @@ const PublicPageView = () => {
 
     // Log Streaming State
     const [activeExecutionId, setActiveExecutionId] = useState<string | null>(null);
+    const [activeWidgetId, setActiveWidgetId] = useState<string | null>(null);
     const [executionLogs, setExecutionLogs] = useState<string>('');
     const [executionStatus, setExecutionStatus] = useState<string | null>(null);
     const [isPollingLogs, setIsPollingLogs] = useState(false);
     const [terminalState, setTerminalState] = useState<'normal' | 'minimized' | 'maximized'>('normal');
+
+    useEffect(() => {
+        if (executionStatus === 'SUCCESS' || executionStatus === 'FAILED' || executionStatus === 'CANCELLED') {
+            if (activeWidgetId) {
+                setRunningWidgets(prev => ({ ...prev, [activeWidgetId]: false }));
+                setTimeout(() => {
+                    setExecutionResults(prev => {
+                        const n = { ...prev };
+                        delete n[activeWidgetId];
+                        return n;
+                    });
+                }, 3000);
+            }
+        }
+    }, [executionStatus, activeWidgetId]);
     const [publicTheme, setPublicTheme] = useState<'light' | 'dark'>(() => {
         return (localStorage.getItem('public-theme') as 'light' | 'dark') || 'dark';
     });
@@ -243,6 +259,7 @@ const PublicPageView = () => {
                 setExecutionResults(prev => ({ ...prev, [widget.id]: { success: true, message: 'SUCCESS' } }));
                 if (widget.show_log) {
                     setActiveExecutionId(data.execution_id);
+                    setActiveWidgetId(widget.id);
                     setExecutionLogs('Initializing trace...');
                     setExecutionStatus('RUNNING');
                     setIsPollingLogs(true);
@@ -270,14 +287,16 @@ const PublicPageView = () => {
                 message: 'Error connecting to server.'
             });
         } finally {
-            setRunningWidgets(prev => ({ ...prev, [widget.id]: false }));
-            setTimeout(() => {
-                setExecutionResults(prev => {
-                    const n = { ...prev };
-                    delete n[widget.id];
-                    return n;
-                });
-            }, 3000);
+            if (!widget.show_log) {
+                setRunningWidgets(prev => ({ ...prev, [widget.id]: false }));
+                setTimeout(() => {
+                    setExecutionResults(prev => {
+                        const n = { ...prev };
+                        delete n[widget.id];
+                        return n;
+                    });
+                }, 3000);
+            }
         }
     };
 
@@ -416,7 +435,21 @@ const PublicPageView = () => {
                     pageToken={pageToken}
                     terminalState={terminalState}
                     setTerminalState={setTerminalState}
-                    onClose={() => setActiveExecutionId(null)}
+                    onClose={() => {
+                        setActiveExecutionId(null);
+                        setExecutionStatus(null);
+                        if (activeWidgetId) {
+                            setRunningWidgets(prev => ({ ...prev, [activeWidgetId]: false }));
+                            setTimeout(() => {
+                                setExecutionResults(prev => {
+                                    const n = { ...prev };
+                                    delete n[activeWidgetId];
+                                    return n;
+                                });
+                            }, 3000);
+                            setActiveWidgetId(null);
+                        }
+                    }}
                     onStatusChange={(status: string) => {
                         setExecutionStatus(status);
                         if (status === 'SUCCESS' || status === 'FAILED') {
