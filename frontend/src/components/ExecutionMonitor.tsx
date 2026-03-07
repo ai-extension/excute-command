@@ -164,7 +164,18 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
         return () => ws.close();
     }, [mode, workflowID, syncStatus]);
 
-    // Effect for Data Fetching (Historical Mode)
+    // Fetch full execution details if we only have an ID (mostly for LIVE mode transition)
+    useEffect(() => {
+        const execID = execution?.id || (workflow as any)?.execution_id;
+        if (execID && !execution) {
+            apiFetch(`${API_BASE_URL}/executions/${execID}`)
+                .then(res => res.json())
+                .then(setExecution)
+                .catch(err => console.error('Failed to fetch execution details:', err));
+        }
+    }, [execution?.id, (workflow as any)?.execution_id, apiFetch]);
+
+    // Effect for Data Fetching (Historical Mode logs)
     useEffect(() => {
         if (mode === 'HISTORICAL' && execution) {
             // Load full workflow if not present
@@ -319,7 +330,7 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                                 size="sm"
                                 onClick={() => {
                                     let inputs: Record<string, string> = {};
-                                    if (mode === 'HISTORICAL' && execution?.inputs) {
+                                    if (execution?.inputs) {
                                         try {
                                             inputs = JSON.parse(execution.inputs);
                                         } catch (e) {
