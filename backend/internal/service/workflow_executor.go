@@ -334,6 +334,12 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 		// Inputs already parsed as inputsMap above
 
 		for i := range wf.Groups {
+			// Check for cancellation before starting each group
+			if err := ctx.Err(); err != nil {
+				runErr = err
+				goto finalize
+			}
+
 			g := wf.Groups[i]
 			// Default server ID fallback:
 			// 1. Group default server
@@ -423,6 +429,9 @@ finalize:
 
 func (e *WorkflowExecutor) RunHooks(ctx context.Context, hooks []domain.WorkflowHook, hookType domain.HookType, namespaceID uuid.UUID, logFile *os.File, depth int, user *domain.User, executionID uuid.UUID) error {
 	for _, hook := range hooks {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if hook.HookType != hookType {
 			continue
 		}
@@ -600,6 +609,11 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 
 	var lastErr error
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		// Check for cancellation before each attempt
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
 		if attempt > 1 {
 			msg := fmt.Sprintf("\n\033[1;33m↻ GROUP RETRY ATTEMPT %d/%d (Delay: %ds): %s\033[0m\n", attempt-1, group.RetryLimit, group.RetryDelay, group.Name)
 			fmt.Fprint(logFile, msg)
@@ -688,6 +702,11 @@ func (e *WorkflowExecutor) runGroupAttempt(ctx context.Context, group *domain.Wo
 		}
 	} else {
 		for i := range group.Steps {
+			// Check for cancellation before each step
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+
 			if err := e.runStep(ctx, &group.Steps[i], inputs, variables, groupResults, effectiveServerID, logFile, workflowID, executionID, namespaceID, user, workingDirs); err != nil {
 				return err
 			}
@@ -797,6 +816,9 @@ func (e *WorkflowExecutor) relayCopy(ctx context.Context, group *domain.Workflow
 }
 
 func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowStep, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, defaultServerID uuid.UUID, mainLogFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, namespaceID uuid.UUID, user *domain.User, workingDirs *sync.Map) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	e.hub.BroadcastStatus(step.ID.String(), executionID.String(), "step", string(domain.StatusRunning))
 
 	// Create execution step record

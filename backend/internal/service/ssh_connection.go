@@ -47,6 +47,9 @@ func (c *SSHConnection) Execute(ctx context.Context, command string, writers ...
 	go func() {
 		select {
 		case <-ctx.Done():
+			// Try to send a signal if possible, though standard SSH sessions
+			// often don't support signals without a PTY.
+			// Closing the session is the most reliable way to stop the remote command.
 			session.Close()
 		case <-done:
 		}

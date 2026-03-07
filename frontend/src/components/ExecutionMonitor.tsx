@@ -49,6 +49,15 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
     const [showStopConfirm, setShowStopConfirm] = useState(false);
     const { apiFetch, showToast } = useAuth();
     const workflowID = workflow?.id;
+    const executionIDRef = React.useRef<string | undefined>(execution?.id || (workflow as any)?.execution_id);
+
+    // Keep the ref updated with the latest execution ID
+    useEffect(() => {
+        const currentID = execution?.id || (workflow as any)?.execution_id;
+        if (currentID) {
+            executionIDRef.current = currentID;
+        }
+    }, [execution?.id, (workflow as any)?.execution_id]);
 
     // Sync internal workflow state with initialWorkflow prop
     // This is crucial in LIVE mode because the runner initially opens the monitor
@@ -114,7 +123,9 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
             const msg = JSON.parse(event.data);
             if (msg.type === 'status') {
                 // Filter by execution_id to avoid mixed-up sessions
-                const currentExecID = (workflow as any)?.execution_id || execution?.id;
+                // Use ref to ensure we have the absolute latest ID from the parent/state
+                const currentExecID = executionIDRef.current;
+
                 if (msg.execution_id && msg.execution_id !== currentExecID?.toString()) {
                     return;
                 }

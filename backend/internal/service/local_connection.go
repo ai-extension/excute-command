@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"syscall"
 
 	"github.com/creack/pty"
 	"github.com/user/csm-backend/internal/domain"
@@ -23,17 +24,35 @@ func NewLocalConnection(server *domain.Server) *LocalConnection {
 }
 
 func (c *LocalConnection) Execute(ctx context.Context, command string, writers ...io.Writer) (string, error) {
-	cmd := exec.CommandContext(ctx, "sh", "-c", command)
-	var stdout, stderr bytes.Buffer
+	cmd := exec.Command("sh", "-c", command)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
+	var stdout, stderr bytes.Buffer
 	stdoutWriters := append([]io.Writer{&stdout}, writers...)
 	stderrWriters := append([]io.Writer{&stderr}, writers...)
 
 	cmd.Stdout = io.MultiWriter(stdoutWriters...)
 	cmd.Stderr = io.MultiWriter(stderrWriters...)
 
-	if err := cmd.Run(); err != nil {
-		return stdout.String() + stderr.String(), fmt.Errorf("failed to run local command: %w", err)
+	if err := cmd.Start(); err != nil {
+		return "", fmt.Errorf("failed to start local command: %w", err)
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		done <- cmd.Wait()
+	}()
+
+	select {
+	case <-ctx.Done():
+		// Kill the entire process group
+		syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		<-done // Wait for Wait() to return
+		return stdout.String() + stderr.String(), ctx.Err()
+	case err := <-done:
+		if err != nil {
+			return stdout.String() + stderr.String(), fmt.Errorf("failed to run local command: %w", err)
+		}
 	}
 
 	return stdout.String(), nil

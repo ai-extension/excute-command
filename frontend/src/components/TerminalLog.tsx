@@ -99,7 +99,7 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
         return () => {
             socket.close();
         };
-    }, [targetID, isActive, isLive]);
+    }, [targetID, executionID, isActive, isLive]);
 
     useEffect(() => {
         if (autoScroll && scrollRef.current) {
