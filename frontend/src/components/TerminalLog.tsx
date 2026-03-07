@@ -80,8 +80,8 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
             try {
                 const data = JSON.parse(event.data);
                 // Type guard: only process log messages here. 
-                // Status messages are handled by ExecutionMonitor.
-                if (data.type === 'log' && data.target_id === targetID && data.content) {
+                // Filter by execution_id to avoid mixed-up sessions.
+                if (data.type === 'log' && data.execution_id === executionID && data.target_id === targetID && data.content) {
                     const newLines = data.content.split('\n').filter((line: string) => line.length > 0);
                     setLogs(prev => [...prev, ...newLines]);
                 }

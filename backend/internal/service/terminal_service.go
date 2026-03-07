@@ -73,7 +73,7 @@ func (s *TerminalService) StartSession(serverID uuid.UUID, user *domain.User) (s
 		for {
 			n, err := stdout.Read(buf)
 			if n > 0 {
-				s.hub.BroadcastLog(sessionID, string(buf[:n]))
+				s.hub.BroadcastLog(sessionID, sessionID, string(buf[:n]))
 			}
 			if err != nil {
 				break

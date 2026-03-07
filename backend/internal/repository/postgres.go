@@ -260,7 +260,20 @@ func (r *PostgresRoleRepo) Update(role *domain.Role) error {
 }
 
 func (r *PostgresRoleRepo) Delete(id uuid.UUID) error {
-	return r.db.Delete(&domain.Role{}, "id = ?", id).Error
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var role domain.Role
+		if err := tx.First(&role, "id = ?", id).Error; err != nil {
+			return err
+		}
+
+		// Prefix name to allow reuse
+		newName := "deleted_" + strconv.FormatInt(time.Now().Unix(), 10) + "_" + role.Name
+		if err := tx.Model(&role).Update("name", newName).Error; err != nil {
+			return err
+		}
+
+		return tx.Delete(&role).Error
+	})
 }
 
 func (r *PostgresRoleRepo) GetByIDs(ids []uuid.UUID) ([]domain.Role, error) {

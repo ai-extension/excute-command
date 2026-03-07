@@ -113,6 +113,12 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
         ws.onmessage = (event) => {
             const msg = JSON.parse(event.data);
             if (msg.type === 'status') {
+                // Filter by execution_id to avoid mixed-up sessions
+                const currentExecID = (workflow as any)?.execution_id || execution?.id;
+                if (msg.execution_id && msg.execution_id !== currentExecID?.toString()) {
+                    return;
+                }
+
                 setWorkflow(prev => {
                     if (!prev) return prev;
                     if (msg.target_id === prev.id) return { ...prev, status: msg.status };

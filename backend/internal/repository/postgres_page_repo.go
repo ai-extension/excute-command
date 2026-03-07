@@ -1,6 +1,9 @@
 package repository
 
 import (
+	"strconv"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/user/csm-backend/internal/domain"
 	"gorm.io/gorm"
@@ -134,5 +137,18 @@ func (r *PostgresPageRepo) Update(page *domain.Page) error {
 }
 
 func (r *PostgresPageRepo) Delete(id uuid.UUID) error {
-	return r.db.Delete(&domain.Page{}, "id = ?", id).Error
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var page domain.Page
+		if err := tx.First(&page, "id = ?", id).Error; err != nil {
+			return err
+		}
+
+		// Prefix slug to allow reuse
+		newSlug := "deleted_" + strconv.FormatInt(time.Now().Unix(), 10) + "_" + page.Slug
+		if err := tx.Model(&page).Update("slug", newSlug).Error; err != nil {
+			return err
+		}
+
+		return tx.Delete(&page).Error
+	})
 }

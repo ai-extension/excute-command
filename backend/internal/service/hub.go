@@ -70,22 +70,24 @@ func (h *Hub) broadcastToAll(message []byte) {
 	}
 }
 
-func (h *Hub) BroadcastLog(targetID string, content string) {
+func (h *Hub) BroadcastLog(targetID string, executionID string, content string) {
 	msg := map[string]string{
-		"type":      "log",
-		"target_id": targetID,
-		"content":   content,
+		"type":         "log",
+		"target_id":    targetID,
+		"execution_id": executionID,
+		"content":      content,
 	}
 	jsonMsg, _ := json.Marshal(msg)
 	h.broadcast <- jsonMsg
 }
 
-func (h *Hub) BroadcastStatus(targetID string, targetType string, status string) {
+func (h *Hub) BroadcastStatus(targetID string, executionID string, targetType string, status string) {
 	msg := map[string]string{
-		"type":        "status",
-		"target_id":   targetID,
-		"target_type": targetType, // workflow, group, or step
-		"status":      status,
+		"type":         "status",
+		"target_id":    targetID,
+		"execution_id": executionID,
+		"target_type":  targetType, // workflow, group, or step
+		"status":       status,
 	}
 	jsonMsg, _ := json.Marshal(msg)
 	h.broadcast <- jsonMsg
