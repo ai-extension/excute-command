@@ -319,6 +319,62 @@ func (h *PageHandler) RunPublicWorkflow(c *gin.Context) {
 	})
 }
 
+func (h *PageHandler) StopPublicExecution(c *gin.Context) {
+	slug := c.Param("slug")
+	execIDStr := c.Param("exec_id")
+	execID, err := uuid.Parse(execIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid execution id"})
+		return
+	}
+
+	page, err := h.service.GetPageBySlug(slug)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "page not found"})
+		return
+	}
+
+	if !page.IsPublic {
+		c.JSON(http.StatusForbidden, gin.H{"error": "page is not public"})
+		return
+	}
+
+	if page.ExpiresAt != nil && page.ExpiresAt.Before(time.Now()) {
+		c.JSON(http.StatusGone, gin.H{"error": "page has expired"})
+		return
+	}
+
+	if !h.verifyPageToken(c, page) {
+		return
+	}
+
+	execution, err := h.workflowService.GetExecution(execID, nil)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "execution not found"})
+		return
+	}
+
+	// Verify workflow belongs to this page
+	found := false
+	for _, pw := range page.Workflows {
+		if pw.WorkflowID == execution.WorkflowID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		c.JSON(http.StatusForbidden, gin.H{"error": "execution does not belong to this page"})
+		return
+	}
+
+	if err := h.executor.StopExecution(execID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Execution stop signal sent"})
+}
+
 func (h *PageHandler) sanitizePage(page *domain.Page) {
 	if page == nil {
 		return

@@ -300,6 +300,23 @@ const PublicPageView = () => {
         }
     };
 
+    const stopWidget = async (widget: PageWidget) => {
+        if (!activeExecutionId) return;
+
+        try {
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+            if (pageToken) headers['X-Page-Token'] = pageToken;
+
+            await fetch(`${API_BASE_URL}/public/pages/${slug}/executions/${activeExecutionId}/stop`, {
+                method: 'POST',
+                headers
+            });
+            // The WebSocket will broadcast CANCELLED status, triggering the cleanup automatically
+        } catch (err) {
+            console.error('Failed to stop execution:', err);
+        }
+    };
+
     if (isLoading && !page) {
         return (
             <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
@@ -392,6 +409,7 @@ const PublicPageView = () => {
                                         isRunning={runningWidgets[widget.id]}
                                         result={executionResults[widget.id]}
                                         onRun={runWidget}
+                                        onStop={stopWidget}
                                     />
                                 );
                             } else if (widget.type === 'TERMINAL') {

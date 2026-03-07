@@ -1,5 +1,5 @@
 import React from 'react';
-import { Zap, Play, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Zap, Play, Loader2, CheckCircle2, AlertTriangle, Square } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { cn } from '../../lib/utils';
@@ -10,13 +10,15 @@ interface EndpointWidgetProps {
     isRunning: boolean;
     result: { success: boolean, message: string } | undefined;
     onRun: (widget: PageWidget) => void;
+    onStop?: (widget: PageWidget) => void;
 }
 
 const EndpointWidget: React.FC<EndpointWidgetProps> = ({
     widget,
     isRunning,
     result,
-    onRun
+    onRun,
+    onStop
 }) => {
     return (
         <div className={cn(
@@ -41,31 +43,49 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
             </div>
 
             <div className="pt-10">
-                <Button
-                    onClick={() => onRun(widget)}
-                    disabled={isRunning}
-                    className={cn(
-                        "w-full h-16 rounded-[1.5rem] font-black uppercase tracking-[0.3em] text-[11px] shadow-premium transition-all active:scale-[0.98]",
-                        result ? (result.success ? "bg-emerald-500 hover:bg-emerald-600 text-white" : "bg-rose-500 hover:bg-rose-600 text-white") : (widget.style || "premium-gradient")
-                    )}
-                >
-                    {isRunning ? (
-                        <div className="flex items-center gap-3">
-                            <Loader2 className="w-6 h-6 animate-spin" />
-                            <span>Running...</span>
-                        </div>
-                    ) : result ? (
-                        <div className="flex items-center gap-2">
-                            {result.success ? <CheckCircle2 className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
-                            <span>{result.message}</span>
-                        </div>
-                    ) : (
-                        <div className="flex items-center gap-3">
-                            <Play className="w-5 h-5 fill-current" />
-                            <span>{widget.label || 'Initiate'}</span>
-                        </div>
-                    )}
-                </Button>
+                {isRunning ? (
+                    <div className="flex items-center gap-3">
+                        <Button
+                            disabled
+                            className={cn(
+                                "flex-1 h-16 rounded-[1.5rem] font-black uppercase tracking-[0.3em] text-[11px] shadow-premium transition-all",
+                                widget.style || "premium-gradient"
+                            )}
+                        >
+                            <div className="flex items-center gap-3 opacity-70">
+                                <Loader2 className="w-6 h-6 animate-spin" />
+                                <span>Running...</span>
+                            </div>
+                        </Button>
+                        <Button
+                            onClick={() => onStop && onStop(widget)}
+                            className="h-16 w-16 shrink-0 rounded-[1.5rem] bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/50 shadow-premium transition-all active:scale-[0.98] flex items-center justify-center group/stop"
+                        >
+                            <Square className="w-5 h-5 fill-current opacity-70 group-hover/stop:opacity-100 transition-opacity" />
+                        </Button>
+                    </div>
+                ) : (
+                    <Button
+                        onClick={() => onRun(widget)}
+                        disabled={isRunning}
+                        className={cn(
+                            "w-full h-16 rounded-[1.5rem] font-black uppercase tracking-[0.3em] text-[11px] shadow-premium transition-all active:scale-[0.98]",
+                            result ? (result.success ? "bg-emerald-500 hover:bg-emerald-600 text-white" : "bg-rose-500 hover:bg-rose-600 text-white") : (widget.style || "premium-gradient")
+                        )}
+                    >
+                        {result ? (
+                            <div className="flex items-center gap-2">
+                                {result.success ? <CheckCircle2 className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
+                                <span>{result.message}</span>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-3">
+                                <Play className="w-5 h-5 fill-current" />
+                                <span>{widget.label || 'Initiate'}</span>
+                            </div>
+                        )}
+                    </Button>
+                )}
             </div>
         </div>
     );
