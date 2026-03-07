@@ -32,7 +32,7 @@ import {
 import { Label } from "../components/ui/label";
 
 const UsersPage = () => {
-    const { apiFetch } = useAuth();
+    const { apiFetch, showToast } = useAuth();
     const [users, setUsers] = useState<any[]>([]);
     const [total, setTotal] = useState(0);
     const [roles, setRoles] = useState<any[]>([]);
@@ -121,7 +121,7 @@ const UsersPage = () => {
                 setNewUserData({ username: '', password: '', email: '' });
             } else {
                 const error = await response.json();
-                alert(error.error || 'Failed to create user');
+                showToast(error.error || 'Failed to create user', 'error');
             }
         } catch (error) {
             console.error('Failed to create user:', error);
@@ -148,7 +148,7 @@ const UsersPage = () => {
                 setSelectedUser(null);
             } else {
                 const error = await response.json();
-                alert(error.error || 'Failed to update user');
+                showToast(error.error || 'Failed to update user', 'error');
             }
         } catch (error) {
             console.error('Failed to update user:', error);
@@ -173,10 +173,10 @@ const UsersPage = () => {
                 setIsResetOpen(false);
                 setResetPasswordData({ new_password: '' });
                 setSelectedUser(null);
-                alert('Password reset successfully');
+                showToast('Password reset successfully', 'success');
             } else {
                 const error = await response.json();
-                alert(error.error || 'Failed to reset password');
+                showToast(error.error || 'Failed to reset password', 'error');
             }
         } catch (error) {
             console.error('Failed to reset password:', error);
@@ -197,7 +197,7 @@ const UsersPage = () => {
                 setDeleteTarget(null);
             } else {
                 const error = await response.json();
-                alert(error.error || 'Failed to delete user');
+                showToast(error.error || 'Failed to delete user', 'error');
             }
         } catch (error) {
             console.error('Failed to delete user:', error);

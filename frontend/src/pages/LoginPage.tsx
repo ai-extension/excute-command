@@ -16,7 +16,7 @@ const LoginPage = () => {
     const [allowRegistration, setAllowRegistration] = useState(false);
     const [googleEnabled, setGoogleEnabled] = useState(false);
     const [facebookEnabled, setFacebookEnabled] = useState(false);
-    const { login } = useAuth();
+    const { login, showToast } = useAuth();
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -67,7 +67,7 @@ const LoginPage = () => {
     const handleSocialLogin = (provider: string) => {
         // In a real scenario, this would redirect to Google/FB
         // For now, we'll show a message or redirect to a placeholder
-        alert(`${provider} login integrated in backend. Frontend OAuth flow requires Client IDs.`);
+        showToast(`${provider} login integrated in backend. Frontend OAuth flow requires Client IDs.`, 'info');
     };
 
     return (

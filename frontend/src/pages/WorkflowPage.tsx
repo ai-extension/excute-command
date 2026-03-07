@@ -36,7 +36,7 @@ import { useUsers } from '../hooks/useUsers';
 const WorkflowPage = () => {
     const navigate = useNavigate();
     const { activeNamespace } = useNamespace();
-    const { apiFetch } = useAuth();
+    const { apiFetch, showToast } = useAuth();
 
     // Filter & List State
     const [searchTerm, setSearchTerm] = useState('');
@@ -175,11 +175,11 @@ const WorkflowPage = () => {
                 navigate(`/workflows/${data.id}/edit`);
             } else {
                 const error = await response.json();
-                alert(error.error || 'Failed to create workflow');
+                showToast(error.error || 'Failed to create workflow', 'error');
             }
         } catch (error) {
             console.error('Failed to create workflow:', error);
-            alert('An unexpected error occurred');
+            showToast('An unexpected error occurred', 'error');
         } finally {
             setIsCreating(false);
         }
@@ -212,11 +212,11 @@ const WorkflowPage = () => {
                 navigate(`/workflows/${data.id}/edit`);
             } else {
                 const error = await response.json();
-                alert(error.error || 'Failed to clone template');
+                showToast(error.error || 'Failed to clone template', 'error');
             }
         } catch (error) {
             console.error('Failed to clone template:', error);
-            alert('An unexpected error occurred');
+            showToast('An unexpected error occurred', 'error');
         } finally {
             setIsCloning(false);
             setCloneTarget(null);
@@ -236,11 +236,11 @@ const WorkflowPage = () => {
                 fetchWorkflows();
             } else {
                 const error = await response.json();
-                alert(error.error || 'Failed to delete workflow');
+                showToast(error.error || 'Failed to delete workflow', 'error');
             }
         } catch (error) {
             console.error('Failed to delete workflow:', error);
-            alert('An unexpected error occurred');
+            showToast('An unexpected error occurred', 'error');
         } finally {
             setIsDeleting(false);
             setDeleteTarget(null);

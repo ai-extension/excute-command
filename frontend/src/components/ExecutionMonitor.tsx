@@ -47,7 +47,7 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
     const [isStatusWSReady, setIsStatusWSReady] = useState(false);
     const [isTerminalReady, setIsTerminalReady] = useState(false);
     const [showStopConfirm, setShowStopConfirm] = useState(false);
-    const { apiFetch } = useAuth();
+    const { apiFetch, showToast } = useAuth();
     const workflowID = workflow?.id;
 
     // Sync internal workflow state with initialWorkflow prop
@@ -208,11 +208,11 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
             // Status will be updated via WebSocket in Live mode
             if (mode === 'HISTORICAL') {
                 // For historical, we just refresh if possible or show message
-                alert('Stop signal sent.');
+                showToast('Stop signal sent.', 'info');
             }
         } catch (err) {
             console.error('Failed to stop execution:', err);
-            alert('Failed to stop execution');
+            showToast('Failed to stop execution', 'error');
         }
     };
 

@@ -19,7 +19,7 @@ interface WorkflowFilesTabProps {
 
 
 export const WorkflowFilesTab: React.FC<WorkflowFilesTabProps> = ({ workflowId, targetFolder, setTargetFolder, cleanupFiles, setCleanupFiles }) => {
-    const { apiFetch } = useAuth();
+    const { apiFetch, showToast } = useAuth();
     const [files, setFiles] = useState<WorkflowFile[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
@@ -40,7 +40,7 @@ export const WorkflowFilesTab: React.FC<WorkflowFilesTabProps> = ({ workflowId, 
             const data = await response.json();
             setFiles(data || []);
         } catch (error: any) {
-            alert(error.message || 'An error occurred');
+            showToast(error.message || 'An error occurred', 'error');
         } finally {
             setIsLoading(false);
         }
@@ -80,7 +80,7 @@ export const WorkflowFilesTab: React.FC<WorkflowFilesTabProps> = ({ workflowId, 
 
             fetchFiles();
         } catch (error: any) {
-            alert(error.message || 'An error occurred');
+            showToast(error.message || 'An error occurred', 'error');
         } finally {
             setIsUploading(false);
             if (fileInputRef.current) fileInputRef.current.value = '';
@@ -104,7 +104,7 @@ export const WorkflowFilesTab: React.FC<WorkflowFilesTabProps> = ({ workflowId, 
 
             setFiles(files.filter(f => f.id !== deleteTargetId));
         } catch (error: any) {
-            alert(error.message || 'An error occurred');
+            showToast(error.message || 'An error occurred', 'error');
         } finally {
             setIsDeleting(false);
             setDeleteTargetId(null);
@@ -257,7 +257,7 @@ export const WorkflowFilesTab: React.FC<WorkflowFilesTabProps> = ({ workflowId, 
                                                             if (!response.ok) throw new Error('Failed to update substitution');
                                                             fetchFiles();
                                                         } catch (error: any) {
-                                                            alert(error.message || 'An error occurred');
+                                                            showToast(error.message || 'An error occurred', 'error');
                                                         }
                                                     }}
                                                 />

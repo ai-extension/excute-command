@@ -39,7 +39,7 @@ import {
 } from "../components/ui/dialog";
 
 const SettingsPage = () => {
-    const { apiFetch, user, refreshSettings } = useAuth();
+    const { apiFetch, user, refreshSettings, showToast } = useAuth();
     const { refreshNamespaces, namespaces } = useNamespace();
     const [activeTab, setActiveTab] = useState<'namespaces' | 'general' | 'auth'>('general');
     const [isLoading, setIsLoading] = useState(false);
@@ -171,10 +171,10 @@ const SettingsPage = () => {
                 await refreshNamespaces();
             } else {
                 const data = await response.json();
-                alert(data.error || 'Failed to delete namespace');
+                showToast(data.error || 'Failed to delete namespace', 'error');
             }
         } catch (err) {
-            alert('An error occurred');
+            showToast('An error occurred', 'error');
         } finally {
             setIsDeleting(false);
             setDeleteTarget(null);

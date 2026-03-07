@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -188,7 +189,20 @@ func (r *PostgresUserRepo) Update(user *domain.User) error {
 }
 
 func (r *PostgresUserRepo) Delete(id uuid.UUID) error {
-	return r.db.Delete(&domain.User{}, "id = ?", id).Error
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var user domain.User
+		if err := tx.First(&user, "id = ?", id).Error; err != nil {
+			return err
+		}
+
+		// Prefix username to allow reuse of the original username
+		newUsername := "deleted_" + strconv.FormatInt(time.Now().Unix(), 10) + "_" + user.Username
+		if err := tx.Model(&user).Update("username", newUsername).Error; err != nil {
+			return err
+		}
+
+		return tx.Delete(&user).Error
+	})
 }
 
 func (r *PostgresUserRepo) SetRoles(userID uuid.UUID, roles []domain.Role) error {
