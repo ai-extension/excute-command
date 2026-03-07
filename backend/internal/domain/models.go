@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type Status string
@@ -265,6 +266,7 @@ type Workflow struct {
 	CreatedByUsername string             `json:"created_by_username,omitempty" gorm:"<-:create"`
 	CreatedAt         time.Time          `json:"created_at" gorm:"<-:create"`
 	UpdatedAt         time.Time          `json:"updated_at"`
+	DeletedAt         gorm.DeletedAt     `json:"-" gorm:"index"`
 }
 
 type WorkflowFile struct {
