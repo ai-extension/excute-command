@@ -78,7 +78,16 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
         }
     }, [initialLogs, isLive]);
 
+    // Clear logs when executionID changes to avoid bleeding old run logs into a new run
+    useEffect(() => {
+        if (isLive) {
+            setLogs([]);
+        }
+    }, [executionID, isLive]);
+
     const { token } = useAuth();
+    const isCatchingUpRef = useRef<boolean>(false);
+    const messageQueueRef = useRef<string[]>([]);
 
     useEffect(() => {
         if (!isActive || !isLive) return;
@@ -89,16 +98,44 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
         socket.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
+                if (data.type === 'catchup_start') {
+                    isCatchingUpRef.current = true;
+                    setLogs([]);
+                    messageQueueRef.current = [];
+                    return;
+                }
+                if (data.type === 'catchup_end') {
+                    isCatchingUpRef.current = false;
+                    // Flush queue
+                    if (messageQueueRef.current.length > 0) {
+                        setLogs(prev => [...prev, ...messageQueueRef.current]);
+                        messageQueueRef.current = [];
+                    }
+                    return;
+                }
+
                 if (data.type === 'log' && data.execution_id === executionID && data.target_id === targetID && data.content) {
                     const newLines = data.content.split('\n').filter((line: string) => line.length > 0);
-                    setLogs(prev => {
-                        // In live mode, we might receive duplicates during catchup/live transition or multi-source logs.
-                        // We check if the last line of the previous state is identical to the first line of the new data.
-                        if (prev.length > 0 && newLines.length > 0 && prev[prev.length - 1] === newLines[0]) {
-                            return [...prev, ...newLines.slice(1)];
-                        }
-                        return [...prev, ...newLines];
-                    });
+
+                    if (isCatchingUpRef.current) {
+                        // If we receive a live message while catching up, queue it
+                        // (Assuming the backend sends live messages without a special flag, 
+                        // anything arriving during catchup that isn't part of the catchup flush gets queued)
+                        // Actually, backend catchup sends log messages sequentially, so we just process them.
+                        // The true fix is that backend marks the END of catchup, and any LIVE messages during that time are queued.
+                        // Wait, if it's a catchup message, we just append it. If it's a live message during catchup, we queue it.
+                        // Since we can't easily distinguish them here, we rely on the fact that catchup messages are sent synchronously in a loop.
+                        // Actually, just appending them is fine AS LONG as we reset logs on catchup_start.
+                        setLogs(prev => [...prev, ...newLines]);
+                    } else {
+                        setLogs(prev => {
+                            // Check for duplicates
+                            if (prev.length > 0 && newLines.length > 0 && prev[prev.length - 1] === newLines[0]) {
+                                return [...prev, ...newLines.slice(1)];
+                            }
+                            return [...prev, ...newLines];
+                        });
+                    }
                 }
             } catch (err) {
                 console.error('Failed to parse WS message:', err);

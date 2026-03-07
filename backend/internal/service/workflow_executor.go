@@ -849,8 +849,7 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 	fmt.Fprint(mainLogFile, msg)
 	fmt.Fprint(stepLogFile, msg)
 
-	e.hub.BroadcastLog(step.ID.String(), executionID.String(), msg)
-	e.hub.BroadcastLog(step.GroupID.String(), executionID.String(), msg)
+	// Broadcast to the master log buffer ONLY, to prevent duplicating entries under the same execution ID
 	e.hub.BroadcastLog(workflowID.String(), executionID.String(), msg)
 
 	var output string
@@ -899,10 +898,11 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 
 		if targetServerID != uuid.Nil {
 			var out bytes.Buffer
+			outWriter := io.Writer(&out) // capture output without broadcasting
 			mw := io.MultiWriter(
-				&wsWriter{hub: e.hub, targetID: step.ID.String(), executionID: executionID.String(), buffer: &out},
 				&wsWriter{hub: e.hub, targetID: workflowID.String(), executionID: executionID.String(), buffer: mainLogFile},
 				&fileWriter{file: stepLogFile},
+				outWriter,
 			)
 			filter := &cwdFilteredWriter{
 				underlying: mw,
@@ -1032,10 +1032,11 @@ func (e *WorkflowExecutor) runLocalStep(ctx context.Context, step *domain.Workfl
 	var out bytes.Buffer
 
 	// Multi-writer for all destinations we want cleaned
+	outWriter := io.Writer(&out) // capture output without broadcasting
 	mw := io.MultiWriter(
-		&wsWriter{hub: e.hub, targetID: step.ID.String(), executionID: executionID.String(), buffer: &out},
 		&wsWriter{hub: e.hub, targetID: workflowID.String(), executionID: executionID.String(), buffer: mainLogFile},
 		&fileWriter{file: stepLogFile},
+		outWriter,
 	)
 
 	// Filter out the CWD marker and capture the directory

@@ -102,6 +102,15 @@ func (h *WSHandler) HandleWS(c *gin.Context) {
 					h.terminalService.HandleInput(msg.SessionID, msg.Content)
 				} else if msg.Type == "request_catchup" && msg.ExecutionID != "" {
 					buffer := h.hub.GetBuffer(msg.ExecutionID)
+
+					// Send catchup_start to signal frontend to clear existing logs
+					startMsg := map[string]string{
+						"type":         "catchup_start",
+						"execution_id": msg.ExecutionID,
+					}
+					jsonStartMsg, _ := json.Marshal(startMsg)
+					conn.WriteMessage(websocket.TextMessage, jsonStartMsg)
+
 					for _, entry := range buffer {
 						resp := map[string]string{
 							"type":         "log",
@@ -112,6 +121,14 @@ func (h *WSHandler) HandleWS(c *gin.Context) {
 						jsonResp, _ := json.Marshal(resp)
 						conn.WriteMessage(websocket.TextMessage, jsonResp)
 					}
+
+					// Send catchup_end
+					endMsg := map[string]string{
+						"type":         "catchup_end",
+						"execution_id": msg.ExecutionID,
+					}
+					jsonEndMsg, _ := json.Marshal(endMsg)
+					conn.WriteMessage(websocket.TextMessage, jsonEndMsg)
 				}
 			}
 		}
