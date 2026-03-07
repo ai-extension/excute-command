@@ -12,12 +12,14 @@ interface TerminalWidgetProps {
 }
 
 const TerminalWidget: React.FC<TerminalWidgetProps> = ({ widget, slug, pageToken }) => {
-    const [output, setOutput] = useState<string>('Connecting...');
+    const [lines, setLines] = useState<string[]>(['Connecting...']);
     const [isLoading, setIsLoading] = useState(true);
+    const [isLive, setIsLive] = useState(false);
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
     const [widgetState, setWidgetState] = useState<'normal' | 'minimized' | 'maximized'>('normal');
     const [isVisible, setIsVisible] = useState(true);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const wsRef = useRef<WebSocket | null>(null);
 
     const fetchOutput = useCallback(async () => {
         try {
@@ -26,23 +28,78 @@ const TerminalWidget: React.FC<TerminalWidgetProps> = ({ widget, slug, pageToken
             const res = await fetch(`${API_BASE_URL}/public/pages/${slug}/widgets/${widget.id}/run`, { headers });
             if (res.ok) {
                 const data = await res.json();
-                setOutput(data.output || '(empty content stream)');
+                const outStr = data.output || '(empty content stream)';
+                setLines(outStr.split('\n'));
                 setLastUpdated(new Date());
             } else {
-                setOutput(`System Error: ${res.status} [Unauthorized or Not Found]`);
+                setLines([`System Error: ${res.status} [Unauthorized or Not Found]`]);
             }
         } catch (err) { } finally { setIsLoading(false); }
     }, [slug, widget.id, pageToken]);
 
     useEffect(() => {
         if (!isVisible) return;
-        fetchOutput();
-        const interval = widget.reload_interval === 'realtime' ? 2000 : parseInt(widget.reload_interval || '10', 10) * 1000;
-        const t = setInterval(fetchOutput, interval);
-        return () => clearInterval(t);
-    }, [fetchOutput, widget.reload_interval, isVisible]);
 
-    useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [output, widgetState]);
+        const isRealtime = widget.reload_interval === 'realtime';
+
+        if (isRealtime) {
+            // Use WebSocket for realtime streaming mode
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            let baseUrl = API_BASE_URL;
+            if (baseUrl.startsWith('/')) {
+                baseUrl = `${window.location.host}${baseUrl}`;
+            } else {
+                baseUrl = baseUrl.replace(/^http(s)?:\/\//, '');
+            }
+
+            // Connect with widget_id to trigger the backend streaming loop
+            const wsUrl = `${protocol}//${baseUrl}/ws?token=${pageToken || ''}&slug=${slug || ''}&widget_id=${widget.id}`;
+            const ws = new WebSocket(wsUrl);
+            wsRef.current = ws;
+
+            ws.onopen = () => setIsLive(true);
+            ws.onclose = () => setIsLive(false);
+            ws.onerror = () => setIsLive(false);
+
+            ws.onmessage = (ev) => {
+                try {
+                    const data = JSON.parse(ev.data);
+                    if (data.type === 'widget_stream_start') {
+                        setLines([]); // Clear existing
+                        setIsLoading(true);
+                        setTimeout(() => setIsLoading(false), 200);
+                    } else if (data.type === 'widget_output') {
+                        const chunk: string = data.content || '';
+                        setLines(prev => {
+                            if (prev.length === 0) {
+                                return chunk.split('\n');
+                            }
+                            // Append chunk to the last line, then split by newline to handle new lines in chunk
+                            const lastLine = prev[prev.length - 1];
+                            const combined = lastLine + chunk;
+                            const newLines = combined.split('\n');
+
+                            return [...prev.slice(0, prev.length - 1), ...newLines];
+                        });
+                    }
+                } catch { }
+            };
+
+            return () => {
+                ws.close();
+                wsRef.current = null;
+                setIsLive(false);
+            };
+        } else {
+            // Non-realtime: use standard polling
+            fetchOutput();
+            const interval = parseInt(widget.reload_interval || '10', 10) * 1000;
+            const t = setInterval(fetchOutput, interval);
+            return () => clearInterval(t);
+        }
+    }, [fetchOutput, widget.reload_interval, isVisible, slug, pageToken, widget.id]);
+
+    useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [lines, widgetState]); // Changed dependency from output to lines
 
     if (!isVisible) return null;
 
@@ -85,10 +142,10 @@ const TerminalWidget: React.FC<TerminalWidgetProps> = ({ widget, slug, pageToken
             {widgetState !== 'minimized' && (
                 <>
                     <div ref={scrollRef} className={cn(
-                        "p-10 font-mono text-[14px] leading-relaxed text-slate-200 overflow-y-auto scrollbar-thin selection:bg-emerald-500/40 selection:text-white",
+                        "p-10 font-mono text-[14px] leading-relaxed text-slate-200 overflow-y-auto overflow-x-auto whitespace-pre scrollbar-thin selection:bg-emerald-500/40 selection:text-white",
                         widgetState === 'maximized' ? "h-[calc(100vh-250px)]" : "min-h-[250px] max-h-[500px]"
                     )}>
-                        {output.split('\n').filter((l, i, arr) => l !== '' || i < arr.length - 1).map((l, i) => (
+                        {lines.map((l: string, i: number) => (
                             <div key={i} className="whitespace-pre-wrap min-h-[1.2rem]">
                                 <AnsiText text={l} />
                             </div>

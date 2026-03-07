@@ -126,3 +126,21 @@ func (s *TerminalService) RunCommandOnServer(serverID uuid.UUID) func(command st
 		return conn.Execute(context.Background(), command)
 	}
 }
+
+// RunStreamingCommandOnServer returns a function to run commands on a given server while streaming output to the provided writers.
+func (s *TerminalService) RunStreamingCommandOnServer(serverID uuid.UUID) func(ctx context.Context, command string, writers ...io.Writer) (string, error) {
+	return func(ctx context.Context, command string, writers ...io.Writer) (string, error) {
+		server, err := s.repo.GetByID(serverID, nil)
+		if err != nil {
+			return "", fmt.Errorf("server not found: %w", err)
+		}
+
+		conn, err := GetServerConnection(server, s.vpnConnector)
+		if err != nil {
+			return "", err
+		}
+		defer conn.Close()
+
+		return conn.Execute(ctx, command, writers...)
+	}
+}

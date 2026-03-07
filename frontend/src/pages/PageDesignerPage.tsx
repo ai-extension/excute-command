@@ -580,20 +580,6 @@ const PageDesignerPage = () => {
                                         <Input value={activeWidget.command || ''} onChange={e => updateWidget(activeWidget.id, { command: e.target.value })}
                                             placeholder="e.g. top -b -n 1" className="h-11 text-xs font-mono bg-muted/30 border border-border/50 rounded-2xl" />
                                     </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Refresh Rate</label>
-                                        <div className="flex gap-2 flex-wrap">
-                                            {RELOAD_OPTIONS.map(opt => (
-                                                <button key={opt.value} onClick={() => updateWidget(activeWidget.id, { reload_interval: opt.value as any })}
-                                                    className={cn("h-9 px-4 rounded-xl text-[10px] font-black transition-all border shrink-0",
-                                                        activeWidget.reload_interval === opt.value
-                                                            ? "bg-emerald-500/10 border-emerald-500 text-emerald-500"
-                                                            : "bg-muted/30 border-transparent text-muted-foreground hover:border-emerald-500/50")}>
-                                                    {opt.label}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
                                 </div>
                             )}
                         </div>

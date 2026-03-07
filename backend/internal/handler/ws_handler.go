@@ -1,12 +1,17 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/user/csm-backend/internal/service"
 )
@@ -42,6 +47,7 @@ func (h *WSHandler) HandleWS(c *gin.Context) {
 		}
 	}
 	slug := c.Query("slug")
+	widgetID := c.Query("widget_id")
 
 	var access service.AccessContext
 
@@ -72,6 +78,38 @@ func (h *WSHandler) HandleWS(c *gin.Context) {
 		return
 	}
 
+	// 3. Widget Live Stream Logic (Public Pages Only)
+	var streamWidget func(ctx context.Context, writers ...io.Writer) (string, error)
+	if widgetID != "" && slug != "" && (access.PageID != nil || access.IsAdmin) {
+		fmt.Printf("Widget WS request received: slug=%s, widgetID=%s\n", slug, widgetID)
+		page, err := h.pageService.GetPageBySlug(slug)
+		if err == nil {
+			var layout struct {
+				Widgets []struct {
+					ID       string `json:"id"`
+					Type     string `json:"type"`
+					ServerID string `json:"server_id"`
+					Command  string `json:"command"`
+				} `json:"widgets"`
+			}
+			if err := json.Unmarshal([]byte(page.Layout), &layout); err == nil {
+				for _, w := range layout.Widgets {
+					if w.ID == widgetID && w.Type == "TERMINAL" {
+						fmt.Printf("Found terminal widget %s. Setting up runner...\n", widgetID)
+						parsedUUID, parseErr := uuid.Parse(w.ServerID)
+						if parseErr == nil {
+							runner := h.terminalService.RunStreamingCommandOnServer(parsedUUID)
+							streamWidget = func(ctx context.Context, writers ...io.Writer) (string, error) {
+								return runner(ctx, w.Command, writers...)
+							}
+						}
+						break
+					}
+				}
+			}
+		}
+	}
+
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		log.Printf("Failed to upgrade to websocket: %v", err)
@@ -80,6 +118,41 @@ func (h *WSHandler) HandleWS(c *gin.Context) {
 
 	client := &service.Client{Conn: conn, Access: access}
 	h.hub.Register(conn, access)
+
+	// If this is a realtime widget connection, start the persistent streaming session
+	if streamWidget != nil {
+		wWriter := &widgetWsWriter{conn: conn, mu: &sync.Mutex{}}
+		go func() {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			// We can run the command in a loop to restart if it drops,
+			// or just let the client reconnect. We will ping-pong it with a reconnect loop here:
+			for {
+				if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+					break // Connection closed
+				}
+
+				wWriter.mu.Lock()
+				msg := map[string]string{
+					"type": "widget_stream_start",
+				}
+				jsonMsg, _ := json.Marshal(msg)
+				conn.WriteMessage(websocket.TextMessage, jsonMsg)
+				wWriter.mu.Unlock()
+
+				fmt.Printf("Starting widget stream execution for widgetID: %s\n", widgetID)
+				_, err := streamWidget(ctx, wWriter)
+				fmt.Printf("Widget stream execution ended. Err: %v\n", err)
+				if err == nil || err == context.Canceled {
+					break
+				}
+
+				// Small delay before restart if command errored out
+				time.Sleep(2 * time.Second)
+			}
+		}()
+	}
 
 	// Keep connection alive until client closes it
 	go func() {
@@ -133,4 +206,23 @@ func (h *WSHandler) HandleWS(c *gin.Context) {
 			}
 		}
 	}()
+}
+
+// widgetWsWriter writes streamed output directly to the WebSocket
+type widgetWsWriter struct {
+	conn *websocket.Conn
+	mu   *sync.Mutex
+}
+
+func (w *widgetWsWriter) Write(p []byte) (n int, err error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	msg := map[string]string{
+		"type":    "widget_output",
+		"content": string(p),
+	}
+	jsonMsg, _ := json.Marshal(msg)
+	err = w.conn.WriteMessage(websocket.TextMessage, jsonMsg)
+	return len(p), err
 }
