@@ -80,16 +80,18 @@ func (h *WSHandler) HandleWS(c *gin.Context) {
 
 	// 3. Widget Live Stream Logic (Public Pages Only)
 	var streamWidget func(ctx context.Context, writers ...io.Writer) (string, error)
+	var streamInterval int
 	if widgetID != "" && slug != "" && (access.PageID != nil || access.IsAdmin) {
 		fmt.Printf("Widget WS request received: slug=%s, widgetID=%s\n", slug, widgetID)
 		page, err := h.pageService.GetPageBySlug(slug)
 		if err == nil {
 			var layout struct {
 				Widgets []struct {
-					ID       string `json:"id"`
-					Type     string `json:"type"`
-					ServerID string `json:"server_id"`
-					Command  string `json:"command"`
+					ID          string `json:"id"`
+					Type        string `json:"type"`
+					ServerID    string `json:"server_id"`
+					Command     string `json:"command"`
+					RunInterval int    `json:"run_interval"`
 				} `json:"widgets"`
 			}
 			if err := json.Unmarshal([]byte(page.Layout), &layout); err == nil {
@@ -98,6 +100,7 @@ func (h *WSHandler) HandleWS(c *gin.Context) {
 						fmt.Printf("Found terminal widget %s. Setting up runner...\n", widgetID)
 						parsedUUID, parseErr := uuid.Parse(w.ServerID)
 						if parseErr == nil {
+							streamInterval = w.RunInterval
 							runner := h.terminalService.RunStreamingCommandOnServer(parsedUUID)
 							streamWidget = func(ctx context.Context, writers ...io.Writer) (string, error) {
 								return runner(ctx, w.Command, writers...)
@@ -133,6 +136,19 @@ func (h *WSHandler) HandleWS(c *gin.Context) {
 					break // Connection closed
 				}
 
+				// If we have an interval, we give the command exactly that much time to run.
+				// If it finishes early, we sleep the remainder before restarting.
+				// If it doesn't finish, the context cancels it, and we restart immediately.
+				var cmdCtx context.Context
+				var cmdCancel context.CancelFunc
+				if streamInterval > 0 {
+					cmdCtx, cmdCancel = context.WithTimeout(ctx, time.Duration(streamInterval)*time.Second)
+				} else {
+					cmdCtx, cmdCancel = context.WithCancel(ctx)
+				}
+
+				start := time.Now()
+
 				wWriter.mu.Lock()
 				msg := map[string]string{
 					"type": "widget_stream_start",
@@ -142,13 +158,34 @@ func (h *WSHandler) HandleWS(c *gin.Context) {
 				wWriter.mu.Unlock()
 
 				fmt.Printf("Starting widget stream execution for widgetID: %s\n", widgetID)
-				_, err := streamWidget(ctx, wWriter)
+				_, err := streamWidget(cmdCtx, wWriter)
 				fmt.Printf("Widget stream execution ended. Err: %v\n", err)
-				if err == nil || err == context.Canceled {
-					break
+
+				cmdCancel()
+
+				if ctx.Err() != nil {
+					break // The parent WebSocket context was cancelled (client dropped)
 				}
 
-				// Small delay before restart if command errored out
+				if streamInterval > 0 {
+					// Wait out the remainder of the interval if it finished early
+					elapsed := time.Since(start)
+					intervalDur := time.Duration(streamInterval) * time.Second
+					if elapsed < intervalDur {
+						select {
+						case <-ctx.Done():
+							break
+						case <-time.After(intervalDur - elapsed):
+						}
+					}
+					continue
+				}
+
+				if err == nil || err == context.Canceled {
+					break // Run once and exit if there's no interval
+				}
+
+				// Small delay before restart if command errored out without an interval
 				time.Sleep(2 * time.Second)
 			}
 		}()

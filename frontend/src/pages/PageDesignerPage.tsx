@@ -584,6 +584,34 @@ const PageDesignerPage = () => {
                                             className="w-full min-h-[80px] p-4 text-xs font-mono bg-muted/30 border border-border/50 rounded-2xl focus:ring-2 ring-primary/10 outline-none resize-y transition-all"
                                         />
                                     </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Run Interval</label>
+                                        <div className="flex gap-2 flex-wrap items-center">
+                                            {[{ label: 'Once', value: undefined }, { label: '5s', value: 5 }, { label: '10s', value: 10 }, { label: '30s', value: 30 }, { label: '1m', value: 60 }].map(opt => (
+                                                <button key={opt.label} onClick={() => updateWidget(activeWidget.id, { run_interval: opt.value })}
+                                                    className={cn("h-9 px-4 rounded-xl text-[10px] font-black transition-all border shrink-0",
+                                                        activeWidget.run_interval === opt.value
+                                                            ? "bg-emerald-500/10 border-emerald-500 text-emerald-500"
+                                                            : "bg-muted/30 border-transparent text-muted-foreground hover:border-emerald-500/50")}>
+                                                    {opt.label}
+                                                </button>
+                                            ))}
+                                            <div className="relative flex-1 min-w-[100px]">
+                                                <Input
+                                                    type="number"
+                                                    value={activeWidget.run_interval || ''}
+                                                    onChange={e => {
+                                                        const val = parseInt(e.target.value, 10);
+                                                        updateWidget(activeWidget.id, { run_interval: isNaN(val) ? undefined : val });
+                                                    }}
+                                                    min="1"
+                                                    placeholder="Custom..."
+                                                    className="h-9 text-xs font-bold bg-muted/30 border border-border/50 rounded-xl pl-3 pr-8 focus:border-emerald-500/50 focus:ring-emerald-500/20 transition-all shadow-sm"
+                                                />
+                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted-foreground">s</span>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
                         </div>

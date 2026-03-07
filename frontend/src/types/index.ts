@@ -261,6 +261,7 @@ export interface PageWidget {
     server_id?: string;
     server_name?: string;
     command?: string;
+    run_interval?: number;
     reload_interval?: PageWidgetReload;
     // ENDPOINT-specific
     workflow_id?: string;
