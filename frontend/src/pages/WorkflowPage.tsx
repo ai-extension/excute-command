@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, ChevronRight, Zap, Settings, Play } from 'lucide-react';
+import { Plus, ChevronRight, Zap, Settings, Play, Trash2 } from 'lucide-react';
 import {
     Table,
     TableBody,
@@ -63,6 +63,10 @@ const WorkflowPage = () => {
     // Clone workflow state
     const [cloneTarget, setCloneTarget] = useState<Workflow | null>(null);
     const [isCloning, setIsCloning] = useState(false);
+
+    // Delete workflow state
+    const [deleteTarget, setDeleteTarget] = useState<Workflow | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const fetchWorkflows = async (searchOverride?: string, tagIdsOverride?: string[], templatesOverride?: boolean) => {
         if (!activeNamespace) return;
@@ -216,6 +220,30 @@ const WorkflowPage = () => {
         } finally {
             setIsCloning(false);
             setCloneTarget(null);
+        }
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteTarget) return;
+        setIsDeleting(true);
+
+        try {
+            const response = await apiFetch(`${API_BASE_URL}/workflows/${deleteTarget.id}`, {
+                method: 'DELETE',
+            });
+
+            if (response.ok) {
+                fetchWorkflows();
+            } else {
+                const error = await response.json();
+                alert(error.error || 'Failed to delete workflow');
+            }
+        } catch (error) {
+            console.error('Failed to delete workflow:', error);
+            alert('An unexpected error occurred');
+        } finally {
+            setIsDeleting(false);
+            setDeleteTarget(null);
         }
     };
 
@@ -517,6 +545,14 @@ const WorkflowPage = () => {
                                                                 >
                                                                     <Settings className="w-4 h-4" />
                                                                 </Button>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    onClick={() => setDeleteTarget(wf)}
+                                                                    className="w-10 rounded-xl hover:bg-destructive/10 hover:text-destructive"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </Button>
                                                             </>
                                                         )}
                                                     </div>
@@ -569,6 +605,17 @@ const WorkflowPage = () => {
                 confirmText="Deploy Automation"
                 variant="success"
                 isLoading={isCloning}
+            />
+
+            <ConfirmDialog
+                isOpen={!!deleteTarget}
+                onClose={() => setDeleteTarget(null)}
+                onConfirm={confirmDelete}
+                title="Delete Automation"
+                description={`Are you sure you want to delete the automation "${deleteTarget?.name}"? This action can be undone by an administrator.`}
+                confirmText="Delete Automation"
+                variant="danger"
+                isLoading={isDeleting}
             />
         </div>
     );
