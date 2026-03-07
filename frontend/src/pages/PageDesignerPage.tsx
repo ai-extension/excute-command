@@ -577,8 +577,12 @@ const PageDesignerPage = () => {
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Execute Command</label>
-                                        <Input value={activeWidget.command || ''} onChange={e => updateWidget(activeWidget.id, { command: e.target.value })}
-                                            placeholder="e.g. top -b -n 1" className="h-11 text-xs font-mono bg-muted/30 border border-border/50 rounded-2xl" />
+                                        <textarea
+                                            value={activeWidget.command || ''}
+                                            onChange={e => updateWidget(activeWidget.id, { command: e.target.value })}
+                                            placeholder="e.g. top -b -n 1"
+                                            className="w-full min-h-[80px] p-4 text-xs font-mono bg-muted/30 border border-border/50 rounded-2xl focus:ring-2 ring-primary/10 outline-none resize-y transition-all"
+                                        />
                                     </div>
                                 </div>
                             )}
