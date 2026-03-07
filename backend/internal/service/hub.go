@@ -9,8 +9,13 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+type LogEntry struct {
+	TargetID string
+	Content  string
+}
+
 type LogStream struct {
-	Buffer       []string
+	Buffer       []LogEntry
 	Ch           chan string
 	LastActivity time.Time
 	mu           sync.Mutex
@@ -45,7 +50,7 @@ func (h *Hub) CreateStream(executionID string) *LogStream {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	stream := &LogStream{
-		Buffer:       make([]string, 0),
+		Buffer:       make([]LogEntry, 0),
 		Ch:           make(chan string, 100),
 		LastActivity: time.Now(),
 	}
@@ -58,6 +63,20 @@ func (h *Hub) GetStream(executionID string) (*LogStream, bool) {
 	defer h.mu.Unlock()
 	s, ok := h.streams[executionID]
 	return s, ok
+}
+
+func (h *Hub) GetBuffer(executionID string) []LogEntry {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if s, ok := h.streams[executionID]; ok {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		// Return a copy to avoid race conditions
+		buf := make([]LogEntry, len(s.Buffer))
+		copy(buf, s.Buffer)
+		return buf
+	}
+	return nil
 }
 
 func (h *Hub) CloseStream(executionID string) {
@@ -132,7 +151,7 @@ func (h *Hub) BroadcastLog(targetID string, executionID string, content string) 
 	h.mu.Lock()
 	if s, ok := h.streams[executionID]; ok {
 		s.mu.Lock()
-		s.Buffer = append(s.Buffer, content)
+		s.Buffer = append(s.Buffer, LogEntry{TargetID: targetID, Content: content})
 		s.LastActivity = time.Now()
 		select {
 		case s.Ch <- content:

@@ -55,8 +55,16 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
                     .then(res => res.text())
                     .then((text: string) => {
                         // Only update if targetID hasn't changed since we started fetching
+                        // AND only if we don't already have logs from WebSocket catchup
                         if (targetRef.current === targetID) {
-                            setLogs(text.split('\n'));
+                            const diskLines = text.split('\n').filter(line => line.length > 0);
+                            setLogs(prev => {
+                                // If we already have logs (e.g. from WS catchup), don't overwrite
+                                // but we could merge if we wanted to be fancy.
+                                // For now, if prev is empty, we use diskLines.
+                                if (prev.length === 0) return diskLines;
+                                return prev;
+                            });
                         }
                     })
                     .catch((err: Error) => console.error('Failed to fetch historical context:', err));
@@ -79,11 +87,16 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
         socket.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
-                // Type guard: only process log messages here. 
-                // Filter by execution_id to avoid mixed-up sessions.
                 if (data.type === 'log' && data.execution_id === executionID && data.target_id === targetID && data.content) {
                     const newLines = data.content.split('\n').filter((line: string) => line.length > 0);
-                    setLogs(prev => [...prev, ...newLines]);
+                    setLogs(prev => {
+                        // In live mode, we might receive duplicates during catchup/live transition or multi-source logs.
+                        // We check if the last line of the previous state is identical to the first line of the new data.
+                        if (prev.length > 0 && newLines.length > 0 && prev[prev.length - 1] === newLines[0]) {
+                            return [...prev, ...newLines.slice(1)];
+                        }
+                        return [...prev, ...newLines];
+                    });
                 }
             } catch (err) {
                 console.error('Failed to parse WS message:', err);
@@ -93,6 +106,14 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
         socket.onopen = () => {
             console.log('WebSocket connected');
             if (onReady) onReady();
+
+            // Request catch-up logs from the in-memory buffer
+            if (executionID) {
+                socket.send(JSON.stringify({
+                    type: 'request_catchup',
+                    execution_id: executionID
+                }));
+            }
         };
         socket.onclose = () => console.log('WebSocket disconnected');
 

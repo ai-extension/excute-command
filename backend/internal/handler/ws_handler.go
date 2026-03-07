@@ -43,14 +43,29 @@ func (h *WSHandler) HandleWS(c *gin.Context) {
 				break
 			}
 
-			// Parse terminal input
+			// Parse incoming message
 			var msg struct {
-				Type      string `json:"type"`
-				SessionID string `json:"session_id"`
-				Content   string `json:"content"`
+				Type        string `json:"type"`
+				SessionID   string `json:"session_id"`
+				ExecutionID string `json:"execution_id"`
+				Content     string `json:"content"`
 			}
-			if err := json.Unmarshal(message, &msg); err == nil && msg.Type == "input" {
-				h.terminalService.HandleInput(msg.SessionID, msg.Content)
+			if err := json.Unmarshal(message, &msg); err == nil {
+				if msg.Type == "input" {
+					h.terminalService.HandleInput(msg.SessionID, msg.Content)
+				} else if msg.Type == "request_catchup" && msg.ExecutionID != "" {
+					buffer := h.hub.GetBuffer(msg.ExecutionID)
+					for _, entry := range buffer {
+						resp := map[string]string{
+							"type":         "log",
+							"execution_id": msg.ExecutionID,
+							"content":      entry.Content,
+							"target_id":    entry.TargetID,
+						}
+						jsonResp, _ := json.Marshal(resp)
+						conn.WriteMessage(websocket.TextMessage, jsonResp)
+					}
+				}
 			}
 		}
 	}()

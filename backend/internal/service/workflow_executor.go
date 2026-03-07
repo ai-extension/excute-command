@@ -189,22 +189,25 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 		executedBy = execution.ExecutedBy.String()
 	}
 
-	fmt.Fprintf(logFile, "\033[1;36m▶ WORKFLOW: %s\033[0m\n", wf.Name)
-	fmt.Fprintf(logFile, "\033[36mUser: %s | Started: %s\033[0m\n", executedBy, execution.StartedAt.Format("2006-01-02 15:04:05"))
+	header := fmt.Sprintf("\033[1;36m▶ WORKFLOW: %s\033[0m\n", wf.Name)
+	header += fmt.Sprintf("\033[36mUser: %s | Started: %s\033[0m\n", executedBy, execution.StartedAt.Format("2006-01-02 15:04:05"))
 
 	// Log Inputs if available
 	if execution.Inputs != "" && execution.Inputs != "{}" {
 		var inputs map[string]string
 		if err := json.Unmarshal([]byte(execution.Inputs), &inputs); err == nil && len(inputs) > 0 {
-			fmt.Fprintf(logFile, "\033[36mInputs:\033[0m\n")
+			header += "\033[36mInputs:\033[0m\n"
 			for k, v := range inputs {
-				fmt.Fprintf(logFile, "  \033[90m- %s:\033[0m %s\n", k, v)
+				header += fmt.Sprintf("  \033[90m- %s:\033[0m %s\n", k, v)
 			}
 		}
 	}
-	fmt.Fprintf(logFile, "\n")
+	header += "\n"
 
-	e.hub.BroadcastLog(workflowID.String(), execution.ID.String(), fmt.Sprintf("\033[1;36m▶ WORKFLOW STARTED: %s (by %s)\033[0m", wf.Name, executedBy))
+	// Write to file
+	fmt.Fprint(logFile, header)
+	// Broadcast to hub (using workflow ID as target for global view)
+	e.hub.BroadcastLog(workflowID.String(), execution.ID.String(), header)
 
 	wf.Status = domain.StatusRunning
 	e.wfRepo.Update(wf)
