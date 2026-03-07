@@ -166,6 +166,10 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 		return fmt.Errorf("failed to get workflow: %w", err)
 	}
 
+	// Create a log stream for this execution
+	e.hub.CreateStream(execution.ID.String())
+	defer e.hub.CloseStream(execution.ID.String())
+
 	logFile, err := os.OpenFile(execution.LogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %w", err)
