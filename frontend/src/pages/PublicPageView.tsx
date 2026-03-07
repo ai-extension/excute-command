@@ -257,18 +257,24 @@ const PublicPageView = () => {
             const data = await response.json();
             if (response.ok) {
                 setExecutionResults(prev => ({ ...prev, [widget.id]: { success: true, message: 'SUCCESS' } }));
-                if (widget.show_log) {
-                    setActiveExecutionId(data.execution_id);
-                    setActiveWidgetId(widget.id);
+
+                // Always track execution in background for status updates
+                setActiveExecutionId(data.execution_id);
+                setActiveWidgetId(widget.id);
+                setExecutionStatus('RUNNING');
+                setIsPollingLogs(true);
+
+                // Determine if logs should be shown (check widget config then fallback to page workflow config)
+                const showLog = widget.show_log ?? page?.workflows?.find(pw => pw.workflow_id === widget.workflow_id)?.show_log ?? false;
+
+                if (showLog) {
                     setExecutionLogs('Initializing trace...');
-                    setExecutionStatus('RUNNING');
-                    setIsPollingLogs(true);
                     setTerminalState('normal');
                 } else {
                     setCompletionAlert({
                         show: true,
                         status: 'SUCCESS',
-                        message: 'Workflow executed successfully!'
+                        message: 'Workflow execution initiated.'
                     });
                 }
             } else {
@@ -287,16 +293,7 @@ const PublicPageView = () => {
                 message: 'Error connecting to server.'
             });
         } finally {
-            if (!widget.show_log) {
-                setRunningWidgets(prev => ({ ...prev, [widget.id]: false }));
-                setTimeout(() => {
-                    setExecutionResults(prev => {
-                        const n = { ...prev };
-                        delete n[widget.id];
-                        return n;
-                    });
-                }, 3000);
-            }
+            // No-op: We wait for WebSocket status broadcast to cleanup running state
         }
     };
 
@@ -447,38 +444,73 @@ const PublicPageView = () => {
                     onCancel={closeInputModal}
                 />
 
-                <PageExecutionTerminal
-                    activeExecutionId={activeExecutionId}
-                    slug={slug || ''}
-                    pageToken={pageToken}
-                    terminalState={terminalState}
-                    setTerminalState={setTerminalState}
-                    onClose={() => {
-                        setActiveExecutionId(null);
-                        setExecutionStatus(null);
-                        if (activeWidgetId) {
-                            setRunningWidgets(prev => ({ ...prev, [activeWidgetId]: false }));
-                            setTimeout(() => {
-                                setExecutionResults(prev => {
-                                    const n = { ...prev };
-                                    delete n[activeWidgetId];
-                                    return n;
-                                });
-                            }, 3000);
-                            setActiveWidgetId(null);
-                        }
-                    }}
-                    onStatusChange={(status: string) => {
-                        setExecutionStatus(status);
-                        if (status === 'SUCCESS' || status === 'FAILED') {
-                            setCompletionAlert({
-                                show: true,
-                                status: status,
-                                message: status === 'SUCCESS' ? 'Workflow executed successfully!' : 'Workflow execution failed.'
-                            });
-                        }
-                    }}
-                />
+                {activeExecutionId && slug && (() => {
+                    const currentWidget = widgets.find(w => w.id === activeWidgetId);
+                    const currentShowLog = currentWidget?.show_log ?? page?.workflows?.find(pw => pw.workflow_id === currentWidget?.workflow_id)?.show_log ?? false;
+
+                    return (
+                        <PageExecutionTerminal
+                            activeExecutionId={activeExecutionId}
+                            slug={slug}
+                            pageToken={pageToken}
+                            terminalState={terminalState}
+                            setTerminalState={setTerminalState}
+                            onClose={() => {
+                                const widgetId = activeWidgetId;
+                                setActiveExecutionId(null);
+                                setActiveWidgetId(null);
+                                setExecutionStatus(null);
+                                setIsPollingLogs(false);
+                                // Cleanup runningWidgets and executionResults after a delay
+                                if (widgetId) {
+                                    setRunningWidgets(prev => ({ ...prev, [widgetId]: false }));
+                                    setTimeout(() => {
+                                        setExecutionResults(prev => {
+                                            const n = { ...prev };
+                                            delete n[widgetId];
+                                            return n;
+                                        });
+                                    }, 3000);
+                                }
+                            }}
+                            onStatusChange={(status: string) => {
+                                setExecutionStatus(status);
+                                if (status === 'SUCCESS' || status === 'FAILED' || status === 'CANCELLED') {
+                                    if (activeWidgetId) {
+                                        setExecutionResults(prev => ({
+                                            ...prev,
+                                            [activeWidgetId]: { success: status === 'SUCCESS', message: status }
+                                        }));
+
+                                        setCompletionAlert({
+                                            show: true,
+                                            status: status,
+                                            message: status === 'SUCCESS' ? 'Workflow executed successfully!' :
+                                                status === 'CANCELLED' ? 'Workflow cancelled.' : 'Workflow execution failed.'
+                                        });
+
+                                        if (!currentShowLog) {
+                                            // Auto cleanup for hidden trackers
+                                            setTimeout(() => {
+                                                setRunningWidgets(prev => ({ ...prev, [activeWidgetId]: false }));
+                                                setTimeout(() => {
+                                                    setExecutionResults(prev => {
+                                                        const n = { ...prev };
+                                                        delete n[activeWidgetId];
+                                                        return n;
+                                                    });
+                                                    setActiveExecutionId(null);
+                                                    setActiveWidgetId(null);
+                                                }, 3000);
+                                            }, 1000);
+                                        }
+                                    }
+                                }
+                            }}
+                            isHidden={!currentShowLog}
+                        />
+                    );
+                })()}
             </div>
         </div>
     );

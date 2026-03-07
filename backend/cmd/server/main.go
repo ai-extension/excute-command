@@ -278,7 +278,6 @@ func main() {
 		api.GET("/public/pages/:slug", pageHandler.GetPublicPage)
 		api.POST("/public/pages/:slug/verify", middleware.LoginRateLimiter(), pageHandler.VerifyPublicPage)
 		api.POST("/public/pages/:slug/run/:workflow_id", middleware.LoginRateLimiter(), pageHandler.RunPublicWorkflow)
-		api.GET("/public/pages/:slug/widgets/:widget_id/run", middleware.LoginRateLimiter(), pageHandler.RunPublicWidgetCommand)
 		api.POST("/public/pages/:slug/executions/:exec_id/stop", middleware.LoginRateLimiter(), pageHandler.StopPublicExecution)
 	}
 

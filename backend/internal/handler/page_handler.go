@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
@@ -398,73 +397,4 @@ func (h *PageHandler) sanitizeExecution(execution *domain.WorkflowExecution) {
 		execution.User.PasswordHash = ""
 		execution.User.Email = "" // Protect PII
 	}
-}
-
-// pageLayoutWidget is a minimal struct to extract widget config from the layout JSON.
-type pageLayoutWidget struct {
-	ID       string `json:"id"`
-	Type     string `json:"type"`
-	ServerID string `json:"server_id"`
-	Command  string `json:"command"`
-}
-
-type pageLayout struct {
-	Widgets []pageLayoutWidget `json:"widgets"`
-}
-
-// RunPublicWidgetCommand executes the predefined command for a terminal widget on a page.
-// It reads the widget config from the page layout, prevents arbitrary command injection.
-func (h *PageHandler) RunPublicWidgetCommand(c *gin.Context) {
-	slug := c.Param("slug")
-	widgetID := c.Param("widget_id")
-
-	page, err := h.service.GetPageBySlug(slug)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "page not found"})
-		return
-	}
-
-	if !page.IsPublic {
-		c.JSON(http.StatusForbidden, gin.H{"error": "page is not public"})
-		return
-	}
-
-	if page.ExpiresAt != nil && page.ExpiresAt.Before(time.Now()) {
-		c.JSON(http.StatusGone, gin.H{"error": "page has expired"})
-		return
-	}
-
-	if !h.verifyPageToken(c, page) {
-		return
-	}
-
-	// Parse layout to find widget
-	var layout pageLayout
-	if err := json.Unmarshal([]byte(page.Layout), &layout); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid page layout"})
-		return
-	}
-
-	var widget *pageLayoutWidget
-	for i := range layout.Widgets {
-		if layout.Widgets[i].ID == widgetID && layout.Widgets[i].Type == "TERMINAL" {
-			w := layout.Widgets[i]
-			widget = &w
-			break
-		}
-	}
-	if widget == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "terminal widget not found"})
-		return
-	}
-
-	serverID, err := uuid.Parse(widget.ServerID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid server id in widget config"})
-		return
-	}
-
-	runner := h.terminalService.RunCommandOnServer(serverID)
-	output, _ := runner(widget.Command) // Ignore execution error, return output regardless
-	c.JSON(http.StatusOK, gin.H{"output": output})
 }

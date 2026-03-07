@@ -48,8 +48,10 @@ func (h *WSHandler) HandleWS(c *gin.Context) {
 	}
 	slug := c.Query("slug")
 	widgetID := c.Query("widget_id")
+	statusOnly := c.Query("status_only") == "true"
 
 	var access service.AccessContext
+	access.StatusOnly = statusOnly
 
 	// 1. Try Admin JWT Token
 	if claims, err := h.authService.ValidateToken(token); err == nil && claims != nil {
@@ -222,6 +224,9 @@ func (h *WSHandler) HandleWS(c *gin.Context) {
 					conn.WriteMessage(websocket.TextMessage, jsonStartMsg)
 
 					for _, entry := range buffer {
+						if access.StatusOnly {
+							continue
+						}
 						resp := map[string]string{
 							"type":         "log",
 							"execution_id": msg.ExecutionID,

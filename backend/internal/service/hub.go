@@ -24,8 +24,9 @@ type LogStream struct {
 }
 
 type AccessContext struct {
-	IsAdmin bool
-	PageID  *uuid.UUID // Which page this client is authorized to view (if public)
+	IsAdmin    bool
+	PageID     *uuid.UUID // Which page this client is authorized to view (if public)
+	StatusOnly bool
 }
 
 type Client struct {
@@ -179,6 +180,11 @@ func (h *Hub) processBroadcast(message []byte) {
 		}
 
 		if isAllowed {
+			// Filtering: If client only wants status updates, skip logs
+			if client.Access.StatusOnly && meta.Type == "log" {
+				continue
+			}
+
 			err := client.Conn.WriteMessage(websocket.TextMessage, message)
 			if err != nil {
 				log.Printf("websocket write error: %v", err)

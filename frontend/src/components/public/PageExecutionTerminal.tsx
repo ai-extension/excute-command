@@ -12,6 +12,7 @@ interface PageExecutionTerminalProps {
     setTerminalState: (state: 'normal' | 'minimized' | 'maximized') => void;
     onClose: () => void;
     onStatusChange?: (status: string) => void;
+    isHidden?: boolean;
 }
 
 const PageExecutionTerminal: React.FC<PageExecutionTerminalProps> = ({
@@ -21,7 +22,8 @@ const PageExecutionTerminal: React.FC<PageExecutionTerminalProps> = ({
     terminalState,
     setTerminalState,
     onClose,
-    onStatusChange
+    onStatusChange,
+    isHidden
 }) => {
     const [logs, setLogs] = useState<string[]>([]);
     const [status, setStatus] = useState<string | null>(null);
@@ -43,7 +45,7 @@ const PageExecutionTerminal: React.FC<PageExecutionTerminalProps> = ({
             baseUrl = baseUrl.replace(/^http(s)?:\/\//, '');
         }
 
-        const wsUrl = `${protocol}//${baseUrl}/ws?token=${pageToken || ''}&slug=${slug || ''}`;
+        const wsUrl = `${protocol}//${baseUrl}/ws?token=${pageToken || ''}&slug=${slug || ''}&status_only=${isHidden ? 'true' : 'false'}`;
         const socket = new WebSocket(wsUrl);
 
         socket.onmessage = (event) => {
@@ -95,6 +97,10 @@ const PageExecutionTerminal: React.FC<PageExecutionTerminalProps> = ({
     }, [logs]);
 
     if (!activeExecutionId) return null;
+
+    if (isHidden) {
+        return <div className="hidden" aria-hidden="true" />;
+    }
 
     return (
         <div className={cn(
