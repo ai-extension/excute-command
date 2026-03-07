@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, UserPlus, Shield, Mail, MoreHorizontal, Search, ShieldCheck, ChevronRight } from 'lucide-react';
+import { Users, UserPlus, Shield, Mail, MoreHorizontal, Search, ShieldCheck, ChevronRight, Key, Edit, Trash2 } from 'lucide-react';
 
 import {
     Table,
@@ -18,6 +18,7 @@ import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../lib/api';
 import { Pagination } from '../components/Pagination';
 import { ResourceFilters } from '../components/ResourceFilters';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 import {
     Dialog,
@@ -38,9 +39,15 @@ const UsersPage = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isRolesOpen, setIsRolesOpen] = useState(false);
+    const [isEditOpen, setIsEditOpen] = useState(false);
+    const [isResetOpen, setIsResetOpen] = useState(false);
+    const [deleteTarget, setDeleteTarget] = useState<any>(null);
+
     const [selectedUser, setSelectedUser] = useState<any>(null);
     const [selectedRoleIDs, setSelectedRoleIDs] = useState<string[]>([]);
     const [newUserData, setNewUserData] = useState({ username: '', password: '', email: '' });
+    const [editUserData, setEditUserData] = useState({ username: '', full_name: '', email: '' });
+    const [resetPasswordData, setResetPasswordData] = useState({ new_password: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [roleFilter, setRoleFilter] = useState<string>('ALL');
@@ -71,7 +78,7 @@ const UsersPage = () => {
 
     const fetchRoles = async (search?: string) => {
         try {
-            let url = `${API_BASE_URL}/roles?limit=20`;
+            let url = `${API_BASE_URL}/roles?limit=50`;
             if (search) url += `&search=${encodeURIComponent(search)}`;
             const response = await apiFetch(url);
             const dataRaw = await response.json();
@@ -112,9 +119,88 @@ const UsersPage = () => {
                 await fetchUsers();
                 setIsCreateOpen(false);
                 setNewUserData({ username: '', password: '', email: '' });
+            } else {
+                const error = await response.json();
+                alert(error.error || 'Failed to create user');
             }
         } catch (error) {
             console.error('Failed to create user:', error);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleUpdateUser = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedUser) return;
+        setIsSubmitting(true);
+        try {
+            const response = await apiFetch(`${API_BASE_URL}/users/${selectedUser.id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(editUserData)
+            });
+            if (response.ok) {
+                await fetchUsers();
+                setIsEditOpen(false);
+                setSelectedUser(null);
+            } else {
+                const error = await response.json();
+                alert(error.error || 'Failed to update user');
+            }
+        } catch (error) {
+            console.error('Failed to update user:', error);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleResetPassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedUser) return;
+        setIsSubmitting(true);
+        try {
+            const response = await apiFetch(`${API_BASE_URL}/users/${selectedUser.id}/password`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(resetPasswordData)
+            });
+            if (response.ok) {
+                setIsResetOpen(false);
+                setResetPasswordData({ new_password: '' });
+                setSelectedUser(null);
+                alert('Password reset successfully');
+            } else {
+                const error = await response.json();
+                alert(error.error || 'Failed to reset password');
+            }
+        } catch (error) {
+            console.error('Failed to reset password:', error);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteTarget) return;
+        setIsSubmitting(true);
+        try {
+            const response = await apiFetch(`${API_BASE_URL}/users/${deleteTarget.id}`, {
+                method: 'DELETE'
+            });
+            if (response.ok) {
+                await fetchUsers();
+                setDeleteTarget(null);
+            } else {
+                const error = await response.json();
+                alert(error.error || 'Failed to delete user');
+            }
+        } catch (error) {
+            console.error('Failed to delete user:', error);
         } finally {
             setIsSubmitting(false);
         }
@@ -124,6 +210,22 @@ const UsersPage = () => {
         setSelectedUser(user);
         setSelectedRoleIDs((user.roles || []).map((r: any) => r.id));
         setIsRolesOpen(true);
+    };
+
+    const openEditDialog = (user: any) => {
+        setSelectedUser(user);
+        setEditUserData({
+            username: user.username,
+            full_name: user.full_name || '',
+            email: user.email || ''
+        });
+        setIsEditOpen(true);
+    };
+
+    const openResetDialog = (user: any) => {
+        setSelectedUser(user);
+        setResetPasswordData({ new_password: '' });
+        setIsResetOpen(true);
     };
 
     const handleUpdateRoles = async () => {
@@ -156,17 +258,6 @@ const UsersPage = () => {
         );
     };
 
-    const filteredUsers = users.filter(u => {
-        const matchesSearch = u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (u.email && u.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-            (u.roles && u.roles.some((r: any) => r.name.toLowerCase().includes(searchTerm.toLowerCase())));
-        const matchesRole = roleFilter === 'ALL' ||
-            (u.roles && u.roles.some((r: any) => r.id === roleFilter));
-        return matchesSearch && matchesRole;
-    });
-
-    const paginatedUsers = filteredUsers.slice(offset, offset + limit);
-
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
             {/* Manage Roles Dialog */}
@@ -180,7 +271,7 @@ const UsersPage = () => {
                     </DialogHeader>
                     <div className="py-6 space-y-4">
                         <p className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Available Roles</p>
-                        <div className="grid gap-2">
+                        <div className="grid gap-2 max-h-[400px] overflow-y-auto pr-2">
                             {roles.map((role) => (
                                 <button
                                     key={role.id}
@@ -226,16 +317,27 @@ const UsersPage = () => {
                 </DialogContent>
             </Dialog>
 
-            {/* Breadcrumb */}
-            <div className="flex items-center gap-2 px-1">
-                <Users className="w-3.5 h-3.5 text-primary" />
-                <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em]">
-                    <span className="text-primary">Identity & Access</span>
-                    <ChevronRight className="w-2.5 h-2.5 text-muted-foreground/30" />
-                    <span className="text-muted-foreground font-black">User Directory</span>
+            {/* Breadcrumb & Actions */}
+            <div className="flex items-center justify-between px-1">
+                <div className="flex items-center gap-2">
+                    <Users className="w-3.5 h-3.5 text-primary" />
+                    <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em]">
+                        <span className="text-primary">Identity & Access</span>
+                        <ChevronRight className="w-2.5 h-2.5 text-muted-foreground/30" />
+                        <span className="text-muted-foreground font-black">User Directory</span>
+                    </div>
                 </div>
+
+                <Button
+                    onClick={() => setIsCreateOpen(true)}
+                    className="px-4 rounded-xl premium-gradient font-black uppercase tracking-widest text-[10px] h-9 shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
+                >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    New User
+                </Button>
             </div>
 
+            {/* Create User Dialog */}
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                 <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
@@ -291,6 +393,95 @@ const UsersPage = () => {
                 </DialogContent>
             </Dialog>
 
+            {/* Edit User Dialog */}
+            <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle className="text-2xl">Edit Identity</DialogTitle>
+                        <DialogDescription>
+                            Update core identification for <span className="text-primary font-black">{selectedUser?.username}</span>.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleUpdateUser} className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="edit-username" className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Username</Label>
+                            <Input
+                                id="edit-username"
+                                className="h-12 bg-muted/30 border-border rounded-xl font-semibold"
+                                value={editUserData.username}
+                                onChange={(e) => setEditUserData({ ...editUserData, username: e.target.value })}
+                                required
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="edit-fullname" className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Full Name</Label>
+                            <Input
+                                id="edit-fullname"
+                                placeholder="John Doe"
+                                className="h-12 bg-muted/30 border-border rounded-xl font-semibold"
+                                value={editUserData.full_name}
+                                onChange={(e) => setEditUserData({ ...editUserData, full_name: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="edit-email" className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Email Address</Label>
+                            <Input
+                                id="edit-email"
+                                type="email"
+                                placeholder="jdoe@example.com"
+                                className="h-12 bg-muted/30 border-border rounded-xl font-semibold"
+                                value={editUserData.email}
+                                onChange={(e) => setEditUserData({ ...editUserData, email: e.target.value })}
+                            />
+                        </div>
+                        <DialogFooter className="pt-4">
+                            <Button
+                                type="submit"
+                                disabled={isSubmitting}
+                                className="premium-gradient font-black uppercase tracking-widest text-[10px] h-12 w-full shadow-premium rounded-xl"
+                            >
+                                {isSubmitting ? "Updating..." : "Save Changes"}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* Reset Password Dialog */}
+            <Dialog open={isResetOpen} onOpenChange={setIsResetOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle className="text-2xl">Reset Password</DialogTitle>
+                        <DialogDescription>
+                            Set a new administrative password for <span className="text-primary font-black">{selectedUser?.username}</span>.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleResetPassword} className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="reset-password" className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">New Password</Label>
+                            <Input
+                                id="reset-password"
+                                type="password"
+                                placeholder="Minimum 6 characters"
+                                className="h-12 bg-muted/30 border-border rounded-xl font-semibold"
+                                value={resetPasswordData.new_password}
+                                onChange={(e) => setResetPasswordData({ ...resetPasswordData, new_password: e.target.value })}
+                                required
+                            />
+                        </div>
+                        <DialogFooter className="pt-4">
+                            <Button
+                                type="submit"
+                                disabled={isSubmitting || resetPasswordData.new_password.length < 6}
+                                className="premium-gradient font-black uppercase tracking-widest text-[10px] h-12 w-full shadow-premium rounded-xl"
+                            >
+                                {isSubmitting ? "Resetting..." : "Reset Password"}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
             <ResourceFilters
                 searchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
@@ -334,11 +525,11 @@ const UsersPage = () => {
                                         </div>
                                         <div>
                                             <p className="text-sm font-black tracking-tight flex items-center gap-2">
-                                                {u.username}
+                                                {u.full_name || u.username}
                                                 {u.username === 'admin' && <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />}
                                             </p>
                                             <p className="text-[11px] text-muted-foreground font-medium flex items-center gap-1.5 mt-0.5">
-                                                <Mail className="w-3 h-3 opacity-50" /> {u.email || 'no-email@example.com'}
+                                                <Mail className="w-3 h-3 opacity-50" /> {u.email || (u.username + '@system')}
                                             </p>
                                         </div>
                                     </div>
@@ -366,23 +557,50 @@ const UsersPage = () => {
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            className="w-10 rounded-xl hover:bg-primary/10 hover:text-primary transition-colors"
+                                            className="w-9 rounded-xl hover:bg-amber-500/10 hover:text-amber-600 transition-colors"
+                                            onClick={() => openEditDialog(u)}
+                                            title="Edit User"
+                                        >
+                                            <Edit className="w-4 h-4" />
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="w-9 rounded-xl hover:bg-primary/10 hover:text-primary transition-colors"
                                             onClick={() => openRolesDialog(u)}
+                                            title="Manage Roles"
                                         >
                                             <Shield className="w-4 h-4" />
                                         </Button>
-                                        <Button variant="ghost" size="icon" className="w-10 rounded-xl hover:bg-muted text-muted-foreground">
-                                            <MoreHorizontal className="w-4 h-4" />
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="w-9 rounded-xl hover:bg-indigo-500/10 hover:text-indigo-600 transition-colors"
+                                            onClick={() => openResetDialog(u)}
+                                            title="Reset Password"
+                                        >
+                                            <Key className="w-4 h-4" />
                                         </Button>
+                                        {u.username !== 'admin' && (
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="w-9 rounded-xl hover:bg-destructive/10 hover:text-destructive transition-colors"
+                                                onClick={() => setDeleteTarget(u)}
+                                                title="Delete User"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                        )}
                                     </div>
                                 </TableCell>
                             </TableRow>
                         )) : (
                             <TableRow>
-                                <TableCell colSpan={5} className="h-32 text-center">
-                                    <div className="flex flex-col items-center gap-3 opacity-40">
-                                        <Users className="w-8 h-8" />
-                                        <p className="text-[10px] font-black uppercase tracking-[0.2em]">{isLoading ? "Synchronizing user registry..." : "No users found matching your criteria"}</p>
+                                <TableCell colSpan={5} className="h-48 text-center">
+                                    <div className="flex flex-col items-center gap-3 opacity-30">
+                                        <Users className="w-12 h-12" />
+                                        <p className="text-[11px] font-black uppercase tracking-widest">{isLoading ? "Synchronizing user registry..." : "No users found matching your criteria"}</p>
                                     </div>
                                 </TableCell>
                             </TableRow>
@@ -398,6 +616,17 @@ const UsersPage = () => {
                     onPageChange={setOffset}
                 />
             </Card>
+
+            <ConfirmDialog
+                isOpen={!!deleteTarget}
+                onClose={() => setDeleteTarget(null)}
+                onConfirm={confirmDelete}
+                title="Delete Identity"
+                description={`Are you sure you want to permanently revoke access for "${deleteTarget?.username}"? This action moves the user to the archive.`}
+                confirmText="Revoke Access"
+                variant="danger"
+                isLoading={isSubmitting}
+            />
         </div >
     );
 };
