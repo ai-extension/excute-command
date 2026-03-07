@@ -199,7 +199,7 @@ const WorkflowDesignerPage = () => {
             const wfData = {
                 name,
                 description,
-                status: 'active',
+                status: 'PENDING',
                 default_server_id: defaultServerId || undefined,
                 target_folder: targetFolder,
                 cleanup_files: cleanupFiles,

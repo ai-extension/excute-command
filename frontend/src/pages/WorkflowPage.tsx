@@ -161,7 +161,7 @@ const WorkflowPage = () => {
                     description: newWorkflowDescription,
                     tags: newWorkflowTags,
                     default_server_id: newWorkflowDefaultServerId || undefined,
-                    status: 'active',
+                    status: 'PENDING',
                 }),
             });
 
