@@ -36,18 +36,19 @@ type SystemSetting struct {
 }
 
 type User struct {
-	ID             uuid.UUID    `json:"id" gorm:"type:uuid;primaryKey"`
-	Username       string       `json:"username" gorm:"uniqueIndex;not null"`
-	FullName       string       `json:"full_name"`
-	PasswordHash   string       `json:"-" gorm:"default:null"`
-	Email          string       `json:"email"`
-	SocialProvider string       `json:"social_provider"` // google, facebook, etc.
-	SocialID       string       `json:"social_id"`
-	AvatarURL      string       `json:"avatar_url"`
-	Roles          []Role       `json:"roles" gorm:"many2many:user_roles;"`
-	Permissions    []Permission `json:"permissions" gorm:"many2many:user_permissions;"`
-	CreatedAt      time.Time    `json:"created_at" gorm:"<-:create"`
-	UpdatedAt      time.Time    `json:"updated_at"`
+	ID             uuid.UUID      `json:"id" gorm:"type:uuid;primaryKey"`
+	Username       string         `json:"username" gorm:"uniqueIndex;not null"`
+	FullName       string         `json:"full_name"`
+	PasswordHash   string         `json:"-" gorm:"default:null"`
+	Email          string         `json:"email"`
+	SocialProvider string         `json:"social_provider"` // google, facebook, etc.
+	SocialID       string         `json:"social_id"`
+	AvatarURL      string         `json:"avatar_url"`
+	Roles          []Role         `json:"roles" gorm:"many2many:user_roles;"`
+	Permissions    []Permission   `json:"permissions" gorm:"many2many:user_permissions;"`
+	CreatedAt      time.Time      `json:"created_at" gorm:"<-:create"`
+	UpdatedAt      time.Time      `json:"updated_at"`
+	DeletedAt      gorm.DeletedAt `json:"-" gorm:"index"`
 }
 
 type Role struct {
@@ -57,6 +58,7 @@ type Role struct {
 	Permissions []RolePermission `json:"permissions" gorm:"foreignKey:RoleID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	CreatedAt   time.Time        `json:"created_at" gorm:"<-:create"`
 	UpdatedAt   time.Time        `json:"updated_at"`
+	DeletedAt   gorm.DeletedAt   `json:"-" gorm:"index"`
 }
 
 type RolePermission struct {
@@ -174,6 +176,7 @@ type Server struct {
 	CreatedByUsername  string         `json:"created_by_username,omitempty" gorm:"<-:create"`
 	CreatedAt          time.Time      `json:"created_at" gorm:"<-:create"`
 	UpdatedAt          time.Time      `json:"updated_at"`
+	DeletedAt          gorm.DeletedAt `json:"-" gorm:"index"`
 }
 
 type ServerMetrics struct {
@@ -193,24 +196,25 @@ type ServerRepository interface {
 }
 
 type VpnConfig struct {
-	ID                 uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey"`
-	Name               string     `json:"name" gorm:"not null"`
-	Description        string     `json:"description"`
-	VpnType            string     `json:"vpn_type" gorm:"not null;default:'SSH'"` // SSH, OPENVPN, WIREGUARD
-	Host               string     `json:"host" gorm:"not null"`
-	Port               int        `json:"port" gorm:"default:22"`
-	User               string     `json:"user"`
-	AuthType           string     `json:"auth_type"` // PASSWORD or PUBLIC_KEY
-	Password           string     `json:"password,omitempty"`
-	PrivateKey         string     `json:"private_key,omitempty"`
-	ConfigFile         string     `json:"config_file,omitempty"`          // For OpenVPN (.ovpn) or WireGuard (.conf)
-	PublicKey          string     `json:"public_key,omitempty"`           // For WireGuard
-	SharedKey          string     `json:"shared_key,omitempty"`           // For WireGuard
-	HostKeyFingerprint string     `json:"host_key_fingerprint,omitempty"` // For strict host key checking (TOFU or manual)
-	CreatedBy          *uuid.UUID `json:"created_by,omitempty" gorm:"type:uuid;<-:create"`
-	CreatedByUsername  string     `json:"created_by_username,omitempty" gorm:"<-:create"`
-	CreatedAt          time.Time  `json:"created_at" gorm:"<-:create"`
-	UpdatedAt          time.Time  `json:"updated_at"`
+	ID                 uuid.UUID      `json:"id" gorm:"type:uuid;primaryKey"`
+	Name               string         `json:"name" gorm:"not null"`
+	Description        string         `json:"description"`
+	VpnType            string         `json:"vpn_type" gorm:"not null;default:'SSH'"` // SSH, OPENVPN, WIREGUARD
+	Host               string         `json:"host" gorm:"not null"`
+	Port               int            `json:"port" gorm:"default:22"`
+	User               string         `json:"user"`
+	AuthType           string         `json:"auth_type"` // PASSWORD or PUBLIC_KEY
+	Password           string         `json:"password,omitempty"`
+	PrivateKey         string         `json:"private_key,omitempty"`
+	ConfigFile         string         `json:"config_file,omitempty"`          // For OpenVPN (.ovpn) or WireGuard (.conf)
+	PublicKey          string         `json:"public_key,omitempty"`           // For WireGuard
+	SharedKey          string         `json:"shared_key,omitempty"`           // For WireGuard
+	HostKeyFingerprint string         `json:"host_key_fingerprint,omitempty"` // For strict host key checking (TOFU or manual)
+	CreatedBy          *uuid.UUID     `json:"created_by,omitempty" gorm:"type:uuid;<-:create"`
+	CreatedByUsername  string         `json:"created_by_username,omitempty" gorm:"<-:create"`
+	CreatedAt          time.Time      `json:"created_at" gorm:"<-:create"`
+	UpdatedAt          time.Time      `json:"updated_at"`
+	DeletedAt          gorm.DeletedAt `json:"-" gorm:"index"`
 }
 
 type VpnConfigRepository interface {
@@ -355,14 +359,15 @@ type GlobalVariable struct {
 }
 
 type Tag struct {
-	ID                uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey"`
-	NamespaceID       uuid.UUID  `json:"namespace_id" gorm:"type:uuid;index"`
-	Name              string     `json:"name" gorm:"not null"`
-	Color             string     `json:"color" gorm:"not null;default:'#6366f1'"`
-	CreatedBy         *uuid.UUID `json:"created_by,omitempty" gorm:"type:uuid;<-:create"`
-	CreatedByUsername string     `json:"created_by_username,omitempty" gorm:"<-:create"`
-	CreatedAt         time.Time  `json:"created_at" gorm:"<-:create"`
-	UpdatedAt         time.Time  `json:"updated_at"`
+	ID                uuid.UUID      `json:"id" gorm:"type:uuid;primaryKey"`
+	NamespaceID       uuid.UUID      `json:"namespace_id" gorm:"type:uuid;index"`
+	Name              string         `json:"name" gorm:"not null"`
+	Color             string         `json:"color" gorm:"not null;default:'#6366f1'"`
+	CreatedBy         *uuid.UUID     `json:"created_by,omitempty" gorm:"type:uuid;<-:create"`
+	CreatedByUsername string         `json:"created_by_username,omitempty" gorm:"<-:create"`
+	CreatedAt         time.Time      `json:"created_at" gorm:"<-:create"`
+	UpdatedAt         time.Time      `json:"updated_at"`
+	DeletedAt         gorm.DeletedAt `json:"-" gorm:"index"`
 }
 
 type ScheduleType string
