@@ -128,6 +128,11 @@ func main() {
 	// Initialize scheduling engine
 	scheduleService.Init()
 
+	// Cleanup zombie executions from previous crashes/restarts
+	if err := workflowService.CleanupZombieExecutions(); err != nil {
+		log.Printf("[Main] Failed to cleanup zombie executions: %v", err)
+	}
+
 	// Initialize Handlers
 	namespaceHandler := handler.NewNamespaceHandler(namespaceRepo)
 	authHandler := handler.NewAuthHandler(authService)

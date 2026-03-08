@@ -1,6 +1,11 @@
 package service
 
 import (
+	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+
 	"github.com/google/uuid"
 	"github.com/user/csm-backend/internal/domain"
 )
@@ -252,4 +257,51 @@ func (s *WorkflowService) CloneWorkflow(id uuid.UUID, targetNamespaceID uuid.UUI
 	}
 
 	return &clone, nil
+}
+
+func (s *WorkflowService) CleanupZombieExecutions() error {
+	log.Println("[Cleanup] Checking for interrupted executions from previous session...")
+	// 1. Fetch all running executions
+	execs, err := s.execRepo.GetRunningExecutions()
+	if err != nil {
+		return err
+	}
+
+	if len(execs) == 0 {
+		log.Println("[Cleanup] No interrupted executions found.")
+		return nil
+	}
+
+	log.Printf("[Cleanup] Found %d interrupted executions. Appending messages to logs...", len(execs))
+	// 2. Append interrupt message to log files
+	cwd, _ := os.Getwd()
+	interruptedMsg := "\n[SYSTEM] Execution interrupted due to server restart.\n"
+
+	for _, exec := range execs {
+		execLogDir := filepath.Join(cwd, "data", "logs", "executions", exec.ID.String())
+
+		// Append to workflow.log
+		mainLogPath := filepath.Join(execLogDir, "workflow.log")
+		if f, err := os.OpenFile(mainLogPath, os.O_APPEND|os.O_WRONLY, 0644); err == nil {
+			fmt.Fprint(f, interruptedMsg)
+			f.Close()
+		}
+
+		// Append to each running step's log
+		for _, step := range exec.Steps {
+			stepLogPath := filepath.Join(execLogDir, step.StepID.String()+".log")
+			if f, err := os.OpenFile(stepLogPath, os.O_APPEND|os.O_WRONLY, 0644); err == nil {
+				fmt.Fprint(f, interruptedMsg)
+				f.Close()
+			}
+		}
+	}
+
+	log.Println("[Cleanup] Marking executions and workflows as FAILED in database...")
+	// 3. Update DB status
+	if err := s.execRepo.CleanupInterruptedExecutions(); err != nil {
+		return err
+	}
+	log.Println("[Cleanup] System clean and ready.")
+	return nil
 }

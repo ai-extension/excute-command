@@ -492,6 +492,8 @@ type WorkflowExecutionRepository interface {
 	Update(exec *WorkflowExecution) error
 	CreateStepResult(stepExec *WorkflowExecutionStep) error
 	GetExecutionAnalytics(namespaceID uuid.UUID, days int, scope *PermissionScope) ([]map[string]interface{}, error)
+	CleanupInterruptedExecutions() error
+	GetRunningExecutions() ([]WorkflowExecution, error)
 }
 
 type GlobalVariableRepository interface {

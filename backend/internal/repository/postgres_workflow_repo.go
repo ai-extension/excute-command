@@ -561,3 +561,51 @@ func (r *PostgresWorkflowExecutionRepo) GetExecutionAnalytics(namespaceID uuid.U
 
 	return results, err
 }
+
+func (r *PostgresWorkflowExecutionRepo) CleanupInterruptedExecutions() error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		now := time.Now()
+		interruptedMsg := "\n[SYSTEM] Execution interrupted due to server restart."
+
+		// Update running steps first
+		if err := tx.Model(&domain.WorkflowExecutionStep{}).
+			Where("status = ?", domain.StatusRunning).
+			Updates(map[string]interface{}{
+				"status":      domain.StatusFailed,
+				"finished_at": &now,
+				"output":      gorm.Expr("output || ?", interruptedMsg),
+			}).Error; err != nil {
+			return err
+		}
+
+		// Update running executions
+		if err := tx.Model(&domain.WorkflowExecution{}).
+			Where("status = ?", domain.StatusRunning).
+			Updates(map[string]interface{}{
+				"status":      domain.StatusFailed,
+				"finished_at": &now,
+			}).Error; err != nil {
+			return err
+		}
+
+		// Update template statuses: Workflow and WorkflowGroup
+		// These are less critical but keep the UI consistent
+		if err := tx.Model(&domain.Workflow{}).
+			Where("status = ?", domain.StatusRunning).
+			Update("status", domain.StatusFailed).Error; err != nil {
+			return err
+		}
+
+		return tx.Model(&domain.WorkflowGroup{}).
+			Where("status = ?", domain.StatusRunning).
+			Update("status", domain.StatusFailed).Error
+	})
+}
+
+func (r *PostgresWorkflowExecutionRepo) GetRunningExecutions() ([]domain.WorkflowExecution, error) {
+	var execs []domain.WorkflowExecution
+	err := r.db.Preload("Steps", "status = ?", domain.StatusRunning).
+		Where("status = ?", domain.StatusRunning).
+		Find(&execs).Error
+	return execs, err
+}
