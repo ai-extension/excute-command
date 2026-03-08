@@ -33,7 +33,8 @@ export const WorkflowRunner: React.FC<WorkflowRunnerProps> = ({ children, onRunC
         setRunKey(prev => prev + 1);
         setPendingRun({ workflow, inputs: inputsValues });
         // Clear execution_id when starting a new run to ensure monitor starts fresh
-        setRunningWorkflow({ ...workflow, execution_id: undefined });
+        // Reset status to PENDING to avoid showing the status of the previously finished run
+        setRunningWorkflow({ ...workflow, execution_id: undefined, status: 'PENDING' });
         setIsMonitorOpen(true);
     };
 

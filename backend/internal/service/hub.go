@@ -55,7 +55,7 @@ func NewHub() *Hub {
 	return &Hub{
 		clients:          make(map[*Client]bool),
 		topicSubscribers: make(map[string]map[*Client]bool),
-		broadcast:        make(chan []byte, 1024),
+		broadcast:        make(chan []byte, 4096),
 		register:         make(chan *Client),
 		unregister:       make(chan *Client),
 		subscribe:        make(chan subscription),
@@ -99,14 +99,12 @@ func (h *Hub) GetBuffer(executionID string) []LogEntry {
 }
 
 func (h *Hub) CloseStream(executionID string) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if s, ok := h.streams[executionID]; ok {
-		close(s.Ch)
-		delete(h.streams, executionID)
-		// Also cleanup topic subscribers for this execution
-		delete(h.topicSubscribers, executionID)
+	msg := map[string]string{
+		"type":         "close_stream",
+		"execution_id": executionID,
 	}
+	jsonMsg, _ := json.Marshal(msg)
+	h.broadcast <- jsonMsg
 }
 
 func (h *Hub) Run() {
@@ -244,16 +242,27 @@ func (h *Hub) processBroadcast(message []byte) {
 		}
 	}
 
-	// 2. Optimization: Clear log from RAM after successful broadcast (per user request)
+	// 2. Optimization: Keep a tail buffer for logs in RAM (per user request for stability)
 	if meta.Type == "log" && meta.ExecutionID != "" {
 		if s, ok := h.streams[meta.ExecutionID]; ok {
 			s.mu.Lock()
-			// Clear buffer since it was just sent to active subscribers.
-			// This implements the "queue-style" where data is discarded after transmission.
-			// Catch-up will only show logs that were buffered BETWEEN catch-up request and now,
-			// or we could keep a very small tail if needed. For now, following "clear after sending".
-			s.Buffer = s.Buffer[:0]
+			// Keep only the last 100 lines for late-joiners/catch-up
+			// This prevents OOM while ensuring new clients don't see an empty screen
+			maxTail := 100
+			if len(s.Buffer) > maxTail {
+				s.Buffer = s.Buffer[len(s.Buffer)-maxTail:]
+			}
 			s.mu.Unlock()
+		}
+	}
+
+	// 3. Graceful cleanup: Handle close_stream message in order
+	if meta.Type == "close_stream" && meta.ExecutionID != "" {
+		if s, ok := h.streams[meta.ExecutionID]; ok {
+			close(s.Ch)
+			delete(h.streams, meta.ExecutionID)
+			delete(h.topicSubscribers, meta.ExecutionID)
+			log.Printf("Gracefully closed LogStream for execution: %s", meta.ExecutionID)
 		}
 	}
 }
@@ -280,10 +289,7 @@ func (h *Hub) BroadcastLog(targetID string, executionID string, content string) 
 	}
 	jsonMsg, _ := json.Marshal(msg)
 
-	select {
-	case h.broadcast <- jsonMsg:
-	default:
-	}
+	h.broadcast <- jsonMsg
 }
 
 func (h *Hub) BroadcastStatus(targetID string, executionID string, targetType string, status string) {

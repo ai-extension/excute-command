@@ -50,8 +50,7 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
     const { apiFetch, showToast } = useAuth();
     const workflowID = workflow?.id;
     const executionIDRef = React.useRef<string | undefined>(execution?.id || (workflow as any)?.execution_id);
-
-    // Keep the ref updated with the latest execution ID
+    const wsRef = React.useRef<WebSocket | null>(null);
     useEffect(() => {
         const currentID = execution?.id || (workflow as any)?.execution_id;
         if (currentID) {
@@ -117,16 +116,23 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
     useEffect(() => {
         if (mode !== 'LIVE' || !workflowID) return;
 
-        console.log('Establishing Status WebSocket connection...');
-        const ws = new WebSocket(`ws://${window.location.hostname}:8080/api/ws?token=${token || ''}`);
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        let baseUrl = API_BASE_URL;
+        if (baseUrl.startsWith('/')) {
+            baseUrl = `${window.location.host}${baseUrl}`;
+        } else {
+            baseUrl = baseUrl.replace(/^http(s)?:\/\//, '');
+        }
+
+        const wsUrl = `${protocol}//${baseUrl}/ws?token=${token || ''}&status_only=true`;
+        console.log('Establishing Status WebSocket connection:', wsUrl);
+        const ws = new WebSocket(wsUrl);
+        wsRef.current = ws;
 
         ws.onmessage = (event) => {
             const msg = JSON.parse(event.data);
             if (msg.type === 'status') {
-                // Filter by execution_id to avoid mixed-up sessions
-                // Use ref to ensure we have the absolute latest ID from the parent/state
                 const currentExecID = executionIDRef.current;
-
                 if (msg.execution_id && msg.execution_id !== currentExecID?.toString()) {
                     return;
                 }
@@ -154,16 +160,37 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
         ws.onopen = () => {
             console.log('Status WebSocket connected');
             setIsStatusWSReady(true);
+
+            const currentExecID = executionIDRef.current;
+            if (currentExecID) {
+                ws.send(JSON.stringify({
+                    type: 'subscribe',
+                    execution_id: currentExecID
+                }));
+            }
             syncStatus();
         };
 
         ws.onclose = () => {
             console.log('Status WebSocket disconnected');
             setIsStatusWSReady(false);
+            wsRef.current = null;
         };
 
         return () => ws.close();
-    }, [mode, workflowID, syncStatus]);
+    }, [mode, workflowID, syncStatus, token]);
+
+    // Send subscribe message if executionID changes while WS is already open
+    useEffect(() => {
+        const currentExecID = execution?.id || (workflow as any)?.execution_id;
+        if (mode === 'LIVE' && currentExecID && isStatusWSReady && wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({
+                type: 'subscribe',
+                execution_id: currentExecID
+            }));
+            syncStatus();
+        }
+    }, [execution?.id, (workflow as any)?.execution_id, isStatusWSReady, mode, syncStatus]);
 
     // Fetch full execution details if we only have an ID (mostly for LIVE mode transition)
     useEffect(() => {

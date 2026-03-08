@@ -92,7 +92,15 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
     useEffect(() => {
         if (!isActive || !isLive) return;
 
-        const wsUrl = `ws://${window.location.hostname}:8080/api/ws?token=${token || ''}`;
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        let baseUrl = API_BASE_URL;
+        if (baseUrl.startsWith('/')) {
+            baseUrl = `${window.location.host}${baseUrl}`;
+        } else {
+            baseUrl = baseUrl.replace(/^http(s)?:\/\//, '');
+        }
+
+        const wsUrl = `${protocol}//${baseUrl}/ws?token=${token || ''}`;
         const socket = new WebSocket(wsUrl);
 
         socket.onmessage = (event) => {
