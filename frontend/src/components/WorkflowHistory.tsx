@@ -33,7 +33,7 @@ const PAGE_SIZE = 20;
 interface WorkflowHistoryProps {
     workflowId?: string;
     namespaceId?: string;
-    onReRun?: (workflow: any, inputs: Record<string, string>) => void;
+    onReRun?: (workflow: any, inputs: Record<string, string>, startGroupID?: string, startStepID?: string) => void;
     status?: string;
     executedBy?: string;
     search?: string;

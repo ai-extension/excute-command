@@ -184,7 +184,9 @@ func (h *WorkflowHandler) RunWorkflow(c *gin.Context) {
 	}
 
 	var req struct {
-		Inputs map[string]string `json:"inputs"`
+		Inputs       map[string]string `json:"inputs"`
+		StartGroupID *uuid.UUID        `json:"start_group_id"`
+		StartStepID  *uuid.UUID        `json:"start_step_id"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil && c.Request.ContentLength > 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -231,7 +233,7 @@ func (h *WorkflowHandler) RunWorkflow(c *gin.Context) {
 
 	// Run inside a goroutine to not block the request
 	go func() {
-		err := h.executor.Run(context.Background(), id, execID, req.Inputs, nil, nil, "MANUAL", user)
+		err := h.executor.Run(context.Background(), id, execID, req.Inputs, nil, nil, "MANUAL", user, req.StartGroupID, req.StartStepID)
 		if err != nil {
 			// Hub broadcast will handle status updates, but we can log error
 			println("Workflow execution error:", err.Error())
@@ -293,12 +295,12 @@ func (h *WorkflowHandler) ListExecutions(c *gin.Context) {
 		}
 	}
 
-var executedBy *uuid.UUID
-if eb := c.Query("executed_by"); eb != "" {
-if id, err := uuid.Parse(eb); err == nil {
-executedBy = &id
-}
-}
+	var executedBy *uuid.UUID
+	if eb := c.Query("executed_by"); eb != "" {
+		if id, err := uuid.Parse(eb); err == nil {
+			executedBy = &id
+		}
+	}
 	userVal, _ := c.Get("user")
 	user := userVal.(*domain.User)
 

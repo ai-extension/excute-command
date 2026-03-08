@@ -280,7 +280,7 @@ func (s *ScheduleService) runScheduledWorkflows(scheduleID uuid.UUID) {
 			for attempt := 0; attempt <= maxRetries; attempt++ {
 				execID := uuid.New()
 				// Background execution, nil user
-				err := s.executor.Run(ctx, w.ID, execID, in, &schedule.ID, nil, "SCHEDULE", nil)
+				err := s.executor.Run(ctx, w.ID, execID, in, &schedule.ID, nil, "SCHEDULE", nil, nil, nil)
 				if err == nil {
 					success = true
 					break

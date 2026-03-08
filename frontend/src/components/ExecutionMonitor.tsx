@@ -27,7 +27,7 @@ interface ExecutionMonitorProps {
     execution?: WorkflowExecution;
     onClose: () => void;
     onReady?: () => void;
-    onReRun?: (workflow: Workflow, inputs: Record<string, string>) => void;
+    onReRun?: (workflow: Workflow, inputs: Record<string, string>, startGroupID?: string, startStepID?: string) => void;
 }
 
 const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
@@ -432,6 +432,26 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                                             </p>
                                         </button>
                                     </div>
+                                    {onReRun && (mode === 'HISTORICAL' || (mode === 'LIVE' && workflow.status !== 'RUNNING' && workflow.status !== 'PENDING')) && (
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                let inputs: Record<string, string> = {};
+                                                if (execution?.inputs) {
+                                                    try {
+                                                        inputs = JSON.parse(execution.inputs);
+                                                    } catch (e) { }
+                                                }
+                                                onReRun(workflow, inputs, group.id);
+                                            }}
+                                            title="Run from this group"
+                                            className="h-6 w-6 rounded-md hover:bg-emerald-500/10 text-muted-foreground hover:text-emerald-500 transition-all opacity-0 group-hover:opacity-100"
+                                        >
+                                            <Play className="w-3 h-3" />
+                                        </Button>
+                                    )}
                                 </div>
 
                                 <div className="grid gap-2 ml-10">
@@ -467,7 +487,29 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <ChevronRight className="w-3 h-3 text-muted-foreground/40" />
+                                                <div className="flex items-center gap-2">
+                                                    {onReRun && (mode === 'HISTORICAL' || (mode === 'LIVE' && workflow.status !== 'RUNNING' && workflow.status !== 'PENDING')) && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                let inputs: Record<string, string> = {};
+                                                                if (execution?.inputs) {
+                                                                    try {
+                                                                        inputs = JSON.parse(execution.inputs);
+                                                                    } catch (e) { }
+                                                                }
+                                                                onReRun(workflow, inputs, group.id, step.id);
+                                                            }}
+                                                            title="Run from this step"
+                                                            className="h-6 w-6 rounded-md hover:bg-emerald-500/10 text-muted-foreground hover:text-emerald-500 transition-all opacity-0 group-hover:opacity-100"
+                                                        >
+                                                            <Play className="w-3 h-3" />
+                                                        </Button>
+                                                    )}
+                                                    <ChevronRight className="w-3 h-3 text-muted-foreground/40" />
+                                                </div>
                                             </button>
                                         );
                                     })}

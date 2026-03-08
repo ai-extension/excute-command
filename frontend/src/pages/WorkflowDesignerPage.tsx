@@ -547,7 +547,7 @@ const WorkflowDesignerPage = () => {
                                         <div className="animate-in fade-in slide-in-from-right-2 duration-300">
                                             <WorkflowHistory
                                                 workflowId={id as string}
-                                                onReRun={(wf, inputs) => runWorkflow({ ...wf, id: id as string }, inputs)}
+                                                onReRun={(wf, inputs, gId, sId) => runWorkflow({ ...wf, id: id as string }, inputs, gId, sId)}
                                             />
                                         </div>
                                     ) : null}
