@@ -323,7 +323,7 @@ const ScheduleDetailPage = () => {
                                     mode="HISTORICAL"
                                     execution={selectedExec}
                                     onClose={() => setSelectedExec(null)}
-                                    onReRun={(wf, inputs, gId, sId) => runWorkflow({ ...wf, id: selectedExec.workflow_id }, inputs, gId, sId)}
+                                    onReRun={(wf, inputs, gId, sId, execId) => runWorkflow({ ...wf, id: selectedExec.workflow_id }, inputs, gId, sId, execId)}
                                 />
                             )}
                         </DialogContent>

@@ -6,7 +6,7 @@ interface WorkflowMonitorProps {
     workflow: Workflow;
     onClose: () => void;
     onReady?: () => void;
-    onReRun?: (workflow: Workflow, inputs: Record<string, string>, startGroupID?: string, startStepID?: string) => void;
+    onReRun?: (workflow: Workflow, inputs: Record<string, string>, startGroupID?: string, startStepID?: string, fromExecutionID?: string) => void;
 }
 
 const WorkflowMonitor = ({ workflow, onClose, onReady, onReRun }: WorkflowMonitorProps) => {

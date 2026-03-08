@@ -438,6 +438,7 @@ type WorkflowExecutionStep struct {
 	Output      string     `json:"output"`
 	StartedAt   time.Time  `json:"started_at"`
 	FinishedAt  *time.Time `json:"finished_at,omitempty"`
+	WorkingDir  string     `json:"working_dir"`
 	CreatedAt   time.Time  `json:"created_at" gorm:"<-:create"`
 	UpdatedAt   time.Time  `json:"updated_at"`
 }

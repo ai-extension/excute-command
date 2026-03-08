@@ -27,7 +27,7 @@ interface ExecutionMonitorProps {
     execution?: WorkflowExecution;
     onClose: () => void;
     onReady?: () => void;
-    onReRun?: (workflow: Workflow, inputs: Record<string, string>, startGroupID?: string, startStepID?: string) => void;
+    onReRun?: (workflow: Workflow, inputs: Record<string, string>, startGroupID?: string, startStepID?: string, fromExecutionID?: string) => void;
 }
 
 const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
@@ -365,7 +365,7 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                                             console.error('Failed to parse inputs for rerun:', e);
                                         }
                                     }
-                                    onReRun(workflow, inputs);
+                                    onReRun(workflow, inputs, undefined, undefined, execution?.id);
                                 }}
                                 className="h-7 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/5 border border-emerald-500/20 transition-all ml-1"
                             >
@@ -444,7 +444,7 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                                                         inputs = JSON.parse(execution.inputs);
                                                     } catch (e) { }
                                                 }
-                                                onReRun(workflow, inputs, group.id);
+                                                onReRun(workflow, inputs, group.id, undefined, execution?.id);
                                             }}
                                             title="Run from this group"
                                             className="h-6 w-6 rounded-md hover:bg-emerald-500/10 text-muted-foreground hover:text-emerald-500 transition-all opacity-0 group-hover:opacity-100"
@@ -500,7 +500,7 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                                                                         inputs = JSON.parse(execution.inputs);
                                                                     } catch (e) { }
                                                                 }
-                                                                onReRun(workflow, inputs, group.id, step.id);
+                                                                onReRun(workflow, inputs, group.id, step.id, execution?.id);
                                                             }}
                                                             title="Run from this step"
                                                             className="h-6 w-6 rounded-md hover:bg-emerald-500/10 text-muted-foreground hover:text-emerald-500 transition-all opacity-0 group-hover:opacity-100"

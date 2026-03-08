@@ -7,7 +7,7 @@ import WorkflowMonitor from './WorkflowMonitor';
 import WorkflowInputDialog from './WorkflowInputDialog';
 
 interface WorkflowRunnerProps {
-    children: (runWorkflow: (workflow: Partial<Workflow> & { id: string }, inputs?: Record<string, string>, startGroupID?: string, startStepID?: string) => void) => React.ReactNode;
+    children: (runWorkflow: (workflow: Partial<Workflow> & { id: string }, inputs?: Record<string, string>, startGroupID?: string, startStepID?: string, fromExecutionID?: string) => void) => React.ReactNode;
     onRunComplete?: () => void;
     onCloseMonitor?: () => void;
 }
@@ -19,9 +19,9 @@ export const WorkflowRunner: React.FC<WorkflowRunnerProps> = ({ children, onRunC
     const [isInputOpen, setIsInputOpen] = useState(false);
     const [runningWorkflow, setRunningWorkflow] = useState<(Partial<Workflow> & { id: string, execution_id?: string }) | null>(null);
     const [isStarting, setIsStarting] = useState(false);
-    const [pendingRun, setPendingRun] = useState<{ workflow: any, inputs?: Record<string, string>, startGroupID?: string, startStepID?: string } | null>(null);
+    const [pendingRun, setPendingRun] = useState<{ workflow: any, inputs?: Record<string, string>, startGroupID?: string, startStepID?: string, fromExecutionID?: string } | null>(null);
 
-    const handleRunWorkflow = async (workflow: Partial<Workflow> & { id: string }, inputsValues?: Record<string, string>, startGroupID?: string, startStepID?: string) => {
+    const handleRunWorkflow = async (workflow: Partial<Workflow> & { id: string }, inputsValues?: Record<string, string>, startGroupID?: string, startStepID?: string, fromExecutionID?: string) => {
         // If workflow has inputs and they weren't provided yet, show dialog
         // Only show input dialog if it's NOT a partial rerun (usually partial reruns reuse inputs)
         // Actually, let's keep it simple: if inputs are missing, show dialog.
@@ -33,7 +33,7 @@ export const WorkflowRunner: React.FC<WorkflowRunnerProps> = ({ children, onRunC
 
         setIsInputOpen(false);
         setRunKey(prev => prev + 1);
-        setPendingRun({ workflow, inputs: inputsValues, startGroupID, startStepID });
+        setPendingRun({ workflow, inputs: inputsValues, startGroupID, startStepID, fromExecutionID });
         // Clear execution_id when starting a new run to ensure monitor starts fresh
         // Reset status to PENDING to avoid showing the status of the previously finished run
         setRunningWorkflow({ ...workflow, execution_id: undefined, status: 'PENDING' });
@@ -43,7 +43,7 @@ export const WorkflowRunner: React.FC<WorkflowRunnerProps> = ({ children, onRunC
     const handleMonitorReady = async () => {
         if (!pendingRun || isStarting) return;
 
-        const { workflow, inputs, startGroupID, startStepID } = pendingRun;
+        const { workflow, inputs, startGroupID, startStepID, fromExecutionID } = pendingRun;
         setIsStarting(true);
         setPendingRun(null);
 
@@ -51,7 +51,8 @@ export const WorkflowRunner: React.FC<WorkflowRunnerProps> = ({ children, onRunC
             const body = {
                 inputs: inputs || {},
                 start_group_id: startGroupID,
-                start_step_id: startStepID
+                start_step_id: startStepID,
+                from_execution_id: fromExecutionID
             };
 
             const response = await apiFetch(`${API_BASE_URL}/workflows/${workflow.id}/run`, {
@@ -79,7 +80,7 @@ export const WorkflowRunner: React.FC<WorkflowRunnerProps> = ({ children, onRunC
 
     return (
         <>
-            {children((workflow, inputs, startGroupID, startStepID) => handleRunWorkflow(workflow, inputs, startGroupID, startStepID))}
+            {children((workflow, inputs, startGroupID, startStepID, fromExecutionID) => handleRunWorkflow(workflow, inputs, startGroupID, startStepID, fromExecutionID))}
 
             {/* Workflow Monitor Dialog */}
             <Dialog open={isMonitorOpen} onOpenChange={setIsMonitorOpen}>
@@ -89,11 +90,11 @@ export const WorkflowRunner: React.FC<WorkflowRunnerProps> = ({ children, onRunC
                             key={runKey}
                             workflow={runningWorkflow as any}
                             onReady={handleMonitorReady}
-                            onReRun={(workflow, inputs, startGroupID, startStepID) => {
+                            onReRun={(workflow, inputs, startGroupID, startStepID, fromExecutionID) => {
                                 // Reset starting states to allow a fresh run
                                 setIsStarting(false);
                                 setPendingRun(null);
-                                handleRunWorkflow(workflow, inputs, startGroupID, startStepID);
+                                handleRunWorkflow(workflow, inputs, startGroupID, startStepID, fromExecutionID);
                             }}
                             onClose={() => {
                                 setIsMonitorOpen(false);

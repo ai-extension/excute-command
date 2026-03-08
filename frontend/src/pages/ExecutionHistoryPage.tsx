@@ -242,7 +242,7 @@ const ExecutionHistoryPage = () => {
                                 workflowId={workflowFilter !== 'ALL' ? workflowFilter : undefined}
                                 executedBy={selectedExecutedBy}
                                 search={searchQuery}
-                                onReRun={(wf: any, inputs: any, gId?: string, sId?: string) => runWorkflow(wf, inputs, gId, sId)}
+                                onReRun={(wf: any, inputs: any, gId?: string, sId?: string, execId?: string) => runWorkflow(wf, inputs, gId, sId, execId)}
                             />
                         </div>
                     </div>
