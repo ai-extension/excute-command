@@ -244,7 +244,7 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 	}
 
 	// 0. Execute BEFORE hooks
-	if err := e.RunHooks(ctx, wf.Hooks, domain.HookTypeBefore, wf.NamespaceID, logFile, depth, execution.User, execution.ID, fromExecutionID); err != nil {
+	if err := e.RunHooks(ctx, wf.Hooks, domain.HookTypeBefore, wf.NamespaceID, logFile, depth, execution.User, execution.ID, fromExecutionID, inputsMap, wf.Variables, groupResults); err != nil {
 		runErr = fmt.Errorf("before hook failed: %w", err)
 		e.hub.BroadcastLog(workflowID.String(), execution.ID.String(), fmt.Sprintf("Error: %v", runErr))
 		goto finalize
@@ -460,7 +460,7 @@ finalize:
 			e.hub.BroadcastLog(wf.ID.String(), execution.ID.String(), fmt.Sprintf("\n\033[1;31m✖ WORKFLOW TIMED OUT (Exceeded %d minutes)\033[0m", wf.TimeoutMinutes))
 
 			// Execute AFTER_FAILED hooks
-			e.RunHooks(context.Background(), wf.Hooks, domain.HookTypeAfterFailed, wf.NamespaceID, logFile, depth, execution.User, execution.ID, fromExecutionID)
+			e.RunHooks(context.Background(), wf.Hooks, domain.HookTypeAfterFailed, wf.NamespaceID, logFile, depth, execution.User, execution.ID, fromExecutionID, inputsMap, wf.Variables, groupResults)
 		} else {
 			// Actual failure
 			wf.Status = domain.StatusFailed
@@ -469,7 +469,7 @@ finalize:
 			e.hub.BroadcastLog(wf.ID.String(), execution.ID.String(), fmt.Sprintf("\n\033[1;31m✖ WORKFLOW FAILED: %v\033[0m", runErr))
 
 			// Execute AFTER_FAILED hooks
-			e.RunHooks(ctx, wf.Hooks, domain.HookTypeAfterFailed, wf.NamespaceID, logFile, depth, execution.User, execution.ID, fromExecutionID)
+			e.RunHooks(ctx, wf.Hooks, domain.HookTypeAfterFailed, wf.NamespaceID, logFile, depth, execution.User, execution.ID, fromExecutionID, inputsMap, wf.Variables, groupResults)
 		}
 	} else {
 		wf.Status = domain.StatusSuccess
@@ -478,7 +478,7 @@ finalize:
 		e.hub.BroadcastLog(wf.ID.String(), execution.ID.String(), "\n\033[1;32m✔ WORKFLOW SUCCESS\033[0m")
 
 		// Execute AFTER_SUCCESS hooks
-		e.RunHooks(ctx, wf.Hooks, domain.HookTypeAfterSuccess, wf.NamespaceID, logFile, depth, execution.User, execution.ID, fromExecutionID)
+		e.RunHooks(ctx, wf.Hooks, domain.HookTypeAfterSuccess, wf.NamespaceID, logFile, depth, execution.User, execution.ID, fromExecutionID, inputsMap, wf.Variables, groupResults)
 	}
 
 	e.execRepo.Update(execution)
@@ -488,7 +488,7 @@ finalize:
 	return runErr
 }
 
-func (e *WorkflowExecutor) RunHooks(ctx context.Context, hooks []domain.WorkflowHook, hookType domain.HookType, namespaceID uuid.UUID, logFile *os.File, depth int, user *domain.User, executionID uuid.UUID, fromExecutionID *uuid.UUID) error {
+func (e *WorkflowExecutor) RunHooks(ctx context.Context, hooks []domain.WorkflowHook, hookType domain.HookType, namespaceID uuid.UUID, logFile *os.File, depth int, user *domain.User, executionID uuid.UUID, fromExecutionID *uuid.UUID, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string) error {
 	for _, hook := range hooks {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -509,12 +509,24 @@ func (e *WorkflowExecutor) RunHooks(ctx context.Context, hooks []domain.Workflow
 			json.Unmarshal([]byte(hook.Inputs), &hookInputs)
 		}
 
+		// Substitute variables in hook inputs
+		pcontext := e.getInterpolationContext(inputs, variables, groupResults, namespaceID, user)
+
+		resolvedInputs := make(map[string]string)
+		for k, v := range hookInputs {
+			rendered, err := e.renderTemplate(v, pcontext)
+			if err != nil {
+				rendered = v // fallback to raw
+			}
+			resolvedInputs[k] = rendered
+		}
+
 		hookExecID := uuid.New()
 
 		// Run hook asynchronously so it doesn't block the progress of the workflow/schedule
-		go func(h domain.WorkflowHook, execID uuid.UUID, inputs map[string]string) {
+		go func(h domain.WorkflowHook, execID uuid.UUID, resolvedInputs map[string]string) {
 			bgCtx := context.Background()
-			err := e.RunWithDepth(bgCtx, h.TargetWorkflowID, execID, inputs, nil, nil, "HOOK", depth+1, user, nil, nil, nil)
+			err := e.RunWithDepth(bgCtx, h.TargetWorkflowID, execID, resolvedInputs, nil, nil, "HOOK", depth+1, user, nil, nil, nil)
 			if err != nil {
 				errMsg := fmt.Sprintf("\033[1;33m⚠ Warning: %s hook failed (%v)\033[0m", hookType, err)
 				if h.WorkflowID != nil {
@@ -525,7 +537,7 @@ func (e *WorkflowExecutor) RunHooks(ctx context.Context, hooks []domain.Workflow
 					e.hub.BroadcastLog(h.WorkflowID.String(), executionID.String(), fmt.Sprintf("\033[1;32m✔ %s HOOK SUCCESS\033[0m", hookType))
 				}
 			}
-		}(hook, hookExecID, hookInputs)
+		}(hook, hookExecID, resolvedInputs)
 	}
 	return nil
 }
