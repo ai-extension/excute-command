@@ -69,7 +69,7 @@ func (h *Hub) CreateStream(executionID string, pageID *uuid.UUID) *LogStream {
 	defer h.mu.Unlock()
 	stream := &LogStream{
 		Buffer:       make([]LogEntry, 0),
-		Ch:           make(chan string, 100),
+		Ch:           make(chan string, 200),
 		PageID:       pageID,
 		LastActivity: time.Now(),
 	}
@@ -246,9 +246,9 @@ func (h *Hub) processBroadcast(message []byte) {
 	if meta.Type == "log" && meta.ExecutionID != "" {
 		if s, ok := h.streams[meta.ExecutionID]; ok {
 			s.mu.Lock()
-			// Keep only the last 100 lines for late-joiners/catch-up
+			// Keep only the last 200 lines for late-joiners/catch-up
 			// This prevents OOM while ensuring new clients don't see an empty screen
-			maxTail := 100
+			maxTail := 200
 			if len(s.Buffer) > maxTail {
 				s.Buffer = s.Buffer[len(s.Buffer)-maxTail:]
 			}
