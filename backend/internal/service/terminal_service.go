@@ -22,15 +22,17 @@ type TerminalService struct {
 	repo         domain.ServerRepository
 	hub          *Hub
 	vpnConnector *VpnConnector
+	sshPool      *SSHPool
 	sessions     map[string]*TerminalSession
 	mu           sync.Mutex
 }
 
-func NewTerminalService(repo domain.ServerRepository, hub *Hub, vpnConnector *VpnConnector) *TerminalService {
+func NewTerminalService(repo domain.ServerRepository, hub *Hub, vpnConnector *VpnConnector, sshPool *SSHPool) *TerminalService {
 	return &TerminalService{
 		repo:         repo,
 		hub:          hub,
 		vpnConnector: vpnConnector,
+		sshPool:      sshPool,
 		sessions:     make(map[string]*TerminalSession),
 	}
 }
@@ -42,7 +44,7 @@ func (s *TerminalService) StartSession(serverID uuid.UUID, user *domain.User) (s
 		return "", fmt.Errorf("failed to get server: %w", err)
 	}
 
-	conn, err := GetServerConnection(server, s.vpnConnector)
+	conn, err := GetServerConnection(server, s.vpnConnector, s.sshPool)
 	if err != nil {
 		return "", err
 	}
@@ -117,7 +119,7 @@ func (s *TerminalService) RunCommandOnServer(serverID uuid.UUID) func(command st
 			return "", fmt.Errorf("server not found: %w", err)
 		}
 
-		conn, err := GetServerConnection(server, s.vpnConnector)
+		conn, err := GetServerConnection(server, s.vpnConnector, s.sshPool)
 		if err != nil {
 			return "", err
 		}
@@ -135,7 +137,7 @@ func (s *TerminalService) RunStreamingCommandOnServer(serverID uuid.UUID) func(c
 			return "", fmt.Errorf("server not found: %w", err)
 		}
 
-		conn, err := GetServerConnection(server, s.vpnConnector)
+		conn, err := GetServerConnection(server, s.vpnConnector, s.sshPool)
 		if err != nil {
 			return "", err
 		}

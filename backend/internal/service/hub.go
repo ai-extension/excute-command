@@ -35,27 +35,32 @@ type Client struct {
 }
 
 type Hub struct {
-	clients    map[*Client]bool
-	broadcast  chan []byte
-	register   chan *Client
-	unregister chan *Client
-	streams    map[string]*LogStream // Key: executionID
-	mu         sync.Mutex
+	clients          map[*Client]bool
+	topicSubscribers map[string]map[*Client]bool // Key: topic (executionID or global)
+	broadcast        chan []byte
+	register         chan *Client
+	unregister       chan *Client
+	subscribe        chan subscription
+	unsubscribe      chan subscription
+	streams          map[string]*LogStream // Key: executionID
+	mu               sync.Mutex
 }
 
-type terminalMessage struct {
-	SessionID string `json:"session_id"`
-	Content   string `json:"content"`
-	Type      string `json:"type"` // "input", "resize", etc.
+type subscription struct {
+	client  *Client
+	topicID string
 }
 
 func NewHub() *Hub {
 	return &Hub{
-		clients:    make(map[*Client]bool),
-		broadcast:  make(chan []byte, 1024), // Larger buffer for non-blocking reliability
-		register:   make(chan *Client),
-		unregister: make(chan *Client),
-		streams:    make(map[string]*LogStream),
+		clients:          make(map[*Client]bool),
+		topicSubscribers: make(map[string]map[*Client]bool),
+		broadcast:        make(chan []byte, 1024),
+		register:         make(chan *Client),
+		unregister:       make(chan *Client),
+		subscribe:        make(chan subscription),
+		unsubscribe:      make(chan subscription),
+		streams:          make(map[string]*LogStream),
 	}
 }
 
@@ -85,7 +90,7 @@ func (h *Hub) GetBuffer(executionID string) []LogEntry {
 	if s, ok := h.streams[executionID]; ok {
 		s.mu.Lock()
 		defer s.mu.Unlock()
-		// Return a copy to avoid race conditions
+		// Return a copy
 		buf := make([]LogEntry, len(s.Buffer))
 		copy(buf, s.Buffer)
 		return buf
@@ -99,6 +104,8 @@ func (h *Hub) CloseStream(executionID string) {
 	if s, ok := h.streams[executionID]; ok {
 		close(s.Ch)
 		delete(h.streams, executionID)
+		// Also cleanup topic subscribers for this execution
+		delete(h.topicSubscribers, executionID)
 	}
 }
 
@@ -115,18 +122,50 @@ func (h *Hub) Run() {
 			h.clients[client] = true
 			h.mu.Unlock()
 		case client := <-h.unregister:
-			h.mu.Lock()
-			if _, ok := h.clients[client]; ok {
-				delete(h.clients, client)
-				client.Conn.Close()
-			}
-			h.mu.Unlock()
+			h.handleUnregister(client)
+		case sub := <-h.subscribe:
+			h.handleSubscribe(sub)
+		case sub := <-h.unsubscribe:
+			h.handleUnsubscribe(sub)
 		case message := <-h.broadcast:
 			h.processBroadcast(message)
 		case <-ticker.C:
 			h.processBroadcast([]byte(`{"type":"ping"}`))
 		case <-cleanupTicker.C:
 			h.cleanupOrphanedStreams()
+		}
+	}
+}
+
+func (h *Hub) handleUnregister(client *Client) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if _, ok := h.clients[client]; ok {
+		delete(h.clients, client)
+		client.Conn.Close()
+		// Cleanup all subscriptions for this client
+		for topicID := range h.topicSubscribers {
+			delete(h.topicSubscribers[topicID], client)
+		}
+	}
+}
+
+func (h *Hub) handleSubscribe(sub subscription) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.topicSubscribers[sub.topicID] == nil {
+		h.topicSubscribers[sub.topicID] = make(map[*Client]bool)
+	}
+	h.topicSubscribers[sub.topicID][sub.client] = true
+}
+
+func (h *Hub) handleUnsubscribe(sub subscription) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if subs, ok := h.topicSubscribers[sub.topicID]; ok {
+		delete(subs, sub.client)
+		if len(subs) == 0 {
+			delete(h.topicSubscribers, sub.topicID)
 		}
 	}
 }
@@ -141,6 +180,7 @@ func (h *Hub) cleanupOrphanedStreams() {
 		if now.Sub(s.LastActivity) > 30*time.Minute {
 			close(s.Ch)
 			delete(h.streams, id)
+			delete(h.topicSubscribers, id)
 			log.Printf("Cleaned up orphaned LogStream for execution: %s (Idle > 30m)", id)
 		}
 		s.mu.Unlock()
@@ -148,15 +188,26 @@ func (h *Hub) cleanupOrphanedStreams() {
 }
 
 func (h *Hub) processBroadcast(message []byte) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	// Parse message partially to find execution_id if it's a log/status update
+	// Parse message partially to find execution_id
 	var meta struct {
 		Type        string `json:"type"`
 		ExecutionID string `json:"execution_id"`
 	}
 	json.Unmarshal(message, &meta)
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	// 1. Determine target clients
+	var targets map[*Client]bool
+	if meta.Type == "ping" {
+		targets = h.clients
+	} else if meta.ExecutionID != "" {
+		targets = h.topicSubscribers[meta.ExecutionID]
+	} else {
+		// Global message? Fallback to all clients for now
+		targets = h.clients
+	}
 
 	var streamPageID *uuid.UUID
 	if meta.ExecutionID != "" {
@@ -165,11 +216,8 @@ func (h *Hub) processBroadcast(message []byte) {
 		}
 	}
 
-	for client := range h.clients {
-		// Security Check:
-		// 1. Admins see everything.
-		// 2. Public users only see messages with execution_id matching their authorized PageID.
-		// 3. Pings are sent to everyone.
+	for client := range targets {
+		// Security Check
 		isAllowed := false
 		if meta.Type == "ping" || client.Access.IsAdmin {
 			isAllowed = true
@@ -180,23 +228,37 @@ func (h *Hub) processBroadcast(message []byte) {
 		}
 
 		if isAllowed {
-			// Filtering: If client only wants status updates, skip logs
 			if client.Access.StatusOnly && meta.Type == "log" {
 				continue
 			}
 
 			err := client.Conn.WriteMessage(websocket.TextMessage, message)
 			if err != nil {
-				log.Printf("websocket write error: %v", err)
 				client.Conn.Close()
 				delete(h.clients, client)
+				// Subscription cleanup will happen on next unregister or here
+				for topicID := range h.topicSubscribers {
+					delete(h.topicSubscribers[topicID], client)
+				}
 			}
+		}
+	}
+
+	// 2. Optimization: Clear log from RAM after successful broadcast (per user request)
+	if meta.Type == "log" && meta.ExecutionID != "" {
+		if s, ok := h.streams[meta.ExecutionID]; ok {
+			s.mu.Lock()
+			// Clear buffer since it was just sent to active subscribers.
+			// This implements the "queue-style" where data is discarded after transmission.
+			// Catch-up will only show logs that were buffered BETWEEN catch-up request and now,
+			// or we could keep a very small tail if needed. For now, following "clear after sending".
+			s.Buffer = s.Buffer[:0]
+			s.mu.Unlock()
 		}
 	}
 }
 
 func (h *Hub) BroadcastLog(targetID string, executionID string, content string) {
-	// Buffer the log if a stream exists for this execution
 	h.mu.Lock()
 	if s, ok := h.streams[executionID]; ok {
 		s.mu.Lock()
@@ -205,7 +267,6 @@ func (h *Hub) BroadcastLog(targetID string, executionID string, content string) 
 		select {
 		case s.Ch <- content:
 		default:
-			// Stream channel full, drop to prevent stalling engine
 		}
 		s.mu.Unlock()
 	}
@@ -219,16 +280,13 @@ func (h *Hub) BroadcastLog(targetID string, executionID string, content string) 
 	}
 	jsonMsg, _ := json.Marshal(msg)
 
-	// Non-blocking broadcast
 	select {
 	case h.broadcast <- jsonMsg:
 	default:
-		log.Printf("Warning: Broadcast log channel full, dropping message for %s", executionID)
 	}
 }
 
 func (h *Hub) BroadcastStatus(targetID string, executionID string, targetType string, status string) {
-	// Update stream activity if it exists
 	h.mu.Lock()
 	if s, ok := h.streams[executionID]; ok {
 		s.mu.Lock()
@@ -241,23 +299,31 @@ func (h *Hub) BroadcastStatus(targetID string, executionID string, targetType st
 		"type":         "status",
 		"target_id":    targetID,
 		"execution_id": executionID,
-		"target_type":  targetType, // workflow, group, or step
+		"target_type":  targetType,
 		"status":       status,
 	}
 	jsonMsg, _ := json.Marshal(msg)
 
-	// Non-blocking broadcast
 	select {
 	case h.broadcast <- jsonMsg:
 	default:
-		log.Printf("Warning: Broadcast status channel full, dropping message for %s", executionID)
 	}
 }
 
-func (h *Hub) Register(conn *websocket.Conn, access AccessContext) {
-	h.register <- &Client{Conn: conn, Access: access}
+func (h *Hub) Register(conn *websocket.Conn, access AccessContext) *Client {
+	c := &Client{Conn: conn, Access: access}
+	h.register <- c
+	return c
 }
 
 func (h *Hub) Unregister(client *Client) {
 	h.unregister <- client
+}
+
+func (h *Hub) Subscribe(client *Client, executionID string) {
+	h.subscribe <- subscription{client: client, topicID: executionID}
+}
+
+func (h *Hub) Unsubscribe(client *Client, executionID string) {
+	h.unsubscribe <- subscription{client: client, topicID: executionID}
 }

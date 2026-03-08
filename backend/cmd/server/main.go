@@ -101,10 +101,11 @@ func main() {
 	go hub.Run()
 
 	// Initialize Services
+	sshPool := service.NewSSHPool()
 	vpnConnector := service.NewVpnConnector()
 	authService := service.NewAuthService(userRepo, settingRepo)
-	serverService := service.NewServerService(serverRepo, hub, vpnConnector)
-	terminalService := service.NewTerminalService(serverRepo, hub, vpnConnector)
+	serverService := service.NewServerService(serverRepo, hub, vpnConnector, sshPool)
+	terminalService := service.NewTerminalService(serverRepo, hub, vpnConnector, sshPool)
 	workflowService := service.NewWorkflowService(workflowRepo, workflowGroupRepo, workflowStepRepo, workflowInputRepo, workflowVariableRepo, execRepo)
 	globalVarService := service.NewGlobalVariableService(globalVarRepo)
 	workflowExecutor := service.NewWorkflowExecutor(workflowRepo, workflowGroupRepo, workflowStepRepo, workflowInputRepo, execRepo, serverService, hub, globalVarRepo)

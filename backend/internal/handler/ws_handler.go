@@ -121,8 +121,13 @@ func (h *WSHandler) HandleWS(c *gin.Context) {
 		return
 	}
 
-	client := &service.Client{Conn: conn, Access: access}
-	h.hub.Register(conn, access)
+	client := h.hub.Register(conn, access)
+
+	// If this is a realtime terminal widget connection, automatically subscribe to its own ID as a topic
+	// or handle it via the specialized streaming loop below.
+	if widgetID != "" {
+		h.hub.Subscribe(client, widgetID)
+	}
 
 	// If this is a realtime widget connection, start the persistent streaming session
 	if streamWidget != nil {
@@ -131,16 +136,11 @@ func (h *WSHandler) HandleWS(c *gin.Context) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			// We can run the command in a loop to restart if it drops,
-			// or just let the client reconnect. We will ping-pong it with a reconnect loop here:
 			for {
 				if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 					break // Connection closed
 				}
 
-				// If we have an interval, we give the command exactly that much time to run.
-				// If it finishes early, we sleep the remainder before restarting.
-				// If it doesn't finish, the context cancels it, and we restart immediately.
 				var cmdCtx context.Context
 				var cmdCancel context.CancelFunc
 				if streamInterval > 0 {
@@ -170,7 +170,6 @@ func (h *WSHandler) HandleWS(c *gin.Context) {
 				}
 
 				if streamInterval > 0 {
-					// Wait out the remainder of the interval if it finished early
 					elapsed := time.Since(start)
 					intervalDur := time.Duration(streamInterval) * time.Second
 					if elapsed < intervalDur {
@@ -187,7 +186,6 @@ func (h *WSHandler) HandleWS(c *gin.Context) {
 					break // Run once and exit if there's no interval
 				}
 
-				// Small delay before restart if command errored out without an interval
 				time.Sleep(2 * time.Second)
 			}
 		}()
@@ -213,9 +211,12 @@ func (h *WSHandler) HandleWS(c *gin.Context) {
 				if msg.Type == "input" {
 					h.terminalService.HandleInput(msg.SessionID, msg.Content)
 				} else if msg.Type == "request_catchup" && msg.ExecutionID != "" {
+					// 1. Subscribe client to this execution's topic for future logs
+					h.hub.Subscribe(client, msg.ExecutionID)
+
+					// 2. Send existing buffer (if any)
 					buffer := h.hub.GetBuffer(msg.ExecutionID)
 
-					// Send catchup_start to signal frontend to clear existing logs
 					startMsg := map[string]string{
 						"type":         "catchup_start",
 						"execution_id": msg.ExecutionID,
@@ -237,13 +238,16 @@ func (h *WSHandler) HandleWS(c *gin.Context) {
 						conn.WriteMessage(websocket.TextMessage, jsonResp)
 					}
 
-					// Send catchup_end
 					endMsg := map[string]string{
 						"type":         "catchup_end",
 						"execution_id": msg.ExecutionID,
 					}
 					jsonEndMsg, _ := json.Marshal(endMsg)
 					conn.WriteMessage(websocket.TextMessage, jsonEndMsg)
+				} else if msg.Type == "subscribe" && msg.ExecutionID != "" {
+					h.hub.Subscribe(client, msg.ExecutionID)
+				} else if msg.Type == "unsubscribe" && msg.ExecutionID != "" {
+					h.hub.Unsubscribe(client, msg.ExecutionID)
 				}
 			}
 		}

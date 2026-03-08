@@ -17,6 +17,7 @@ import (
 type SSHConnection struct {
 	client *ssh.Client
 	server *domain.Server
+	pooled bool
 }
 
 func NewSSHConnection(server *domain.Server, vpnConnector *VpnConnector) (*SSHConnection, error) {
@@ -166,6 +167,9 @@ func (c *SSHConnection) StartTerminal(ctx context.Context) (io.WriteCloser, io.R
 }
 
 func (c *SSHConnection) Close() error {
+	if c.pooled {
+		return nil // Client is managed by pool
+	}
 	return c.client.Close()
 }
 

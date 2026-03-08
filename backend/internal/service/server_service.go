@@ -15,10 +15,11 @@ type ServerService struct {
 	repo         domain.ServerRepository
 	hub          *Hub
 	vpnConnector *VpnConnector
+	sshPool      *SSHPool
 }
 
-func NewServerService(repo domain.ServerRepository, hub *Hub, vpnConnector *VpnConnector) *ServerService {
-	return &ServerService{repo: repo, hub: hub, vpnConnector: vpnConnector}
+func NewServerService(repo domain.ServerRepository, hub *Hub, vpnConnector *VpnConnector, sshPool *SSHPool) *ServerService {
+	return &ServerService{repo: repo, hub: hub, vpnConnector: vpnConnector, sshPool: sshPool}
 }
 
 func (s *ServerService) CreateServer(server *domain.Server, user *domain.User) error {
@@ -90,7 +91,7 @@ func (s *ServerService) getConnection(ctx context.Context, serverID uuid.UUID, u
 		return nil, nil, err
 	}
 
-	conn, err := GetServerConnection(server, s.vpnConnector)
+	conn, err := GetServerConnection(server, s.vpnConnector, s.sshPool)
 	if err != nil {
 		return nil, nil, err
 	}
