@@ -95,7 +95,33 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
         try {
             const data = await apiFetch(`${API_BASE_URL}/workflows/${workflowID}`);
             const updatedWF = await data.json();
-            setWorkflow(updatedWF);
+            setWorkflow(prev => {
+                if (!prev) return updatedWF;
+
+                // Preserve execution_id
+                const next = { ...updatedWF, status: prev.status || updatedWF.status };
+                if ((prev as any).execution_id && !(next as any).execution_id) {
+                    (next as any).execution_id = (prev as any).execution_id;
+                }
+
+                if (next.groups && prev.groups) {
+                    next.groups = next.groups.map((g: any) => {
+                        const prevG = prev.groups?.find(pg => pg.id === g.id);
+                        if (!prevG) return g;
+
+                        return {
+                            ...g,
+                            status: (prevG as any).status || g.status,
+                            steps: g.steps?.map((s: any) => {
+                                const prevS = prevG.steps?.find((ps: any) => ps.id === s.id);
+                                if (!prevS) return s;
+                                return { ...s, status: (prevS as any).status || s.status };
+                            })
+                        };
+                    });
+                }
+                return next;
+            });
         } catch (err) {
             console.error('Failed to sync workflow status:', err);
         }
