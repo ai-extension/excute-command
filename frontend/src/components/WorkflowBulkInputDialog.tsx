@@ -39,6 +39,8 @@ const WorkflowBulkInputDialog: React.FC<WorkflowBulkInputDialogProps> = ({
         inputs.forEach(input => {
             if (input.type === 'select' || input.type === 'multi-select') {
                 initial[input.key] = '';
+            } else if (input.type === 'multi-input') {
+                initial[input.key] = '[{}]';
             } else {
                 initial[input.key] = input.default_value !== undefined ? String(input.default_value) : '';
             }
@@ -77,6 +79,7 @@ const WorkflowBulkInputDialog: React.FC<WorkflowBulkInputDialogProps> = ({
         let rows: any[] = [];
         try {
             rows = JSON.parse(currentValue || '[]');
+            if (!Array.isArray(rows)) rows = [];
         } catch (e) { rows = []; }
         rows.push({});
         return JSON.stringify(rows);

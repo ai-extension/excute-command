@@ -44,6 +44,8 @@ const WorkflowRunDialog: React.FC<WorkflowRunDialogProps> = ({
         inputs.forEach(input => {
             if (input.type === 'select' || input.type === 'multi-select') {
                 initial[input.key] = '';
+            } else if (input.type === 'multi-input') {
+                initial[input.key] = '[{}]';
             } else {
                 initial[input.key] = input.default_value !== undefined ? String(input.default_value) : '';
             }
@@ -127,7 +129,14 @@ const WorkflowRunDialog: React.FC<WorkflowRunDialogProps> = ({
         let rows: any[] = [];
         try {
             rows = JSON.parse(currentValue || '[]');
+            if (!Array.isArray(rows)) rows = [];
         } catch (e) { rows = []; }
+
+        // If the current "rendered" state already has a row (even if '[]' in state),
+        // we should ensure we are adding a SECOND row if the first one is expected to be there.
+        // Actually, if we initialize as '[]', and the UI renders '[]' as one row, 
+        // then addMultiInputRow should probably push {} once if empty, and twice if we want a new one?
+        // No, let's just make the state consistent: start with '[{}]'
         rows.push({});
         return JSON.stringify(rows);
     };
