@@ -282,67 +282,43 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
                 </div>
             ) : (
                 <div className="space-y-2 px-1">
-                    {executions.map((exec, index) => {
-                        const prevExec = executions[index - 1];
-                        const nextExec = executions[index + 1];
-                        const isBatchTop = exec.batch_id && (!prevExec || prevExec.batch_id !== exec.batch_id);
-                        const isBatchBottom = exec.batch_id && (!nextExec || nextExec.batch_id !== exec.batch_id);
-                        const isBatchMiddle = exec.batch_id && prevExec?.batch_id === exec.batch_id && nextExec?.batch_id === exec.batch_id;
-                        const isPartOfBatch = !!exec.batch_id;
-
-                        return (
-                            <div key={exec.id} className="relative">
-                                {isBatchTop && (
-                                    <div className="flex items-center gap-2 mb-1 px-2 mt-4 first:mt-0">
-                                        <Layers className="w-3 h-3 text-primary" />
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-primary/70">Batch Run</span>
-                                        <div className="h-px flex-1 bg-primary/10" />
-                                    </div>
-                                )}
-                                <Card
-                                    className={cn(
-                                        "bg-white/5 border-white/10 hover:bg-white/[0.08] transition-colors cursor-pointer group overflow-hidden",
-                                        isPartOfBatch && "border-l-primary/30 border-l-4 ml-2"
-                                    )}
-                                    onClick={() => fetchExecutionDetail(exec)}
-                                >
-                                    <CardContent className="p-3 flex items-center justify-between gap-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className={cn(
-                                                "w-1 h-10 rounded-full shrink-0",
-                                                exec.status === 'SUCCESS' ? 'bg-green-500' :
-                                                    exec.status === 'FAILED' ? 'bg-red-500' :
-                                                        exec.status === 'CANCELLED' ? 'bg-yellow-500' : 'bg-blue-500'
-                                            )} />
-                                            <div className="space-y-1">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <span className="text-xs font-mono text-muted-foreground">#{exec.id.slice(0, 8)}</span>
-                                                    {getStatusBadge(exec.status)}
-                                                    {getTriggerBadge(exec)}
-                                                    {isPartOfBatch && (
-                                                        <Badge variant="outline" className="bg-primary/5 text-primary/70 border-primary/20 text-[8px] font-black uppercase h-4 px-1">
-                                                            Batch Item
-                                                        </Badge>
-                                                    )}
-                                                </div>
-                                                <div className="flex items-center gap-4 text-xs text-muted-foreground font-medium">
-                                                    <span className="flex items-center gap-1">
-                                                        <Calendar className="w-3 h-3" />
-                                                        {format(new Date(exec.started_at), 'MMM d, HH:mm:ss')}
-                                                    </span>
-                                                    <span className="flex items-center gap-1">
-                                                        <Clock className="w-3 h-3" />
-                                                        {getDuration(exec.started_at, exec.finished_at)}
-                                                    </span>
-                                                </div>
+                    {executions.map((exec) => (
+                        <div key={exec.id} className="relative">
+                            <Card
+                                className="bg-white/5 border-white/10 hover:bg-white/[0.08] transition-colors cursor-pointer group overflow-hidden"
+                                onClick={() => fetchExecutionDetail(exec)}
+                            >
+                                <CardContent className="p-3 flex items-center justify-between gap-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className={cn(
+                                            "w-1 h-10 rounded-full shrink-0",
+                                            exec.status === 'SUCCESS' ? 'bg-green-500' :
+                                                exec.status === 'FAILED' ? 'bg-red-500' :
+                                                    exec.status === 'CANCELLED' ? 'bg-yellow-500' : 'bg-blue-500'
+                                        )} />
+                                        <div className="space-y-1">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="text-xs font-mono text-muted-foreground">#{exec.id.slice(0, 8)}</span>
+                                                {getStatusBadge(exec.status)}
+                                                {getTriggerBadge(exec)}
+                                            </div>
+                                            <div className="flex items-center gap-4 text-xs text-muted-foreground font-medium">
+                                                <span className="flex items-center gap-1">
+                                                    <Calendar className="w-3 h-3" />
+                                                    {format(new Date(exec.started_at), 'MMM d, HH:mm:ss')}
+                                                </span>
+                                                <span className="flex items-center gap-1">
+                                                    <Clock className="w-3 h-3" />
+                                                    {getDuration(exec.started_at, exec.finished_at)}
+                                                </span>
                                             </div>
                                         </div>
-                                        <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
-                                    </CardContent>
-                                </Card>
-                            </div>
-                        );
-                    })}
+                                    </div>
+                                    <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
+                                </CardContent>
+                            </Card>
+                        </div>
+                    ))}
 
                     {/* Load More button */}
                     {hasMore && (
