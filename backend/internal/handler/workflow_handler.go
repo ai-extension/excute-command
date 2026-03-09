@@ -216,13 +216,14 @@ func (h *WorkflowHandler) RunWorkflow(c *gin.Context) {
 
 	// Initial execution record creation to avoid race conditions with log fetching
 	execution := &domain.WorkflowExecution{
-		ID:            execID,
-		WorkflowID:    id,
-		Status:        domain.StatusRunning,
-		StartedAt:     time.Now(),
-		ExecutedBy:    &user.ID,
-		TriggerSource: "MANUAL",
-		BatchID:       req.BatchID,
+		ID:                execID,
+		WorkflowID:        id,
+		Status:            domain.StatusRunning,
+		StartedAt:         time.Now(),
+		ExecutedBy:        &user.ID,
+		TriggerSource:     "MANUAL",
+		BatchID:           req.BatchID,
+		ParentExecutionID: req.FromExecutionID,
 	}
 	if req.Inputs != nil {
 		inputsByes, _ := json.Marshal(req.Inputs)

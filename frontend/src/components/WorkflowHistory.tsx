@@ -56,6 +56,79 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
     const offsetRef = useRef(0);
     const [selectedExec, setSelectedExec] = useState<WorkflowExecution | null>(null);
     const [loadingDetail, setLoadingDetail] = useState(false);
+    const wsRef = useRef<WebSocket | null>(null);
+    const [now, setNow] = useState(Date.now());
+
+    const { token } = useAuth();
+
+    // Effect for ticking timer
+    useEffect(() => {
+        const interval = setInterval(() => setNow(Date.now()), 1000);
+        return () => clearInterval(interval);
+    }, []);
+
+    // Effect for WebSocket status updates
+    useEffect(() => {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        let baseUrl = API_BASE_URL;
+        if (baseUrl.startsWith('/')) {
+            baseUrl = `${window.location.host}${baseUrl}`;
+        } else {
+            baseUrl = baseUrl.replace(/^http(s)?:\/\//, '');
+        }
+
+        const wsUrl = `${protocol}//${baseUrl}/ws?token=${token || ''}&status_only=true`;
+        const ws = new WebSocket(wsUrl);
+        wsRef.current = ws;
+
+        ws.onmessage = (event) => {
+            try {
+                const msg = JSON.parse(event.data);
+                if (msg.type === 'status' && msg.target_type === 'workflow') {
+                    setExecutions(prev => prev.map(exec => {
+                        if (exec.id === msg.execution_id) {
+                            const updates: Partial<WorkflowExecution> = { status: msg.status };
+                            if (exec.status === 'RUNNING' && msg.status !== 'RUNNING' && !exec.finished_at) {
+                                updates.finished_at = new Date().toISOString();
+                            }
+                            return { ...exec, ...updates };
+                        }
+                        return exec;
+                    }));
+                }
+            } catch (err) {
+                console.error('Failed to process status message:', err);
+            }
+        };
+
+        ws.onopen = () => {
+            // Subscribe to all currently running executions
+            executions.forEach(exec => {
+                if (exec.status === 'RUNNING') {
+                    ws.send(JSON.stringify({
+                        type: 'subscribe',
+                        execution_id: exec.id
+                    }));
+                }
+            });
+        };
+
+        return () => ws.close();
+    }, [token]);
+
+    // Effect to subscribe to running executions whenever list or connection changes
+    useEffect(() => {
+        if (wsRef.current?.readyState === WebSocket.OPEN && executions.length > 0) {
+            executions.forEach(exec => {
+                if (exec.status === 'RUNNING') {
+                    wsRef.current?.send(JSON.stringify({
+                        type: 'subscribe',
+                        execution_id: exec.id
+                    }));
+                }
+            });
+        }
+    }, [executions, token]); // Re-subscribe if list changes or token changes (new WS)
 
     const loadPage = async (currentOffset: number, replace = false) => {
         if (replace) setLoading(true);
@@ -167,8 +240,10 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
     };
 
     const getDuration = (start: string, end?: string) => {
-        if (!end) return 'Running...';
-        const diff = Math.floor((new Date(end).getTime() - new Date(start).getTime()) / 1000);
+        const startTime = new Date(start).getTime();
+        const endTime = end ? new Date(end).getTime() : now;
+        const diff = Math.floor((endTime - startTime) / 1000);
+        if (diff < 0) return '0s';
         if (diff < 60) return `${diff}s`;
         return `${Math.floor(diff / 60)}m ${diff % 60}s`;
     };
@@ -304,7 +379,7 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
                         </div>
                     ) : selectedExec && (
                         <ExecutionMonitor
-                            mode="HISTORICAL"
+                            mode={selectedExec.status === 'RUNNING' ? 'LIVE' : 'HISTORICAL'}
                             execution={selectedExec}
                             onClose={() => setSelectedExec(null)}
                             onReRun={onReRun}

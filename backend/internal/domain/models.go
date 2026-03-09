@@ -409,25 +409,26 @@ type ScheduleWorkflow struct {
 }
 
 type WorkflowExecution struct {
-	ID            uuid.UUID               `json:"id" gorm:"type:uuid;primaryKey"`
-	WorkflowID    uuid.UUID               `json:"workflow_id" gorm:"type:uuid;index"`
-	ScheduledID   *uuid.UUID              `json:"scheduled_id" gorm:"type:uuid;index"`
-	PageID        *uuid.UUID              `json:"page_id,omitempty" gorm:"type:uuid;index"`
-	TriggerSource string                  `json:"trigger_source" gorm:"size:50;index"` // MANUAL, PAGE, SCHEDULE, HOOK
-	Status        Status                  `json:"status"`
-	Inputs        string                  `json:"inputs"` // JSON string
-	ExecutedBy    *uuid.UUID              `json:"executed_by" gorm:"type:uuid"`
-	User          *User                   `json:"user,omitempty" gorm:"foreignKey:ExecutedBy"`
-	LogPath       string                  `json:"log_path"`
-	StartedAt     time.Time               `json:"started_at"`
-	FinishedAt    *time.Time              `json:"finished_at,omitempty"`
-	CreatedAt     time.Time               `json:"created_at" gorm:"<-:create"`
-	UpdatedAt     time.Time               `json:"updated_at"`
-	BatchID       *uuid.UUID              `json:"batch_id,omitempty" gorm:"type:uuid;index"`
-	Workflow      *Workflow               `json:"workflow,omitempty" gorm:"foreignKey:WorkflowID"`
-	Schedule      *Schedule               `json:"schedule,omitempty" gorm:"foreignKey:ScheduledID"`
-	Page          *Page                   `json:"page,omitempty" gorm:"foreignKey:PageID"`
-	Steps         []WorkflowExecutionStep `json:"steps,omitempty" gorm:"foreignKey:ExecutionID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	ID                uuid.UUID               `json:"id" gorm:"type:uuid;primaryKey"`
+	WorkflowID        uuid.UUID               `json:"workflow_id" gorm:"type:uuid;index"`
+	ScheduledID       *uuid.UUID              `json:"scheduled_id" gorm:"type:uuid;index"`
+	PageID            *uuid.UUID              `json:"page_id,omitempty" gorm:"type:uuid;index"`
+	TriggerSource     string                  `json:"trigger_source" gorm:"size:50;index"` // MANUAL, PAGE, SCHEDULE, HOOK
+	Status            Status                  `json:"status"`
+	Inputs            string                  `json:"inputs"` // JSON string
+	ExecutedBy        *uuid.UUID              `json:"executed_by" gorm:"type:uuid"`
+	User              *User                   `json:"user,omitempty" gorm:"foreignKey:ExecutedBy"`
+	LogPath           string                  `json:"log_path"`
+	StartedAt         time.Time               `json:"started_at"`
+	FinishedAt        *time.Time              `json:"finished_at,omitempty"`
+	CreatedAt         time.Time               `json:"created_at" gorm:"<-:create"`
+	UpdatedAt         time.Time               `json:"updated_at"`
+	BatchID           *uuid.UUID              `json:"batch_id,omitempty" gorm:"type:uuid;index"`
+	ParentExecutionID *uuid.UUID              `json:"parent_execution_id,omitempty" gorm:"type:uuid;index"`
+	Workflow          *Workflow               `json:"workflow,omitempty" gorm:"foreignKey:WorkflowID"`
+	Schedule          *Schedule               `json:"schedule,omitempty" gorm:"foreignKey:ScheduledID"`
+	Page              *Page                   `json:"page,omitempty" gorm:"foreignKey:PageID"`
+	Steps             []WorkflowExecutionStep `json:"steps,omitempty" gorm:"foreignKey:ExecutionID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 }
 
 type WorkflowExecutionStep struct {
@@ -451,6 +452,7 @@ type WorkflowRepository interface {
 	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, tagIDs []uuid.UUID, isTemplate *bool, createdBy *uuid.UUID, scope *PermissionScope) ([]Workflow, int64, error)
 	ListGlobalPaginated(limit, offset int, searchTerm string, isTemplate *bool, scope *PermissionScope) ([]Workflow, int64, error)
 	Update(wf *Workflow) error
+	UpdateStatus(id uuid.UUID, status Status) error
 	Delete(id uuid.UUID) error
 }
 
@@ -458,6 +460,7 @@ type WorkflowGroupRepository interface {
 	Create(group *WorkflowGroup) error
 	GetByWorkflowID(workflowID uuid.UUID) ([]WorkflowGroup, error)
 	Update(group *WorkflowGroup) error
+	UpdateStatus(id uuid.UUID, status Status) error
 	Delete(id uuid.UUID) error
 }
 

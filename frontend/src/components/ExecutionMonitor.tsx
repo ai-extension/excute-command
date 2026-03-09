@@ -42,6 +42,7 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
 }) => {
     const [workflow, setWorkflow] = useState<Workflow | null>(initialWorkflow || initialExecution?.workflow || null);
     const [execution, setExecution] = useState<WorkflowExecution | null>(initialExecution || null);
+    const [patchedStatuses, setPatchedStatuses] = useState<Record<string, string>>({});
     const [activeStepID, setActiveStepID] = useState<string | null>(null);
     const [activeGroupID, setActiveGroupID] = useState<string | null>(null);
     const [globalLogs, setGlobalLogs] = useState<string[]>([]);
@@ -152,26 +153,64 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                     return;
                 }
 
+                const targetID = msg.target_id;
+                const status = msg.status;
+                const targetType = msg.target_type;
+
+                // 0. Update patched statuses for robust UI tracking
+                setPatchedStatuses(prev => ({ ...prev, [targetID]: status }));
+
+                // 1. Update Workflow state (for Groups and overall status)
                 setWorkflow(prev => {
                     if (!prev) return prev;
-                    if (msg.target_id === prev.id) {
-                        if (onStatusChange && msg.status !== prev.status) {
-                            onStatusChange(msg.status);
-                        }
-                        return { ...prev, status: msg.status };
+                    if (targetID === prev.id) {
+                        if (onStatusChange && status !== prev.status) onStatusChange(status);
+                        return { ...prev, status };
                     }
 
                     const next = { ...prev };
                     next.groups = next.groups?.map(g => {
-                        if (g.id === msg.target_id) return { ...g, status: msg.status };
+                        if (g.id === targetID) return { ...g, status };
                         return {
                             ...g,
                             steps: g.steps?.map(s => {
-                                if (s.id === msg.target_id) return { ...s, status: msg.status };
+                                if (s.id === targetID) return { ...s, status };
                                 return s;
                             })
                         };
                     });
+                    return next;
+                });
+
+                // 2. Update Execution state (for overall status and individual Steps)
+                setExecution(prev => {
+                    if (!prev) return prev;
+
+                    const next = { ...prev };
+                    if (targetID === prev.workflow_id || targetID === prev.id) {
+                        next.status = status;
+                    }
+
+                    if (targetType === 'step') {
+                        const steps = [...(next.steps || [])];
+                        const stepIndex = steps.findIndex(s => s.step_id === targetID);
+                        if (stepIndex >= 0) {
+                            steps[stepIndex] = { ...steps[stepIndex], status };
+                        } else {
+                            // Find step name from workflow if possible
+                            const stepName = workflow?.groups?.flatMap(g => g.steps || []).find(s => s.id === targetID)?.name || 'Unknown Step';
+                            steps.push({
+                                id: '', // Temporary ID
+                                execution_id: msg.execution_id,
+                                step_id: targetID,
+                                name: stepName,
+                                status: status,
+                                output: '',
+                                started_at: new Date().toISOString()
+                            });
+                        }
+                        next.steps = steps;
+                    }
                     return next;
                 });
             }
@@ -263,13 +302,42 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
     };
 
     const getStepStatus = (stepID: string) => {
-        if (mode === 'HISTORICAL' && execution?.steps) {
+        // 0. Check real-time patched statuses first (most robust against clobbering)
+        if (patchedStatuses[stepID]) return patchedStatuses[stepID];
+
+        // 1. Check if we have a persisted (or patched) result for this step in the execution object
+        if (execution?.steps) {
             const stepResult = execution.steps.find(s => s.step_id === stepID);
-            return stepResult?.status || 'PENDING';
+            if (stepResult) return stepResult.status;
         }
-        // For live, we use the status dynamically patched into the workflow object by WS
+
+        // 2. Fallback to the workflow object (legacy/backup)
         const step = workflow.groups?.flatMap(g => g.steps || []).find(s => s.id === stepID);
         return (step as any)?.status || 'PENDING';
+    };
+
+    const getGroupStatus = (groupID: string) => {
+        // 0. Check real-time patched statuses first
+        if (patchedStatuses[groupID]) return patchedStatuses[groupID];
+
+        // 1. Check the patched workflow object first for real-time group status
+        const group = workflow.groups?.find(g => g.id === groupID);
+        const wsStatus = (group as any)?.status;
+        if (wsStatus && wsStatus !== 'PENDING') return wsStatus;
+
+        // 2. Check if all steps in this group are finished in execution.steps
+        if (execution?.steps && group?.steps) {
+            const groupStepIDs = group.steps.map(s => s.id);
+            const finishedSteps = execution.steps.filter(s => groupStepIDs.includes(s.step_id));
+
+            if (finishedSteps.length > 0) {
+                if (finishedSteps.some(s => s.status === 'FAILED')) return 'FAILED';
+                if (finishedSteps.some(s => s.status === 'RUNNING')) return 'RUNNING';
+                if (finishedSteps.length === group.steps.length) return 'SUCCESS';
+            }
+        }
+
+        return wsStatus || 'PENDING';
     };
 
     const handleStop = async () => {
@@ -413,9 +481,10 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                                     <div className="flex items-center gap-3">
                                         <div className={cn(
                                             "w-7 h-7 rounded-lg flex items-center justify-center border",
-                                            group.status === 'RUNNING' ? "bg-primary/20 border-primary/40 animate-pulse text-primary" :
-                                                group.status === 'SUCCESS' ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500" :
-                                                    "bg-muted border-border text-muted-foreground/60"
+                                            getGroupStatus(group.id) === 'RUNNING' ? "bg-primary/20 border-primary/40 animate-pulse text-primary" :
+                                                getGroupStatus(group.id) === 'SUCCESS' ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500" :
+                                                    getGroupStatus(group.id) === 'FAILED' ? "bg-red-500/10 border-red-500/30 text-red-500" :
+                                                        "bg-muted border-border text-muted-foreground/60"
                                         )}>
                                             <Layers className="w-3.5 h-3.5" />
                                         </div>
@@ -493,9 +562,10 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                                                 <div className="flex items-center gap-3">
                                                     <div className={cn(
                                                         "w-1.5 h-1.5 rounded-full",
-                                                        status === 'RUNNING' ? "bg-primary animate-pulse shadow-[0_0_8px_rgba(99,102,241,1)]" :
-                                                            status === 'SUCCESS' ? "bg-emerald-500" :
-                                                                status === 'FAILED' ? "bg-destructive" : "bg-muted-foreground/30"
+                                                        status === 'SUCCESS' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' :
+                                                            status === 'FAILED' ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' :
+                                                                status === 'RUNNING' ? 'bg-blue-500 animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.5)]' :
+                                                                    'bg-muted-foreground/20'
                                                     )} />
                                                     <div>
                                                         <p className="text-[11px] font-bold tracking-tight text-foreground/80">{step.name}</p>
@@ -544,6 +614,7 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                         <TerminalLog
                             targetID={activeStepID || activeGroupID || (workflow?.id || 'GLOBAL')}
                             executionID={execution?.id || (workflow as any)?.execution_id}
+                            parentExecutionID={execution?.parent_execution_id}
                             isActive={true}
                             isGlobal={!activeStepID && !activeGroupID}
                             isGroup={!!activeGroupID && !activeStepID}

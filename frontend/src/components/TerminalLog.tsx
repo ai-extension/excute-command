@@ -14,6 +14,7 @@ interface TerminalLogProps {
     isGroup?: boolean;
     initialLogs?: string[];
     isLive?: boolean;
+    parentExecutionID?: string;
     showHeader?: boolean;
     onClear?: () => void;
     onReady?: () => void;
@@ -28,6 +29,7 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
     isLive = true,
     isGlobal = false,
     isGroup = false,
+    parentExecutionID,
     showHeader = true,
     onClear,
     onReady,
@@ -43,32 +45,6 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
         targetRef.current = targetID;
         if (isLive) {
             setLogs([]); // Clear logs immediately when switching targets in live mode
-            if (executionID) {
-                // Fetch existing logs for the new target
-                const url = isGlobal
-                    ? `${API_BASE_URL}/executions/${executionID}/logs`
-                    : isGroup
-                        ? `${API_BASE_URL}/executions/${executionID}/logs?group_id=${targetID}`
-                        : `${API_BASE_URL}/executions/${executionID}/logs?step_id=${targetID}`;
-
-                apiFetch(url)
-                    .then(res => res.text())
-                    .then((text: string) => {
-                        // Only update if targetID hasn't changed since we started fetching
-                        // AND only if we don't already have logs from WebSocket catchup
-                        if (targetRef.current === targetID) {
-                            const diskLines = text.split('\n').filter(line => line.length > 0);
-                            setLogs(prev => {
-                                // If we already have logs (e.g. from WS catchup), don't overwrite
-                                // but we could merge if we wanted to be fancy.
-                                // For now, if prev is empty, we use diskLines.
-                                if (prev.length === 0) return diskLines;
-                                return prev;
-                            });
-                        }
-                    })
-                    .catch((err: Error) => console.error('Failed to fetch historical context:', err));
-            }
         }
     }, [targetID, executionID, isLive, isGlobal, isGroup, apiFetch]);
 
@@ -126,23 +102,16 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
                     const newLines = data.content.split('\n').filter((line: string) => line.length > 0);
 
                     if (isCatchingUpRef.current) {
-                        // If we receive a live message while catching up, queue it
-                        // (Assuming the backend sends live messages without a special flag, 
-                        // anything arriving during catchup that isn't part of the catchup flush gets queued)
-                        // Actually, backend catchup sends log messages sequentially, so we just process them.
-                        // The true fix is that backend marks the END of catchup, and any LIVE messages during that time are queued.
-                        // Wait, if it's a catchup message, we just append it. If it's a live message during catchup, we queue it.
-                        // Since we can't easily distinguish them here, we rely on the fact that catchup messages are sent synchronously in a loop.
-                        // Actually, just appending them is fine AS LONG as we reset logs on catchup_start.
-                        setLogs(prev => [...prev, ...newLines]);
+                        // If it's a catchup message, append it directly
+                        if (data.is_catchup) {
+                            setLogs(prev => [...prev, ...newLines]);
+                        } else {
+                            // If it's a LIVE message arriving during catchup, queue it
+                            messageQueueRef.current = [...messageQueueRef.current, ...newLines];
+                        }
                     } else {
-                        setLogs(prev => {
-                            // Check for duplicates
-                            if (prev.length > 0 && newLines.length > 0 && prev[prev.length - 1] === newLines[0]) {
-                                return [...prev, ...newLines.slice(1)];
-                            }
-                            return [...prev, ...newLines];
-                        });
+                        // Regular live message
+                        setLogs(prev => [...prev, ...newLines]);
                     }
                 }
             } catch (err) {
@@ -158,7 +127,9 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
             if (executionID) {
                 socket.send(JSON.stringify({
                     type: 'request_catchup',
-                    execution_id: executionID
+                    execution_id: executionID,
+                    parent_execution_id: parentExecutionID,
+                    target_id: targetID
                 }));
             }
         };

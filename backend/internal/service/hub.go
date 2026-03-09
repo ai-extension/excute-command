@@ -10,16 +10,16 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type LogEntry struct {
-	TargetID string
-	Content  string
+type BufferedStatus struct {
+	Status string `json:"status"`
+	Type   string `json:"type"`
 }
 
 type LogStream struct {
-	Buffer       []LogEntry
 	Ch           chan string
 	PageID       *uuid.UUID // Associated page if this is a public execution
 	LastActivity time.Time
+	StepStatuses map[string]BufferedStatus // targetID -> BufferedStatus
 	mu           sync.Mutex
 }
 
@@ -32,6 +32,7 @@ type AccessContext struct {
 type Client struct {
 	Conn   *websocket.Conn
 	Access AccessContext
+	Mu     sync.Mutex // Protects Conn from concurrent writes
 }
 
 type Hub struct {
@@ -68,10 +69,10 @@ func (h *Hub) CreateStream(executionID string, pageID *uuid.UUID) *LogStream {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	stream := &LogStream{
-		Buffer:       make([]LogEntry, 0),
 		Ch:           make(chan string, 200),
 		PageID:       pageID,
 		LastActivity: time.Now(),
+		StepStatuses: make(map[string]BufferedStatus),
 	}
 	h.streams[executionID] = stream
 	return stream
@@ -84,19 +85,7 @@ func (h *Hub) GetStream(executionID string) (*LogStream, bool) {
 	return s, ok
 }
 
-func (h *Hub) GetBuffer(executionID string) []LogEntry {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if s, ok := h.streams[executionID]; ok {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		// Return a copy
-		buf := make([]LogEntry, len(s.Buffer))
-		copy(buf, s.Buffer)
-		return buf
-	}
-	return nil
-}
+// GetBuffer removed as per user request to use file-based logs
 
 func (h *Hub) CloseStream(executionID string) {
 	msg := map[string]string{
@@ -175,11 +164,11 @@ func (h *Hub) cleanupOrphanedStreams() {
 	now := time.Now()
 	for id, s := range h.streams {
 		s.mu.Lock()
-		if now.Sub(s.LastActivity) > 30*time.Minute {
+		if now.Sub(s.LastActivity) > 15*time.Minute {
 			close(s.Ch)
 			delete(h.streams, id)
 			delete(h.topicSubscribers, id)
-			log.Printf("Cleaned up orphaned LogStream for execution: %s (Idle > 30m)", id)
+			log.Printf("Cleaned up orphaned LogStream for execution: %s (Idle > 15m)", id)
 		}
 		s.mu.Unlock()
 	}
@@ -230,7 +219,9 @@ func (h *Hub) processBroadcast(message []byte) {
 				continue
 			}
 
+			client.Mu.Lock()
 			err := client.Conn.WriteMessage(websocket.TextMessage, message)
+			client.Mu.Unlock()
 			if err != nil {
 				client.Conn.Close()
 				delete(h.clients, client)
@@ -242,19 +233,7 @@ func (h *Hub) processBroadcast(message []byte) {
 		}
 	}
 
-	// 2. Optimization: Keep a tail buffer for logs in RAM (per user request for stability)
-	if meta.Type == "log" && meta.ExecutionID != "" {
-		if s, ok := h.streams[meta.ExecutionID]; ok {
-			s.mu.Lock()
-			// Keep only the last 200 lines for late-joiners/catch-up
-			// This prevents OOM while ensuring new clients don't see an empty screen
-			maxTail := 200
-			if len(s.Buffer) > maxTail {
-				s.Buffer = s.Buffer[len(s.Buffer)-maxTail:]
-			}
-			s.mu.Unlock()
-		}
-	}
+	// 2. Optimization: RAM buffer removed. Catchup handled by file reading.
 
 	// 3. Graceful cleanup: Handle close_stream message in order
 	if meta.Type == "close_stream" && meta.ExecutionID != "" {
@@ -271,7 +250,6 @@ func (h *Hub) BroadcastLog(targetID string, executionID string, content string) 
 	h.mu.Lock()
 	if s, ok := h.streams[executionID]; ok {
 		s.mu.Lock()
-		s.Buffer = append(s.Buffer, LogEntry{TargetID: targetID, Content: content})
 		s.LastActivity = time.Now()
 		select {
 		case s.Ch <- content:
@@ -281,11 +259,12 @@ func (h *Hub) BroadcastLog(targetID string, executionID string, content string) 
 	}
 	h.mu.Unlock()
 
-	msg := map[string]string{
+	msg := map[string]interface{}{
 		"type":         "log",
 		"target_id":    targetID,
 		"execution_id": executionID,
 		"content":      content,
+		"is_catchup":   false,
 	}
 	jsonMsg, _ := json.Marshal(msg)
 
@@ -297,6 +276,9 @@ func (h *Hub) BroadcastStatus(targetID string, executionID string, targetType st
 	if s, ok := h.streams[executionID]; ok {
 		s.mu.Lock()
 		s.LastActivity = time.Now()
+		if targetType == "step" || targetType == "group" {
+			s.StepStatuses[targetID] = BufferedStatus{Status: status, Type: targetType}
+		}
 		s.mu.Unlock()
 	}
 	h.mu.Unlock()
@@ -332,4 +314,19 @@ func (h *Hub) Subscribe(client *Client, executionID string) {
 
 func (h *Hub) Unsubscribe(client *Client, executionID string) {
 	h.unsubscribe <- subscription{client: client, topicID: executionID}
+}
+
+func (h *Hub) GetStepStatuses(executionID string) map[string]BufferedStatus {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if s, ok := h.streams[executionID]; ok {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		copy := make(map[string]BufferedStatus)
+		for k, v := range s.StepStatuses {
+			copy[k] = v
+		}
+		return copy
+	}
+	return nil
 }

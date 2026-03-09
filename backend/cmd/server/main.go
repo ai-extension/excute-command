@@ -140,7 +140,7 @@ func main() {
 	roleHandler := handler.NewRoleHandler(roleRepo, permRepo)
 	permHandler := handler.NewPermissionHandler(permRepo, workflowRepo, globalVarRepo, scheduleRepo, pageRepo, tagRepo, serverRepo, namespaceRepo, execRepo, userRepo, roleRepo, vpnRepo)
 	serverHandler := handler.NewServerHandler(serverService, terminalService)
-	wsHandler := handler.NewWSHandler(hub, terminalService, authService, pageService)
+	wsHandler := handler.NewWSHandler(hub, terminalService, authService, pageService, workflowService)
 	workflowHandler := handler.NewWorkflowHandler(workflowService, workflowExecutor)
 	globalVarHandler := handler.NewGlobalVariableHandler(globalVarService)
 	scheduleHandler := handler.NewScheduleHandler(scheduleService)

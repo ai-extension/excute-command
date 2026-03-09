@@ -156,6 +156,10 @@ func (r *PostgresWorkflowRepo) ListGlobalPaginated(limit, offset int, searchTerm
 	return wfs, total, err
 }
 
+func (r *PostgresWorkflowRepo) UpdateStatus(id uuid.UUID, status domain.Status) error {
+	return r.db.Model(&domain.Workflow{}).Where("id = ?", id).Update("status", status).Error
+}
+
 func (r *PostgresWorkflowRepo) Update(wf *domain.Workflow) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		// Sync Inputs: explicitly delete all old inputs and recreate them.
@@ -264,6 +268,10 @@ func (r *PostgresWorkflowGroupRepo) GetByWorkflowID(workflowID uuid.UUID) ([]dom
 
 func (r *PostgresWorkflowGroupRepo) Update(group *domain.WorkflowGroup) error {
 	return r.db.Save(group).Error
+}
+
+func (r *PostgresWorkflowGroupRepo) UpdateStatus(id uuid.UUID, status domain.Status) error {
+	return r.db.Model(&domain.WorkflowGroup{}).Where("id = ?", id).Update("status", status).Error
 }
 
 func (r *PostgresWorkflowGroupRepo) Delete(id uuid.UUID) error {

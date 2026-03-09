@@ -206,18 +206,19 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 
 	// Write to file
 	fmt.Fprint(logFile, header)
+	logFile.Sync()
 	// Broadcast to hub (using workflow ID as target for global view)
 	e.hub.BroadcastLog(workflowID.String(), execution.ID.String(), header)
 
 	wf.Status = domain.StatusRunning
-	e.wfRepo.Update(wf)
+	e.wfRepo.UpdateStatus(wf.ID, domain.StatusRunning)
 	e.hub.BroadcastStatus(wf.ID.String(), execution.ID.String(), "workflow", string(domain.StatusRunning))
 
 	// Reset groups and steps to PENDING for new execution visualization
 	for i := range wf.Groups {
-		wf.Groups[i].Status = domain.StatusPending
-		e.groupRepo.Update(&wf.Groups[i])
-		e.hub.BroadcastStatus(wf.Groups[i].ID.String(), execution.ID.String(), "group", string(domain.StatusPending))
+		wf.Groups[i].Status = domain.StatusRunning
+		e.groupRepo.UpdateStatus(wf.Groups[i].ID, domain.StatusRunning)
+		e.hub.BroadcastStatus(wf.Groups[i].ID.String(), execution.ID.String(), "group", string(domain.StatusRunning))
 		for j := range wf.Groups[i].Steps {
 			e.hub.BroadcastStatus(wf.Groups[i].Steps[j].ID.String(), execution.ID.String(), "step", string(domain.StatusPending))
 		}
@@ -362,6 +363,7 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 				isSkipping = false
 				msg := fmt.Sprintf("\033[1;33m▶ RERUN STARTING FROM GROUP: %s\033[0m\n", g.Name)
 				fmt.Fprint(logFile, msg)
+				logFile.Sync()
 				e.hub.BroadcastLog(workflowID.String(), execution.ID.String(), msg)
 			}
 
@@ -376,7 +378,7 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 				fmt.Fprint(logFile, msg)
 				e.hub.BroadcastLog(workflowID.String(), execution.ID.String(), msg)
 				wf.Groups[i].Status = "SKIPPED"
-				e.groupRepo.Update(&wf.Groups[i])
+				e.groupRepo.UpdateStatus(wf.Groups[i].ID, "SKIPPED")
 				e.hub.BroadcastStatus(wf.Groups[i].ID.String(), execution.ID.String(), "group", "SKIPPED")
 
 				// Simulate directory updates for skipped steps
@@ -482,8 +484,9 @@ finalize:
 	}
 
 	e.execRepo.Update(execution)
-	e.wfRepo.Update(wf)
-	e.hub.BroadcastStatus(wf.ID.String(), execution.ID.String(), "workflow", string(wf.Status))
+	wf.Status = execution.Status
+	e.wfRepo.UpdateStatus(wf.ID, execution.Status)
+	e.hub.BroadcastStatus(wf.ID.String(), execution.ID.String(), "workflow", string(execution.Status))
 
 	return runErr
 }
@@ -661,14 +664,15 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 		fmt.Fprint(logFile, msg)
 		e.hub.BroadcastLog(workflowID.String(), executionID.String(), msg)
 		group.Status = "SKIPPED"
-		e.groupRepo.Update(group)
+		e.groupRepo.UpdateStatus(group.ID, "SKIPPED")
 		e.hub.BroadcastStatus(group.ID.String(), executionID.String(), "group", "SKIPPED")
 		return nil
 	}
 
-	msg := fmt.Sprintf("\n\n\033[1;35m❖ GROUP START: %s\033[0m \033[90m[Parallel: %v]\033[0m\n", group.Name, group.IsParallel)
-	fmt.Fprint(logFile, msg)
-	e.hub.BroadcastLog(group.WorkflowID.String(), executionID.String(), msg)
+	groupHeader := fmt.Sprintf("\n\n\033[1;35m❖ GROUP START: %s\033[0m \033[90m[Parallel: %v]\033[0m\n", group.Name, group.IsParallel)
+	fmt.Fprint(logFile, groupHeader)
+	logFile.Sync()
+	e.hub.BroadcastLog(group.WorkflowID.String(), executionID.String(), groupHeader)
 
 	effectiveServerID := defaultServerID
 	if group.DefaultServerID != nil {
@@ -707,7 +711,7 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 		}
 
 		group.Status = domain.StatusRunning
-		e.groupRepo.Update(group)
+		e.groupRepo.UpdateStatus(group.ID, domain.StatusRunning)
 		e.hub.BroadcastStatus(group.ID.String(), executionID.String(), "group", string(domain.StatusRunning))
 
 		lastErr = e.runGroupAttempt(ctx, group, inputs, variables, groupResults, effectiveServerID, logFile, workflowID, executionID, namespaceID, user, workingDirs, startStepID, fromExecutionID, oldStepDirs)
@@ -715,13 +719,13 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 		if lastErr == nil {
 			group.Status = domain.StatusSuccess
 			e.hub.BroadcastStatus(group.ID.String(), executionID.String(), "group", string(domain.StatusSuccess))
-			return e.groupRepo.Update(group)
+			return e.groupRepo.UpdateStatus(group.ID, domain.StatusSuccess)
 		}
 
 		// Handle cancellation immediately
 		if ctx.Err() != nil {
 			group.Status = domain.StatusCancelled
-			e.groupRepo.Update(group)
+			e.groupRepo.UpdateStatus(group.ID, domain.StatusCancelled)
 			e.hub.BroadcastStatus(group.ID.String(), executionID.String(), "group", string(domain.StatusCancelled))
 			msg := fmt.Sprintf("\n\033[1;33m⏹ GROUP CANCELLED: %s\033[0m\n", group.Name)
 			fmt.Fprint(logFile, msg)
@@ -735,7 +739,7 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 
 		// Final failure after all retries
 		group.Status = domain.StatusFailed
-		e.groupRepo.Update(group)
+		e.groupRepo.UpdateStatus(group.ID, domain.StatusFailed)
 		e.hub.BroadcastStatus(group.ID.String(), executionID.String(), "group", string(domain.StatusFailed))
 
 		if group.ContinueOnFailure {
