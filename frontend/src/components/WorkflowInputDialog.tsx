@@ -3,7 +3,7 @@ import { WorkflowInput } from '../types';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Dialog, DialogContent, DialogFooter } from './ui/dialog';
-import { Zap } from 'lucide-react';
+import { Zap, Plus, Trash2, Search } from 'lucide-react';
 
 interface WorkflowInputDialogProps {
     isOpen: boolean;
@@ -27,14 +27,61 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
     const [values, setValues] = useState<Record<string, string>>({});
     const [errors, setErrors] = useState<Record<string, string>>({});
 
+    const toggleMultiSelectValue = (currentValue: string, option: string) => {
+        let selected: string[] = [];
+        try {
+            selected = JSON.parse(currentValue || '[]');
+        } catch (e) {
+            selected = (currentValue || '').split(',').map(s => s.trim()).filter(Boolean);
+        }
+
+        if (selected.includes(option)) {
+            selected = selected.filter(s => s !== option);
+        } else {
+            selected = [...selected, option];
+        }
+        return JSON.stringify(selected);
+    };
+
+    const updateMultiInputValue = (currentValue: string, rowIndex: number, key: string, value: string) => {
+        let rows: any[] = [];
+        try {
+            rows = JSON.parse(currentValue || '[]');
+        } catch (e) { rows = [{}]; }
+
+        if (!rows[rowIndex]) rows[rowIndex] = {};
+        rows[rowIndex][key] = value;
+        return JSON.stringify(rows);
+    };
+
+    const addMultiInputRow = (currentValue: string) => {
+        let rows: any[] = [];
+        try {
+            rows = JSON.parse(currentValue || '[]');
+            if (!Array.isArray(rows)) rows = [];
+        } catch (e) { rows = []; }
+        rows.push({});
+        return JSON.stringify(rows);
+    };
+
+    const removeMultiInputRow = (currentValue: string, rowIndex: number) => {
+        let rows: any[] = [];
+        try {
+            rows = JSON.parse(currentValue || '[]');
+        } catch (e) { rows = []; }
+        rows.splice(rowIndex, 1);
+        return JSON.stringify(rows);
+    };
+
     useEffect(() => {
         if (isOpen) {
             const initial: Record<string, string> = {};
             inputs.forEach(input => {
-                if (input.type === 'select') {
+                if (input.type === 'select' || input.type === 'multi-select') {
                     initial[input.key] = '';
+                } else if (input.type === 'multi-input') {
+                    initial[input.key] = '[{}]';
                 } else {
-                    // Ensure default value is a string, handle cases where it might be undefined
                     initial[input.key] = input.default_value !== undefined ? String(input.default_value) : '';
                 }
             });
@@ -45,11 +92,11 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
 
     const validate = () => {
         const newErrors: Record<string, string> = {};
-        const safeRegex = /^[a-zA-Z0-9_\-\.\ \/\{\}]*$/;
+        const safeRegex = /^[a-zA-Z0-9_\-\.\ \/\{\},]*$/;
 
         inputs.forEach(input => {
             const val = values[input.key];
-            const isValueEmpty = val === undefined || val === null || String(val).trim() === '';
+            const isValueEmpty = val === undefined || val === null || String(val).trim() === '' || val === '[]';
 
             if (input.type === 'select') {
                 const options = (input.default_value || '').split(',').map(o => o.trim()).filter(Boolean);
@@ -58,8 +105,32 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                 } else if (!isValueEmpty && !options.includes(val)) {
                     newErrors[input.key] = 'Invalid option';
                 }
+            } else if (input.type === 'multi-select') {
+                if (input.required && isValueEmpty) {
+                    newErrors[input.key] = 'Please select at least one option';
+                }
+            } else if (input.type === 'multi-input') {
+                let rows: any[] = [];
+                try {
+                    rows = JSON.parse(val || '[]');
+                } catch (e) {
+                    newErrors[input.key] = 'Invalid format';
+                    return;
+                }
+                if (!Array.isArray(rows)) {
+                    newErrors[input.key] = 'Must be an array';
+                    return;
+                }
+                for (const row of rows) {
+                    for (const k in row) {
+                        if (!safeRegex.test(String(row[k]))) {
+                            newErrors[input.key] = `Invalid characters in ${k}`;
+                            return;
+                        }
+                    }
+                }
             } else {
-                if (isValueEmpty) {
+                if (input.required && isValueEmpty) {
                     newErrors[input.key] = 'This field is required';
                 } else if (!isValueEmpty) {
                     if (input.type === 'number') {
@@ -124,6 +195,86 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                                                 <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                                             </svg>
                                         </div>
+                                    </div>
+                                ) : input.type === 'multi-select' ? (
+                                    <div className="flex flex-wrap gap-2 p-3 bg-muted/30 border border-border rounded-xl">
+                                        {(input.default_value || '').split(',').map((opt) => opt.trim()).filter(Boolean).map((opt) => {
+                                            let selected: string[] = [];
+                                            try { selected = JSON.parse(values[input.key] || '[]'); } catch (e) { }
+                                            const isSelected = selected.includes(opt);
+                                            return (
+                                                <Button
+                                                    key={opt}
+                                                    type="button"
+                                                    variant={isSelected ? "default" : "outline"}
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        const newValue = toggleMultiSelectValue(values[input.key], opt);
+                                                        setValues({ ...values, [input.key]: newValue });
+                                                    }}
+                                                    className={`h-7 px-3 text-[10px] font-bold rounded-lg transition-all ${isSelected ? 'premium-gradient shadow-sm' : 'hover:bg-primary/10 hover:text-primary hover:border-primary/30'}`}
+                                                >
+                                                    {opt}
+                                                </Button>
+                                            );
+                                        })}
+                                    </div>
+                                ) : input.type === 'multi-input' ? (
+                                    <div className="space-y-3 bg-muted/30 p-3 border border-border rounded-xl">
+                                        {(() => {
+                                            let rows: any[] = [];
+                                            try { rows = JSON.parse(values[input.key] || '[]'); } catch (e) { rows = [{}]; }
+                                            if (!Array.isArray(rows)) rows = [{}];
+
+                                            return (
+                                                <>
+                                                    {rows.map((row, rowIndex) => (
+                                                        <div key={rowIndex} className="space-y-2 p-3 bg-background/50 border border-border/50 rounded-lg relative group/row">
+                                                            {(input.default_value || '').split(',').map((k: string) => k.trim()).filter(Boolean).map((fieldKey: string) => (
+                                                                <div key={fieldKey} className="space-y-1">
+                                                                    <label className="text-[9px] font-black uppercase tracking-widest opacity-40 ml-1">{fieldKey}</label>
+                                                                    <Input
+                                                                        className="h-9 bg-muted/30 border-border/50 rounded-lg text-xs font-bold"
+                                                                        value={row[fieldKey] || ''}
+                                                                        onChange={(e) => {
+                                                                            const newValue = updateMultiInputValue(values[input.key], rowIndex, fieldKey, e.target.value);
+                                                                            setValues({ ...values, [input.key]: newValue });
+                                                                        }}
+                                                                        placeholder={`Enter ${fieldKey}...`}
+                                                                    />
+                                                                </div>
+                                                            ))}
+                                                            {rows.length > 1 && (
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    onClick={() => {
+                                                                        const newValue = removeMultiInputRow(values[input.key], rowIndex);
+                                                                        setValues({ ...values, [input.key]: newValue });
+                                                                    }}
+                                                                    className="absolute -right-2 -top-2 h-6 w-6 rounded-full bg-destructive/10 text-destructive opacity-0 group-hover/row:opacity-100 transition-opacity border border-destructive/20"
+                                                                >
+                                                                    <Trash2 className="w-3 h-3" />
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => {
+                                                            const newValue = addMultiInputRow(values[input.key]);
+                                                            setValues({ ...values, [input.key]: newValue });
+                                                        }}
+                                                        className="w-full h-8 border-dashed border-primary/30 text-primary bg-primary/5 hover:bg-primary/10 text-[9px] font-black uppercase tracking-widest rounded-lg"
+                                                    >
+                                                        <Plus className="w-3 h-3 mr-1" /> Add Row
+                                                    </Button>
+                                                </>
+                                            );
+                                        })()}
                                     </div>
                                 ) : (
                                     <Input
