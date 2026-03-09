@@ -107,11 +107,15 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                                                     <option value="input">Input</option>
                                                     <option value="number">Number</option>
                                                     <option value="select">Select</option>
+                                                    <option value="multi-select">Multi-Select</option>
+                                                    <option value="multi-input">Multi-Input</option>
                                                 </select>
                                             </div>
                                             <div className="space-y-1.5">
                                                 <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">
-                                                    {input.type === 'select' ? 'Options (comma-separated)' : 'Default Value'}
+                                                    {input.type === 'select' || input.type === 'multi-select' ? 'Options (comma-separated)'
+                                                        : input.type === 'multi-input' ? 'Keys (comma-separated, e.g. key1, key2)'
+                                                            : 'Default Value'}
                                                 </label>
                                                 {input.type === 'input' ? (
                                                     <Textarea
@@ -135,7 +139,9 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                                                         }}
                                                         placeholder={
                                                             input.type === 'number' ? '0'
-                                                                : 'option1, option2, option3'
+                                                                : (input.type === 'select' || input.type === 'multi-select') ? 'option1, option2, option3'
+                                                                    : input.type === 'multi-input' ? 'key1, key2, key3'
+                                                                        : 'Default value...'
                                                         }
                                                         className="h-8 text-[11px] border-border bg-background"
                                                     />

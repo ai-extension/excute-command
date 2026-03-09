@@ -42,7 +42,7 @@ const WorkflowRunDialog: React.FC<WorkflowRunDialogProps> = ({
     const createInitialValues = () => {
         const initial: Record<string, string> = {};
         inputs.forEach(input => {
-            if (input.type === 'select') {
+            if (input.type === 'select' || input.type === 'multi-select') {
                 initial[input.key] = '';
             } else {
                 initial[input.key] = input.default_value !== undefined ? String(input.default_value) : '';
@@ -96,27 +96,102 @@ const WorkflowRunDialog: React.FC<WorkflowRunDialogProps> = ({
         }
     };
 
+    const toggleMultiSelectValue = (currentValue: string, option: string) => {
+        let selected: string[] = [];
+        try {
+            selected = JSON.parse(currentValue || '[]');
+        } catch (e) {
+            selected = (currentValue || '').split(',').map(s => s.trim()).filter(Boolean);
+        }
+
+        if (selected.includes(option)) {
+            selected = selected.filter(s => s !== option);
+        } else {
+            selected = [...selected, option];
+        }
+        return JSON.stringify(selected);
+    };
+
+    const updateMultiInputValue = (currentValue: string, rowIndex: number, key: string, value: string) => {
+        let rows: any[] = [];
+        try {
+            rows = JSON.parse(currentValue || '[]');
+        } catch (e) { rows = [{}]; }
+
+        if (!rows[rowIndex]) rows[rowIndex] = {};
+        rows[rowIndex][key] = value;
+        return JSON.stringify(rows);
+    };
+
+    const addMultiInputRow = (currentValue: string) => {
+        let rows: any[] = [];
+        try {
+            rows = JSON.parse(currentValue || '[]');
+        } catch (e) { rows = []; }
+        rows.push({});
+        return JSON.stringify(rows);
+    };
+
+    const removeMultiInputRow = (currentValue: string, rowIndex: number) => {
+        let rows: any[] = [];
+        try {
+            rows = JSON.parse(currentValue || '[]');
+        } catch (e) { rows = []; }
+        rows.splice(rowIndex, 1);
+        return JSON.stringify(rows);
+    };
+
     const validate = () => {
-        const safeRegex = /^[a-zA-Z0-9_\-\.\ \/\{\}]*$/;
+        const safeRegex = /^[a-zA-Z0-9_\-\.\ \/\{\},]*$/;
         let hasErrors = false;
+
+        const validateField = (input: WorkflowInput, val: any): string | null => {
+            const isValueEmpty = val === undefined || val === null || (typeof val === 'string' && val.trim() === '') || (Array.isArray(val) && val.length === 0);
+
+            if (input.required && isValueEmpty) {
+                return 'Required';
+            }
+
+            if (!isValueEmpty) {
+                if (input.type === 'number') {
+                    if (isNaN(Number(val))) return 'Must be a number';
+                } else if (input.type === 'multi-select') {
+                    const options = (input.default_value || '').split(',').map(o => o.trim()).filter(Boolean);
+                    let selected: string[] = [];
+                    try {
+                        selected = typeof val === 'string' ? JSON.parse(val) : val;
+                    } catch (e) {
+                        selected = String(val).split(',').map(s => s.trim()).filter(Boolean);
+                    }
+                    const invalid = selected.filter(s => !options.includes(s));
+                    if (invalid.length > 0) return 'Invalid options';
+                } else if (input.type === 'multi-input') {
+                    let rows: any[] = [];
+                    try {
+                        rows = typeof val === 'string' ? JSON.parse(val) : val;
+                    } catch (e) { return 'Invalid format'; }
+
+                    if (!Array.isArray(rows)) return 'Must be an array of objects';
+
+                    for (const row of rows) {
+                        for (const k in row) {
+                            if (!safeRegex.test(String(row[k]))) return `Invalid chars in ${k}`;
+                        }
+                    }
+                } else {
+                    if (!safeRegex.test(String(val))) return 'Invalid characters';
+                }
+            }
+            return null;
+        };
 
         if (runMode === 'SINGLE') {
             const newErrors: Record<string, string> = {};
             inputs.forEach(input => {
-                const val = singleValues[input.key];
-                const isValueEmpty = val === undefined || val === null || String(val).trim() === '';
-
-                if (input.required && isValueEmpty) {
-                    newErrors[input.key] = 'Required';
+                const err = validateField(input, singleValues[input.key]);
+                if (err) {
+                    newErrors[input.key] = err;
                     hasErrors = true;
-                } else if (!isValueEmpty) {
-                    if (input.type === 'number' && isNaN(Number(val))) {
-                        newErrors[input.key] = 'Must be a number';
-                        hasErrors = true;
-                    } else if (input.type !== 'number' && !safeRegex.test(val)) {
-                        newErrors[input.key] = 'Invalid characters';
-                        hasErrors = true;
-                    }
                 }
             });
             setSingleErrors(newErrors);
@@ -125,20 +200,10 @@ const WorkflowRunDialog: React.FC<WorkflowRunDialogProps> = ({
             rows.forEach(row => {
                 const rowErrors: Record<string, string> = {};
                 inputs.forEach(input => {
-                    const val = row.values[input.key];
-                    const isValueEmpty = val === undefined || val === null || String(val).trim() === '';
-
-                    if (input.required && isValueEmpty) {
-                        rowErrors[input.key] = 'Required';
+                    const err = validateField(input, row.values[input.key]);
+                    if (err) {
+                        rowErrors[input.key] = err;
                         hasErrors = true;
-                    } else if (!isValueEmpty) {
-                        if (input.type === 'number' && isNaN(Number(val))) {
-                            rowErrors[input.key] = 'Must be a number';
-                            hasErrors = true;
-                        } else if (input.type !== 'number' && !safeRegex.test(val)) {
-                            rowErrors[input.key] = 'Invalid characters';
-                            hasErrors = true;
-                        }
                     }
                 });
                 if (Object.keys(rowErrors).length > 0) {
@@ -268,17 +333,93 @@ const WorkflowRunDialog: React.FC<WorkflowRunDialogProps> = ({
                                                 </svg>
                                             </div>
                                         </div>
+                                    ) : input.type === 'multi-select' ? (
+                                        <div className="flex flex-wrap gap-2 p-3 bg-muted/30 border border-border rounded-xl min-h-[44px]">
+                                            {(input.default_value || '').split(',').map((opt) => opt.trim()).filter(Boolean).map((opt) => {
+                                                const selectedStr = singleValues[input.key] || '[]';
+                                                let selected: string[] = [];
+                                                try { selected = JSON.parse(selectedStr); } catch (e) { selected = selectedStr.split(',').map(s => s.trim()).filter(Boolean); }
+                                                const isSelected = selected.includes(opt);
+                                                return (
+                                                    <button
+                                                        key={opt}
+                                                        type="button"
+                                                        onClick={() => updateSingleValue(input.key, toggleMultiSelectValue(singleValues[input.key], opt))}
+                                                        className={cn(
+                                                            "px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border",
+                                                            isSelected
+                                                                ? "bg-primary text-white border-primary shadow-sm"
+                                                                : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                                                        )}
+                                                    >
+                                                        {opt}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : input.type === 'multi-input' ? (
+                                        <div className="space-y-3 p-4 bg-muted/30 border border-border rounded-2xl">
+                                            {(() => {
+                                                const keys = (input.default_value || '').split(',').map(k => k.trim()).filter(Boolean);
+                                                const currentStr = singleValues[input.key] || '[]';
+                                                let rows: any[] = [];
+                                                try { rows = JSON.parse(currentStr); if (!Array.isArray(rows)) rows = [{}]; } catch (e) { rows = [{}]; }
+                                                if (rows.length === 0) rows = [{}];
+
+                                                return (
+                                                    <div className="space-y-4">
+                                                        {rows.map((row, rowIndex) => (
+                                                            <div key={rowIndex} className="flex flex-col gap-3 p-3 bg-background/50 rounded-xl border border-border/50 relative group">
+                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                                    {keys.map(key => (
+                                                                        <div key={key} className="space-y-1">
+                                                                            <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground/70">{key}</label>
+                                                                            <Input
+                                                                                value={row[key] || ''}
+                                                                                onChange={(e) => updateSingleValue(input.key, updateMultiInputValue(currentStr, rowIndex, key, e.target.value))}
+                                                                                placeholder={key}
+                                                                                className="h-8 text-[10px] bg-background border-border"
+                                                                            />
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                                {rows.length > 1 && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => updateSingleValue(input.key, removeMultiInputRow(currentStr, rowIndex))}
+                                                                        className="absolute -top-2 -right-2 w-5 h-5 bg-destructive text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                                                                    >
+                                                                        <Trash2 className="w-3 h-3" />
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                        <Button
+                                                            type="button"
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => updateSingleValue(input.key, addMultiInputRow(currentStr))}
+                                                            className="w-full h-8 border-dashed border-2 text-[9px] font-black uppercase tracking-widest gap-2 bg-background hover:bg-muted"
+                                                        >
+                                                            <Plus className="w-3 h-3" /> Add Row
+                                                        </Button>
+                                                    </div>
+                                                );
+                                            })()}
+                                        </div>
                                     ) : (
-                                        <Input
-                                            type={input.type === 'number' ? 'number' : 'text'}
-                                            value={singleValues[input.key] || ''}
-                                            onChange={(e) => updateSingleValue(input.key, e.target.value)}
-                                            className={cn(
-                                                "h-11 px-4 bg-muted/50 focus:border-primary/50 focus:ring-primary/20 text-xs font-semibold rounded-xl transition-all",
-                                                singleErrors[input.key] ? 'border-destructive' : 'border-border'
-                                            )}
-                                            placeholder={`Enter ${input.label || input.key}...`}
-                                        />
+                                        <div className="relative">
+                                            <Input
+                                                type={input.type === 'number' ? 'number' : 'text'}
+                                                value={singleValues[input.key] || ''}
+                                                onChange={(e) => updateSingleValue(input.key, e.target.value)}
+                                                className={cn(
+                                                    "h-11 px-4 bg-muted/50 focus:border-primary/50 focus:ring-primary/20 text-xs font-semibold rounded-xl transition-all",
+                                                    singleErrors[input.key] ? 'border-destructive' : 'border-border'
+                                                )}
+                                                placeholder={`Enter ${input.label || input.key}...`}
+                                            />
+                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -344,17 +485,93 @@ const WorkflowRunDialog: React.FC<WorkflowRunDialogProps> = ({
                                                                 </svg>
                                                             </div>
                                                         </div>
+                                                    ) : input.type === 'multi-select' ? (
+                                                        <div className="flex flex-wrap gap-1.5 p-2 bg-background/30 border border-border rounded-xl min-h-[40px]">
+                                                            {(input.default_value || '').split(',').map((opt) => opt.trim()).filter(Boolean).map((opt) => {
+                                                                const selectedStr = row.values[input.key] || '[]';
+                                                                let selected: string[] = [];
+                                                                try { selected = JSON.parse(selectedStr); } catch (e) { selected = selectedStr.split(',').map(s => s.trim()).filter(Boolean); }
+                                                                const isSelected = selected.includes(opt);
+                                                                return (
+                                                                    <button
+                                                                        key={opt}
+                                                                        type="button"
+                                                                        onClick={() => updateRowValue(row.id, input.key, toggleMultiSelectValue(row.values[input.key], opt))}
+                                                                        className={cn(
+                                                                            "px-2 py-1 rounded-lg text-[9px] font-bold transition-all border",
+                                                                            isSelected
+                                                                                ? "bg-primary text-white border-primary"
+                                                                                : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                                                                        )}
+                                                                    >
+                                                                        {opt}
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    ) : input.type === 'multi-input' ? (
+                                                        <div className="space-y-3 p-3 bg-background/20 border border-border rounded-xl">
+                                                            {(() => {
+                                                                const keys = (input.default_value || '').split(',').map(k => k.trim()).filter(Boolean);
+                                                                const currentStr = row.values[input.key] || '[]';
+                                                                let rows: any[] = [];
+                                                                try { rows = JSON.parse(currentStr); if (!Array.isArray(rows)) rows = [{}]; } catch (e) { rows = [{}]; }
+                                                                if (rows.length === 0) rows = [{}];
+
+                                                                return (
+                                                                    <div className="space-y-3">
+                                                                        {rows.map((mRow, mRowIndex) => (
+                                                                            <div key={mRowIndex} className="flex flex-col gap-2 p-2 bg-background/50 rounded-lg border border-border/50 relative group">
+                                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                                                    {keys.map(key => (
+                                                                                        <div key={key} className="space-y-1">
+                                                                                            <label className="text-[7px] font-black uppercase tracking-widest text-muted-foreground/70">{key}</label>
+                                                                                            <Input
+                                                                                                value={mRow[key] || ''}
+                                                                                                onChange={(e) => updateRowValue(row.id, input.key, updateMultiInputValue(currentStr, mRowIndex, key, e.target.value))}
+                                                                                                placeholder={key}
+                                                                                                className="h-7 text-[9px] bg-background border-border"
+                                                                                            />
+                                                                                        </div>
+                                                                                    ))}
+                                                                                </div>
+                                                                                {rows.length > 1 && (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => updateRowValue(row.id, input.key, removeMultiInputRow(currentStr, mRowIndex))}
+                                                                                        className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-destructive text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                                                                                    >
+                                                                                        <Trash2 className="w-2.5 h-2.5" />
+                                                                                    </button>
+                                                                                )}
+                                                                            </div>
+                                                                        ))}
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            onClick={() => updateRowValue(row.id, input.key, addMultiInputRow(currentStr))}
+                                                                            className="w-full h-7 border-dashed border text-[8px] font-black uppercase tracking-widest gap-2 bg-background"
+                                                                        >
+                                                                            <Plus className="w-2.5 h-2.5" /> Add Row
+                                                                        </Button>
+                                                                    </div>
+                                                                );
+                                                            })()}
+                                                        </div>
                                                     ) : (
-                                                        <Input
-                                                            type={input.type === 'number' ? 'number' : 'text'}
-                                                            value={row.values[input.key] || ''}
-                                                            onChange={(e) => updateRowValue(row.id, input.key, e.target.value)}
-                                                            className={cn(
-                                                                "h-10 px-4 bg-background/50 focus:border-primary/50 text-xs font-semibold rounded-xl transition-all",
-                                                                errors[row.id]?.[input.key] ? 'border-destructive' : 'border-border'
-                                                            )}
-                                                            placeholder={input.label || input.key}
-                                                        />
+                                                        <div className="relative">
+                                                            <Input
+                                                                type={input.type === 'number' ? 'number' : 'text'}
+                                                                value={row.values[input.key] || ''}
+                                                                onChange={(e) => updateRowValue(row.id, input.key, e.target.value)}
+                                                                className={cn(
+                                                                    "h-10 px-4 bg-background/50 focus:border-primary/50 text-xs font-semibold rounded-xl transition-all",
+                                                                    errors[row.id]?.[input.key] ? 'border-destructive' : 'border-border'
+                                                                )}
+                                                                placeholder={input.label || input.key}
+                                                            />
+                                                        </div>
                                                     )}
                                                 </div>
                                             </div>

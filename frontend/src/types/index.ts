@@ -178,7 +178,7 @@ export interface WorkflowInput {
     workflow_id: string;
     key: string;
     label: string;
-    type: 'input' | 'number' | 'select';
+    type: 'input' | 'number' | 'select' | 'multi-select' | 'multi-input';
     default_value: string;
     required: boolean;
     created_at: string;

@@ -579,12 +579,71 @@ func (e *WorkflowExecutor) validateInputs(wf *domain.Workflow, provided map[stri
 			if !valid {
 				return fmt.Errorf("field %s has invalid option: %s", input.Label, val)
 			}
+		case "multi-select":
+			// Try JSON first, fallback to comma separated
+			var selected []string
+			if err := json.Unmarshal([]byte(val), &selected); err != nil {
+				// Fallback
+				parts := strings.Split(val, ",")
+				for _, p := range parts {
+					selected = append(selected, strings.TrimSpace(p))
+				}
+			}
+
+			options := strings.Split(input.DefaultValue, ",")
+			trimmedOptions := make([]string, 0, len(options))
+			for _, opt := range options {
+				trimmedOptions = append(trimmedOptions, strings.TrimSpace(opt))
+			}
+
+			for _, s := range selected {
+				if s == "" {
+					continue
+				}
+				valid := false
+				for _, opt := range trimmedOptions {
+					if opt == s {
+						valid = true
+						break
+					}
+				}
+				if !valid {
+					return fmt.Errorf("field %s has invalid option: %s", input.Label, s)
+				}
+			}
+		case "multi-input":
+			var rows []map[string]interface{}
+			if err := json.Unmarshal([]byte(val), &rows); err != nil {
+				// Fallback for simple comma-separated (non-multi-key)
+				values := strings.Split(val, ",")
+				securityRegex := regexp.MustCompile(`^[\pL0-9_\-\.\ \/]+$`)
+				for _, v := range values {
+					v = strings.TrimSpace(v)
+					if v == "" {
+						continue
+					}
+					if !securityRegex.MatchString(v) {
+						return fmt.Errorf("field %s contains invalid characters in value '%s'", input.Label, v)
+					}
+				}
+			} else {
+				securityRegex := regexp.MustCompile(`^[\pL0-9_\-\.\ \/]+$`)
+				for _, row := range rows {
+					for k, v := range row {
+						strV := fmt.Sprintf("%v", v)
+						if strV == "" {
+							continue
+						}
+						if !securityRegex.MatchString(strV) {
+							return fmt.Errorf("field %s contains invalid characters in field '%s': '%s'", input.Label, k, strV)
+						}
+					}
+				}
+			}
 		default: // "input"
-			// Whitelist approach: only allow alphabetic characters (including Unicode), digits, spaces, and basic symbols used in paths/params
-			// We block shell metacharacters: ; & | $ ` > < ( ) etc.
-			matched, _ := regexp.MatchString(`^[\pL0-9_\-\.\ \/]+$`, val)
-			if !matched {
-				return fmt.Errorf("field %s contains invalid characters. Security policy: only alpha-numeric, space, _, -, ., / are allowed", input.Label)
+			securityRegex := regexp.MustCompile(`^[\pL0-9_\-\.\ \/]+$`)
+			if !securityRegex.MatchString(val) {
+				return fmt.Errorf("field %s contains invalid characters", input.Label)
 			}
 		}
 	}
@@ -1284,10 +1343,21 @@ func (e *WorkflowExecutor) getInterpolationContext(inputs map[string]string, var
 	ctx["variable"] = vars
 
 	// 3. Inputs: input.key
-	in := make(map[string]string)
+	in := make(map[string]interface{})
 	for k, v := range inputs {
-		if v == "" || securityRegex.MatchString(v) {
+		if v == "" {
 			in[k] = v
+			continue
+		}
+
+		// Try to parse as JSON for multi-select and multi-input
+		var jsonVal interface{}
+		if err := json.Unmarshal([]byte(v), &jsonVal); err == nil {
+			in[k] = jsonVal
+		} else {
+			if securityRegex.MatchString(v) {
+				in[k] = v
+			}
 		}
 	}
 	ctx["input"] = in
