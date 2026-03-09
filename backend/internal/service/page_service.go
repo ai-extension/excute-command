@@ -80,9 +80,12 @@ func (s *PageService) UpdatePage(page *domain.Page, user *domain.User) error {
 	}
 
 	// If password is being updated (not empty), hash it
-	// If it's empty, keep the existing one
-	if page.Password != "" {
-		if page.Password[:4] != "$2a$" {
+	// If it's a special marker "__CLEAR_PASSWORD__", explicitly clear it.
+	// If it's empty, keep the existing one.
+	if page.Password == "__CLEAR_PASSWORD__" {
+		page.Password = ""
+	} else if page.Password != "" {
+		if len(page.Password) < 4 || page.Password[:4] != "$2a$" {
 			hashed, err := bcrypt.GenerateFromPassword([]byte(page.Password), bcrypt.DefaultCost)
 			if err != nil {
 				return err

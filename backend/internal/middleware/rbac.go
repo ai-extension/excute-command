@@ -75,6 +75,72 @@ func AuthMiddleware(authService *service.AuthService, userRepo domain.UserReposi
 	}
 }
 
+func OptionalAuthMiddleware(authService *service.AuthService, userRepo domain.UserRepository, apiKeyRepo domain.APIKeyRepository) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// 1. Try API Key first
+		apiKeyStr := c.GetHeader("X-API-Key")
+		if apiKeyStr != "" && len(apiKeyStr) > 8 {
+			prefix := apiKeyStr[:8]
+			keys, err := apiKeyRepo.ListByPrefix(prefix)
+			if err == nil {
+				for _, key := range keys {
+					if err := bcrypt.CompareHashAndPassword([]byte(key.KeyHash), []byte(apiKeyStr)); err == nil {
+						user, err := userRepo.GetByID(key.UserID)
+						if err == nil {
+							c.Set("user_id", user.ID)
+							c.Set("username", user.Username)
+							c.Set("user", user)
+							c.Set("api_key_scopes", key.Scopes)
+							go apiKeyRepo.UpdateLastUsed(key.ID)
+							c.Next()
+							return
+						}
+					}
+				}
+			}
+		}
+
+		var tokenStr string
+
+		// 2. Try cookie
+		cookie, err := c.Cookie("auth_token")
+		if err == nil && cookie != "" {
+			tokenStr = cookie
+		} else {
+			// 3. Fallback to Authorization header
+			authHeader := c.GetHeader("Authorization")
+			if authHeader != "" {
+				parts := strings.Split(authHeader, " ")
+				if len(parts) == 2 && parts[0] == "Bearer" {
+					tokenStr = parts[1]
+				}
+			}
+		}
+
+		if tokenStr == "" {
+			c.Next() // Allow request without authentication
+			return
+		}
+
+		claims, err := authService.ValidateToken(tokenStr)
+		if err != nil {
+			c.Next() // Allow request without valid authentication
+			return
+		}
+
+		c.Set("user_id", claims["user_id"])
+		c.Set("username", claims["username"])
+
+		// Attempt to fetch and set user object so RBAC check later works
+		username := claims["username"].(string)
+		if user, err := userRepo.GetByUsername(username); err == nil {
+			c.Set("user", user)
+		}
+
+		c.Next()
+	}
+}
+
 func RBACMiddleware(userRepo domain.UserRepository, permType, action string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		currentUser, _ := c.Get("user") // Attempt to get user object directly if set by previous middleware

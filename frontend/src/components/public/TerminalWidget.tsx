@@ -53,7 +53,8 @@ const TerminalWidget: React.FC<TerminalWidgetProps> = ({ widget, slug, pageToken
             }
 
             // Connect with widget_id to trigger the backend streaming loop
-            const wsUrl = `${protocol}//${baseUrl}/ws?token=${pageToken || ''}&slug=${slug || ''}&widget_id=${widget.id}`;
+            const token = localStorage.getItem('token');
+            const wsUrl = `${protocol}//${baseUrl}/ws?token=${pageToken || ''}&slug=${slug || ''}&widget_id=${widget.id}&auth_token=${token || ''}`;
             const ws = new WebSocket(wsUrl);
             wsRef.current = ws;
 

@@ -114,7 +114,11 @@ const PublicPageView = () => {
         setError(null);
         try {
             const url = `${API_BASE_URL}/public/pages/${slug}`;
-            const response = await fetch(url);
+            const token = localStorage.getItem('token');
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            const response = await fetch(url, { headers });
             const data = await response.json();
 
             if (response.status === 410) {
@@ -156,9 +160,13 @@ const PublicPageView = () => {
         e.preventDefault();
         setIsVerifying(true);
         try {
+            const token = localStorage.getItem('token');
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
             const response = await fetch(`${API_BASE_URL}/public/pages/${slug}/verify`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify({ password })
             });
             const data = await response.json();
@@ -240,8 +248,10 @@ const PublicPageView = () => {
         setInputModal({ isOpen: false, widget: null, workflowInputs: [] });
         setRunningWidgets(prev => ({ ...prev, [widget.id]: true }));
         try {
+            const token = localStorage.getItem('token');
             const headers: Record<string, string> = { 'Content-Type': 'application/json' };
             if (pageToken) headers['X-Page-Token'] = pageToken;
+            if (token) headers['Authorization'] = `Bearer ${token}`;
 
             const response = await fetch(`${API_BASE_URL}/public/pages/${slug}/run/${widget.workflow_id}`, {
                 method: 'POST',
@@ -301,8 +311,10 @@ const PublicPageView = () => {
         if (!activeExecutionId) return;
 
         try {
+            const token = localStorage.getItem('token');
             const headers: Record<string, string> = { 'Content-Type': 'application/json' };
             if (pageToken) headers['X-Page-Token'] = pageToken;
+            if (token) headers['Authorization'] = `Bearer ${token}`;
 
             await fetch(`${API_BASE_URL}/public/pages/${slug}/executions/${activeExecutionId}/stop`, {
                 method: 'POST',

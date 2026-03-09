@@ -116,6 +116,10 @@ func (s *AuthService) ValidateToken(tokenString string) (jwt.MapClaims, error) {
 	return nil, errors.New("invalid token")
 }
 
+func (s *AuthService) GetUserByUsername(username string) (*domain.User, error) {
+	return s.userRepo.GetByUsername(username)
+}
+
 func (s *AuthService) SocialLogin(provider, socialID, email, fullName, avatarURL string) (string, *domain.User, error) {
 	// 1. Try to find user by email (using it as unique identifier)
 	user, err := s.userRepo.GetByUsername(email)

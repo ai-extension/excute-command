@@ -171,7 +171,7 @@ func (h *PageHandler) GetPublicPage(c *gin.Context) {
 		return
 	}
 
-	if !page.IsPublic {
+	if !h.checkPublicAccess(c, page) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "page is not public"})
 		return
 	}
@@ -182,9 +182,20 @@ func (h *PageHandler) GetPublicPage(c *gin.Context) {
 		return
 	}
 
-	// If page has a password, don't return the full content yet
-	// Return a simplified version or a flag indicating password is required
-	if page.Password != "" {
+	requiresPassword := page.Password != ""
+	if requiresPassword {
+		if userObj, exists := c.Get("user"); exists {
+			user := userObj.(*domain.User)
+			nsIDStr := page.NamespaceID.String()
+			pageIDStr := page.ID.String()
+			if domain.HasPermission(user, "pages", "READ", &nsIDStr, &pageIDStr, nil) {
+				requiresPassword = false
+			}
+		}
+	}
+
+	// If page requires a password, don't return the full content yet
+	if requiresPassword {
 		c.JSON(http.StatusOK, gin.H{
 			"id":                page.ID,
 			"title":             page.Title,
@@ -215,6 +226,11 @@ func (h *PageHandler) VerifyPublicPage(c *gin.Context) {
 		return
 	}
 
+	if !h.checkPublicAccess(c, page) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "page is not public"})
+		return
+	}
+
 	if err := h.service.ValidatePagePassword(page, req.Password); err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid password"})
 		return
@@ -241,6 +257,17 @@ func (h *PageHandler) verifyPageToken(c *gin.Context, page *domain.Page) bool {
 	if page.Password == "" {
 		return true // No password → no token required
 	}
+
+	// Bypass password/token if user has RBAC permissions
+	if userObj, exists := c.Get("user"); exists {
+		user := userObj.(*domain.User)
+		nsIDStr := page.NamespaceID.String()
+		pageIDStr := page.ID.String()
+		if domain.HasPermission(user, "pages", "READ", &nsIDStr, &pageIDStr, nil) {
+			return true
+		}
+	}
+
 	token := c.GetHeader("X-Page-Token")
 	if token == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication required", "token_required": true})
@@ -268,7 +295,7 @@ func (h *PageHandler) RunPublicWorkflow(c *gin.Context) {
 		return
 	}
 
-	if !page.IsPublic {
+	if !h.checkPublicAccess(c, page) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "page is not public"})
 		return
 	}
@@ -333,7 +360,7 @@ func (h *PageHandler) StopPublicExecution(c *gin.Context) {
 		return
 	}
 
-	if !page.IsPublic {
+	if !h.checkPublicAccess(c, page) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "page is not public"})
 		return
 	}
@@ -397,4 +424,17 @@ func (h *PageHandler) sanitizeExecution(execution *domain.WorkflowExecution) {
 		execution.User.PasswordHash = ""
 		execution.User.Email = "" // Protect PII
 	}
+}
+
+func (h *PageHandler) checkPublicAccess(c *gin.Context, page *domain.Page) bool {
+	if page.IsPublic {
+		return true
+	}
+	user, exists := c.Get("user")
+	if !exists {
+		return false
+	}
+	nsIDStr := page.NamespaceID.String()
+	pageIDStr := page.ID.String()
+	return domain.HasPermission(user.(*domain.User), "pages", "READ", &nsIDStr, &pageIDStr, nil)
 }

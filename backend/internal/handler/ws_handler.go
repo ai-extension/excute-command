@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"github.com/user/csm-backend/internal/domain"
 	"github.com/user/csm-backend/internal/service"
 )
 
@@ -40,9 +41,13 @@ func NewWSHandler(hub *service.Hub, terminalService *service.TerminalService, au
 
 func (h *WSHandler) HandleWS(c *gin.Context) {
 	token := c.Query("token")
-	// If token is "cookie_managed" or empty, try to get it from cookie
+	authToken := c.Query("auth_token")
+
+	// If token is "cookie_managed" or empty, try to get it from auth_token query param first, then cookie
 	if token == "" || token == "cookie_managed" {
-		if cookie, err := c.Cookie("auth_token"); err == nil {
+		if authToken != "" {
+			token = authToken
+		} else if cookie, err := c.Cookie("auth_token"); err == nil {
 			token = cookie
 		}
 	}
@@ -53,23 +58,46 @@ func (h *WSHandler) HandleWS(c *gin.Context) {
 	var access service.AccessContext
 	access.StatusOnly = statusOnly
 
-	// 1. Try Admin JWT Token
+	var userObj *domain.User
+
+	// 1. Try Admin/General JWT Token
 	if claims, err := h.authService.ValidateToken(token); err == nil && claims != nil {
-		access.IsAdmin = true
-	} else if slug != "" {
-		// 2. Try Public Page Token
+		if username, ok := claims["username"].(string); ok {
+			userObj, _ = h.authService.GetUserByUsername(username)
+			if userObj != nil {
+				// We don't automatically grant `access.IsAdmin = true` for all widgets.
+				// We still need to check if the user has permission to read the page.
+			}
+		}
+	}
+
+	if slug != "" {
+		// 2. Try Public Page Token or RBAC
 		page, err := h.pageService.GetPageBySlug(slug)
-		if err == nil && page.IsPublic {
-			// Check expiration
-			if page.ExpiresAt == nil || page.ExpiresAt.After(time.Now()) {
-				// If page has no password, access granted
-				if page.Password == "" {
-					access.PageID = &page.ID
-				} else if token != "" {
-					// Validate page token
-					if err := h.pageService.ValidatePageToken(page, token); err == nil {
+		if err == nil {
+			if page.IsPublic {
+				// Check expiration
+				if page.ExpiresAt == nil || page.ExpiresAt.After(time.Now()) {
+					// If page has no password, access granted
+					if page.Password == "" {
 						access.PageID = &page.ID
+					} else if token != "" {
+						// Validate page token
+						if err := h.pageService.ValidatePageToken(page, token); err == nil {
+							access.PageID = &page.ID
+						}
 					}
+				}
+			}
+
+			// If not public or page token wasn't valid, check if user has RBAC access
+			if access.PageID == nil && userObj != nil {
+				nsIDStr := page.NamespaceID.String()
+				pageIDStr := page.ID.String()
+				if domain.HasPermission(userObj, "pages", "READ", &nsIDStr, &pageIDStr, nil) {
+					access.PageID = &page.ID
+					// Also grant admin if they have write/execute permissions, or just grant access
+					access.IsAdmin = true // Give access to stream
 				}
 			}
 		}

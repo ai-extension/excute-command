@@ -147,7 +147,7 @@ const PageDesignerPage = () => {
                 description,
                 slug,
                 is_public: isPublic,
-                password: password || undefined,
+                password: password || '__CLEAR_PASSWORD__',
                 token_ttl_minutes: tokenTTL,
                 expires_at: calculateExpiration(expirationOption),
                 layout: JSON.stringify(layout),

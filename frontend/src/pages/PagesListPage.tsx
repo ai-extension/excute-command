@@ -262,16 +262,14 @@ const PagesListPage = () => {
                                         )}
                                     </div>
                                     <div className="flex gap-2">
-                                        {page.is_public && (
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                className="h-8 px-3 text-[10px] font-bold uppercase tracking-widest rounded-lg"
-                                                onClick={() => window.open(`/public/pages/${page.slug}`, '_blank')}
-                                            >
-                                                <ExternalLink className="w-3 h-3" />
-                                            </Button>
-                                        )}
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-8 px-3 text-[10px] font-bold uppercase tracking-widest rounded-lg"
+                                            onClick={() => window.open(`/public/pages/${page.slug}`, '_blank')}
+                                        >
+                                            <ExternalLink className="w-3 h-3" />
+                                        </Button>
                                         <Button
                                             className="px-4 h-8 text-[10px] font-bold uppercase tracking-widest rounded-lg premium-gradient text-white"
                                             onClick={() => navigate(`/pages/${page.id}/edit`)}

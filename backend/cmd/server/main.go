@@ -289,11 +289,12 @@ func main() {
 			protected.PUT("/settings", middleware.RBACMiddleware(userRepo, "settings", "WRITE"), settingsHandler.UpdateSetting)
 		}
 
-		// Public Page access (no auth required)
-		api.GET("/public/pages/:slug", pageHandler.GetPublicPage)
-		api.POST("/public/pages/:slug/verify", middleware.LoginRateLimiter(), pageHandler.VerifyPublicPage)
-		api.POST("/public/pages/:slug/run/:workflow_id", middleware.LoginRateLimiter(), pageHandler.RunPublicWorkflow)
-		api.POST("/public/pages/:slug/executions/:exec_id/stop", middleware.LoginRateLimiter(), pageHandler.StopPublicExecution)
+		// Public Page access (optional auth for private pages)
+		optionalAuth := middleware.OptionalAuthMiddleware(authService, userRepo, apiKeyRepo)
+		api.GET("/public/pages/:slug", optionalAuth, pageHandler.GetPublicPage)
+		api.POST("/public/pages/:slug/verify", middleware.LoginRateLimiter(), optionalAuth, pageHandler.VerifyPublicPage)
+		api.POST("/public/pages/:slug/run/:workflow_id", middleware.LoginRateLimiter(), optionalAuth, pageHandler.RunPublicWorkflow)
+		api.POST("/public/pages/:slug/executions/:exec_id/stop", middleware.LoginRateLimiter(), optionalAuth, pageHandler.StopPublicExecution)
 	}
 
 	serverPort := os.Getenv("SERVER_PORT")
