@@ -556,20 +556,6 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                                                         );
                                                                                                                                     })
                                                                                                                                 )}
-                                                                                                                                <DropdownMenuSeparator className="bg-indigo-500/10" />
-                                                                                                                                <DropdownMenuLabel className="text-[9px] uppercase tracking-widest opacity-50">System</DropdownMenuLabel>
-                                                                                                                                <DropdownMenuItem
-                                                                                                                                    onClick={() => updateInput(`{{workflow.id}}`)}
-                                                                                                                                    className="text-[10px] font-mono cursor-pointer"
-                                                                                                                                >
-                                                                                                                                    workflow.id
-                                                                                                                                </DropdownMenuItem>
-                                                                                                                                <DropdownMenuItem
-                                                                                                                                    onClick={() => updateInput(`{{workflow.name}}`)}
-                                                                                                                                    className="text-[10px] font-mono cursor-pointer"
-                                                                                                                                >
-                                                                                                                                    workflow.name
-                                                                                                                                </DropdownMenuItem>
                                                                                                                             </DropdownMenuContent>
                                                                                                                         </DropdownMenu>
                                                                                                                     </div>
