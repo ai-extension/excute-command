@@ -45,28 +45,56 @@ export const WorkflowRunner: React.FC<WorkflowRunnerProps> = ({ children, onRunC
         }
 
         // Individual run (e.g. from history rerun or simple workflow)
-        startExecutionBatch(workflow, [inputsValues || {}], 'PARALLEL');
+        await executeBatch(workflow, [inputsValues || {}], 'PARALLEL');
     };
 
-    const startExecutionBatch = (
+    const executeBatch = async (
         workflow: Partial<Workflow> & { id: string },
         rows: Record<string, string>[],
         mode: 'PARALLEL' | 'SEQUENTIAL'
     ) => {
         const batchID = crypto.randomUUID();
-        setBatchState({
-            workflow,
-            rows,
-            mode,
-            batchID,
-            currentIndex: 0,
-            executionIDs: []
-        });
+        setIsStarting(true);
 
-        setIsInputOpen(false);
-        setRunKey(prev => prev + 1);
-        setRunningWorkflow({ ...workflow, execution_id: undefined, status: 'PENDING' });
-        setIsMonitorOpen(true);
+        if (mode === 'PARALLEL') {
+            const triggerPromises = rows.map(row => triggerExecution(workflow.id, row, batchID));
+            const results = await Promise.all(triggerPromises);
+            const validExecIDs = results.filter((id): id is string => !!id);
+
+            if (validExecIDs.length > 0) {
+                setRunKey(prev => prev + 1);
+                setRunningWorkflow({ ...workflow, execution_id: validExecIDs[0], status: 'PENDING' });
+                setIsMonitorOpen(true);
+                setIsInputOpen(false);
+                if (validExecIDs.length > 1) {
+                    showToast(`Launched ${validExecIDs.length} parallel executions as batch.`, 'info');
+                }
+            } else {
+                showToast('Failed to start any executions.', 'error');
+            }
+        } else {
+            // SEQUENTIAL
+            const execID = await triggerExecution(workflow.id, rows[0], batchID);
+            if (execID) {
+                setBatchState({
+                    workflow,
+                    rows,
+                    mode,
+                    batchID,
+                    currentIndex: 0,
+                    executionIDs: [execID]
+                });
+                setRunKey(prev => prev + 1);
+                setRunningWorkflow({ ...workflow, execution_id: execID, status: 'PENDING' });
+                setIsMonitorOpen(true);
+                setIsInputOpen(false);
+            } else {
+                showToast('Failed to start sequential execution.', 'error');
+            }
+        }
+
+        setIsStarting(false);
+        if (onRunComplete) onRunComplete();
     };
 
     const triggerExecution = useCallback(async (workflowID: string, inputs: Record<string, string>, batchID: string) => {
@@ -82,48 +110,22 @@ export const WorkflowRunner: React.FC<WorkflowRunnerProps> = ({ children, onRunC
                 body: JSON.stringify(body)
             });
 
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.error || 'Trigger failed');
+            }
+
             const data = await response.json();
             return data.execution_id as string;
         } catch (error) {
             console.error('Failed to trigger workflow execution:', error);
+            showToast(`Execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
             return null;
         }
-    }, [apiFetch]);
+    }, [apiFetch, showToast]);
 
     const handleMonitorReady = async () => {
-        if (!batchState || isStarting) return;
-        setIsStarting(true);
-
-        const { workflow, rows, mode, batchID } = batchState;
-
-        if (mode === 'PARALLEL') {
-            // Trigger all simultaneously
-            const triggerPromises = rows.map(row => triggerExecution(workflow.id, row, batchID));
-            const results = await Promise.all(triggerPromises);
-            const validExecIDs = results.filter((id): id is string => !!id);
-
-            if (validExecIDs.length > 0) {
-                // Show the first one in the monitor
-                setRunningWorkflow(prev => prev ? { ...prev, execution_id: validExecIDs[0] } : null);
-                if (validExecIDs.length > 1) {
-                    showToast(`Launched ${validExecIDs.length} parallel executions as batch.`, 'info');
-                }
-            }
-
-            setBatchState(null); // Batch initialization done
-            setIsStarting(false);
-            if (onRunComplete) onRunComplete();
-        } else {
-            // SEQUENTIAL: Trigger the first one
-            const execID = await triggerExecution(workflow.id, rows[0], batchID);
-            if (execID) {
-                setRunningWorkflow(prev => prev ? { ...prev, execution_id: execID } : null);
-                setBatchState(prev => prev ? { ...prev, currentIndex: 0, executionIDs: [execID] } : null);
-            } else {
-                setBatchState(null); // Failed to start
-            }
-            setIsStarting(false);
-        }
+        // Monitor is ready, but we already triggered initial runs in executeBatch
     };
 
     // Sequential Orchestration: Watch status of runningWorkflow
@@ -177,7 +179,7 @@ export const WorkflowRunner: React.FC<WorkflowRunnerProps> = ({ children, onRunC
             {children((workflow, inputs, startGroupID, startStepID, fromExecutionID) => {
                 // If it's a rerun from history/monitor (inputs provided), run it as a single row parallel batch
                 if (inputs) {
-                    startExecutionBatch(workflow, [inputs], 'PARALLEL');
+                    executeBatch(workflow, [inputs], 'PARALLEL');
                 } else {
                     handleRunWorkflow(workflow);
                 }
@@ -195,7 +197,7 @@ export const WorkflowRunner: React.FC<WorkflowRunnerProps> = ({ children, onRunC
                             onReRun={(workflow, inputs) => {
                                 setIsStarting(false);
                                 setBatchState(null);
-                                startExecutionBatch(workflow, [inputs], 'PARALLEL');
+                                executeBatch(workflow, [inputs], 'PARALLEL');
                             }}
                             onClose={() => {
                                 setIsMonitorOpen(false);
@@ -212,7 +214,7 @@ export const WorkflowRunner: React.FC<WorkflowRunnerProps> = ({ children, onRunC
                 onOpenChange={setIsInputOpen}
                 inputs={runningWorkflow?.inputs as WorkflowInput[] || []}
                 isStarting={isStarting}
-                onConfirm={(rows, mode) => startExecutionBatch(runningWorkflow!, rows, mode)}
+                onConfirm={(rows, mode) => executeBatch(runningWorkflow!, rows, mode)}
                 onCancel={() => setIsInputOpen(false)}
             />
         </>

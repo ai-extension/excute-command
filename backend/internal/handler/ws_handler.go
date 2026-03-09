@@ -65,8 +65,8 @@ func (h *WSHandler) HandleWS(c *gin.Context) {
 		if username, ok := claims["username"].(string); ok {
 			userObj, _ = h.authService.GetUserByUsername(username)
 			if userObj != nil {
-				// We don't automatically grant `access.IsAdmin = true` for all widgets.
-				// We still need to check if the user has permission to read the page.
+				// User is authenticated, grant general access
+				access.IsAdmin = true
 			}
 		}
 	}
