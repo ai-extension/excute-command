@@ -13,6 +13,7 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Card } from '../ui/card';
 import { cn } from '../../lib/utils';
+import { formatDisplayDate } from '../../lib/date';
 import { Schedule } from '../../types';
 
 import { Pagination } from '../Pagination';
@@ -119,7 +120,7 @@ export const ScheduleTable: React.FC<ScheduleTableProps> = ({
                                     <div className="flex items-center gap-2">
                                         <Calendar className="w-3.5 h-3.5 text-muted-foreground/40" />
                                         <span className="text-[11px] font-black text-slate-300">
-                                            {s.next_run_at ? new Date(s.next_run_at).toLocaleString() : 'Not set/Finished'}
+                                            {formatDisplayDate(s.next_run_at)}
                                         </span>
                                     </div>
                                     {s.type === 'RECURRING' && (

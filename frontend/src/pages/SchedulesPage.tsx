@@ -3,6 +3,7 @@ import { Calendar, ChevronRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNamespace } from '../context/NamespaceContext';
 import { API_BASE_URL } from '../lib/api';
+import { formatToLocalInput, convertToUTC } from '../lib/date';
 import { Schedule, Workflow, Tag } from '../types';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import ScheduleCalendar from '../components/ScheduleCalendar';
@@ -110,7 +111,7 @@ const SchedulesPage = () => {
             const payload = {
                 ...formData,
                 next_run_at: formData.type === 'ONE_TIME' && formData.next_run_at
-                    ? new Date(formData.next_run_at).toISOString()
+                    ? convertToUTC(formData.next_run_at)
                     : formData.next_run_at,
                 tags: formData.tags,
                 workflows: formData.workflows.map(w => ({ id: w.id, inputs: w.inputs })),
@@ -175,20 +176,12 @@ const SchedulesPage = () => {
         if (schedule) {
             setIsEditing(true);
             setEditingSchedule(schedule);
-            const formatForInput = (isoString?: string) => {
-                if (!isoString) return '';
-                try {
-                    return new Date(isoString).toISOString().slice(0, 16);
-                } catch (e) {
-                    return '';
-                }
-            };
 
             setFormData({
                 name: schedule.name,
                 type: schedule.type,
                 cron_expression: schedule.cron_expression || '',
-                next_run_at: formatForInput(schedule.next_run_at),
+                next_run_at: formatToLocalInput(schedule.next_run_at),
                 status: schedule.status,
                 retries: schedule.retries || 0,
                 workflows: schedule.scheduled_workflows?.map(sw => ({
@@ -203,15 +196,15 @@ const SchedulesPage = () => {
         } else {
             setIsEditing(false);
             setEditingSchedule(null);
-            const initialDate = date || new Date(Date.now() + 3600000);
-            const offset = initialDate.getTimezoneOffset();
-            const localDate = new Date(initialDate.getTime() - (offset * 60 * 1000));
+
+            // Default next run to now
+            const now = new Date();
 
             setFormData({
                 name: '',
                 type: 'ONE_TIME',
                 cron_expression: '0 0 * * *',
-                next_run_at: localDate.toISOString().slice(0, 16),
+                next_run_at: formatToLocalInput(now),
                 status: 'ACTIVE',
                 retries: 0,
                 workflows: [],
