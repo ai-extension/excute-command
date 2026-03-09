@@ -4,7 +4,7 @@ import { API_BASE_URL } from '../lib/api';
 import { Workflow, WorkflowInput } from '../types';
 import { Dialog, DialogContent } from "./ui/dialog";
 import WorkflowMonitor from './WorkflowMonitor';
-import WorkflowRunDialog from './WorkflowRunDialog';
+import WorkflowInputDialog from './WorkflowInputDialog';
 
 interface WorkflowRunnerProps {
     children: (runWorkflow: (workflow: Partial<Workflow> & { id: string }, inputs?: Record<string, string>, startGroupID?: string, startStepID?: string, fromExecutionID?: string) => void) => React.ReactNode;
@@ -123,13 +123,14 @@ export const WorkflowRunner: React.FC<WorkflowRunnerProps> = ({ children, onRunC
             </Dialog>
 
             {/* Unified Run Dialog */}
-            <WorkflowRunDialog
+            <WorkflowInputDialog
                 isOpen={isInputOpen}
                 onOpenChange={setIsInputOpen}
                 inputs={runningWorkflow?.inputs as WorkflowInput[] || []}
                 isStarting={isStarting}
-                onConfirm={(inputs: Record<string, string>, openMonitor: boolean) => executeWorkflow(runningWorkflow!, inputs, openMonitor)}
+                onConfirm={(inputs: Record<string, string>) => executeWorkflow(runningWorkflow!, inputs, true)}
                 onCancel={() => setIsInputOpen(false)}
+                confirmLabel="Run Workflow"
             />
         </>
     );
