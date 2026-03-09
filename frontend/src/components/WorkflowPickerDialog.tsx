@@ -14,7 +14,7 @@ interface WorkflowPickerDialogProps {
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
     workflows: Workflow[];
-    onSelect: (workflowId: string, inputs: string) => void;
+    onSelect: (workflow: Workflow) => void;
 }
 
 export const WorkflowPickerDialog: React.FC<WorkflowPickerDialogProps> = ({
@@ -56,7 +56,7 @@ export const WorkflowPickerDialog: React.FC<WorkflowPickerDialogProps> = ({
                             <div
                                 key={workflow.id}
                                 className="group flex items-center justify-between p-3 rounded-xl hover:bg-muted/50 cursor-pointer transition-all border border-transparent hover:border-border/50"
-                                onClick={() => onSelect(workflow.id, typeof workflow.inputs === 'string' ? workflow.inputs : JSON.stringify(workflow.inputs || []))}
+                                onClick={() => onSelect(workflow)}
                             >
                                 <div className="flex items-center gap-3">
                                     <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20 group-hover:scale-110 transition-transform">

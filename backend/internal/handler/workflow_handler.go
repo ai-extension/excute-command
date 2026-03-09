@@ -188,6 +188,7 @@ func (h *WorkflowHandler) RunWorkflow(c *gin.Context) {
 		StartGroupID    *uuid.UUID        `json:"start_group_id"`
 		StartStepID     *uuid.UUID        `json:"start_step_id"`
 		FromExecutionID *uuid.UUID        `json:"from_execution_id"`
+		BatchID         *uuid.UUID        `json:"batch_id"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil && c.Request.ContentLength > 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -221,6 +222,7 @@ func (h *WorkflowHandler) RunWorkflow(c *gin.Context) {
 		StartedAt:     time.Now(),
 		ExecutedBy:    &user.ID,
 		TriggerSource: "MANUAL",
+		BatchID:       req.BatchID,
 	}
 	if req.Inputs != nil {
 		inputsByes, _ := json.Marshal(req.Inputs)

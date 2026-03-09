@@ -423,6 +423,7 @@ type WorkflowExecution struct {
 	FinishedAt    *time.Time              `json:"finished_at,omitempty"`
 	CreatedAt     time.Time               `json:"created_at" gorm:"<-:create"`
 	UpdatedAt     time.Time               `json:"updated_at"`
+	BatchID       *uuid.UUID              `json:"batch_id,omitempty" gorm:"type:uuid;index"`
 	Workflow      *Workflow               `json:"workflow,omitempty" gorm:"foreignKey:WorkflowID"`
 	Schedule      *Schedule               `json:"schedule,omitempty" gorm:"foreignKey:ScheduledID"`
 	Page          *Page                   `json:"page,omitempty" gorm:"foreignKey:PageID"`

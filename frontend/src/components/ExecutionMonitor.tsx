@@ -27,6 +27,7 @@ interface ExecutionMonitorProps {
     execution?: WorkflowExecution;
     onClose: () => void;
     onReady?: () => void;
+    onStatusChange?: (status: string) => void;
     onReRun?: (workflow: Workflow, inputs: Record<string, string>, startGroupID?: string, startStepID?: string, fromExecutionID?: string) => void;
 }
 
@@ -36,6 +37,7 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
     execution: initialExecution,
     onClose,
     onReady,
+    onStatusChange,
     onReRun
 }) => {
     const [workflow, setWorkflow] = useState<Workflow | null>(initialWorkflow || initialExecution?.workflow || null);
@@ -93,39 +95,26 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
     const syncStatus = useCallback(async () => {
         if (!workflowID) return;
         try {
-            const data = await apiFetch(`${API_BASE_URL}/workflows/${workflowID}`);
+            const data = await apiFetch(`${API_BASE_URL}/workflows/${workflowID}`, {});
             const updatedWF = await data.json();
             setWorkflow(prev => {
                 if (!prev) return updatedWF;
+                if (onStatusChange && updatedWF.status !== prev.status) {
+                    onStatusChange(updatedWF.status);
+                }
 
-                // Preserve execution_id
-                const next = { ...updatedWF, status: prev.status || updatedWF.status };
+                // Preserve execution_id if it's attached to the workflow object
+                const next = { ...updatedWF };
                 if ((prev as any).execution_id && !(next as any).execution_id) {
                     (next as any).execution_id = (prev as any).execution_id;
                 }
 
-                if (next.groups && prev.groups) {
-                    next.groups = next.groups.map((g: any) => {
-                        const prevG = prev.groups?.find(pg => pg.id === g.id);
-                        if (!prevG) return g;
-
-                        return {
-                            ...g,
-                            status: (prevG as any).status || g.status,
-                            steps: g.steps?.map((s: any) => {
-                                const prevS = prevG.steps?.find((ps: any) => ps.id === s.id);
-                                if (!prevS) return s;
-                                return { ...s, status: (prevS as any).status || s.status };
-                            })
-                        };
-                    });
-                }
                 return next;
             });
         } catch (err) {
             console.error('Failed to sync workflow status:', err);
         }
-    }, [workflowID, apiFetch]);
+    }, [workflowID, apiFetch, onStatusChange]);
 
     useEffect(() => {
         if (mode === 'LIVE' && isStatusWSReady && isTerminalReady) {
@@ -165,7 +154,12 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
 
                 setWorkflow(prev => {
                     if (!prev) return prev;
-                    if (msg.target_id === prev.id) return { ...prev, status: msg.status };
+                    if (msg.target_id === prev.id) {
+                        if (onStatusChange && msg.status !== prev.status) {
+                            onStatusChange(msg.status);
+                        }
+                        return { ...prev, status: msg.status };
+                    }
 
                     const next = { ...prev };
                     next.groups = next.groups?.map(g => {

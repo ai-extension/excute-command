@@ -6,16 +6,18 @@ interface WorkflowMonitorProps {
     workflow: Workflow;
     onClose: () => void;
     onReady?: () => void;
+    onStatusChange?: (status: string) => void;
     onReRun?: (workflow: Workflow, inputs: Record<string, string>, startGroupID?: string, startStepID?: string, fromExecutionID?: string) => void;
 }
 
-const WorkflowMonitor = ({ workflow, onClose, onReady, onReRun }: WorkflowMonitorProps) => {
+const WorkflowMonitor = ({ workflow, onClose, onReady, onStatusChange, onReRun }: WorkflowMonitorProps) => {
     return (
         <ExecutionMonitor
             mode="LIVE"
             workflow={workflow}
             onClose={onClose}
             onReady={onReady}
+            onStatusChange={onStatusChange}
             onReRun={onReRun}
         />
     );

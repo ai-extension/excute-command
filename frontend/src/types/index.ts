@@ -145,6 +145,7 @@ export interface WorkflowExecution {
     workflow_id: string;
     scheduled_id?: string;
     page_id?: string;
+    batch_id?: string;
     trigger_source: string;
     status: Status;
     inputs: string;

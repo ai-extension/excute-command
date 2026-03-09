@@ -11,6 +11,8 @@ import { ScheduleTable } from '../components/schedules/ScheduleTable';
 import { ScheduleFormDialog } from '../components/schedules/ScheduleFormDialog';
 import { WorkflowPickerDialog } from '../components/WorkflowPickerDialog';
 import { useUsers } from '../hooks/useUsers';
+import WorkflowInputDialog from '../components/WorkflowInputDialog';
+import { WorkflowInput } from '../types';
 
 const SchedulesPage = () => {
     const { apiFetch } = useAuth();
@@ -51,6 +53,10 @@ const SchedulesPage = () => {
     // Delete state
     const [deleteTarget, setDeleteTarget] = useState<Schedule | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    // Workflow input dialog state
+    const [isInputDialogOpen, setIsInputDialogOpen] = useState(false);
+    const [pendingWorkflow, setPendingWorkflow] = useState<Workflow | null>(null);
 
     const fetchSchedules = async () => {
         if (!activeNamespace) return;
@@ -217,18 +223,37 @@ const SchedulesPage = () => {
         setIsFormOpen(true);
     };
 
-    const handleWorkflowSelect = (workflowId: string, inputs: string) => {
-        const wf = workflows.find(w => w.id === workflowId);
-        if (!wf) return;
+    const handleWorkflowSelect = (workflow: Workflow) => {
+        if (workflow.inputs && workflow.inputs.length > 0) {
+            setPendingWorkflow(workflow);
+            setIsInputDialogOpen(true);
+        } else {
+            setFormData(prev => ({
+                ...prev,
+                workflows: [...prev.workflows, {
+                    id: workflow.id,
+                    name: workflow.name,
+                    inputs: '{}'
+                }]
+            }));
+            setIsPickerOpen(false);
+        }
+    };
+
+    const handleConfirmScheduleWorkflowInputs = (values: Record<string, string>) => {
+        if (!pendingWorkflow) return;
 
         setFormData(prev => ({
             ...prev,
             workflows: [...prev.workflows, {
-                id: workflowId,
-                name: wf.name,
-                inputs: inputs || '{}'
+                id: pendingWorkflow.id,
+                name: pendingWorkflow.name,
+                inputs: JSON.stringify(values)
             }]
         }));
+
+        setIsInputDialogOpen(false);
+        setPendingWorkflow(null);
         setIsPickerOpen(false);
     };
 
@@ -287,7 +312,18 @@ const SchedulesPage = () => {
                 isOpen={isPickerOpen}
                 onOpenChange={setIsPickerOpen}
                 workflows={workflows}
-                onSelect={(workflowId: string, inputs: string) => handleWorkflowSelect(workflowId, inputs)}
+                onSelect={handleWorkflowSelect}
+            />
+
+            <WorkflowInputDialog
+                isOpen={isInputDialogOpen}
+                onOpenChange={setIsInputDialogOpen}
+                inputs={pendingWorkflow?.inputs as WorkflowInput[] || []}
+                onConfirm={handleConfirmScheduleWorkflowInputs}
+                onCancel={() => {
+                    setIsInputDialogOpen(false);
+                    setPendingWorkflow(null);
+                }}
             />
 
             <ConfirmDialog
