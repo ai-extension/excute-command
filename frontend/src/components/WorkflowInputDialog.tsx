@@ -220,7 +220,7 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                                         })}
                                     </div>
                                 ) : input.type === 'multi-input' ? (
-                                    <div className="space-y-3 bg-muted/30 p-3 border border-border rounded-xl">
+                                    <div className="space-y-3 bg-indigo-500/5 p-3 border border-indigo-500/10 rounded-xl">
                                         {(() => {
                                             let rows: any[] = [];
                                             try { rows = JSON.parse(values[input.key] || '[]'); } catch (e) { rows = [{}]; }
@@ -229,12 +229,12 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                                             return (
                                                 <>
                                                     {rows.map((row, rowIndex) => (
-                                                        <div key={rowIndex} className="space-y-2 p-3 bg-background/50 border border-border/50 rounded-lg relative group/row">
+                                                        <div key={rowIndex} className="space-y-2 p-3 bg-background border border-indigo-500/10 rounded-lg relative group/row">
                                                             {(input.default_value || '').split(',').map((k: string) => k.trim()).filter(Boolean).map((fieldKey: string) => (
-                                                                <div key={fieldKey} className="space-y-1">
-                                                                    <label className="text-[9px] font-black uppercase tracking-widest opacity-40 ml-1">{fieldKey}</label>
+                                                                <div key={fieldKey} className="flex items-center gap-2">
+                                                                    <span className="text-[8px] font-black uppercase tracking-widest opacity-30 w-16 truncate shrink-0">{fieldKey}</span>
                                                                     <Input
-                                                                        className="h-9 bg-muted/30 border-border/50 rounded-lg text-xs font-bold"
+                                                                        className="h-8 bg-muted/20 border-border/50 rounded text-[11px] font-bold"
                                                                         value={row[fieldKey] || ''}
                                                                         onChange={(e) => {
                                                                             const newValue = updateMultiInputValue(values[input.key], rowIndex, fieldKey, e.target.value);
@@ -253,7 +253,7 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                                                                         const newValue = removeMultiInputRow(values[input.key], rowIndex);
                                                                         setValues({ ...values, [input.key]: newValue });
                                                                     }}
-                                                                    className="absolute -right-2 -top-2 h-6 w-6 rounded-full bg-destructive/10 text-destructive opacity-0 group-hover/row:opacity-100 transition-opacity border border-destructive/20"
+                                                                    className="absolute -right-2 -top-2 h-6 w-6 rounded-full bg-destructive text-white flex items-center justify-center opacity-0 group-hover/row:opacity-100 transition-opacity"
                                                                 >
                                                                     <Trash2 className="w-3 h-3" />
                                                                 </Button>
@@ -268,7 +268,7 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                                                             const newValue = addMultiInputRow(values[input.key]);
                                                             setValues({ ...values, [input.key]: newValue });
                                                         }}
-                                                        className="w-full h-8 border-dashed border-primary/30 text-primary bg-primary/5 hover:bg-primary/10 text-[9px] font-black uppercase tracking-widest rounded-lg"
+                                                        className="w-full h-8 border-dashed border-indigo-500/30 text-indigo-500 bg-indigo-500/5 hover:bg-indigo-500/10 text-[9px] font-black uppercase tracking-widest rounded-lg"
                                                     >
                                                         <Plus className="w-3 h-3 mr-1" /> Add Row
                                                     </Button>

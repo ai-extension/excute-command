@@ -330,7 +330,7 @@ type WorkflowInput struct {
 	WorkflowID   uuid.UUID `json:"workflow_id" gorm:"type:uuid;index"`
 	Key          string    `json:"key" gorm:"not null"`
 	Label        string    `json:"label" gorm:"not null"`
-	Type         string    `json:"type" gorm:"not null;default:'input'"` // input, number, or select
+	Type         string    `json:"type" gorm:"not null;default:'input'"` // input, number, select, multi-select, multi-input
 	DefaultValue string    `json:"default_value"`
 	Required     bool      `json:"required" gorm:"default:false"`
 	CreatedAt    time.Time `json:"created_at" gorm:"<-:create"`

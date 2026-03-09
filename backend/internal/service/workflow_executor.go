@@ -42,6 +42,18 @@ func NewWorkflowExecutor(
 	hub *Hub,
 	globalVarRepo domain.GlobalVariableRepository,
 ) *WorkflowExecutor {
+	// Register custom pongo2 filters
+	pongo2.RegisterFilter("json", func(in *pongo2.Value, param *pongo2.Value) (*pongo2.Value, *pongo2.Error) {
+		b, err := json.Marshal(in.Interface())
+		if err != nil {
+			return nil, &pongo2.Error{
+				Sender:    "filter:json",
+				OrigError: err,
+			}
+		}
+		return pongo2.AsSafeValue(string(b)), nil
+	})
+
 	return &WorkflowExecutor{
 		wfRepo:        wfRepo,
 		groupRepo:     groupRepo,
@@ -582,7 +594,9 @@ func (e *WorkflowExecutor) validateInputs(wf *domain.Workflow, provided map[stri
 		case "multi-select":
 			// Try JSON first, fallback to comma separated
 			var selected []string
-			if err := json.Unmarshal([]byte(val), &selected); err != nil {
+			decoder := json.NewDecoder(strings.NewReader(val))
+			decoder.UseNumber()
+			if err := decoder.Decode(&selected); err != nil {
 				// Fallback
 				parts := strings.Split(val, ",")
 				for _, p := range parts {
@@ -613,7 +627,9 @@ func (e *WorkflowExecutor) validateInputs(wf *domain.Workflow, provided map[stri
 			}
 		case "multi-input":
 			var rows []map[string]interface{}
-			if err := json.Unmarshal([]byte(val), &rows); err != nil {
+			decoder := json.NewDecoder(strings.NewReader(val))
+			decoder.UseNumber()
+			if err := decoder.Decode(&rows); err != nil {
 				// Fallback for simple comma-separated (non-multi-key)
 				values := strings.Split(val, ",")
 				securityRegex := regexp.MustCompile(`^[\pL0-9_\-\.\ \/]+$`)
@@ -1350,14 +1366,20 @@ func (e *WorkflowExecutor) getInterpolationContext(inputs map[string]string, var
 			continue
 		}
 
-		// Try to parse as JSON for multi-select and multi-input
-		var jsonVal interface{}
-		if err := json.Unmarshal([]byte(v), &jsonVal); err == nil {
-			in[k] = jsonVal
-		} else {
-			if securityRegex.MatchString(v) {
-				in[k] = v
+		// Only try to parse as JSON for multi-select and multi-input (arrays or objects)
+		trimmed := strings.TrimSpace(v)
+		if strings.HasPrefix(trimmed, "[") || strings.HasPrefix(trimmed, "{") {
+			var jsonVal interface{}
+			decoder := json.NewDecoder(strings.NewReader(v))
+			decoder.UseNumber()
+			if err := decoder.Decode(&jsonVal); err == nil {
+				in[k] = jsonVal
+				continue
 			}
+		}
+
+		if securityRegex.MatchString(v) {
+			in[k] = v
 		}
 	}
 	ctx["input"] = in

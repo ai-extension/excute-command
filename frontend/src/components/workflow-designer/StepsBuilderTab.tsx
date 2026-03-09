@@ -8,6 +8,14 @@ import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 import { SearchableSelect } from '../SearchableSelect';
 import { cn } from '../../lib/utils';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 
 import { WorkflowGroup, WorkflowStep, Server as ServerType, Workflow } from '../../types';
 
@@ -27,6 +35,9 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
     handleDragEnd, handleAddGroup, handleSearchServers, id
 }) => {
     const [openSettingsGroupIdx, setOpenSettingsGroupIdx] = useState<number | null>(null);
+
+    const parentWf = allWorkflows.find(w => w.id === id);
+    const parentInputs = parentWf?.inputs || [];
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-left-2 duration-300">
@@ -484,24 +495,182 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                     try { return JSON.parse(step.target_workflow_inputs || '{}'); } catch { return {}; }
                                                                                                 })();
                                                                                                 return (
-                                                                                                    <div className="space-y-1.5 bg-indigo-500/5 border border-indigo-500/20 rounded-lg p-3">
+                                                                                                    <div className="space-y-3 bg-indigo-500/5 border border-indigo-500/20 rounded-lg p-3">
                                                                                                         <label className="text-[8px] font-bold uppercase tracking-widest text-indigo-500">Workflow Inputs</label>
-                                                                                                        {targetWf.inputs.map(inp => (
-                                                                                                            <div key={inp.key} className="flex items-center gap-2">
-                                                                                                                <span className="text-[10px] font-mono text-muted-foreground w-24 truncate shrink-0">{inp.label || inp.key}</span>
-                                                                                                                <Input
-                                                                                                                    value={parsedInputs[inp.key] || ''}
-                                                                                                                    onChange={(e) => {
-                                                                                                                        const ng = [...groups];
-                                                                                                                        const updated = { ...parsedInputs, [inp.key]: e.target.value };
-                                                                                                                        ng[gIdx]!.steps![sIdx].target_workflow_inputs = JSON.stringify(updated);
-                                                                                                                        setGroups(ng);
-                                                                                                                    }}
-                                                                                                                    placeholder={`{{variable.x}} or value`}
-                                                                                                                    className="h-7 text-[10px] font-mono border-indigo-500/20 bg-background flex-1"
-                                                                                                                />
-                                                                                                            </div>
-                                                                                                        ))}
+                                                                                                        {targetWf.inputs.map(inp => {
+                                                                                                            const val = parsedInputs[inp.key] || '';
+                                                                                                            const isVariable = val.startsWith('{{') && val.endsWith('}}');
+
+                                                                                                            const updateInput = (newVal: string) => {
+                                                                                                                const ng = [...groups];
+                                                                                                                const updated = { ...parsedInputs, [inp.key]: newVal };
+                                                                                                                ng[gIdx]!.steps![sIdx].target_workflow_inputs = JSON.stringify(updated);
+                                                                                                                setGroups(ng);
+                                                                                                            };
+
+                                                                                                            if (isVariable) {
+                                                                                                                return (
+                                                                                                                    <div key={inp.key} className="flex items-center gap-2">
+                                                                                                                        <span className="text-[9px] font-mono text-muted-foreground w-20 truncate shrink-0" title={inp.label || inp.key}>{inp.label || inp.key}</span>
+                                                                                                                        <div className="flex-1 flex items-center gap-2 bg-background border border-indigo-500/30 rounded px-2 h-7 group/var">
+                                                                                                                            <Badge variant="secondary" className="h-5 text-[8px] font-mono bg-indigo-500/10 text-indigo-500 border-indigo-500/20">
+                                                                                                                                {val}
+                                                                                                                            </Badge>
+                                                                                                                            <button
+                                                                                                                                onClick={() => updateInput('')}
+                                                                                                                                className="ml-auto opacity-0 group-hover/var:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
+                                                                                                                            >
+                                                                                                                                <Trash2 className="w-3 h-3" />
+                                                                                                                            </button>
+                                                                                                                        </div>
+                                                                                                                    </div>
+                                                                                                                );
+                                                                                                            }
+
+                                                                                                            return (
+                                                                                                                <div key={inp.key} className="space-y-1">
+                                                                                                                    <div className="flex items-center justify-between">
+                                                                                                                        <span className="text-[9px] font-mono text-muted-foreground truncate" title={inp.label || inp.key}>{inp.label || inp.key}</span>
+                                                                                                                        <DropdownMenu>
+                                                                                                                            <DropdownMenuTrigger asChild>
+                                                                                                                                <button className="text-[7px] font-black uppercase tracking-widest text-indigo-500/50 hover:text-indigo-500 transition-colors">
+                                                                                                                                    Use Variable
+                                                                                                                                </button>
+                                                                                                                            </DropdownMenuTrigger>
+                                                                                                                            <DropdownMenuContent align="end" className="w-48 bg-card border-indigo-500/20">
+                                                                                                                                <DropdownMenuLabel className="text-[9px] uppercase tracking-widest opacity-50">Parent Inputs</DropdownMenuLabel>
+                                                                                                                                {parentInputs.length === 0 ? (
+                                                                                                                                    <DropdownMenuItem disabled className="text-[10px]">No inputs available</DropdownMenuItem>
+                                                                                                                                ) : (
+                                                                                                                                    parentInputs.map(pInp => {
+                                                                                                                                        const isComplex = pInp.type === 'multi-select' || pInp.type === 'multi-input';
+                                                                                                                                        const varName = isComplex ? `{{input.${pInp.key} | json}}` : `{{input.${pInp.key}}}`;
+                                                                                                                                        return (
+                                                                                                                                            <DropdownMenuItem
+                                                                                                                                                key={pInp.key}
+                                                                                                                                                onClick={() => updateInput(varName)}
+                                                                                                                                                className="text-[10px] font-mono cursor-pointer"
+                                                                                                                                            >
+                                                                                                                                                input.{pInp.key}{isComplex && <span className="ml-1 opacity-50">| json</span>}
+                                                                                                                                            </DropdownMenuItem>
+                                                                                                                                        );
+                                                                                                                                    })
+                                                                                                                                )}
+                                                                                                                                <DropdownMenuSeparator className="bg-indigo-500/10" />
+                                                                                                                                <DropdownMenuLabel className="text-[9px] uppercase tracking-widest opacity-50">System</DropdownMenuLabel>
+                                                                                                                                <DropdownMenuItem
+                                                                                                                                    onClick={() => updateInput(`{{workflow.id}}`)}
+                                                                                                                                    className="text-[10px] font-mono cursor-pointer"
+                                                                                                                                >
+                                                                                                                                    workflow.id
+                                                                                                                                </DropdownMenuItem>
+                                                                                                                                <DropdownMenuItem
+                                                                                                                                    onClick={() => updateInput(`{{workflow.name}}`)}
+                                                                                                                                    className="text-[10px] font-mono cursor-pointer"
+                                                                                                                                >
+                                                                                                                                    workflow.name
+                                                                                                                                </DropdownMenuItem>
+                                                                                                                            </DropdownMenuContent>
+                                                                                                                        </DropdownMenu>
+                                                                                                                    </div>
+
+                                                                                                                    {inp.type === 'select' ? (
+                                                                                                                        <select
+                                                                                                                            value={val}
+                                                                                                                            onChange={(e) => updateInput(e.target.value)}
+                                                                                                                            className="h-7 px-2 w-full text-[10px] font-semibold border border-indigo-500/20 rounded bg-background text-foreground outline-none focus:ring-1 focus:ring-indigo-500/30 cursor-pointer"
+                                                                                                                        >
+                                                                                                                            <option value="">— Select —</option>
+                                                                                                                            {(inp.default_value || '').split(',').map(o => o.trim()).filter(Boolean).map(o => (
+                                                                                                                                <option key={o} value={o}>{o}</option>
+                                                                                                                            ))}
+                                                                                                                        </select>
+                                                                                                                    ) : inp.type === 'multi-select' ? (
+                                                                                                                        <div className="flex flex-wrap gap-1 p-1 bg-background border border-indigo-500/20 rounded min-h-[28px]">
+                                                                                                                            {(inp.default_value || '').split(',').map(o => o.trim()).filter(Boolean).map(o => {
+                                                                                                                                let selected: string[] = [];
+                                                                                                                                try { selected = JSON.parse(val || '[]'); } catch { }
+                                                                                                                                const isSelected = selected.includes(o);
+                                                                                                                                return (
+                                                                                                                                    <button
+                                                                                                                                        key={o}
+                                                                                                                                        onClick={() => {
+                                                                                                                                            let next = [...selected];
+                                                                                                                                            if (isSelected) next = next.filter(s => s !== o);
+                                                                                                                                            else next.push(o);
+                                                                                                                                            updateInput(JSON.stringify(next));
+                                                                                                                                        }}
+                                                                                                                                        className={cn(
+                                                                                                                                            "px-1.5 py-0.5 rounded text-[8px] font-bold transition-all border",
+                                                                                                                                            isSelected
+                                                                                                                                                ? "bg-indigo-500 text-white border-indigo-500"
+                                                                                                                                                : "bg-background text-muted-foreground border-border hover:border-indigo-500/50"
+                                                                                                                                        )}
+                                                                                                                                    >
+                                                                                                                                        {o}
+                                                                                                                                    </button>
+                                                                                                                                );
+                                                                                                                            })}
+                                                                                                                        </div>
+                                                                                                                    ) : inp.type === 'multi-input' ? (
+                                                                                                                        <div className="space-y-2 bg-indigo-500/5 p-2 rounded border border-indigo-500/10">
+                                                                                                                            {(() => {
+                                                                                                                                const keys = (inp.default_value || '').split(',').map(k => k.trim()).filter(Boolean);
+                                                                                                                                let rows: any[] = [];
+                                                                                                                                try { rows = JSON.parse(val || '[]'); if (!Array.isArray(rows)) rows = [{}]; } catch { rows = [{}]; }
+                                                                                                                                if (rows.length === 0) rows = [{}];
+
+                                                                                                                                return (
+                                                                                                                                    <>
+                                                                                                                                        {rows.map((row, rIdx) => (
+                                                                                                                                            <div key={rIdx} className="space-y-1 p-2 bg-background border border-indigo-500/10 rounded relative group/mrow">
+                                                                                                                                                {keys.map(k => (
+                                                                                                                                                    <div key={k} className="flex items-center gap-1">
+                                                                                                                                                        <span className="text-[7px] font-bold text-muted-foreground/50 w-12 truncate">{k}</span>
+                                                                                                                                                        <Input
+                                                                                                                                                            value={row[k] || ''}
+                                                                                                                                                            onChange={(e) => {
+                                                                                                                                                                const next = [...rows];
+                                                                                                                                                                next[rIdx] = { ...next[rIdx], [k]: e.target.value };
+                                                                                                                                                                updateInput(JSON.stringify(next));
+                                                                                                                                                            }}
+                                                                                                                                                            className="h-6 text-[9px] bg-muted/20 border-border/50"
+                                                                                                                                                        />
+                                                                                                                                                    </div>
+                                                                                                                                                ))}
+                                                                                                                                                {rows.length > 1 && (
+                                                                                                                                                    <button
+                                                                                                                                                        onClick={() => updateInput(JSON.stringify(rows.filter((_, i) => i !== rIdx)))}
+                                                                                                                                                        className="absolute -right-1.5 -top-1.5 w-4 h-4 rounded-full bg-destructive text-white flex items-center justify-center opacity-0 group-hover/mrow:opacity-100 transition-opacity"
+                                                                                                                                                    >
+                                                                                                                                                        <Trash2 className="w-2 h-2" />
+                                                                                                                                                    </button>
+                                                                                                                                                )}
+                                                                                                                                            </div>
+                                                                                                                                        ))}
+                                                                                                                                        <Button
+                                                                                                                                            variant="outline"
+                                                                                                                                            size="sm"
+                                                                                                                                            onClick={() => updateInput(JSON.stringify([...rows, {}]))}
+                                                                                                                                            className="w-full h-6 border-dashed border-indigo-500/30 text-[8px] font-black uppercase tracking-widest bg-background"
+                                                                                                                                        >
+                                                                                                                                            <Plus className="w-2 h-2 mr-1" /> Add Row
+                                                                                                                                        </Button>
+                                                                                                                                    </>
+                                                                                                                                );
+                                                                                                                            })()}
+                                                                                                                        </div>
+                                                                                                                    ) : (
+                                                                                                                        <Input
+                                                                                                                            value={val}
+                                                                                                                            onChange={(e) => updateInput(e.target.value)}
+                                                                                                                            placeholder={`Value or {{input.key}}`}
+                                                                                                                            className="h-7 text-[10px] font-mono border-indigo-500/20 bg-background"
+                                                                                                                        />
+                                                                                                                    )}
+                                                                                                                </div>
+                                                                                                            );
+                                                                                                        })}
                                                                                                     </div>
                                                                                                 );
                                                                                             })()}
