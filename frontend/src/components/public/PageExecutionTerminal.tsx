@@ -54,20 +54,7 @@ const PageExecutionTerminal: React.FC<PageExecutionTerminalProps> = ({
                 if (data.execution_id === activeExecutionId) {
                     if (data.type === 'log' && data.content) {
                         const newLines = data.content.split('\n').filter((l: string) => l.length > 0);
-                        setLogs(prev => {
-                            // Deduplication logic: If the first new line matches the last existing line, avoid duplication
-                            if (prev.length > 0 && newLines.length > 0 && prev[prev.length - 1] === newLines[0]) {
-                                return [...prev, ...newLines.slice(1)];
-                            }
-                            // Also check if we already have these lines (simple check for catch-up vs initial fetch)
-                            if (prev.length >= newLines.length) {
-                                const tail = prev.slice(-newLines.length);
-                                if (JSON.stringify(tail) === JSON.stringify(newLines)) {
-                                    return prev;
-                                }
-                            }
-                            return [...prev, ...newLines];
-                        });
+                        setLogs(prev => [...prev, ...newLines]);
                     } else if (data.type === 'status' && data.target_type === 'workflow') {
                         setStatus(data.status);
                         if (onStatusChangeRef.current) onStatusChangeRef.current(data.status);
