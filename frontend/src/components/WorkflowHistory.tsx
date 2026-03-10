@@ -248,6 +248,115 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
         return `${Math.floor(diff / 60)}m ${diff % 60}s`;
     };
 
+    const [expandedExecs, setExpandedExecs] = useState<Set<string>>(new Set());
+
+    const toggleExpand = (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        setExpandedExecs(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    // Helper to group executions for nested display
+    const renderExecutionTree = () => {
+        // Group by parent
+        const childrenMap: Record<string, WorkflowExecution[]> = {};
+        const roots: WorkflowExecution[] = [];
+
+        executions.forEach(exec => {
+            if (exec.parent_execution_id) {
+                if (!childrenMap[exec.parent_execution_id]) {
+                    childrenMap[exec.parent_execution_id] = [];
+                }
+                childrenMap[exec.parent_execution_id].push(exec);
+            } else {
+                roots.push(exec);
+            }
+        });
+
+        // Some "children" might have parents that aren't in this page/list
+        // We should treat them as roots if their parent isn't found in executions
+        executions.forEach(exec => {
+            if (exec.parent_execution_id && !executions.find(e => e.id === exec.parent_execution_id)) {
+                if (!roots.find(r => r.id === exec.id)) {
+                    roots.push(exec);
+                }
+            }
+        });
+
+        const renderExecRow = (exec: WorkflowExecution, depth = 0) => {
+            const hasChildren = childrenMap[exec.id]?.length > 0;
+            const isExpanded = expandedExecs.has(exec.id);
+
+            return (
+                <div key={exec.id} className="space-y-2">
+                    <Card
+                        className={cn(
+                            "bg-white/5 border-white/10 hover:bg-white/[0.08] transition-colors cursor-pointer group overflow-hidden relative",
+                            depth > 0 && "ml-8 before:absolute before:left-[-20px] before:top-1/2 before:w-[20px] before:h-[1px] before:bg-white/10"
+                        )}
+                        onClick={() => fetchExecutionDetail(exec)}
+                    >
+                        <CardContent className="p-3 flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-3 overflow-hidden">
+                                <div className={cn(
+                                    "w-1 h-10 rounded-full shrink-0",
+                                    exec.status === 'SUCCESS' ? 'bg-green-500' :
+                                        exec.status === 'FAILED' ? 'bg-red-500' :
+                                            exec.status === 'CANCELLED' ? 'bg-yellow-500' : 'bg-blue-500'
+                                )} />
+                                {hasChildren && (
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 p-0 hover:bg-white/10 shrink-0"
+                                        onClick={(e) => toggleExpand(e, exec.id)}
+                                    >
+                                        <ChevronDown className={cn("w-4 h-4 transition-transform", !isExpanded && "-rotate-90")} />
+                                    </Button>
+                                )}
+                                <div className="space-y-1 overflow-hidden">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="text-xs font-mono text-muted-foreground shrink-0">#{exec.id.slice(0, 8)}</span>
+                                        {getStatusBadge(exec.status)}
+                                        {getTriggerBadge(exec)}
+                                        {exec.workflow?.name && (
+                                            <Badge variant="outline" className="bg-white/5 border-white/10 text-[10px] uppercase tracking-tighter truncate max-w-[150px]">
+                                                {exec.workflow.name}
+                                            </Badge>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-4 text-xs text-muted-foreground font-medium whitespace-nowrap overflow-hidden">
+                                        <span className="flex items-center gap-1 shrink-0">
+                                            <Calendar className="w-3 h-3" />
+                                            {format(new Date(exec.started_at), 'MMM d, HH:mm:ss')}
+                                        </span>
+                                        <span className="flex items-center gap-1 shrink-0">
+                                            <Clock className="w-3 h-3" />
+                                            {getDuration(exec.started_at, exec.finished_at)}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
+                        </CardContent>
+                    </Card>
+
+                    {hasChildren && isExpanded && (
+                        <div className="border-l border-white/10 ml-4 pl-4 space-y-2">
+                            {childrenMap[exec.id].map(child => renderExecRow(child, depth + 1))}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        return roots.map(root => renderExecRow(root));
+    };
+
     const hasMore = executions.length < total;
 
     if (loading) {
@@ -282,43 +391,7 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
                 </div>
             ) : (
                 <div className="space-y-2 px-1">
-                    {executions.map((exec) => (
-                        <div key={exec.id} className="relative">
-                            <Card
-                                className="bg-white/5 border-white/10 hover:bg-white/[0.08] transition-colors cursor-pointer group overflow-hidden"
-                                onClick={() => fetchExecutionDetail(exec)}
-                            >
-                                <CardContent className="p-3 flex items-center justify-between gap-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className={cn(
-                                            "w-1 h-10 rounded-full shrink-0",
-                                            exec.status === 'SUCCESS' ? 'bg-green-500' :
-                                                exec.status === 'FAILED' ? 'bg-red-500' :
-                                                    exec.status === 'CANCELLED' ? 'bg-yellow-500' : 'bg-blue-500'
-                                        )} />
-                                        <div className="space-y-1">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <span className="text-xs font-mono text-muted-foreground">#{exec.id.slice(0, 8)}</span>
-                                                {getStatusBadge(exec.status)}
-                                                {getTriggerBadge(exec)}
-                                            </div>
-                                            <div className="flex items-center gap-4 text-xs text-muted-foreground font-medium">
-                                                <span className="flex items-center gap-1">
-                                                    <Calendar className="w-3 h-3" />
-                                                    {format(new Date(exec.started_at), 'MMM d, HH:mm:ss')}
-                                                </span>
-                                                <span className="flex items-center gap-1">
-                                                    <Clock className="w-3 h-3" />
-                                                    {getDuration(exec.started_at, exec.finished_at)}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
-                                </CardContent>
-                            </Card>
-                        </div>
-                    ))}
+                    {renderExecutionTree()}
 
                     {/* Load More button */}
                     {hasMore && (

@@ -142,6 +142,9 @@ func (e *WorkflowExecutor) RunWithDepth(ctx context.Context, workflowID uuid.UUI
 			// and we were passed a user, use it.
 			execution.User = user
 		}
+		if fromExecutionID != nil {
+			execution.ParentExecutionID = fromExecutionID
+		}
 		e.execRepo.Create(execution)
 	} else {
 		// Even if record exists, update with trigger info if missing
@@ -149,6 +152,9 @@ func (e *WorkflowExecutor) RunWithDepth(ctx context.Context, workflowID uuid.UUI
 		execution.TriggerSource = triggerSource
 		if scheduledID != nil {
 			execution.ScheduledID = scheduledID
+		}
+		if fromExecutionID != nil {
+			execution.ParentExecutionID = fromExecutionID
 		}
 	}
 
@@ -541,7 +547,7 @@ func (e *WorkflowExecutor) RunHooks(ctx context.Context, hooks []domain.Workflow
 		// Run hook asynchronously so it doesn't block the progress of the workflow/schedule
 		go func(h domain.WorkflowHook, execID uuid.UUID, resolvedInputs map[string]string) {
 			bgCtx := context.Background()
-			err := e.RunWithDepth(bgCtx, h.TargetWorkflowID, execID, resolvedInputs, nil, nil, "HOOK", depth+1, user, nil, nil, nil)
+			err := e.RunWithDepth(bgCtx, h.TargetWorkflowID, execID, resolvedInputs, nil, nil, "HOOK", depth+1, user, nil, nil, &executionID)
 			if err != nil {
 				errMsg := fmt.Sprintf("\033[1;33m⚠ Warning: %s hook failed (%v)\033[0m", hookType, err)
 				if h.WorkflowID != nil {
@@ -1327,7 +1333,7 @@ func (e *WorkflowExecutor) runWorkflowStep(ctx context.Context, step *domain.Wor
 		// Async: spawn the workflow and immediately return success
 		go func(targetID uuid.UUID, execID uuid.UUID, in map[string]string) {
 			bgCtx := context.Background()
-			err := e.RunWithDepth(bgCtx, targetID, execID, in, nil, nil, "STEP", 1, user, nil, nil, fromExecutionID)
+			err := e.RunWithDepth(bgCtx, targetID, execID, in, nil, nil, "STEP", 1, user, nil, nil, &executionID)
 			if err != nil {
 				e.hub.BroadcastLog(workflowID.String(), executionID.String(), fmt.Sprintf("\033[1;33m⚠ Async workflow %s failed: %v\033[0m", targetID, err))
 			} else {
@@ -1340,7 +1346,7 @@ func (e *WorkflowExecutor) runWorkflowStep(ctx context.Context, step *domain.Wor
 		return "async", nil
 	}
 
-	err = e.RunWithDepth(ctx, *step.TargetWorkflowID, hookExecID, resolvedInputs, nil, nil, "STEP", 1, user, nil, nil, fromExecutionID)
+	err = e.RunWithDepth(ctx, *step.TargetWorkflowID, hookExecID, resolvedInputs, nil, nil, "STEP", 1, user, nil, nil, &executionID)
 	if err != nil {
 		return "", fmt.Errorf("target workflow %s failed: %w", step.TargetWorkflowID, err)
 	}
