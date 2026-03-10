@@ -48,7 +48,12 @@ const XTerminal: React.FC<XTerminalProps> = ({ sessionID, isActive, className })
         xtermRef.current = term;
 
         // Connect WebSocket
-        const wsUrl = `ws://${window.location.hostname}:8080/api/ws?token=${token || ''}`;
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        let baseUrl = '/api';
+
+        const host = window.location.host;
+        const wsUrl = `${protocol}//${host}${baseUrl}/ws?token=${token || ''}`;
+
         const socket = new WebSocket(wsUrl);
         socketRef.current = socket;
 
