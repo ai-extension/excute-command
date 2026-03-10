@@ -90,9 +90,10 @@ export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
                             placeholder: 'FILTER BY TAGS',
                             type: 'multi',
                             isSearchable: true,
+                            isNewLine: false,
                             onSearch: onFetchTags,
                             options: availableTags.map(t => ({ label: t.name.toUpperCase(), value: t.id })),
-                            width: 'w-64'
+                            width: 'w-48'
                         },
                         {
                             key: 'createdBy',

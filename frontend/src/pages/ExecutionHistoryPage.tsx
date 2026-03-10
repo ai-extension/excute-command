@@ -201,7 +201,7 @@ const ExecutionHistoryPage = () => {
                                     { label: 'FAILED', value: 'FAILED' },
                                     { label: 'RUNNING', value: 'RUNNING' }
                                 ],
-                                width: 'w-32',
+                                width: 'w-48',
                                 isSearchable: true
                             },
                             {
@@ -219,6 +219,7 @@ const ExecutionHistoryPage = () => {
                                 key: 'executedBy',
                                 placeholder: 'EXECUTED BY',
                                 type: 'single',
+                                isNewLine: false,
                                 isSearchable: true,
                                 onSearch: (query) => fetchUsers(query),
                                 options: [
@@ -232,6 +233,7 @@ const ExecutionHistoryPage = () => {
                                 placeholder: 'TAGS',
                                 type: 'multi',
                                 isSearchable: true,
+                                isNewLine: true,
                                 onSearch: (query) => fetchTags(query),
                                 options: availableTags.map(t => ({ label: t.name.toUpperCase(), value: t.id })),
                                 width: 'w-48'

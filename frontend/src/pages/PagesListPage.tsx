@@ -205,6 +205,7 @@ const PagesListPage = () => {
                         placeholder: 'TAGS',
                         type: 'multi',
                         isSearchable: true,
+                        isNewLine: false,
                         onSearch: (query: string) => fetchTags(query),
                         options: availableTags.map(t => ({ label: t.name.toUpperCase(), value: t.id })),
                         width: 'w-48'
