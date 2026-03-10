@@ -591,7 +591,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                                                                             updateInput(JSON.stringify({ ...foreachVal, template: newTemplate }));
                                                                                                                                                         }}
                                                                                                                                                         className="h-6 text-[9px] border-amber-500/20 bg-background"
-                                                                                                                                                        placeholder={`"{{item}}"`}
+                                                                                                                                                        placeholder={`{{item}}`}
                                                                                                                                                     />
                                                                                                                                                 </div>
                                                                                                                                             );

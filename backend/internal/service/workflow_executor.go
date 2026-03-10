@@ -558,6 +558,8 @@ func (e *WorkflowExecutor) RunHooks(ctx context.Context, hooks []domain.Workflow
 }
 
 func (e *WorkflowExecutor) validateInputs(wf *domain.Workflow, provided map[string]string) error {
+	// Allow most characters including JSON structural ones, but block dangerous shell metacharacters
+	securityRegex := regexp.MustCompile(`^[\pL0-9_\-\.\ \/\:\[\]\{\}\"\'\,\@\#\$\%\^\!\*\+\=\?\(\)]*$`)
 	for _, input := range wf.Inputs {
 		val, ok := provided[input.Key]
 		if !ok {
@@ -632,7 +634,6 @@ func (e *WorkflowExecutor) validateInputs(wf *domain.Workflow, provided map[stri
 			if err := decoder.Decode(&rows); err != nil {
 				// Fallback for simple comma-separated (non-multi-key)
 				values := strings.Split(val, ",")
-				securityRegex := regexp.MustCompile(`^[\pL0-9_\-\.\ \/]+$`)
 				for _, v := range values {
 					v = strings.TrimSpace(v)
 					if v == "" {
@@ -643,7 +644,6 @@ func (e *WorkflowExecutor) validateInputs(wf *domain.Workflow, provided map[stri
 					}
 				}
 			} else {
-				securityRegex := regexp.MustCompile(`^[\pL0-9_\-\.\ \/]+$`)
 				for _, row := range rows {
 					for k, v := range row {
 						strV := fmt.Sprintf("%v", v)
@@ -657,7 +657,6 @@ func (e *WorkflowExecutor) validateInputs(wf *domain.Workflow, provided map[stri
 				}
 			}
 		default: // "input"
-			securityRegex := regexp.MustCompile(`^[\pL0-9_\-\.\ \/]+$`)
 			if !securityRegex.MatchString(val) {
 				return fmt.Errorf("field %s contains invalid characters", input.Label)
 			}
@@ -1144,51 +1143,140 @@ func (e *WorkflowExecutor) runWorkflowStep(ctx context.Context, step *domain.Wor
 	}
 
 	// Interpolate the target workflow inputs
-	var rawInputs map[string]string
+	var rawInputs map[string]interface{}
 	if step.TargetWorkflowInputs != "" {
-		json.Unmarshal([]byte(step.TargetWorkflowInputs), &rawInputs)
+		if err := json.Unmarshal([]byte(step.TargetWorkflowInputs), &rawInputs); err != nil {
+			fmt.Fprintf(mainLogFile, "\033[1;31m✖ Failed to unmarshal TargetWorkflowInputs: %v\033[0m\n", err)
+		}
+	}
+	fmt.Fprintf(mainLogFile, "\033[90mDEBUG Step [TargetWorkflowInputs] raw: %s\033[0m\n", step.TargetWorkflowInputs)
+	fmt.Fprintf(mainLogFile, "\033[90mDEBUG Step [rawInputs] map: %v\033[0m\n", rawInputs)
+
+	// NEW: Fetch target workflow to get its default inputs
+	targetWf, err := e.wfRepo.GetByID(*step.TargetWorkflowID, nil)
+	if err != nil {
+		fmt.Fprintf(mainLogFile, "\033[1;31m✖ Failed to fetch target workflow %s for defaults: %v\033[0m\n", step.TargetWorkflowID, err)
 	}
 
 	// Interpolate each input value through the current workflow context
 	pcontext := e.getInterpolationContext(inputs, variables, groupResults, namespaceID, user)
 	resolvedInputs := make(map[string]string)
-	for k, v := range rawInputs {
+
+	// 1. First, populate with target workflow default values
+	if targetWf != nil {
+		for _, in := range targetWf.Inputs {
+			resolvedInputs[in.Key] = in.DefaultValue
+		}
+		fmt.Fprintf(mainLogFile, "\033[90mDEBUG Target Workflow Defaults: %v\033[0m\n", resolvedInputs)
+	}
+
+	// 2. Then, apply overrides from step inputs
+	for k, vRaw := range rawInputs {
+		v := ""
+		if s, ok := vRaw.(string); ok {
+			v = s
+		} else {
+			// If it's already an object/array, stringify it so the Foreach/Render logic can handle it
+			b, _ := json.Marshal(vRaw)
+			v = string(b)
+		}
+		isForeach := false
+		fmt.Fprintf(mainLogFile, "\033[90mDEBUG evaluating input [%s]: value_len=%d\033[0m\n", k, len(v))
 		// New JSON-based Foreach logic
 		var foreachData struct {
 			Type     string      `json:"_type"`
 			Source   string      `json:"source"`
 			Template interface{} `json:"template"`
 		}
-		isForeach := false
-		if strings.HasPrefix(v, "{") && strings.Contains(v, "\"_type\":\"foreach\"") {
-			if err := json.Unmarshal([]byte(v), &foreachData); err == nil && foreachData.Type == "foreach" {
+		trimmedV := strings.TrimSpace(v)
+		if strings.HasPrefix(trimmedV, "{") {
+			unmarshalErr := json.Unmarshal([]byte(v), &foreachData)
+			if unmarshalErr == nil && foreachData.Type == "foreach" {
 				isForeach = true
+			} else {
+				limit := 15
+				if len(trimmedV) < limit {
+					limit = len(trimmedV)
+				}
+				logDetail := fmt.Sprintf("\033[93mDEBUG Not Foreach [%s]: err=%v type=%s prefix=%s\033[0m\n", k, unmarshalErr, foreachData.Type, trimmedV[:limit])
+				fmt.Fprint(mainLogFile, logDetail)
 			}
 		}
 
 		if isForeach {
 			// 1. Render source variable to get the array
-			sourceJson, err := e.renderTemplate(foreachData.Source, pcontext)
+			// If the source is a simple template like {{...}}, wrap it in |json filter to ensure valid JSON representation of maps/slices
+			renderSource := foreachData.Source
+			if strings.HasPrefix(strings.TrimSpace(renderSource), "{{") && strings.HasSuffix(strings.TrimSpace(renderSource), "}}") && !strings.Contains(renderSource, "|json") {
+				inner := strings.TrimSuffix(strings.TrimPrefix(strings.TrimSpace(renderSource), "{{"), "}}")
+				renderSource = fmt.Sprintf("{{ %s | json }}", strings.TrimSpace(inner))
+			}
+
+			sourceJson, err := e.renderTemplate(renderSource, pcontext)
 			if err != nil {
+				fmt.Fprintf(mainLogFile, "\033[1;31m✖ Failed to render source [%s] with template [%s]: %v\033[0m\n", k, renderSource, err)
 				resolvedInputs[k] = "[]"
 				continue
 			}
 
-			// 2. Parse sourceJson as array
+			// 2. Parse sourceJson as array or single item (robustly)
 			var items []interface{}
-			if err := json.Unmarshal([]byte(sourceJson), &items); err != nil {
-				// Fallback: try comma-separated if not JSON
-				if sourceJson != "" {
-					parts := strings.Split(sourceJson, ",")
-					for _, p := range parts {
-						items = append(items, strings.TrimSpace(p))
-					}
+			var parseJsonItems func(string) []interface{}
+			parseJsonItems = func(js string) []interface{} {
+				js = strings.TrimSpace(js)
+				if js == "" {
+					return nil
 				}
+				// Try straight array unmarshal
+				var list []interface{}
+				if err := json.Unmarshal([]byte(js), &list); err == nil {
+					return list
+				}
+				// Try as a single value (could be a double-encoded JSON string)
+				var single interface{}
+				if err := json.Unmarshal([]byte(js), &single); err == nil {
+					if s, ok := single.(string); ok {
+						// If the string itself is a JSON array/object, recurse
+						trimmedS := strings.TrimSpace(s)
+						if strings.HasPrefix(trimmedS, "[") || strings.HasPrefix(trimmedS, "{") {
+							return parseJsonItems(s)
+						}
+						// Comma separated fallback
+						if strings.Contains(s, ",") {
+							parts := strings.Split(s, ",")
+							var res []interface{}
+							for _, p := range parts {
+								res = append(res, strings.TrimSpace(p))
+							}
+							return res
+						}
+						return []interface{}{s}
+					}
+					return []interface{}{single}
+				}
+				// Final raw fallback for non-JSON strings
+				if strings.Contains(js, ",") {
+					parts := strings.Split(js, ",")
+					var res []interface{}
+					for _, p := range parts {
+						res = append(res, strings.TrimSpace(p))
+					}
+					return res
+				}
+				return []interface{}{js}
 			}
+
+			items = parseJsonItems(sourceJson)
+
+			// Debug logging
+			debugMsg := fmt.Sprintf("\033[90mDEBUG Foreach [%s]: source=\"%s\" raw_rendered=\"%s\" parsed_items_count=%d\033[0m\n", k, renderSource, sourceJson, len(items))
+			fmt.Fprint(mainLogFile, debugMsg)
+			fmt.Fprint(stepLogFile, debugMsg)
+			e.hub.BroadcastLog(workflowID.String(), executionID.String(), debugMsg)
 
 			// 3. Render template for each item
 			var results []interface{}
-			for _, item := range items {
+			for i, item := range items {
 				// Create sub-context
 				subContext := make(pongo2.Context)
 				for pk, pv := range pcontext {
@@ -1196,11 +1284,23 @@ func (e *WorkflowExecutor) runWorkflowStep(ctx context.Context, step *domain.Wor
 				}
 				subContext["item"] = item
 
+				// Debug: Log item structure for the first few items
+				if i < 3 {
+					itemJson, _ := json.Marshal(item)
+					itemDebug := fmt.Sprintf("\033[90mDEBUG Item [%d]: %s\033[0m\n", i, string(itemJson))
+					fmt.Fprint(mainLogFile, itemDebug)
+					fmt.Fprint(stepLogFile, itemDebug)
+					e.hub.BroadcastLog(workflowID.String(), executionID.String(), itemDebug)
+				}
+
 				// Determine template string based on type (string for multi-select, map for multi-input)
 				switch t := foreachData.Template.(type) {
 				case string:
 					rendered, err := e.renderTemplate(t, subContext)
-					if err != nil || strings.TrimSpace(rendered) == "" {
+					if err != nil {
+						fmt.Fprintf(mainLogFile, "\033[1;31m✖ Failed to render template for input key [%s], item index [%d]: %v\033[0m\n", k, i, err)
+						results = append(results, item) // Fallback to original item on error
+					} else if strings.TrimSpace(rendered) == "" {
 						results = append(results, item)
 					} else {
 						results = append(results, strings.TrimSpace(rendered))
@@ -1210,8 +1310,13 @@ func (e *WorkflowExecutor) runWorkflowStep(ctx context.Context, step *domain.Wor
 					row := make(map[string]interface{})
 					for tk, tv := range t {
 						if tvStr, ok := tv.(string); ok {
-							rendered, _ := e.renderTemplate(tvStr, subContext)
-							row[tk] = strings.TrimSpace(rendered)
+							rendered, err := e.renderTemplate(tvStr, subContext)
+							if err != nil {
+								fmt.Fprintf(mainLogFile, "\033[1;31m✖ Failed to render template for row key [%s], item [%d]: %v\033[0m\n", tk, i, err)
+								row[tk] = tvStr
+							} else {
+								row[tk] = strings.TrimSpace(rendered)
+							}
 						} else {
 							row[tk] = tv
 						}
@@ -1226,6 +1331,7 @@ func (e *WorkflowExecutor) runWorkflowStep(ctx context.Context, step *domain.Wor
 		} else {
 			rendered, err := e.renderTemplate(v, pcontext)
 			if err != nil {
+				fmt.Fprintf(mainLogFile, "\033[1;31m✖ Failed to render input [%s]: %v\033[0m\n", k, err)
 				rendered = v // fallback to raw value on error
 			}
 			resolvedInputs[k] = rendered
@@ -1256,7 +1362,13 @@ func (e *WorkflowExecutor) runWorkflowStep(ctx context.Context, step *domain.Wor
 	}
 
 	// Synchronous: wait for the target workflow to complete
-	err := e.RunWithDepth(ctx, *step.TargetWorkflowID, hookExecID, resolvedInputs, nil, nil, "STEP", 1, user, nil, nil, fromExecutionID)
+	resolvedInputsJson, _ := json.Marshal(resolvedInputs)
+	resolvedLogMsg := fmt.Sprintf("\033[90mDEBUG Final Resolved Inputs: %s\033[0m\n", string(resolvedInputsJson))
+	fmt.Fprint(mainLogFile, resolvedLogMsg)
+	fmt.Fprint(stepLogFile, resolvedLogMsg)
+	e.hub.BroadcastLog(workflowID.String(), executionID.String(), resolvedLogMsg)
+
+	err = e.RunWithDepth(ctx, *step.TargetWorkflowID, hookExecID, resolvedInputs, nil, nil, "STEP", 1, user, nil, nil, fromExecutionID)
 	if err != nil {
 		return "", fmt.Errorf("target workflow %s failed: %w", step.TargetWorkflowID, err)
 	}
@@ -1406,7 +1518,8 @@ func (e *WorkflowExecutor) renderTemplate(templateStr string, ctx pongo2.Context
 
 func (e *WorkflowExecutor) getInterpolationContext(inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, namespaceID uuid.UUID, user *domain.User) pongo2.Context {
 	ctx := make(pongo2.Context)
-	securityRegex := regexp.MustCompile(`^[\pL0-9_\-\.\ \/]+$`)
+	// Allow most characters including JSON structural ones, but block dangerous shell metacharacters
+	securityRegex := regexp.MustCompile(`^[\pL0-9_\-\.\ \/\:\[\]\{\}\"\'\,\@\#\$\%\^\!\*\+\=\?\(\)]*$`)
 
 	// 1. Global Variables: global.key
 	global := make(map[string]string)
@@ -1446,7 +1559,10 @@ func (e *WorkflowExecutor) getInterpolationContext(inputs map[string]string, var
 			decoder.UseNumber()
 			if err := decoder.Decode(&jsonVal); err == nil {
 				in[k] = jsonVal
+				// fmt.Printf("DEBUG getInterpolationContext: parsed [%s] as JSON: %v\n", k, jsonVal)
 				continue
+			} else {
+				// fmt.Printf("DEBUG getInterpolationContext: failed to parse [%s] as JSON (treating as string): %v\n", k, err)
 			}
 		}
 

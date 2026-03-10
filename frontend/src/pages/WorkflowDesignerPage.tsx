@@ -237,11 +237,17 @@ const WorkflowDesignerPage = () => {
                     default_server_id: g.default_server_id || undefined,
                     copy_target_server_id: g.copy_target_server_id || undefined,
                     order: gIdx,
-                    steps: g.steps?.map((s, sIdx) => ({
-                        ...s,
-                        order: sIdx,
-                        server_id: s.server_id || undefined
-                    }))
+                    steps: g.steps?.map((s, sIdx) => {
+                        const cleanedStep = {
+                            ...s,
+                            order: sIdx,
+                            server_id: s.server_id || undefined
+                        };
+                        if (cleanedStep.action_type === 'WORKFLOW' && typeof cleanedStep.target_workflow_inputs === 'object' && cleanedStep.target_workflow_inputs) {
+                            cleanedStep.target_workflow_inputs = JSON.stringify(cleanedStep.target_workflow_inputs);
+                        }
+                        return cleanedStep;
+                    })
                 })),
                 hooks: hooks.map((h, hIdx) => ({
                     ...h,
