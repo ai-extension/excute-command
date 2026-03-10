@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { usePersistentState } from '../hooks/usePersistentState';
 import { Database, Plus, Search, MoreHorizontal, Trash2, Edit3, Globe, Code, ChevronRight, Copy, Check } from 'lucide-react';
 
 import {
@@ -44,8 +45,8 @@ const GlobalVariablesPage = () => {
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [selectedVar, setSelectedVar] = useState<GlobalVariable | null>(null);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [selectedCreatedBy, setSelectedCreatedBy] = useState<string | undefined>(undefined);
+    const [searchTerm, setSearchTerm] = usePersistentState('gv_search', '');
+    const [selectedCreatedBy, setSelectedCreatedBy] = usePersistentState<string | undefined>('gv_createdBy', undefined);
     const { users: availableUsers, fetchUsers } = useUsers();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [copiedId, setCopiedId] = useState<string | null>(null);

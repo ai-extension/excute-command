@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { usePersistentState } from '../hooks/usePersistentState';
 import { Users, UserPlus, Shield, Mail, MoreHorizontal, Search, ShieldCheck, ChevronRight, Key, Edit, Trash2 } from 'lucide-react';
 
 import {
@@ -49,8 +50,8 @@ const UsersPage = () => {
     const [editUserData, setEditUserData] = useState({ username: '', full_name: '', email: '' });
     const [resetPasswordData, setResetPasswordData] = useState({ new_password: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [roleFilter, setRoleFilter] = useState<string>('ALL');
+    const [searchTerm, setSearchTerm] = usePersistentState('users_search', '');
+    const [roleFilter, setRoleFilter] = usePersistentState<string>('users_roleFilter', 'ALL');
 
     const [limit, setLimit] = useState(20);
     const [offset, setOffset] = useState(0);

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { usePersistentState } from '../hooks/usePersistentState';
 import {
     History,
     FileText,
@@ -44,13 +45,13 @@ const ExecutionHistoryPage = () => {
     const [error, setError] = useState<string | null>(null);
     const [selectedExec, setSelectedExec] = useState<WorkflowExecution | null>(null);
     const [loadingDetail, setLoadingDetail] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [statusFilter, setStatusFilter] = useState<string>('ALL');
-    const [workflowFilter, setWorkflowFilter] = useState<string>('ALL');
+    const [searchQuery, setSearchQuery] = usePersistentState('exec_search', '');
+    const [statusFilter, setStatusFilter] = usePersistentState<string>('exec_status', 'ALL');
+    const [workflowFilter, setWorkflowFilter] = usePersistentState<string>('exec_workflow', 'ALL');
     const [workflows, setWorkflows] = useState<Workflow[]>([]);
-    const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+    const [selectedTagIds, setSelectedTagIds] = usePersistentState<string[]>('exec_tags', []);
     const [availableTags, setAvailableTags] = useState<Tag[]>([]);
-    const [selectedExecutedBy, setSelectedExecutedBy] = useState<string | undefined>(undefined);
+    const [selectedExecutedBy, setSelectedExecutedBy] = usePersistentState<string | undefined>('exec_executedBy', undefined);
     const { users: availableUsers, fetchUsers } = useUsers();
 
     useEffect(() => {

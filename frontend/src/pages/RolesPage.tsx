@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { usePersistentState } from '../hooks/usePersistentState';
 import { Shield, ShieldAlert, Plus, Lock, Settings, Trash2, ArrowRight, Check, Search, ChevronRight } from 'lucide-react';
 
 import { API_BASE_URL } from '../lib/api';
@@ -31,7 +32,7 @@ const RolesPage = () => {
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [newRoleData, setNewRoleData] = useState({ name: '', description: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchTerm, setSearchTerm] = usePersistentState('roles_search', '');
 
     const [total, setTotal] = useState(0);
     const [limit, setLimit] = useState(21);

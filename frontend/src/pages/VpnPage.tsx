@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { usePersistentState } from '../hooks/usePersistentState';
 import { Plus, Search, ChevronRight, Network, Shield, Key, Edit2, Trash2, XCircle } from 'lucide-react';
 import {
     Table,
@@ -35,11 +36,11 @@ const VpnPage = () => {
     const [total, setTotal] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [authTypeFilter, setAuthTypeFilter] = useState<string>('ALL');
+    const [searchTerm, setSearchTerm] = usePersistentState('vpn_search', '');
+    const [authTypeFilter, setAuthTypeFilter] = usePersistentState<string>('vpn_authType', 'ALL');
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingVpn, setEditingVpn] = useState<VpnConfig | null>(null);
-    const [selectedCreatedBy, setSelectedCreatedBy] = useState<string | undefined>(undefined);
+    const [selectedCreatedBy, setSelectedCreatedBy] = usePersistentState<string | undefined>('vpn_createdBy', undefined);
     const { users: availableUsers, fetchUsers } = useUsers();
 
     // Delete VPN state

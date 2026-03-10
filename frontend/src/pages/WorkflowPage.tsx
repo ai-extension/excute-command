@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { usePersistentState } from '../hooks/usePersistentState';
 import { useNavigate } from 'react-router-dom';
 import {
     Plus,
@@ -53,8 +54,8 @@ const WorkflowPage = () => {
     const { apiFetch, showToast } = useAuth();
 
     // Filter & List State
-    const [searchTerm, setSearchTerm] = useState('');
-    const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+    const [searchTerm, setSearchTerm] = usePersistentState('wf_search', '');
+    const [selectedTagIds, setSelectedTagIds] = usePersistentState<string[]>('wf_tags', []);
     const [workflows, setWorkflows] = useState<Workflow[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [total, setTotal] = useState(0);
@@ -62,8 +63,8 @@ const WorkflowPage = () => {
     const [offset, setOffset] = useState(0);
     const [availableTags, setAvailableTags] = useState<Tag[]>([]);
     const [showTemplates, setShowTemplates] = useState(false);
-    const [selectedCreatedBy, setSelectedCreatedBy] = useState<string | undefined>(undefined);
-    const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'public' | 'draft'>('all');
+    const [selectedCreatedBy, setSelectedCreatedBy] = usePersistentState<string | undefined>('wf_createdBy', undefined);
+    const [visibilityFilter, setVisibilityFilter] = usePersistentState<'all' | 'public' | 'draft'>('wf_visibility', 'all');
     const { users: availableUsers, fetchUsers } = useUsers();
 
     // Create workflow dialog state

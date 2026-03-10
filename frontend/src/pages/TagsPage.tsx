@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { usePersistentState } from '../hooks/usePersistentState';
 import { Tag as TagIcon, Plus, Search, Trash2, Edit3, Paintbrush, ChevronRight } from 'lucide-react';
 
 import {
@@ -40,8 +41,8 @@ const TagsPage = () => {
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [selectedTag, setSelectedTag] = useState<Tag | null>(null);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [selectedCreatedBy, setSelectedCreatedBy] = useState<string | undefined>(undefined);
+    const [searchTerm, setSearchTerm] = usePersistentState('tags_search', '');
+    const [selectedCreatedBy, setSelectedCreatedBy] = usePersistentState<string | undefined>('tags_createdBy', undefined);
     const { users: availableUsers, fetchUsers } = useUsers();
     const [isSubmitting, setIsSubmitting] = useState(false);
 

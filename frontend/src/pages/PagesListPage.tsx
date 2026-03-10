@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { usePersistentState } from '../hooks/usePersistentState';
 import { useNavigate } from 'react-router-dom';
 import { Layout, Plus, Search, MoreVertical, Edit2, Trash2, Globe, Lock, ChevronRight, ExternalLink, Copy, AlertTriangle } from 'lucide-react';
 import { Button } from '../components/ui/button';
@@ -23,11 +24,11 @@ const PagesListPage = () => {
     const [total, setTotal] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [visibilityFilter, setVisibilityFilter] = useState<string>('ALL');
-    const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+    const [searchQuery, setSearchQuery] = usePersistentState('pages_search', '');
+    const [visibilityFilter, setVisibilityFilter] = usePersistentState<string>('pages_visibility', 'ALL');
+    const [selectedTagIds, setSelectedTagIds] = usePersistentState<string[]>('pages_tags', []);
     const [availableTags, setAvailableTags] = useState<Tag[]>([]);
-    const [selectedCreatedBy, setSelectedCreatedBy] = useState<string | undefined>(undefined);
+    const [selectedCreatedBy, setSelectedCreatedBy] = usePersistentState<string | undefined>('pages_createdBy', undefined);
     const { users: availableUsers, fetchUsers } = useUsers();
 
     const [limit, setLimit] = useState(21);
