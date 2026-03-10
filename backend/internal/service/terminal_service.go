@@ -75,9 +75,11 @@ func (s *TerminalService) StartSession(serverID uuid.UUID, user *domain.User) (s
 		for {
 			n, err := stdout.Read(buf)
 			if n > 0 {
+				fmt.Printf("[TerminalService] Read %d bytes from session %s: %q\n", n, sessionID, string(buf[:n]))
 				s.hub.BroadcastLog(sessionID, sessionID, string(buf[:n]))
 			}
 			if err != nil {
+				fmt.Printf("[TerminalService] Read error on session %s: %v\n", sessionID, err)
 				break
 			}
 		}
@@ -103,10 +105,15 @@ func (s *TerminalService) HandleInput(sessionID string, input string) error {
 	s.mu.Unlock()
 
 	if !ok {
+		fmt.Printf("[TerminalService] Session NOT FOUND: %s\n", sessionID)
 		return fmt.Errorf("session not found: %s", sessionID)
 	}
 
+	fmt.Printf("[TerminalService] Writing %d bytes to session %s\n", len(input), sessionID)
 	_, err := ts.Stdin.Write([]byte(input))
+	if err != nil {
+		fmt.Printf("[TerminalService] Write error: %v\n", err)
+	}
 	return err
 }
 

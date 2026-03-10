@@ -58,17 +58,24 @@ const XTerminal: React.FC<XTerminalProps> = ({ sessionID, isActive, className })
         socketRef.current = socket;
 
         socket.onopen = () => {
-            console.log('XTerminal connected to WS');
+            console.log('Terminal WebSocket connected. Subscribing to session:', sessionID);
+            socket.send(JSON.stringify({
+                type: 'request_catchup',
+                execution_id: sessionID
+            }));
         };
+
+        socket.onclose = (event) => console.log('Terminal WebSocket disconnected:', event.code, event.reason);
+        socket.onerror = (err) => console.error('Terminal WebSocket error:', err);
 
         socket.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
-                if (data.target_id === sessionID) {
+                if (data.type === 'log' && data.target_id === sessionID && data.content) {
                     term.write(data.content);
                 }
             } catch (err) {
-                // Not a JSON message or different format
+                console.error('Failed to parse WS message:', err);
             }
         };
 
@@ -80,6 +87,8 @@ const XTerminal: React.FC<XTerminalProps> = ({ sessionID, isActive, className })
                     session_id: sessionID,
                     content: data
                 }));
+            } else {
+                console.warn('Cannot send input, socket not open. State:', socket.readyState);
             }
         });
 

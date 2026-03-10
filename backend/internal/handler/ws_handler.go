@@ -232,6 +232,7 @@ func (h *WSHandler) HandleWS(c *gin.Context) {
 			if err != nil {
 				break
 			}
+			fmt.Printf("[WS] Raw message received: %s\n", string(message))
 
 			// Parse incoming message
 			var msg struct {
@@ -244,8 +245,13 @@ func (h *WSHandler) HandleWS(c *gin.Context) {
 			}
 			if err := json.Unmarshal(message, &msg); err == nil {
 				if msg.Type == "input" {
-					h.terminalService.HandleInput(msg.SessionID, msg.Content)
+					fmt.Printf("[WS] Received input for session %s: %q\n", msg.SessionID, msg.Content)
+					err := h.terminalService.HandleInput(msg.SessionID, msg.Content)
+					if err != nil {
+						fmt.Printf("[WS] Error handling input: %v\n", err)
+					}
 				} else if msg.Type == "request_catchup" && msg.ExecutionID != "" {
+					fmt.Printf("[WS] Subscription request for: %s\n", msg.ExecutionID)
 					// 1. Subscribe client to this execution's topic for future logs
 					h.hub.Subscribe(client, msg.ExecutionID)
 

@@ -144,6 +144,7 @@ func (h *Hub) handleSubscribe(sub subscription) {
 		h.topicSubscribers[sub.topicID] = make(map[*Client]bool)
 	}
 	h.topicSubscribers[sub.topicID][sub.client] = true
+	log.Printf("[Hub] Client subscribed to topic: %s. Total subscribers: %d", sub.topicID, len(h.topicSubscribers[sub.topicID]))
 }
 
 func (h *Hub) handleUnsubscribe(sub subscription) {
@@ -180,7 +181,9 @@ func (h *Hub) processBroadcast(message []byte) {
 		Type        string `json:"type"`
 		ExecutionID string `json:"execution_id"`
 	}
-	json.Unmarshal(message, &meta)
+	if err := json.Unmarshal(message, &meta); err != nil {
+		log.Printf("[Hub] Failed to unmarshal broadcast meta: %v", err)
+	}
 
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -212,6 +215,10 @@ func (h *Hub) processBroadcast(message []byte) {
 			if streamPageID.String() == client.Access.PageID.String() {
 				isAllowed = true
 			}
+		}
+
+		if !isAllowed {
+			log.Printf("[Hub] Message NOT allowed for client. Admin: %v, PageID: %v, StreamPageID: %v", client.Access.IsAdmin, client.Access.PageID, streamPageID)
 		}
 
 		if isAllowed {
