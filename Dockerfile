@@ -13,7 +13,7 @@ RUN apk add --no-cache gcc musl-dev
 COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 COPY backend/ .
-RUN go build -o main cmd/server/main.go
+RUN CGO_ENABLED=0 go build -o main cmd/server/main.go
 
 # Final Stage
 FROM ubuntu:22.04
