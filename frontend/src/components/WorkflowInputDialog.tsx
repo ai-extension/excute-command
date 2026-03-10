@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { WorkflowInput } from '../types';
+import { WorkflowInput, MultiInputItem } from '../types';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Dialog, DialogContent, DialogFooter } from './ui/dialog';
@@ -226,22 +226,54 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                                             try { rows = JSON.parse(values[input.key] || '[]'); } catch (e) { rows = [{}]; }
                                             if (!Array.isArray(rows)) rows = [{}];
 
+                                            let config: MultiInputItem[] = [];
+                                            try {
+                                                config = JSON.parse(input.default_value || '[]');
+                                                if (!Array.isArray(config)) throw new Error();
+                                            } catch (e) {
+                                                // Fallback for old format
+                                                config = (input.default_value || '').split(',').map(k => ({
+                                                    key: k.trim(),
+                                                    label: k.trim(),
+                                                    type: 'input' as const
+                                                })).filter(c => c.key);
+                                            }
+
                                             return (
                                                 <>
                                                     {rows.map((row, rowIndex) => (
                                                         <div key={rowIndex} className="space-y-2 p-3 bg-background border border-indigo-500/10 rounded-lg relative group/row">
-                                                            {(input.default_value || '').split(',').map((k: string) => k.trim()).filter(Boolean).map((fieldKey: string) => (
-                                                                <div key={fieldKey} className="flex items-center gap-2">
-                                                                    <span className="text-[8px] font-black uppercase tracking-widest opacity-30 w-16 truncate shrink-0">{fieldKey}</span>
-                                                                    <Input
-                                                                        className="h-8 bg-muted/20 border-border/50 rounded text-[11px] font-bold"
-                                                                        value={row[fieldKey] || ''}
-                                                                        onChange={(e) => {
-                                                                            const newValue = updateMultiInputValue(values[input.key], rowIndex, fieldKey, e.target.value);
-                                                                            setValues({ ...values, [input.key]: newValue });
-                                                                        }}
-                                                                        placeholder={`Enter ${fieldKey}...`}
-                                                                    />
+                                                            {config.map((field) => (
+                                                                <div key={field.key} className="flex items-center gap-2">
+                                                                    <span className="text-[8px] font-black uppercase tracking-widest opacity-30 w-16 truncate shrink-0" title={field.label || field.key}>
+                                                                        {field.label || field.key}
+                                                                    </span>
+                                                                    {field.type === 'select' ? (
+                                                                        <select
+                                                                            value={row[field.key] || ''}
+                                                                            onChange={(e) => {
+                                                                                const newValue = updateMultiInputValue(values[input.key], rowIndex, field.key, e.target.value);
+                                                                                setValues({ ...values, [input.key]: newValue });
+                                                                            }}
+                                                                            className="h-8 w-full px-2 bg-muted/20 border border-border/50 rounded text-[11px] font-bold outline-none"
+                                                                        >
+                                                                            <option value="">Select...</option>
+                                                                            {(field.options || '').split(',').map((o: string) => o.trim()).filter(Boolean).map((o: string) => (
+                                                                                <option key={o} value={o}>{o}</option>
+                                                                            ))}
+                                                                        </select>
+                                                                    ) : (
+                                                                        <Input
+                                                                            type={field.type === 'number' ? 'number' : 'text'}
+                                                                            className="h-8 bg-muted/20 border-border/50 rounded text-[11px] font-bold"
+                                                                            value={row[field.key] || ''}
+                                                                            onChange={(e) => {
+                                                                                const newValue = updateMultiInputValue(values[input.key], rowIndex, field.key, e.target.value);
+                                                                                setValues({ ...values, [input.key]: newValue });
+                                                                            }}
+                                                                            placeholder={`Enter ${field.label || field.key}...`}
+                                                                        />
+                                                                    )}
                                                                 </div>
                                                             ))}
                                                             {rows.length > 1 && (

@@ -3,7 +3,127 @@ import { Terminal, Plus, Trash2, Database, Check, Copy, Zap } from 'lucide-react
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
-import { WorkflowInput, WorkflowVariable } from '../../types';
+import { WorkflowInput, WorkflowVariable, MultiInputItem } from '../../types';
+
+const MultiInputConfigEditor: React.FC<{
+    defaultValue: string;
+    onChange: (value: string) => void;
+}> = ({ defaultValue, onChange }) => {
+    let items: MultiInputItem[] = [];
+    try {
+        items = JSON.parse(defaultValue);
+        if (!Array.isArray(items)) throw new Error();
+    } catch (e) {
+        // Fallback for old comma-separated keys
+        items = (defaultValue || '').split(',').map(k => ({
+            key: k.trim(),
+            label: k.trim(),
+            type: 'input' as const
+        })).filter(i => i.key);
+    }
+
+    const updateItems = (newItems: MultiInputItem[]) => {
+        onChange(JSON.stringify(newItems));
+    };
+
+    return (
+        <div className="space-y-4 pt-4 border-t border-border/30 mt-2">
+            <div className="flex items-center justify-between px-1">
+                <span className="text-[9px] font-bold text-primary uppercase tracking-wider">Field Definitions</span>
+                <span className="text-[8px] text-muted-foreground italic">Add keys that will correspond to each row item</span>
+            </div>
+            <div className="space-y-3">
+                {items.map((item, i) => (
+                    <div key={i} className="group/item bg-muted/30 hover:bg-muted/50 border border-border/50 rounded-xl p-4 transition-all duration-200 relative">
+                        <div className="grid grid-cols-12 gap-4 items-start">
+                            <div className="col-span-4 space-y-1.5">
+                                <label className="text-[7px] font-black uppercase tracking-widest text-muted-foreground/70">Variable Key</label>
+                                <Input
+                                    value={item.key}
+                                    onChange={(e) => {
+                                        const ni = [...items];
+                                        ni[i].key = e.target.value.replace(/[^a-zA-Z0-9_]/g, '');
+                                        updateItems(ni);
+                                    }}
+                                    placeholder="key"
+                                    className="h-8 text-[11px] font-mono bg-background border-border/50 focus:border-primary/50"
+                                />
+                            </div>
+                            <div className="col-span-4 space-y-1.5">
+                                <label className="text-[7px] font-black uppercase tracking-widest text-muted-foreground/70">Display Label</label>
+                                <Input
+                                    value={item.label}
+                                    onChange={(e) => {
+                                        const ni = [...items];
+                                        ni[i].label = e.target.value;
+                                        updateItems(ni);
+                                    }}
+                                    placeholder="label"
+                                    className="h-8 text-[11px] bg-background border-border/50 focus:border-primary/50"
+                                />
+                            </div>
+                            <div className="col-span-4 space-y-1.5">
+                                <label className="text-[7px] font-black uppercase tracking-widest text-muted-foreground/70">Field Type</label>
+                                <select
+                                    value={item.type}
+                                    onChange={(e) => {
+                                        const ni = [...items];
+                                        ni[i].type = e.target.value as any;
+                                        updateItems(ni);
+                                    }}
+                                    className="h-8 px-2 w-full text-[11px] font-semibold border border-border/50 rounded-md bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 cursor-pointer"
+                                >
+                                    <option value="input">Input</option>
+                                    <option value="number">Number</option>
+                                    <option value="select">Select</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {item.type === 'select' && (
+                            <div className=" border-t border-border/20 space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                                <label className="text-[7px] font-black uppercase tracking-widest text-primary/70">Options (comma-separated)</label>
+                                <Input
+                                    value={item.options || ''}
+                                    onChange={(e) => {
+                                        const ni = [...items];
+                                        ni[i].options = e.target.value;
+                                        updateItems(ni);
+                                    }}
+                                    placeholder="opt1, opt2, opt3"
+                                    className="h-8 text-[11px] bg-background border-border/50 focus:border-primary/50"
+                                />
+                            </div>
+                        )}
+
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                                const ni = items.filter((_, idx) => idx !== i);
+                                updateItems(ni);
+                            }}
+                            className="absolute -right-2 -top-2 h-6 w-6 rounded-full bg-destructive text-white shadow-lg opacity-0 group-hover/item:opacity-100 transition-all duration-200 hover:scale-110 active:scale-95"
+                        >
+                            <Trash2 className="w-3 h-3" />
+                        </Button>
+                    </div>
+                ))}
+            </div>
+
+            <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                    updateItems([...items, { key: '', label: '', type: 'input' }]);
+                }}
+                className="w-full h-9 border-dashed border-primary/30 text-primary bg-primary/5 hover:bg-primary/10 text-[9px] font-black uppercase tracking-[0.2em] rounded-xl transition-all duration-200"
+            >
+                <Plus className="w-3.5 h-3.5 mr-2" /> Add Structure Field
+            </Button>
+        </div>
+    );
+};
 
 interface VariablesTabProps {
     inputs: Partial<WorkflowInput>[];
@@ -77,7 +197,7 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                                                             ni[idx].key = e.target.value.replace(/[^a-zA-Z0-9_]/g, '');
                                                             setInputs(ni);
                                                         }}
-                                                        placeholder="e.g. app_node_version"
+                                                        placeholder="key"
                                                         className="h-8 text-[11px] font-mono border-border bg-background pr-8"
                                                     />
                                                     {input.key && (
@@ -114,10 +234,19 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                                             <div className="space-y-1.5">
                                                 <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">
                                                     {input.type === 'select' || input.type === 'multi-select' ? 'Options (comma-separated)'
-                                                        : input.type === 'multi-input' ? 'Keys (comma-separated, e.g. key1, key2)'
+                                                        : input.type === 'multi-input' ? 'Configure Fields for Rows'
                                                             : 'Default Value'}
                                                 </label>
-                                                {input.type === 'input' ? (
+                                                {input.type === 'multi-input' ? (
+                                                    <MultiInputConfigEditor
+                                                        defaultValue={input.default_value || ''}
+                                                        onChange={(newValue) => {
+                                                            const ni = [...inputs];
+                                                            ni[idx].default_value = newValue;
+                                                            setInputs(ni);
+                                                        }}
+                                                    />
+                                                ) : input.type === 'input' ? (
                                                     <Textarea
                                                         value={input.default_value}
                                                         onChange={(e) => {
@@ -140,8 +269,7 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                                                         placeholder={
                                                             input.type === 'number' ? '0'
                                                                 : (input.type === 'select' || input.type === 'multi-select') ? 'option1, option2, option3'
-                                                                    : input.type === 'multi-input' ? 'key1, key2, key3'
-                                                                        : 'Default value...'
+                                                                    : 'Default value...'
                                                         }
                                                         className="h-8 text-[11px] border-border bg-background"
                                                     />

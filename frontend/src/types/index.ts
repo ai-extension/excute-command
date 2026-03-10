@@ -172,6 +172,13 @@ export interface WorkflowExecutionStep {
     finished_at?: string;
 }
 
+export interface MultiInputItem {
+    key: string;
+    label: string;
+    type: 'input' | 'number' | 'select';
+    options?: string; // Comma separated for select type
+}
+
 export interface WorkflowInput {
     id: string;
     workflow_id: string;
