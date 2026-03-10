@@ -270,6 +270,7 @@ type Workflow struct {
 	CreatedByUsername string             `json:"created_by_username,omitempty" gorm:"<-:create"`
 	CreatedAt         time.Time          `json:"created_at" gorm:"<-:create"`
 	UpdatedAt         time.Time          `json:"updated_at"`
+	IsPublic          bool               `json:"is_public" gorm:"default:false"`
 	DeletedAt         gorm.DeletedAt     `json:"-" gorm:"index"`
 }
 
@@ -448,7 +449,7 @@ type WorkflowRepository interface {
 	Create(wf *Workflow) error
 	GetByID(id uuid.UUID, scope *PermissionScope) (*Workflow, error)
 	List(namespaceID uuid.UUID, scope *PermissionScope) ([]Workflow, error)
-	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, tagIDs []uuid.UUID, isTemplate *bool, createdBy *uuid.UUID, scope *PermissionScope) ([]Workflow, int64, error)
+	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, tagIDs []uuid.UUID, isTemplate *bool, isPublic *bool, createdBy *uuid.UUID, scope *PermissionScope) ([]Workflow, int64, error)
 	ListGlobalPaginated(limit, offset int, searchTerm string, isTemplate *bool, scope *PermissionScope) ([]Workflow, int64, error)
 	Update(wf *Workflow) error
 	UpdateStatus(id uuid.UUID, status Status) error

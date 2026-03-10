@@ -1,6 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, ChevronRight, Zap, Settings, Play, Trash2 } from 'lucide-react';
+import {
+    Plus,
+    ChevronRight,
+    Zap,
+    Settings,
+    Play,
+    Trash2,
+    Layout,
+    Database,
+    History,
+    FileText,
+    Settings as SettingsIcon,
+    Globe,
+    Lock, SquareChartGantt
+} from 'lucide-react';
 import {
     Table,
     TableBody,
@@ -49,6 +63,7 @@ const WorkflowPage = () => {
     const [availableTags, setAvailableTags] = useState<Tag[]>([]);
     const [showTemplates, setShowTemplates] = useState(false);
     const [selectedCreatedBy, setSelectedCreatedBy] = useState<string | undefined>(undefined);
+    const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'public' | 'draft'>('all');
     const { users: availableUsers, fetchUsers } = useUsers();
 
     // Create workflow dialog state
@@ -76,8 +91,14 @@ const WorkflowPage = () => {
             const currentTagIds = tagIdsOverride !== undefined ? tagIdsOverride : selectedTagIds;
             const currentShowTemplates = templatesOverride !== undefined ? templatesOverride : showTemplates;
             const currentCreatedBy = selectedCreatedBy;
+            const currentVisibility = visibilityFilter;
 
             let url = `${API_BASE_URL}/namespaces/${activeNamespace.id}/workflows?limit=${limit}&offset=${offset}&is_template=${currentShowTemplates}`;
+            if (currentVisibility !== 'all') {
+                url += `&is_public=${currentVisibility === 'public'}`;
+            } else {
+                url += `&is_public=all`;
+            }
             if (currentSearch) url += `&search=${encodeURIComponent(currentSearch)}`;
             if (currentCreatedBy) url += `&created_by=${currentCreatedBy}`;
             if (currentTagIds.length > 0) {
@@ -253,12 +274,13 @@ const WorkflowPage = () => {
             fetchTags();
             fetchServers();
         }
-    }, [activeNamespace, limit, offset, searchTerm, selectedTagIds, showTemplates, selectedCreatedBy]);
+    }, [activeNamespace, limit, offset, searchTerm, selectedTagIds, showTemplates, selectedCreatedBy, visibilityFilter]);
 
     const handleApplyFilter = (search: string, filters: { [key: string]: any }) => {
         setSearchTerm(search);
         setSelectedTagIds(filters.tags || []);
         setSelectedCreatedBy(filters.createdBy);
+        setVisibilityFilter(filters.visibility || 'all');
         setOffset(0);
     };
 
@@ -307,7 +329,7 @@ const WorkflowPage = () => {
                                     <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
                                         <Button
                                             onClick={() => setIsCreateDialogOpen(true)}
-                                            className="px-4 rounded-xl premium-gradient font-black uppercase tracking-widest text-[10px] shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
+                                            className="h-8 px-4 rounded-xl premium-gradient font-black uppercase tracking-widest text-[9px] shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
                                         >
                                             <Plus className="w-3.5 h-3.5" />
                                             New Workflow
@@ -389,8 +411,18 @@ const WorkflowPage = () => {
                                 searchTerm={searchTerm}
                                 onSearchChange={setSearchTerm}
                                 onApply={handleApplyFilter}
-                                filters={{ tags: selectedTagIds, createdBy: selectedCreatedBy }}
+                                filters={{ tags: selectedTagIds, createdBy: selectedCreatedBy, visibility: visibilityFilter }}
                                 filterConfigs={[
+                                    {
+                                        key: 'visibility',
+                                        placeholder: 'Visibility',
+                                        type: 'single',
+                                        options: [
+                                            { label: 'All Status', value: 'all' },
+                                            { label: 'Public Only', value: 'public' },
+                                            { label: 'Draft Only', value: 'draft' }
+                                        ]
+                                    },
                                     {
                                         key: 'tags',
                                         placeholder: 'Tags',
@@ -424,6 +456,7 @@ const WorkflowPage = () => {
                                     setSearchTerm('');
                                     setSelectedTagIds([]);
                                     setSelectedCreatedBy(undefined);
+                                    setVisibilityFilter('all');
                                 }}
                             />
 
@@ -432,7 +465,7 @@ const WorkflowPage = () => {
                                     <TableHeader>
                                         <TableRow className="bg-muted hover:bg-muted/80 border-border">
                                             <TableHead className="w-[350px] h-12 font-black uppercase tracking-[0.15em] text-[9px] px-6 text-muted-foreground">Workflow Information</TableHead>
-                                            {!showTemplates && <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Status</TableHead>}
+                                            <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Execution</TableHead>
                                             <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Orchestration</TableHead>
                                             <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Created By</TableHead>
                                             <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Created At</TableHead>
@@ -455,12 +488,22 @@ const WorkflowPage = () => {
                                                     <div className="flex items-center gap-3">
                                                         <div className={cn(
                                                             "h-8 w-8 rounded-xl flex items-center justify-center shrink-0 border group-hover:scale-110 transition-all duration-500 shadow-sm",
-                                                            showTemplates ? "bg-amber-500/10 border-amber-500/20" : "bg-indigo-500/10 border-indigo-500/20"
+                                                            wf.is_public ? "bg-indigo-500/10 border-indigo-500/20" : "bg-amber-500/10 border-amber-500/20"
                                                         )}>
-                                                            <Zap className={cn("w-3.5 h-3.5", showTemplates ? "text-amber-500" : "text-indigo-500")} />
+                                                            <Zap className={cn("w-3.5 h-3.5", wf.is_public ? "text-indigo-500" : "text-amber-500")} />
                                                         </div>
                                                         <div>
-                                                            <p className="text-[13px] font-black tracking-tight group-hover:text-primary transition-colors">{wf.name}</p>
+                                                            <div className="flex items-center gap-2">
+                                                                <p className={cn(
+                                                                    "text-[13px] font-black tracking-tight transition-colors",
+                                                                    wf.is_public ? "group-hover:text-indigo-500" : "group-hover:text-amber-500"
+                                                                )}>{wf.name}</p>
+                                                                {wf.is_public ? (
+                                                                    <Globe className="w-3 h-3 text-indigo-500 opacity-60" />
+                                                                ) : (
+                                                                    <SquareChartGantt className="w-3 h-3 text-amber-500 opacity-60" />
+                                                                )}
+                                                            </div>
                                                             <p className="text-[10px] text-muted-foreground font-medium line-clamp-1 opacity-70 mb-1.5">
                                                                 {wf.description || 'No description provided'}
                                                             </p>
@@ -565,7 +608,7 @@ const WorkflowPage = () => {
                                             </TableRow>
                                         )) : (
                                             <TableRow>
-                                                <TableCell colSpan={showTemplates ? 5 : 6} className="h-48 text-center">
+                                                <TableCell colSpan={showTemplates ? 5 : 7} className="h-48 text-center">
                                                     <div className="flex flex-col items-center justify-center gap-3 opacity-30">
                                                         <Zap className="w-12 h-12" />
                                                         <p className="text-[11px] font-black uppercase tracking-widest">

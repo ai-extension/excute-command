@@ -121,6 +121,7 @@ export interface Workflow {
     target_folder?: string;
     cleanup_files?: boolean;
     is_template?: boolean;
+    is_public?: boolean;
     hooks?: WorkflowHook[];
     created_by?: string;
     created_by_username?: string;

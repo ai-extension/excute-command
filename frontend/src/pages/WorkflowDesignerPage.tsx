@@ -10,7 +10,10 @@ import {
     Play,
     Save,
     Clock,
-    Settings as SettingsIcon
+    Settings as SettingsIcon,
+    Globe,
+    Pencil,
+    Info
 } from 'lucide-react';
 import { DropResult } from '@hello-pangea/dnd';
 
@@ -39,6 +42,7 @@ import WorkflowHistory from '../components/WorkflowHistory';
 import { GeneralSettingsTab } from '../components/workflow-designer/GeneralSettingsTab';
 import { VariablesTab } from '../components/workflow-designer/VariablesTab';
 import { StepsBuilderTab } from '../components/workflow-designer/StepsBuilderTab';
+import { Switch } from '../components/ui/switch';
 
 const WorkflowDesignerPage = () => {
     const { id } = useParams();
@@ -65,6 +69,7 @@ const WorkflowDesignerPage = () => {
     const [error, setError] = useState<string | null>(null);
     const [openSettingsGroupIdx, setOpenSettingsGroupIdx] = useState<number | null>(null);
     const [isTemplate, setIsTemplate] = useState(false);
+    const [isPublic, setIsPublic] = useState(false);
     const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
     const copyToClipboard = (text: string, key: string) => {
@@ -171,6 +176,7 @@ const WorkflowDesignerPage = () => {
                 setTimeoutMinutes(data.timeout_minutes || 15);
                 setTags(data.tags || []);
                 setIsTemplate(!!data.is_template);
+                setIsPublic(!!data.is_public);
 
                 const cleanGroups = (data.groups || []).map((g: any) => {
                     const cleanedGroup = { ...g };
@@ -228,6 +234,7 @@ const WorkflowDesignerPage = () => {
                 cleanup_files: cleanupFiles,
                 timeout_minutes: timeoutMinutes,
                 is_template: isTemplate,
+                is_public: isPublic,
                 namespace_id: activeNamespace.id,
                 tags,
                 inputs: inputs.filter(i => i.key?.trim()),
@@ -377,33 +384,77 @@ const WorkflowDesignerPage = () => {
                     ) : (
                         <>
                             {/* Page Header */}
-                            <div className="flex items-center justify-between px-6 py-3 bg-card border-b border-border shadow-sm">
-                                <div className="flex items-center gap-4">
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => navigate('/workflows')}
-                                        className="h-9 w-9 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground"
-                                    >
-                                        <ChevronLeft className="w-5 h-5" />
-                                    </Button>
-                                    <div className="flex flex-col">
-                                        <div className="flex items-center gap-2">
-                                            <h1 className="text-sm font-bold tracking-tight text-foreground uppercase">
-                                                {id ? 'Modify Automation' : 'New Orchestration'}
-                                            </h1>
-                                            <Badge variant="outline" className="text-[9px] font-bold px-1.5 h-4 bg-primary/10 border-primary/20 text-primary">
-                                                {id ? 'v4' : 'Draft'}
-                                            </Badge>
+                            <div className="flex flex-col bg-card border-b border-border shadow-sm">
+                                {/* Row 1: Title & Main Actions */}
+                                <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/40">
+                                    <div className="flex items-center gap-3">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => navigate('/workflows')}
+                                            className="h-8 w-8 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground"
+                                        >
+                                            <ChevronLeft className="w-4 h-4" />
+                                        </Button>
+                                        <div className="flex flex-col">
+                                            <div className="flex items-center gap-2">
+                                                <h1 className="text-sm font-bold tracking-tight text-foreground uppercase">
+                                                    {id ? 'Modify Automation' : 'New Orchestration'}
+                                                </h1>
+                                                <Badge variant="outline" className="text-[9px] font-bold px-1.5 h-4 bg-primary/10 border-primary/20 text-primary">
+                                                    {id ? 'v4' : 'New'}
+                                                </Badge>
+                                            </div>
+                                            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest leading-none">
+                                                {name || 'Untitled Pipeline'}
+                                            </p>
                                         </div>
-                                        <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest leading-none">
-                                            {name || 'Untitled Pipeline'}
-                                        </p>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 px-2.5 py-1 bg-muted/40 rounded-lg border border-border/50 group/status transition-all hover:border-indigo-500/20 mr-1">
+                                            <div className="flex flex-col items-start">
+                                                <div className="flex items-center gap-2 mt-0.5">
+                                                    <Switch
+                                                        checked={isPublic}
+                                                        onCheckedChange={setIsPublic}
+                                                        className={cn(
+                                                            "scale-75 data-[state=checked]:bg-indigo-500 data-[state=unchecked]:bg-amber-500/50",
+                                                        )}
+                                                    />
+                                                    <span className={cn(
+                                                        "text-[9px] font-bold uppercase tracking-wider leading-none transition-colors",
+                                                        isPublic ? "text-indigo-500" : "text-amber-500"
+                                                    )}>
+                                                        {isPublic ? 'Public' : 'Draft'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {id && (
+                                            <Button
+                                                onClick={() => runWorkflow({ id: id as string, name, description, inputs: inputs as any, groups: groups as any })}
+                                                variant="outline"
+                                                className="h-8 px-3 rounded-lg border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-400 text-[9px] font-bold uppercase tracking-widest transition-all"
+                                            >
+                                                <Play className="w-3 h-3 mr-1.5" />
+                                                Run
+                                            </Button>
+                                        )}
+                                        <Button
+                                            onClick={handleSave}
+                                            disabled={isSaving}
+                                            className="premium-gradient text-white text-[9px] font-bold uppercase tracking-widest h-8 px-4 rounded-lg shadow-premium"
+                                        >
+                                            <Save className="w-3 h-3 mr-1.5" />
+                                            {isSaving ? 'Saving...' : 'Save Pipeline'}
+                                        </Button>
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-2">
-                                    <div className="flex p-0.5 bg-muted/50 rounded-lg border border-border mr-2">
+                                {/* Row 2: Navigation Tabs */}
+                                <div className="flex items-center justify-center px-4 py-1.5 bg-muted/10">
+                                    <div className="flex p-0.5 bg-muted/50 rounded-lg border border-border">
                                         <button
                                             onClick={() => setActiveTab('general')}
                                             className={cn(
@@ -461,24 +512,6 @@ const WorkflowDesignerPage = () => {
                                             </button>
                                         )}
                                     </div>
-                                    {id && (
-                                        <Button
-                                            onClick={() => runWorkflow({ id: id as string, name, description, inputs: inputs as any, groups: groups as any })}
-                                            variant="outline"
-                                            className="h-9 px-4 rounded-lg border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-400 text-[10px] font-bold uppercase tracking-widest transition-all"
-                                        >
-                                            <Play className="w-3.5 h-3.5 mr-2" />
-                                            Run
-                                        </Button>
-                                    )}
-                                    <Button
-                                        onClick={handleSave}
-                                        disabled={isSaving}
-                                        className="premium-gradient text-white text-[10px] font-bold uppercase tracking-widest h-9 px-6 rounded-lg shadow-premium"
-                                    >
-                                        <Save className="w-3.5 h-3.5 mr-2" />
-                                        {isSaving ? 'Saving...' : 'Save Pipeline'}
-                                    </Button>
                                 </div>
                             </div>
 
@@ -501,6 +534,8 @@ const WorkflowDesignerPage = () => {
                                             handleSearchServers={handleSearchServers}
                                             isTemplate={isTemplate}
                                             setIsTemplate={setIsTemplate}
+                                            isPublic={isPublic}
+                                            setIsPublic={setIsPublic}
                                         />
                                     ) : activeTab === 'variables' ? (
                                         <VariablesTab
@@ -577,7 +612,7 @@ const WorkflowDesignerPage = () => {
                                         <div className="animate-in fade-in slide-in-from-right-2 duration-300">
                                             <WorkflowHistory
                                                 workflowId={id as string}
-                                                onReRun={(wf, inputs, gId, sId, execId) => runWorkflow({ ...wf, id: id as string }, inputs, gId, sId, execId)}
+                                                onReRun={(wf: any, inputs: any, gId: any, sId: any, execId: any) => runWorkflow({ ...wf, id: id as string }, inputs, gId, sId, execId)}
                                             />
                                         </div>
                                     ) : null}

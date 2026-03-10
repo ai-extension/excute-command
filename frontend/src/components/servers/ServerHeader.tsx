@@ -48,7 +48,7 @@ export const ServerHeader: React.FC<ServerHeaderProps> = ({
                 </div>
                 <Button
                     onClick={onNewServer}
-                    className="px-4 rounded-xl premium-gradient font-black uppercase tracking-widest text-[10px] shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
+                    className="h-8 px-4 rounded-xl premium-gradient font-black uppercase tracking-widest text-[9px] shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
                 >
                     <Plus className="w-3.5 h-3.5" />
                     Deploy Host

@@ -61,6 +61,20 @@ func (h *WorkflowHandler) ListWorkflows(c *gin.Context) {
 		isTemplate = &val
 	}
 
+	var isPublic *bool
+	if ip := c.Query("is_public"); ip != "" {
+		if ip == "all" {
+			isPublic = nil
+		} else {
+			val := ip == "true"
+			isPublic = &val
+		}
+	} else {
+		// Default to public only as requested
+		defaultPublic := true
+		isPublic = &defaultPublic
+	}
+
 	currentUser, _ := c.Get("user")
 	user, _ := currentUser.(*domain.User)
 
@@ -71,7 +85,7 @@ func (h *WorkflowHandler) ListWorkflows(c *gin.Context) {
 		}
 	}
 
-	wfs, total, err := h.service.ListWorkflowsPaginated(nsID, limit, offset, searchTerm, tagIDs, isTemplate, createdBy, user)
+	wfs, total, err := h.service.ListWorkflowsPaginated(nsID, limit, offset, searchTerm, tagIDs, isTemplate, isPublic, createdBy, user)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

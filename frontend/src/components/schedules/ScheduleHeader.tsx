@@ -47,7 +47,7 @@ export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
                 </div>
                 <Button
                     onClick={onNewSchedule}
-                    className="h-9 px-4 rounded-xl premium-gradient text-[10px] font-black uppercase tracking-widest shadow-premium transition-all active:scale-95 gap-2"
+                    className="h-8 px-4 rounded-xl premium-gradient text-[9px] font-black uppercase tracking-widest shadow-premium transition-all active:scale-95 gap-2"
                 >
                     <Plus className="w-3.5 h-3.5" />
                     New Schedule

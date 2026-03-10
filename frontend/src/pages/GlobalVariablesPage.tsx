@@ -195,8 +195,8 @@ const GlobalVariablesPage = () => {
                     if (!open) setFormData({ key: '', value: '', description: '' });
                 }}>
                     <DialogTrigger asChild>
-                        <Button className="premium-gradient font-black uppercase tracking-widest text-[10px] px-4 shadow-premium rounded-xl gap-2">
-                            <Plus className="w-4 h-4" /> Add Global Variable
+                        <Button className="h-8 premium-gradient font-black uppercase tracking-widest text-[9px] px-4 shadow-premium rounded-xl gap-2">
+                            <Plus className="w-3.5 h-3.5" /> Add Global Variable
                         </Button>
                     </DialogTrigger>
                     <DialogContent className="sm:max-w-[425px]">

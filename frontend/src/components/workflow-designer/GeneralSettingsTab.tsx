@@ -1,5 +1,15 @@
 import React from 'react';
-import { Zap, Server, Layers } from 'lucide-react';
+import {
+    ChevronRight,
+    Search,
+    Clock,
+    Layers,
+    Globe,
+    Lock,
+    Zap,
+    Server
+} from 'lucide-react';
+import { cn } from '../../lib/utils';
 import { Input } from '../ui/input';
 import { TagSelector } from '../TagSelector';
 import { SearchableSelect } from '../SearchableSelect';
@@ -22,13 +32,16 @@ interface GeneralSettingsTabProps {
     handleSearchServers: (query: string) => void;
     isTemplate: boolean;
     setIsTemplate: (val: boolean) => void;
+    isPublic: boolean;
+    setIsPublic: (val: boolean) => void;
 }
 
 export const GeneralSettingsTab: React.FC<GeneralSettingsTabProps> = ({
     name, setName, description, setDescription,
     timeoutMinutes, setTimeoutMinutes, tags, setTags,
     availableServers, defaultServerId, setDefaultServerId,
-    handleSearchServers, isTemplate, setIsTemplate
+    handleSearchServers, isTemplate, setIsTemplate,
+    isPublic, setIsPublic
 }) => {
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-right-2 duration-300">
@@ -106,20 +119,46 @@ export const GeneralSettingsTab: React.FC<GeneralSettingsTabProps> = ({
                     </div>
                 </div>
 
-                {/* Template Section */}
+                {/* Template & Status Section */}
                 <div className="col-span-12 space-y-4 border-t border-border/50 pt-4">
                     <div className="flex items-center gap-3 mb-2">
                         <div className="p-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-500">
                             <Layers className="w-4 h-4" />
                         </div>
-                        <h2 className="text-sm font-bold text-foreground uppercase tracking-tight">Template Status</h2>
+                        <h2 className="text-sm font-bold text-foreground uppercase tracking-tight">Status & Visibility</h2>
                     </div>
-                    <div className="bg-card p-6 rounded-xl border border-border flex items-center justify-between">
-                        <div className="space-y-1 w-3/4">
-                            <h3 className="text-[12px] font-black uppercase tracking-widest text-primary">Library Template</h3>
-                            <p className="text-[10px] text-muted-foreground font-medium">Enable this option to publish this workflow into the Template Library. This allows other users across namespaces to clone it as a starting point for their own automations.</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="bg-card p-6 rounded-xl border border-border flex items-center justify-between">
+                            <div className="space-y-1 w-3/4">
+                                <h3 className="text-[12px] font-black uppercase tracking-widest text-primary">Library Template</h3>
+                                <p className="text-[10px] text-muted-foreground font-medium">Enable to publish this workflow into the Template Library for others to clone.</p>
+                            </div>
+                            <Switch checked={isTemplate} onCheckedChange={setIsTemplate} />
                         </div>
-                        <Switch checked={isTemplate} onCheckedChange={setIsTemplate} />
+                        <div className={cn(
+                            "p-6 rounded-xl border transition-all duration-300 flex items-center justify-between",
+                            isPublic
+                                ? "bg-indigo-500/5 border-indigo-500/20 shadow-[0_0_15px_-5px_rgba(99,102,241,0.1)]"
+                                : "bg-card border-border"
+                        )}>
+                            <div className="space-y-1 w-3/4">
+                                <div className="flex items-center gap-2">
+                                    <h3 className={cn(
+                                        "text-[12px] font-black uppercase tracking-widest transition-colors",
+                                        isPublic ? "text-indigo-500" : "text-amber-500"
+                                    )}>
+                                        {isPublic ? 'Public Status' : 'Draft Status'}
+                                    </h3>
+                                    {isPublic ? <Globe className="w-3 h-3 text-indigo-500" /> : <Lock className="w-3 h-3 text-amber-500" />}
+                                </div>
+                                <p className="text-[10px] text-muted-foreground font-medium">Draft workflows are hidden from some views. Mark as Public when ready for general use.</p>
+                            </div>
+                            <Switch
+                                checked={isPublic}
+                                onCheckedChange={setIsPublic}
+                                className="data-[state=checked]:bg-indigo-500 data-[state=unchecked]:bg-amber-500/50"
+                            />
+                        </div>
                     </div>
                 </div>
             </div>

@@ -74,7 +74,7 @@ func (s *DashboardService) getStats(namespaceID uuid.UUID, user *domain.User, is
 	if isGlobal {
 		wfs, wfTotal, _ = s.wfRepo.ListGlobalPaginated(6, 0, "", nil, &wfScope)
 	} else {
-		wfs, wfTotal, _ = s.wfRepo.ListPaginated(namespaceID, 6, 0, "", nil, nil, nil, &wfScope)
+		wfs, wfTotal, _ = s.wfRepo.ListPaginated(namespaceID, 6, 0, "", nil, nil, nil, nil, &wfScope)
 	}
 	stats.Workflows = StatsResult{Total: wfTotal, Items: wfs}
 
