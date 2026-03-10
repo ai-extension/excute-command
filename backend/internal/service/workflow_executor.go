@@ -1153,11 +1153,83 @@ func (e *WorkflowExecutor) runWorkflowStep(ctx context.Context, step *domain.Wor
 	pcontext := e.getInterpolationContext(inputs, variables, groupResults, namespaceID, user)
 	resolvedInputs := make(map[string]string)
 	for k, v := range rawInputs {
-		rendered, err := e.renderTemplate(v, pcontext)
-		if err != nil {
-			rendered = v // fallback to raw value on error
+		// New JSON-based Foreach logic
+		var foreachData struct {
+			Type     string      `json:"_type"`
+			Source   string      `json:"source"`
+			Template interface{} `json:"template"`
 		}
-		resolvedInputs[k] = rendered
+		isForeach := false
+		if strings.HasPrefix(v, "{") && strings.Contains(v, "\"_type\":\"foreach\"") {
+			if err := json.Unmarshal([]byte(v), &foreachData); err == nil && foreachData.Type == "foreach" {
+				isForeach = true
+			}
+		}
+
+		if isForeach {
+			// 1. Render source variable to get the array
+			sourceJson, err := e.renderTemplate(foreachData.Source, pcontext)
+			if err != nil {
+				resolvedInputs[k] = "[]"
+				continue
+			}
+
+			// 2. Parse sourceJson as array
+			var items []interface{}
+			if err := json.Unmarshal([]byte(sourceJson), &items); err != nil {
+				// Fallback: try comma-separated if not JSON
+				if sourceJson != "" {
+					parts := strings.Split(sourceJson, ",")
+					for _, p := range parts {
+						items = append(items, strings.TrimSpace(p))
+					}
+				}
+			}
+
+			// 3. Render template for each item
+			var results []interface{}
+			for _, item := range items {
+				// Create sub-context
+				subContext := make(pongo2.Context)
+				for pk, pv := range pcontext {
+					subContext[pk] = pv
+				}
+				subContext["item"] = item
+
+				// Determine template string based on type (string for multi-select, map for multi-input)
+				switch t := foreachData.Template.(type) {
+				case string:
+					rendered, err := e.renderTemplate(t, subContext)
+					if err != nil || strings.TrimSpace(rendered) == "" {
+						results = append(results, item)
+					} else {
+						results = append(results, strings.TrimSpace(rendered))
+					}
+				case map[string]interface{}:
+					// For multi-input, we iterate over keys and render each
+					row := make(map[string]interface{})
+					for tk, tv := range t {
+						if tvStr, ok := tv.(string); ok {
+							rendered, _ := e.renderTemplate(tvStr, subContext)
+							row[tk] = strings.TrimSpace(rendered)
+						} else {
+							row[tk] = tv
+						}
+					}
+					results = append(results, row)
+				default:
+					results = append(results, item)
+				}
+			}
+			finalJson, _ := json.Marshal(results)
+			resolvedInputs[k] = string(finalJson)
+		} else {
+			rendered, err := e.renderTemplate(v, pcontext)
+			if err != nil {
+				rendered = v // fallback to raw value on error
+			}
+			resolvedInputs[k] = rendered
+		}
 	}
 
 	hookExecID := uuid.New()

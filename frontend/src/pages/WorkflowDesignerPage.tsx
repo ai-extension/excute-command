@@ -73,6 +73,29 @@ const WorkflowDesignerPage = () => {
         setTimeout(() => setCopiedKey(null), 2000);
     };
 
+    const handleSearchWorkflows = async (query: string) => {
+        if (!activeNamespace) return;
+        try {
+            const url = `${API_BASE_URL}/namespaces/${activeNamespace.id}/workflows?limit=50&search=${encodeURIComponent(query)}`;
+            const response = await apiFetch(url);
+            if (!response.ok) throw new Error(`Search failed: ${response.status}`);
+            const data = await response.json();
+            const items = data.items || (Array.isArray(data) ? data : []);
+
+            setAllWorkflows(prev => {
+                const existing = new Map(prev.map(w => [w.id, w]));
+                items.forEach((w: Workflow) => {
+                    if (w.id !== id) { // Don't include the current workflow
+                        existing.set(w.id, w);
+                    }
+                });
+                return Array.from(existing.values());
+            });
+        } catch (error) {
+            console.error('Failed to search workflows:', error);
+        }
+    };
+
     const handleSearchServers = async (query: string) => {
         try {
             const url = `${API_BASE_URL}/servers?limit=50&search=${encodeURIComponent(query)}`;
@@ -491,6 +514,7 @@ const WorkflowDesignerPage = () => {
                                             handleDragEnd={handleDragEnd}
                                             handleAddGroup={handleAddGroup}
                                             handleSearchServers={handleSearchServers}
+                                            handleSearchWorkflows={handleSearchWorkflows}
                                             id={id}
                                         />
                                     ) : activeTab === 'files' ? (

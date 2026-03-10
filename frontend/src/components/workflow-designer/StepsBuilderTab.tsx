@@ -27,12 +27,17 @@ interface StepsBuilderTabProps {
     handleDragEnd: (result: DropResult) => void;
     handleAddGroup: () => void;
     handleSearchServers: (query: string) => void;
+    handleSearchWorkflows: (query: string) => void;
     id: string | undefined;
 }
 
 export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
     groups, setGroups, availableServers, allWorkflows,
-    handleDragEnd, handleAddGroup, handleSearchServers, id
+    handleDragEnd,
+    handleAddGroup,
+    handleSearchServers,
+    handleSearchWorkflows,
+    id
 }) => {
     const [openSettingsGroupIdx, setOpenSettingsGroupIdx] = useState<number | null>(null);
 
@@ -471,21 +476,24 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                         <div className="space-y-2">
                                                                                             <div className="space-y-1">
                                                                                                 <label className="text-[8px] font-bold uppercase tracking-widest text-indigo-500">Target Workflow</label>
-                                                                                                <select
+                                                                                                <SearchableSelect
+                                                                                                    options={allWorkflows.filter(w => w.id !== id).map(w => ({
+                                                                                                        label: w.name,
+                                                                                                        value: w.id
+                                                                                                    }))}
                                                                                                     value={step.target_workflow_id || ''}
-                                                                                                    onChange={(e) => {
+                                                                                                    onValueChange={(val) => {
                                                                                                         const ng = [...groups];
-                                                                                                        ng[gIdx]!.steps![sIdx].target_workflow_id = e.target.value || undefined;
+                                                                                                        ng[gIdx]!.steps![sIdx].target_workflow_id = val || undefined;
                                                                                                         ng[gIdx]!.steps![sIdx].target_workflow_inputs = undefined;
                                                                                                         setGroups(ng);
                                                                                                     }}
-                                                                                                    className="h-8 px-2 w-full text-[11px] font-semibold border border-indigo-500/30 rounded-md bg-background text-foreground outline-none focus:ring-1 focus:ring-indigo-500/30 cursor-pointer"
-                                                                                                >
-                                                                                                    <option value="">— Select workflow —</option>
-                                                                                                    {allWorkflows.filter(w => w.id !== id).map(w => (
-                                                                                                        <option key={w.id} value={w.id}>{w.name}</option>
-                                                                                                    ))}
-                                                                                                </select>
+                                                                                                    isSearchable
+                                                                                                    onSearch={handleSearchWorkflows}
+                                                                                                    placeholder="— Select workflow —"
+                                                                                                    searchPlaceholder="Search workflows..."
+                                                                                                    triggerClassName="h-8 px-2 w-full text-[11px] font-semibold border-indigo-500/30 rounded-md bg-background text-foreground"
+                                                                                                />
                                                                                             </div>
                                                                                             {/* Dynamic inputs for selected target workflow */}
                                                                                             {(() => {
@@ -527,40 +535,81 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                                 );
                                                                                                             }
 
+                                                                                                            const isForeach = (() => { try { const p = JSON.parse(val); return p?._type === 'foreach'; } catch { return false; } })();
+                                                                                                            const foreachVal = isForeach ? JSON.parse(val) : { _type: 'foreach', source: '', template: inp.type === 'multi-input' ? {} : '' };
+
                                                                                                             return (
                                                                                                                 <div key={inp.key} className="space-y-1">
                                                                                                                     <div className="flex items-center justify-between">
                                                                                                                         <span className="text-[9px] font-mono text-muted-foreground truncate" title={inp.label || inp.key}>{inp.label || inp.key}</span>
-                                                                                                                        <DropdownMenu>
-                                                                                                                            <DropdownMenuTrigger asChild>
-                                                                                                                                <button className="text-[7px] font-black uppercase tracking-widest text-indigo-500/50 hover:text-indigo-500 transition-colors">
-                                                                                                                                    Use Variable
-                                                                                                                                </button>
-                                                                                                                            </DropdownMenuTrigger>
-                                                                                                                            <DropdownMenuContent align="end" className="w-48 bg-card border-indigo-500/20">
-                                                                                                                                <DropdownMenuLabel className="text-[9px] uppercase tracking-widest opacity-50">Parent Inputs</DropdownMenuLabel>
-                                                                                                                                {parentInputs.length === 0 ? (
-                                                                                                                                    <DropdownMenuItem disabled className="text-[10px]">No inputs available</DropdownMenuItem>
-                                                                                                                                ) : (
-                                                                                                                                    parentInputs.map(pInp => {
-                                                                                                                                        const isComplex = pInp.type === 'multi-select' || pInp.type === 'multi-input';
-                                                                                                                                        const varName = isComplex ? `{{input.${pInp.key} | json}}` : `{{input.${pInp.key}}}`;
-                                                                                                                                        return (
-                                                                                                                                            <DropdownMenuItem
-                                                                                                                                                key={pInp.key}
-                                                                                                                                                onClick={() => updateInput(varName)}
-                                                                                                                                                className="text-[10px] font-mono cursor-pointer"
-                                                                                                                                            >
-                                                                                                                                                input.{pInp.key}{isComplex && <span className="ml-1 opacity-50">| json</span>}
-                                                                                                                                            </DropdownMenuItem>
-                                                                                                                                        );
-                                                                                                                                    })
+                                                                                                                        {(inp.type === 'multi-select' || inp.type === 'multi-input') && (
+                                                                                                                            <button
+                                                                                                                                onClick={() => {
+                                                                                                                                    if (isForeach) {
+                                                                                                                                        updateInput('[]');
+                                                                                                                                    } else {
+                                                                                                                                        updateInput(JSON.stringify({ _type: 'foreach', source: '', template: inp.type === 'multi-input' ? {} : '' }));
+                                                                                                                                    }
+                                                                                                                                }}
+                                                                                                                                className={cn(
+                                                                                                                                    "text-[7px] font-black uppercase tracking-widest transition-colors",
+                                                                                                                                    isForeach ? "text-amber-500" : "text-indigo-500/50 hover:text-indigo-500"
                                                                                                                                 )}
-                                                                                                                            </DropdownMenuContent>
-                                                                                                                        </DropdownMenu>
+                                                                                                                            >
+                                                                                                                                {isForeach ? 'Exit Variable' : 'Use Variable'}
+                                                                                                                            </button>
+                                                                                                                        )}
                                                                                                                     </div>
 
-                                                                                                                    {inp.type === 'select' ? (
+                                                                                                                    {isForeach ? (
+                                                                                                                        <div className="space-y-2 bg-amber-500/5 p-2 rounded border border-amber-500/20">
+                                                                                                                            <div className="space-y-1">
+                                                                                                                                <label className="text-[7px] font-bold text-amber-500 uppercase">Foreach Array</label>
+                                                                                                                                <Input
+                                                                                                                                    value={foreachVal.source || ''}
+                                                                                                                                    onChange={(e) => {
+                                                                                                                                        updateInput(JSON.stringify({ ...foreachVal, source: e.target.value }));
+                                                                                                                                    }}
+                                                                                                                                    placeholder="{{input.my_array}}"
+                                                                                                                                    className="h-7 text-[10px] font-mono border-amber-500/20 bg-background"
+                                                                                                                                />
+                                                                                                                            </div>
+                                                                                                                            <div className="space-y-1">
+                                                                                                                                <label className="text-[7px] font-bold text-amber-500 uppercase">Item Template (use {"{{item}}"})</label>
+                                                                                                                                {inp.type === 'multi-input' ? (
+                                                                                                                                    <div className="space-y-2 p-2 bg-background/50 border border-amber-500/10 rounded">
+                                                                                                                                        {(inp.default_value || '').split(',').map(k => k.trim()).filter(Boolean).map(key => {
+                                                                                                                                            const currentVal = typeof foreachVal.template === 'object' ? (foreachVal.template[key] || '') : '';
+
+                                                                                                                                            return (
+                                                                                                                                                <div key={key} className="flex items-center gap-1">
+                                                                                                                                                    <span className="text-[7px] font-bold text-amber-500/70 w-12 truncate">{key}</span>
+                                                                                                                                                    <Input
+                                                                                                                                                        value={currentVal}
+                                                                                                                                                        onChange={(e) => {
+                                                                                                                                                            const newTemplate = { ...(typeof foreachVal.template === 'object' ? foreachVal.template : {}), [key]: e.target.value };
+                                                                                                                                                            updateInput(JSON.stringify({ ...foreachVal, template: newTemplate }));
+                                                                                                                                                        }}
+                                                                                                                                                        className="h-6 text-[9px] border-amber-500/20 bg-background"
+                                                                                                                                                        placeholder={`"{{item}}"`}
+                                                                                                                                                    />
+                                                                                                                                                </div>
+                                                                                                                                            );
+                                                                                                                                        })}
+                                                                                                                                    </div>
+                                                                                                                                ) : (
+                                                                                                                                    <Input
+                                                                                                                                        value={typeof foreachVal.template === 'string' ? foreachVal.template : ''}
+                                                                                                                                        onChange={(e) => {
+                                                                                                                                            updateInput(JSON.stringify({ ...foreachVal, template: e.target.value }));
+                                                                                                                                        }}
+                                                                                                                                        placeholder="{{item}}"
+                                                                                                                                        className="h-7 text-[10px] font-mono border-amber-500/20 bg-background"
+                                                                                                                                    />
+                                                                                                                                )}
+                                                                                                                            </div>
+                                                                                                                        </div>
+                                                                                                                    ) : inp.type === 'select' ? (
                                                                                                                         <select
                                                                                                                             value={val}
                                                                                                                             onChange={(e) => updateInput(e.target.value)}
@@ -734,8 +783,8 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                             </div>
                         )}
                     </Droppable>
-                </DragDropContext>
+                </DragDropContext >
             )}
-        </div>
+        </div >
     );
 };
