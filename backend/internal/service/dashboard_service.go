@@ -82,9 +82,9 @@ func (s *DashboardService) getStats(namespaceID uuid.UUID, user *domain.User, is
 	var execs []domain.WorkflowExecution
 	var execTotal int64
 	if isGlobal {
-		execs, execTotal, _ = s.execRepo.ListGlobalPaginated(20, 0, "ALL", nil, nil, &wfScope)
+		execs, execTotal, _ = s.execRepo.ListGlobalPaginated(20, 0, "ALL", nil, nil, nil, &wfScope)
 	} else {
-		execs, execTotal, _ = s.execRepo.ListByNamespaceIDPaginated(namespaceID, 20, 0, "ALL", nil, nil, &wfScope)
+		execs, execTotal, _ = s.execRepo.ListByNamespaceIDPaginated(namespaceID, 20, 0, "ALL", nil, nil, nil, &wfScope)
 	}
 
 	success := 0
@@ -121,7 +121,7 @@ func (s *DashboardService) getStats(namespaceID uuid.UUID, user *domain.User, is
 	var schedules []domain.Schedule
 	var schTotal int64
 	if isGlobal {
-		schedules, schTotal, _ = s.scheduleRepo.ListGlobalPaginated(5, 0, "", &schScope)
+		schedules, schTotal, _ = s.scheduleRepo.ListGlobalPaginated(5, 0, "", nil, &schScope)
 	} else {
 		schedules, schTotal, _ = s.scheduleRepo.ListPaginated(namespaceID, 5, 0, "", nil, nil, &schScope)
 	}

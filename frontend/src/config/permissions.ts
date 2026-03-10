@@ -8,7 +8,9 @@
 // to automatically grant visibility to the corresponding menu items.
 export const TAGGABLE_RESOURCES = [
     'workflows',
-    'schedules'
+    'schedules',
+    'pages',
+    'history'
 ];
 
 // Define which resource types are scoped within a namespace.

@@ -5,7 +5,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
 import { cn } from '../lib/utils';
-import { Page } from '../types';
+import { Page, Tag } from '../types';
 import { useNamespace } from '../context/NamespaceContext';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../lib/api';
@@ -25,6 +25,8 @@ const PagesListPage = () => {
     const [error, setError] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [visibilityFilter, setVisibilityFilter] = useState<string>('ALL');
+    const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+    const [availableTags, setAvailableTags] = useState<Tag[]>([]);
     const [selectedCreatedBy, setSelectedCreatedBy] = useState<string | undefined>(undefined);
     const { users: availableUsers, fetchUsers } = useUsers();
 
@@ -48,6 +50,11 @@ const PagesListPage = () => {
             }
             if (selectedCreatedBy) url += `&created_by=${selectedCreatedBy}`;
             if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
+            if (selectedTagIds.length > 0) {
+                selectedTagIds.forEach(id => {
+                    url += `&tag_ids=${id}`;
+                });
+            }
 
             const response = await apiFetch(url);
             if (!response.ok) {
@@ -64,13 +71,30 @@ const PagesListPage = () => {
         }
     };
 
+    const fetchTags = async (search?: string) => {
+        if (!activeNamespace) return;
+        try {
+            let url = `${API_BASE_URL}/namespaces/${activeNamespace.id}/tags?limit=20`;
+            if (search) url += `&search=${encodeURIComponent(search)}`;
+            const response = await apiFetch(url);
+            const data = await response.json();
+            setAvailableTags(data.items || (Array.isArray(data) ? data : []));
+        } catch (error) {
+            console.error('Failed to fetch tags:', error);
+        }
+    };
+
     useEffect(() => {
-        fetchPages();
-    }, [activeNamespace, offset, limit, searchQuery, visibilityFilter, selectedCreatedBy]);
+        if (activeNamespace) {
+            fetchPages();
+            fetchTags();
+        }
+    }, [activeNamespace, offset, limit, searchQuery, visibilityFilter, selectedCreatedBy, selectedTagIds]);
 
     const handleApplyFilter = (search: string, filters: { [key: string]: any }) => {
         setSearchQuery(search);
         setVisibilityFilter(filters.visibility || 'ALL');
+        setSelectedTagIds(filters.tags || []);
         setSelectedCreatedBy(filters.createdBy);
         setOffset(0);
     };
@@ -128,21 +152,30 @@ const PagesListPage = () => {
 
     return (
         <div className="flex flex-col h-full space-y-5 animate-in fade-in duration-500">
-            {/* Breadcrumb */}
-            <div className="flex items-center gap-2 px-1">
-                <Layout className="w-3.5 h-3.5 text-primary" />
-                <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em]">
-                    <span className="text-primary">Automations</span>
-                    <ChevronRight className="w-2.5 h-2.5 text-muted-foreground/30" />
-                    <span className="text-muted-foreground font-black">Pages</span>
+            {/* Header */}
+            <div className="flex items-center justify-between px-1">
+                <div className="flex items-center gap-2">
+                    <Layout className="w-3.5 h-3.5 text-primary" />
+                    <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em]">
+                        <span className="text-primary">Automations</span>
+                        <ChevronRight className="w-2.5 h-2.5 text-muted-foreground/30" />
+                        <span className="text-muted-foreground font-black">Pages</span>
+                    </div>
                 </div>
+                <Button
+                    onClick={handleCreatePage}
+                    className="px-4 rounded-xl premium-gradient font-black uppercase tracking-widest text-[10px] shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
+                >
+                    <Plus className="w-3.5 h-3.5" />
+                    New Page
+                </Button>
             </div>
 
             <ResourceFilters
                 searchTerm={searchQuery}
                 onSearchChange={setSearchQuery}
                 onApply={handleApplyFilter}
-                filters={{ visibility: visibilityFilter, createdBy: selectedCreatedBy }}
+                filters={{ visibility: visibilityFilter, createdBy: selectedCreatedBy, tags: selectedTagIds }}
                 filterConfigs={[
                     {
                         key: 'visibility',
@@ -166,6 +199,15 @@ const PagesListPage = () => {
                             ...availableUsers.map(u => ({ label: u.username.toUpperCase(), value: u.id }))
                         ],
                         width: 'w-48'
+                    },
+                    {
+                        key: 'tags',
+                        placeholder: 'TAGS',
+                        type: 'multi',
+                        isSearchable: true,
+                        onSearch: (query: string) => fetchTags(query),
+                        options: availableTags.map(t => ({ label: t.name.toUpperCase(), value: t.id })),
+                        width: 'w-48'
                     }
                 ]}
                 searchPlaceholder="Search pages by title or slug..."
@@ -173,17 +215,10 @@ const PagesListPage = () => {
                 onReset={() => {
                     setSearchQuery('');
                     setVisibilityFilter('ALL');
+                    setSelectedTagIds([]);
                     setSelectedCreatedBy(undefined);
                 }}
-                primaryAction={
-                    <Button
-                        onClick={handleCreatePage}
-                        className="px-4 rounded-xl premium-gradient font-black uppercase tracking-widest text-[10px] shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
-                    >
-                        <Plus className="w-3.5 h-3.5" />
-                        New Page
-                    </Button>
-                }
+                primaryAction={null}
             />
 
             {isLoading && pages.length === 0 ? (
@@ -237,6 +272,19 @@ const PagesListPage = () => {
                                                 </Badge>
                                             )}
                                         </div>
+                                        {page.tags && page.tags.length > 0 && (
+                                            <div className="flex flex-wrap gap-1 mt-1.5 px-0.5">
+                                                {page.tags.map(tag => (
+                                                    <span
+                                                        key={tag.id}
+                                                        className="px-1.5 py-0.5 rounded text-[8px] font-bold border"
+                                                        style={{ backgroundColor: `${tag.color}20`, color: tag.color, borderColor: `${tag.color}40` }}
+                                                    >
+                                                        {tag.name}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => navigate(`/pages/${page.id}/edit`)}>

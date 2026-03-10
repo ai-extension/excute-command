@@ -306,7 +306,14 @@ func (h *WorkflowHandler) ListExecutions(c *gin.Context) {
 	userVal, _ := c.Get("user")
 	user := userVal.(*domain.User)
 
-	execs, total, err := h.service.ListExecutionsPaginated(id, limit, offset, executedBy, user)
+	var tagIDs []uuid.UUID
+	for _, idStr := range c.QueryArray("tag_ids") {
+		if id, err := uuid.Parse(idStr); err == nil {
+			tagIDs = append(tagIDs, id)
+		}
+	}
+
+	execs, total, err := h.service.ListExecutionsPaginated(id, limit, offset, executedBy, tagIDs, user)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -353,7 +360,14 @@ func (h *WorkflowHandler) ListAllExecutions(c *gin.Context) {
 	userVal, _ := c.Get("user")
 	user := userVal.(*domain.User)
 
-	execs, total, err := h.service.ListNamespaceExecutionsPaginated(nsID, limit, offset, status, workflowID, executedBy, user)
+	var tagIDs []uuid.UUID
+	for _, idStr := range c.QueryArray("tag_ids") {
+		if id, err := uuid.Parse(idStr); err == nil {
+			tagIDs = append(tagIDs, id)
+		}
+	}
+
+	execs, total, err := h.service.ListNamespaceExecutionsPaginated(nsID, limit, offset, status, workflowID, executedBy, tagIDs, user)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -23,7 +23,7 @@ func (r *PostgresPageRepo) Create(page *domain.Page) error {
 
 func (r *PostgresPageRepo) GetByID(id uuid.UUID, scope *domain.PermissionScope) (*domain.Page, error) {
 	var page domain.Page
-	db := applyScope(r.db, scope, "", "")
+	db := applyScope(r.db, scope, "page_tags", "page_id")
 	err := db.
 		Preload("Workflows", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
 		Preload("Workflows.Workflow").
@@ -50,7 +50,7 @@ func (r *PostgresPageRepo) GetBySlug(slug string) (*domain.Page, error) {
 
 func (r *PostgresPageRepo) List(namespaceID uuid.UUID, scope *domain.PermissionScope) ([]domain.Page, error) {
 	var pages []domain.Page
-	db := applyScope(r.db, scope, "", "")
+	db := applyScope(r.db, scope, "page_tags", "page_id")
 	err := db.
 		Preload("Workflows", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
 		Preload("Workflows.Workflow").
@@ -64,10 +64,10 @@ func (r *PostgresPageRepo) List(namespaceID uuid.UUID, scope *domain.PermissionS
 	return pages, nil
 }
 
-func (r *PostgresPageRepo) ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, isPublic *bool, createdBy *uuid.UUID, scope *domain.PermissionScope) ([]domain.Page, int64, error) {
+func (r *PostgresPageRepo) ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, isPublic *bool, createdBy *uuid.UUID, tagIDs []uuid.UUID, scope *domain.PermissionScope) ([]domain.Page, int64, error) {
 	var pages []domain.Page
 	var total int64
-	db := applyScope(r.db, scope, "", "").Where("namespace_id = ?", namespaceID)
+	db := applyScope(r.db, scope, "page_tags", "page_id").Where("namespace_id = ?", namespaceID)
 
 	if searchTerm != "" {
 		s := "%" + searchTerm + "%"
@@ -80,6 +80,10 @@ func (r *PostgresPageRepo) ListPaginated(namespaceID uuid.UUID, limit, offset in
 
 	if createdBy != nil {
 		db = db.Where("created_by = ?", createdBy)
+	}
+
+	if len(tagIDs) > 0 {
+		db = db.Where("id IN (SELECT page_id FROM page_tags WHERE tag_id IN ?)", tagIDs)
 	}
 
 	if err := db.Model(&domain.Page{}).Count(&total).Error; err != nil {
@@ -95,10 +99,10 @@ func (r *PostgresPageRepo) ListPaginated(namespaceID uuid.UUID, limit, offset in
 	return pages, total, err
 }
 
-func (r *PostgresPageRepo) ListGlobalPaginated(limit, offset int, searchTerm string, isPublic *bool, scope *domain.PermissionScope) ([]domain.Page, int64, error) {
+func (r *PostgresPageRepo) ListGlobalPaginated(limit, offset int, searchTerm string, isPublic *bool, tagIDs []uuid.UUID, scope *domain.PermissionScope) ([]domain.Page, int64, error) {
 	var pages []domain.Page
 	var total int64
-	db := applyScope(r.db, scope, "", "") // Pages don't have tags in this schema
+	db := applyScope(r.db, scope, "page_tags", "page_id")
 	db = db.Model(&domain.Page{})
 
 	if searchTerm != "" {
@@ -107,6 +111,10 @@ func (r *PostgresPageRepo) ListGlobalPaginated(limit, offset int, searchTerm str
 
 	if isPublic != nil {
 		db = db.Where("is_public = ?", *isPublic)
+	}
+
+	if len(tagIDs) > 0 {
+		db = db.Where("id IN (SELECT page_id FROM page_tags WHERE tag_id IN ?)", tagIDs)
 	}
 
 	if err := db.Count(&total).Error; err != nil {
@@ -119,20 +127,13 @@ func (r *PostgresPageRepo) ListGlobalPaginated(limit, offset int, searchTerm str
 
 func (r *PostgresPageRepo) Update(page *domain.Page) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		// Sync Workflows
-		if err := tx.Where("page_id = ?", page.ID).Delete(&domain.PageWorkflow{}).Error; err != nil {
+		// Sync Tags
+		if err := tx.Model(page).Association("Tags").Replace(page.Tags); err != nil {
 			return err
-		}
-		for i := range page.Workflows {
-			page.Workflows[i].ID = uuid.New()
-			page.Workflows[i].PageID = page.ID
-			if err := tx.Omit("Workflow").Create(&page.Workflows[i]).Error; err != nil {
-				return err
-			}
 		}
 
 		// Update top-level fields
-		return tx.Omit("Workflows").Save(page).Error
+		return tx.Omit("Workflows", "Tags").Save(page).Error
 	})
 }
 

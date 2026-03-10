@@ -180,14 +180,74 @@ const GlobalVariablesPage = () => {
 
     return (
         <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            {/* Breadcrumb */}
-            <div className="flex items-center gap-2 px-1">
-                <Globe className="w-3.5 h-3.5 text-primary" />
-                <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em]">
-                    <span className="text-primary">Settings</span>
-                    <ChevronRight className="w-2.5 h-2.5 text-muted-foreground/30" />
-                    <span className="text-muted-foreground font-black">Global Variables</span>
+            {/* Header */}
+            <div className="flex items-center justify-between px-1">
+                <div className="flex items-center gap-2">
+                    <Globe className="w-3.5 h-3.5 text-primary" />
+                    <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em]">
+                        <span className="text-primary">Settings</span>
+                        <ChevronRight className="w-2.5 h-2.5 text-muted-foreground/30" />
+                        <span className="text-muted-foreground font-black">Global Variables</span>
+                    </div>
                 </div>
+                <Dialog open={isCreateOpen} onOpenChange={(open) => {
+                    setIsCreateOpen(open);
+                    if (!open) setFormData({ key: '', value: '', description: '' });
+                }}>
+                    <DialogTrigger asChild>
+                        <Button className="premium-gradient font-black uppercase tracking-widest text-[10px] px-4 shadow-premium rounded-xl gap-2">
+                            <Plus className="w-4 h-4" /> Add Global Variable
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                            <DialogTitle className="text-2xl font-black tracking-tight">Create Variable</DialogTitle>
+                            <DialogDescription className="text-[11px] font-medium text-muted-foreground">
+                                Define a new key-value pair for this namespace.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <form onSubmit={handleCreate} className="space-y-4 py-4">
+                            <div className="space-y-2">
+                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Key Name</Label>
+                                <Input
+                                    placeholder="e.g. API_ENDPOINT"
+                                    className="h-12 bg-muted/30 border-border rounded-xl font-bold uppercase tracking-tight focus:bg-background transition-all"
+                                    value={formData.key}
+                                    onChange={(e) => setFormData({ ...formData, key: e.target.value })}
+                                    required
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Value</Label>
+                                <Textarea
+                                    placeholder="Enter variable value... supports multi-line"
+                                    className="min-h-[100px] bg-muted/30 border-border rounded-xl font-medium resize-y"
+                                    value={formData.value}
+                                    onChange={(e) => setFormData({ ...formData, value: e.target.value })}
+                                    required
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Description</Label>
+                                <Textarea
+                                    placeholder="What is this variable used for?"
+                                    className="min-h-[100px] bg-muted/30 border-border rounded-xl font-medium resize-none"
+                                    value={formData.description}
+                                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                />
+                            </div>
+                            <DialogFooter className="pt-4">
+                                <Button
+                                    type="submit"
+                                    disabled={isSubmitting}
+                                    className="premium-gradient font-black uppercase tracking-widest text-[10px] h-12 w-full shadow-premium rounded-xl"
+                                >
+                                    {isSubmitting ? "Creating..." : "Save Variable"}
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </DialogContent>
+                </Dialog>
             </div>
 
             <ResourceFilters
@@ -215,66 +275,7 @@ const GlobalVariablesPage = () => {
                     setSearchTerm('');
                     setSelectedCreatedBy(undefined);
                 }}
-                primaryAction={
-                    <Dialog open={isCreateOpen} onOpenChange={(open) => {
-                        setIsCreateOpen(open);
-                        if (!open) setFormData({ key: '', value: '', description: '' });
-                    }}>
-                        <DialogTrigger asChild>
-                            <Button className="premium-gradient font-black uppercase tracking-widest text-[10px] px-4 shadow-premium rounded-xl gap-2">
-                                <Plus className="w-4 h-4" /> Add Global Variable
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-[425px]">
-                            <DialogHeader>
-                                <DialogTitle className="text-2xl font-black tracking-tight">Create Variable</DialogTitle>
-                                <DialogDescription className="text-[11px] font-medium text-muted-foreground">
-                                    Define a new key-value pair for this namespace.
-                                </DialogDescription>
-                            </DialogHeader>
-                            <form onSubmit={handleCreate} className="space-y-4 py-4">
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Key Name</Label>
-                                    <Input
-                                        placeholder="e.g. API_ENDPOINT"
-                                        className="h-12 bg-muted/30 border-border rounded-xl font-bold uppercase tracking-tight focus:bg-background transition-all"
-                                        value={formData.key}
-                                        onChange={(e) => setFormData({ ...formData, key: e.target.value })}
-                                        required
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Value</Label>
-                                    <Textarea
-                                        placeholder="Enter variable value... supports multi-line"
-                                        className="min-h-[100px] bg-muted/30 border-border rounded-xl font-medium resize-y"
-                                        value={formData.value}
-                                        onChange={(e) => setFormData({ ...formData, value: e.target.value })}
-                                        required
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Description</Label>
-                                    <Textarea
-                                        placeholder="What is this variable used for?"
-                                        className="min-h-[100px] bg-muted/30 border-border rounded-xl font-medium resize-none"
-                                        value={formData.description}
-                                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                    />
-                                </div>
-                                <DialogFooter className="pt-4">
-                                    <Button
-                                        type="submit"
-                                        disabled={isSubmitting}
-                                        className="premium-gradient font-black uppercase tracking-widest text-[10px] h-12 w-full shadow-premium rounded-xl"
-                                    >
-                                        {isSubmitting ? "Creating..." : "Save Variable"}
-                                    </Button>
-                                </DialogFooter>
-                            </form>
-                        </DialogContent>
-                    </Dialog>
-                }
+                primaryAction={null}
             />
 
             <Card className="border-border bg-card shadow-premium overflow-hidden rounded-2xl">

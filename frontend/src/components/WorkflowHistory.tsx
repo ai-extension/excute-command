@@ -38,6 +38,7 @@ interface WorkflowHistoryProps {
     status?: string;
     executedBy?: string;
     search?: string;
+    tagIds?: string[];
 }
 
 const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
@@ -46,7 +47,8 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
     onReRun,
     status,
     executedBy,
-    search
+    search,
+    tagIds
 }) => {
     const { apiFetch } = useAuth();
     const [executions, setExecutions] = useState<WorkflowExecution[]>([]);
@@ -147,6 +149,11 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
             if (status && status !== 'ALL') url += `&status=${status}`;
             if (executedBy) url += `&executed_by=${executedBy}`;
             if (search) url += `&search=${encodeURIComponent(search)}`;
+            if (tagIds && tagIds.length > 0) {
+                tagIds.forEach(id => {
+                    url += `&tag_ids=${id}`;
+                });
+            }
 
             const response = await apiFetch(url);
             if (response.ok) {
@@ -175,7 +182,7 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
     useEffect(() => {
         if (workflowId || namespaceId) refresh();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [workflowId, namespaceId, status, executedBy, search]);
+    }, [workflowId, namespaceId, status, executedBy, search, tagIds]);
 
     const fetchExecutionDetail = async (exec: WorkflowExecution) => {
         try {
@@ -327,6 +334,19 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
                                             <Badge variant="outline" className="bg-white/5 border-white/10 text-[10px] uppercase tracking-tighter truncate max-w-[150px]">
                                                 {exec.workflow.name}
                                             </Badge>
+                                        )}
+                                        {exec.workflow?.tags && exec.workflow.tags.length > 0 && (
+                                            <div className="flex flex-wrap gap-1">
+                                                {exec.workflow.tags.map(tag => (
+                                                    <span
+                                                        key={tag.id}
+                                                        className="px-1 py-0 rounded text-[7px] font-bold border"
+                                                        style={{ backgroundColor: `${tag.color}20`, color: tag.color, borderColor: `${tag.color}40` }}
+                                                    >
+                                                        {tag.name}
+                                                    </span>
+                                                ))}
+                                            </div>
                                         )}
                                     </div>
                                     <div className="flex items-center gap-4 text-xs text-muted-foreground font-medium whitespace-nowrap overflow-hidden">

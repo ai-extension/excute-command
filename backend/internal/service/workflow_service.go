@@ -152,9 +152,9 @@ func (s *WorkflowService) ListExecutions(workflowID uuid.UUID, user *domain.User
 	return s.execRepo.ListByWorkflowID(workflowID, &scope)
 }
 
-func (s *WorkflowService) ListExecutionsPaginated(workflowID uuid.UUID, limit, offset int, executedBy *uuid.UUID, user *domain.User) ([]domain.WorkflowExecution, int64, error) {
+func (s *WorkflowService) ListExecutionsPaginated(workflowID uuid.UUID, limit, offset int, executedBy *uuid.UUID, tagIDs []uuid.UUID, user *domain.User) ([]domain.WorkflowExecution, int64, error) {
 	scope := domain.GetPermissionScope(user, "workflows", "READ")
-	return s.execRepo.ListByWorkflowIDPaginated(workflowID, limit, offset, executedBy, &scope)
+	return s.execRepo.ListByWorkflowIDPaginated(workflowID, limit, offset, executedBy, tagIDs, &scope)
 }
 
 func (s *WorkflowService) ListNamespaceExecutions(namespaceID uuid.UUID, user *domain.User) ([]domain.WorkflowExecution, error) {
@@ -162,9 +162,9 @@ func (s *WorkflowService) ListNamespaceExecutions(namespaceID uuid.UUID, user *d
 	return s.execRepo.ListByNamespaceID(namespaceID, &scope)
 }
 
-func (s *WorkflowService) ListNamespaceExecutionsPaginated(namespaceID uuid.UUID, limit, offset int, status string, workflowID *uuid.UUID, executedBy *uuid.UUID, user *domain.User) ([]domain.WorkflowExecution, int64, error) {
+func (s *WorkflowService) ListNamespaceExecutionsPaginated(namespaceID uuid.UUID, limit, offset int, status string, workflowID *uuid.UUID, executedBy *uuid.UUID, tagIDs []uuid.UUID, user *domain.User) ([]domain.WorkflowExecution, int64, error) {
 	scope := domain.GetPermissionScope(user, "workflows", "READ")
-	return s.execRepo.ListByNamespaceIDPaginated(namespaceID, limit, offset, status, workflowID, executedBy, &scope)
+	return s.execRepo.ListByNamespaceIDPaginated(namespaceID, limit, offset, status, workflowID, executedBy, tagIDs, &scope)
 }
 
 func (s *WorkflowService) GetExecution(id uuid.UUID, user *domain.User) (*domain.WorkflowExecution, error) {

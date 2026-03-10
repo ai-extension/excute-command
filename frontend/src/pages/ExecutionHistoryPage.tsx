@@ -26,7 +26,7 @@ import {
     DialogTitle,
     DialogDescription
 } from '../components/ui/dialog';
-import { WorkflowExecution, Workflow } from '../types';
+import { WorkflowExecution, Workflow, Tag } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useNamespace } from '../context/NamespaceContext';
 import { format } from 'date-fns';
@@ -48,12 +48,15 @@ const ExecutionHistoryPage = () => {
     const [statusFilter, setStatusFilter] = useState<string>('ALL');
     const [workflowFilter, setWorkflowFilter] = useState<string>('ALL');
     const [workflows, setWorkflows] = useState<Workflow[]>([]);
+    const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+    const [availableTags, setAvailableTags] = useState<Tag[]>([]);
     const [selectedExecutedBy, setSelectedExecutedBy] = useState<string | undefined>(undefined);
     const { users: availableUsers, fetchUsers } = useUsers();
 
     useEffect(() => {
         if (activeNamespace) {
             fetchWorkflows();
+            fetchTags();
         }
     }, [activeNamespace]);
 
@@ -67,6 +70,19 @@ const ExecutionHistoryPage = () => {
             setWorkflows(data.items || (Array.isArray(data) ? data : []));
         } catch (error) {
             console.error('Failed to fetch workflows:', error);
+        }
+    };
+
+    const fetchTags = async (search?: string) => {
+        if (!activeNamespace) return;
+        try {
+            let url = `${API_BASE_URL}/namespaces/${activeNamespace.id}/tags?limit=20`;
+            if (search) url += `&search=${encodeURIComponent(search)}`;
+            const response = await apiFetch(url);
+            const data = await response.json();
+            setAvailableTags(data.items || (Array.isArray(data) ? data : []));
+        } catch (error) {
+            console.error('Failed to fetch tags:', error);
         }
     };
 
@@ -153,6 +169,7 @@ const ExecutionHistoryPage = () => {
         setStatusFilter(filters.status || 'ALL');
         setWorkflowFilter(filters.workflowId || 'ALL');
         setSelectedExecutedBy(filters.executedBy);
+        setSelectedTagIds(filters.tags || []);
     };
 
     return (
@@ -173,7 +190,7 @@ const ExecutionHistoryPage = () => {
                         searchTerm={searchQuery}
                         onSearchChange={setSearchQuery}
                         onApply={handleApplyFilter}
-                        filters={{ status: statusFilter, workflowId: workflowFilter, executedBy: selectedExecutedBy }}
+                        filters={{ status: statusFilter, workflowId: workflowFilter, executedBy: selectedExecutedBy, tags: selectedTagIds }}
                         filterConfigs={[
                             {
                                 key: 'status',
@@ -209,6 +226,15 @@ const ExecutionHistoryPage = () => {
                                     ...availableUsers.map(u => ({ label: u.username.toUpperCase(), value: u.id }))
                                 ],
                                 width: 'w-48'
+                            },
+                            {
+                                key: 'tags',
+                                placeholder: 'TAGS',
+                                type: 'multi',
+                                isSearchable: true,
+                                onSearch: (query) => fetchTags(query),
+                                options: availableTags.map(t => ({ label: t.name.toUpperCase(), value: t.id })),
+                                width: 'w-48'
                             }
                         ]}
                         searchPlaceholder="SEARCH BY WORKFLOW OR ID..."
@@ -218,6 +244,7 @@ const ExecutionHistoryPage = () => {
                             setStatusFilter('ALL');
                             setWorkflowFilter('ALL');
                             setSelectedExecutedBy(undefined);
+                            setSelectedTagIds([]);
                         }}
                     />
 
@@ -231,6 +258,7 @@ const ExecutionHistoryPage = () => {
                                 workflowId={workflowFilter !== 'ALL' ? workflowFilter : undefined}
                                 executedBy={selectedExecutedBy}
                                 search={searchQuery}
+                                tagIds={selectedTagIds}
                                 onReRun={(wf: any, inputs: any, gId?: string, sId?: string, execId?: string) => runWorkflow(wf, inputs, gId, sId, execId)}
                             />
                         </div>

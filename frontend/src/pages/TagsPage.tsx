@@ -173,14 +173,72 @@ const TagsPage = () => {
 
     return (
         <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            {/* Breadcrumb */}
-            <div className="flex items-center gap-2 px-1">
-                <TagIcon className="w-3.5 h-3.5 text-primary" />
-                <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em]">
-                    <span className="text-primary">Settings</span>
-                    <ChevronRight className="w-2.5 h-2.5 text-muted-foreground/30" />
-                    <span className="text-muted-foreground font-black">Tags</span>
+            {/* Header */}
+            <div className="flex items-center justify-between px-1">
+                <div className="flex items-center gap-2">
+                    <TagIcon className="w-3.5 h-3.5 text-primary" />
+                    <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em]">
+                        <span className="text-primary">Settings</span>
+                        <ChevronRight className="w-2.5 h-2.5 text-muted-foreground/30" />
+                        <span className="text-muted-foreground font-black">Tags</span>
+                    </div>
                 </div>
+                <Dialog open={isCreateOpen} onOpenChange={(open) => {
+                    setIsCreateOpen(open);
+                    if (!open) setFormData({ name: '', color: '#6366f1' });
+                }}>
+                    <DialogTrigger asChild>
+                        <Button className="premium-gradient font-black uppercase tracking-widest text-[10px] px-4 shadow-premium rounded-xl gap-2">
+                            <Plus className="w-4 h-4" /> Create Tag
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                            <DialogTitle className="text-2xl font-black tracking-tight">Create Tag</DialogTitle>
+                            <DialogDescription className="text-[11px] font-medium text-muted-foreground">
+                                Add a new tag to the namespace. tags can be used to filter and categorize.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <form onSubmit={handleCreate} className="space-y-4 py-4">
+                            <div className="space-y-2">
+                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Tag Name</Label>
+                                <Input
+                                    placeholder="e.g. Production, High Priority"
+                                    className="h-12 bg-muted/30 border-border rounded-xl font-bold tracking-tight focus:bg-background transition-all"
+                                    value={formData.name}
+                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                    required
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Color</Label>
+                                <div className="flex items-center gap-4">
+                                    <Input
+                                        type="color"
+                                        className="h-12 w-20 p-1 cursor-pointer bg-muted/30 border-border rounded-xl"
+                                        value={formData.color}
+                                        onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                                    />
+                                    <div
+                                        className="px-4 py-2 rounded-full text-xs font-bold border"
+                                        style={{ backgroundColor: `${formData.color}20`, color: formData.color, borderColor: `${formData.color}40` }}
+                                    >
+                                        {formData.name || 'Preview Tag'}
+                                    </div>
+                                </div>
+                            </div>
+                            <DialogFooter className="pt-4">
+                                <Button
+                                    type="submit"
+                                    disabled={isSubmitting}
+                                    className="premium-gradient font-black uppercase tracking-widest text-[10px] h-12 w-full shadow-premium rounded-xl"
+                                >
+                                    {isSubmitting ? "Creating..." : "Save Tag"}
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </DialogContent>
+                </Dialog>
             </div>
 
             <ResourceFilters
@@ -208,64 +266,7 @@ const TagsPage = () => {
                     setSearchTerm('');
                     setSelectedCreatedBy(undefined);
                 }}
-                primaryAction={
-                    <Dialog open={isCreateOpen} onOpenChange={(open) => {
-                        setIsCreateOpen(open);
-                        if (!open) setFormData({ name: '', color: '#6366f1' });
-                    }}>
-                        <DialogTrigger asChild>
-                            <Button className="premium-gradient font-black uppercase tracking-widest text-[10px] px-4 shadow-premium rounded-xl gap-2">
-                                <Plus className="w-4 h-4" /> Create Tag
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-[425px]">
-                            <DialogHeader>
-                                <DialogTitle className="text-2xl font-black tracking-tight">Create Tag</DialogTitle>
-                                <DialogDescription className="text-[11px] font-medium text-muted-foreground">
-                                    Add a new tag to the namespace. tags can be used to filter and categorize.
-                                </DialogDescription>
-                            </DialogHeader>
-                            <form onSubmit={handleCreate} className="space-y-4 py-4">
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Tag Name</Label>
-                                    <Input
-                                        placeholder="e.g. Production, High Priority"
-                                        className="h-12 bg-muted/30 border-border rounded-xl font-bold tracking-tight focus:bg-background transition-all"
-                                        value={formData.name}
-                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                        required
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Color</Label>
-                                    <div className="flex items-center gap-4">
-                                        <Input
-                                            type="color"
-                                            className="h-12 w-20 p-1 cursor-pointer bg-muted/30 border-border rounded-xl"
-                                            value={formData.color}
-                                            onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                                        />
-                                        <div
-                                            className="px-4 py-2 rounded-full text-xs font-bold border"
-                                            style={{ backgroundColor: `${formData.color}20`, color: formData.color, borderColor: `${formData.color}40` }}
-                                        >
-                                            {formData.name || 'Preview Tag'}
-                                        </div>
-                                    </div>
-                                </div>
-                                <DialogFooter className="pt-4">
-                                    <Button
-                                        type="submit"
-                                        disabled={isSubmitting}
-                                        className="premium-gradient font-black uppercase tracking-widest text-[10px] h-12 w-full shadow-premium rounded-xl"
-                                    >
-                                        {isSubmitting ? "Creating..." : "Save Tag"}
-                                    </Button>
-                                </DialogFooter>
-                            </form>
-                        </DialogContent>
-                    </Dialog>
-                }
+                primaryAction={null}
             />
 
             <Card className="border-border bg-card shadow-premium overflow-hidden rounded-2xl">

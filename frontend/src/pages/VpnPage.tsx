@@ -191,14 +191,23 @@ const VpnPage = () => {
 
     return (
         <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            {/* Breadcrumb */}
-            <div className="flex items-center gap-2 px-1">
-                <Network className="w-3.5 h-3.5 text-primary" />
-                <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em]">
-                    <span className="text-primary">Infrastructure</span>
-                    <ChevronRight className="w-2.5 h-2.5 text-muted-foreground/30" />
-                    <span className="text-muted-foreground font-black">VPN Jump Hosts</span>
+            {/* Header */}
+            <div className="flex items-center justify-between px-1">
+                <div className="flex items-center gap-2">
+                    <Network className="w-3.5 h-3.5 text-primary" />
+                    <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em]">
+                        <span className="text-primary">Infrastructure</span>
+                        <ChevronRight className="w-2.5 h-2.5 text-muted-foreground/30" />
+                        <span className="text-muted-foreground font-black">VPN Jump Hosts</span>
+                    </div>
                 </div>
+                <Button
+                    onClick={() => handleOpenForm()}
+                    className="px-4 rounded-xl premium-gradient font-black uppercase tracking-widest text-[10px] shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
+                >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add VPN
+                </Button>
             </div>
 
             <ResourceFilters
@@ -250,15 +259,7 @@ const VpnPage = () => {
                     setAuthTypeFilter('ALL');
                     setSelectedCreatedBy(undefined);
                 }}
-                primaryAction={
-                    <Button
-                        onClick={() => handleOpenForm()}
-                        className="px-4 rounded-xl premium-gradient font-black uppercase tracking-widest text-[10px] shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
-                    >
-                        <Plus className="w-3.5 h-3.5" />
-                        Add VPN
-                    </Button>
-                }
+                primaryAction={null}
             />
 
             {/* Error State */}

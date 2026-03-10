@@ -29,6 +29,18 @@ const SchedulesPage = () => {
     const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
     const [selectedCreatedBy, setSelectedCreatedBy] = useState<string | undefined>(undefined);
     const { users: availableUsers, fetchUsers } = useUsers();
+    const [availableTags, setAvailableTags] = useState<Tag[]>([]);
+
+    const fetchTags = async (query: string = '') => {
+        if (!activeNamespace) return;
+        try {
+            const response = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/tags?search=${query}&limit=50`);
+            const data = await response.json();
+            setAvailableTags(data.items || []);
+        } catch (error) {
+            console.error('Failed to fetch tags:', error);
+        }
+    };
 
     const [limit, setLimit] = useState(20);
     const [offset, setOffset] = useState(0);
@@ -96,6 +108,7 @@ const SchedulesPage = () => {
     useEffect(() => {
         fetchSchedules();
         fetchWorkflows();
+        fetchTags();
     }, [activeNamespace, offset, limit, appliedSearchTerm, appliedTagIds, selectedCreatedBy]);
 
     const handleSaveSchedule = async (e: React.FormEvent) => {
@@ -260,16 +273,20 @@ const SchedulesPage = () => {
                 setSearchTerm={setSearchTerm}
                 onApplyFilter={(search: string, filters: { [key: string]: any }) => {
                     setAppliedSearchTerm(search);
+                    setAppliedTagIds(filters.tagIds || []);
                     setSelectedCreatedBy(filters.createdBy);
                     setOffset(0);
                 }}
                 selectedCreatedBy={selectedCreatedBy}
                 availableUsers={availableUsers}
                 onFetchUsers={fetchUsers}
+                availableTags={availableTags}
+                onFetchTags={fetchTags}
                 onReset={() => {
                     setSearchTerm('');
                     setAppliedSearchTerm('');
                     setSelectedCreatedBy(undefined);
+                    setAppliedTagIds([]);
                 }}
             />
 

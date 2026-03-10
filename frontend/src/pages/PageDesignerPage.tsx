@@ -9,12 +9,13 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
 import { cn } from '../lib/utils';
-import { PageWidget, PageLayout, Server, Workflow } from '../types';
+import { PageWidget, PageLayout, Server, Workflow, Tag } from '../types';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { useNamespace } from '../context/NamespaceContext';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../lib/api';
 import { SearchableSelect } from '../components/SearchableSelect';
+import { TagSelector } from '../components/TagSelector';
 
 
 const generateId = () => Math.random().toString(36).slice(2, 10);
@@ -48,6 +49,7 @@ const PageDesignerPage = () => {
     const [isPublic, setIsPublic] = useState(false);
     const [password, setPassword] = useState('');
     const [tokenTTL, setTokenTTL] = useState<number>(15);
+    const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
     const [expirationOption, setExpirationOption] = useState<'none' | '1h' | '1d' | '1w'>('none');
 
     // Widgets
@@ -74,6 +76,7 @@ const PageDesignerPage = () => {
                 setSlug(data.slug);
                 setIsPublic(data.is_public);
                 setTokenTTL(data.token_ttl_minutes ?? 15);
+                setSelectedTags(data.tags || []);
 
                 let layoutWidgets: PageWidget[] = [];
                 if (data.layout) {
@@ -153,6 +156,7 @@ const PageDesignerPage = () => {
                 layout: JSON.stringify(layout),
                 namespace_id: activeNamespace.id,
                 workflows: pageWorkflows,
+                tags: selectedTags,
             };
 
             const r = await apiFetch(`${API_BASE_URL}/pages/${id}`, {
@@ -369,6 +373,10 @@ const PageDesignerPage = () => {
                                     <div className="space-y-1.5">
                                         <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Description</label>
                                         <Input value={description} onChange={e => setDescription(e.target.value)} className="h-11 bg-background rounded-xl" />
+                                    </div>
+                                    <div className="space-y-1.5 pt-2">
+                                        <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Tags</label>
+                                        <TagSelector selectedTags={selectedTags} onChange={setSelectedTags} />
                                     </div>
                                 </div>
 

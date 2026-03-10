@@ -296,6 +296,7 @@ export interface Page {
     expires_at?: string;
     layout: string;
     workflows?: PageWorkflow[];
+    tags?: Tag[];
     created_by?: string;
     created_by_username?: string;
     created_at?: string;

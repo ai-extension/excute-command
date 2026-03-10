@@ -488,10 +488,10 @@ type WorkflowExecutionRepository interface {
 	Create(exec *WorkflowExecution) error
 	GetByID(id uuid.UUID, scope *PermissionScope) (*WorkflowExecution, error)
 	ListByWorkflowID(workflowID uuid.UUID, scope *PermissionScope) ([]WorkflowExecution, error)
-	ListByWorkflowIDPaginated(workflowID uuid.UUID, limit, offset int, executedBy *uuid.UUID, scope *PermissionScope) ([]WorkflowExecution, int64, error)
+	ListByWorkflowIDPaginated(workflowID uuid.UUID, limit, offset int, executedBy *uuid.UUID, tagIDs []uuid.UUID, scope *PermissionScope) ([]WorkflowExecution, int64, error)
 	ListByNamespaceID(namespaceID uuid.UUID, scope *PermissionScope) ([]WorkflowExecution, error)
-	ListByNamespaceIDPaginated(namespaceID uuid.UUID, limit, offset int, status string, workflowID *uuid.UUID, executedBy *uuid.UUID, scope *PermissionScope) ([]WorkflowExecution, int64, error)
-	ListGlobalPaginated(limit, offset int, status string, workflowID *uuid.UUID, executedBy *uuid.UUID, scope *PermissionScope) ([]WorkflowExecution, int64, error)
+	ListByNamespaceIDPaginated(namespaceID uuid.UUID, limit, offset int, status string, workflowID *uuid.UUID, executedBy *uuid.UUID, tagIDs []uuid.UUID, scope *PermissionScope) ([]WorkflowExecution, int64, error)
+	ListGlobalPaginated(limit, offset int, status string, workflowID *uuid.UUID, executedBy *uuid.UUID, tagIDs []uuid.UUID, scope *PermissionScope) ([]WorkflowExecution, int64, error)
 	ListByScheduledID(scheduledID uuid.UUID, scope *PermissionScope) ([]WorkflowExecution, error)
 	Update(exec *WorkflowExecution) error
 	CreateStepResult(stepExec *WorkflowExecutionStep) error
@@ -515,7 +515,7 @@ type ScheduleRepository interface {
 	GetByID(id uuid.UUID, scope *PermissionScope) (*Schedule, error)
 	List(namespaceID uuid.UUID, scope *PermissionScope) ([]Schedule, error)
 	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, tagIDs []uuid.UUID, createdBy *uuid.UUID, scope *PermissionScope) ([]Schedule, int64, error)
-	ListGlobalPaginated(limit, offset int, searchTerm string, scope *PermissionScope) ([]Schedule, int64, error)
+	ListGlobalPaginated(limit, offset int, searchTerm string, tagIDs []uuid.UUID, scope *PermissionScope) ([]Schedule, int64, error)
 	Update(s *Schedule) error
 	Delete(id uuid.UUID) error
 	AddScheduledWorkflow(sw *ScheduleWorkflow) error
@@ -544,6 +544,7 @@ type Page struct {
 	ExpiresAt         *time.Time     `json:"expires_at" gorm:"index"`
 	Layout            string         `json:"layout" gorm:"type:text"`
 	Workflows         []PageWorkflow `json:"workflows,omitempty" gorm:"foreignKey:PageID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Tags              []Tag          `json:"tags,omitempty" gorm:"many2many:page_tags;"`
 	CreatedBy         *uuid.UUID     `json:"created_by,omitempty" gorm:"type:uuid;<-:create"`
 	CreatedByUsername string         `json:"created_by_username,omitempty" gorm:"<-:create"`
 	CreatedAt         time.Time      `json:"created_at" gorm:"<-:create"`
@@ -566,8 +567,8 @@ type PageRepository interface {
 	GetByID(id uuid.UUID, scope *PermissionScope) (*Page, error)
 	GetBySlug(slug string) (*Page, error) // Public slug lookup doesn't need scope
 	List(namespaceID uuid.UUID, scope *PermissionScope) ([]Page, error)
-	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, isPublic *bool, createdBy *uuid.UUID, scope *PermissionScope) ([]Page, int64, error)
-	ListGlobalPaginated(limit, offset int, searchTerm string, isPublic *bool, scope *PermissionScope) ([]Page, int64, error)
+	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, isPublic *bool, createdBy *uuid.UUID, tagIDs []uuid.UUID, scope *PermissionScope) ([]Page, int64, error)
+	ListGlobalPaginated(limit, offset int, searchTerm string, isPublic *bool, tagIDs []uuid.UUID, scope *PermissionScope) ([]Page, int64, error)
 	Update(page *Page) error
 	Delete(id uuid.UUID) error
 }

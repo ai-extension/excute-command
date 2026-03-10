@@ -129,15 +129,15 @@ func (h *PermissionHandler) ListResourceItems(c *gin.Context) {
 	case "variables", "global-variables":
 		items, total, err = h.globalVarRepo.ListGlobalPaginated(limit, offset, searchTerm, &scope)
 	case "schedules":
-		items, total, err = h.scheduleRepo.ListGlobalPaginated(limit, offset, searchTerm, &scope)
+		items, total, err = h.scheduleRepo.ListGlobalPaginated(limit, offset, searchTerm, nil, &scope)
 	case "pages":
-		items, total, err = h.pageRepo.ListGlobalPaginated(limit, offset, searchTerm, nil, &scope)
+		items, total, err = h.pageRepo.ListGlobalPaginated(limit, offset, searchTerm, nil, nil, &scope)
 	case "tags":
 		items, total, err = h.tagRepo.ListGlobalPaginated(limit, offset, searchTerm, &scope)
 	case "servers":
 		items, total, err = h.serverRepo.ListPaginated(limit, offset, searchTerm, "", nil, nil, &scope)
 	case "history", "executions":
-		items, total, err = h.execRepo.ListGlobalPaginated(limit, offset, "", nil, nil, &scope)
+		items, total, err = h.execRepo.ListGlobalPaginated(limit, offset, "", nil, nil, nil, &scope)
 	case "users":
 		items, total, err = h.userRepo.ListPaginated(limit, offset, searchTerm, nil)
 	case "roles":

@@ -63,8 +63,15 @@ func (h *PageHandler) ListPages(c *gin.Context) {
 		}
 	}
 
+	var tagIDs []uuid.UUID
+	for _, idStr := range c.QueryArray("tag_ids") {
+		if id, err := uuid.Parse(idStr); err == nil {
+			tagIDs = append(tagIDs, id)
+		}
+	}
+
 	user, _ := c.Get("user")
-	pages, total, err := h.service.ListPagesPaginated(nsID, limit, offset, searchTerm, isPublic, createdBy, user.(*domain.User))
+	pages, total, err := h.service.ListPagesPaginated(nsID, limit, offset, searchTerm, isPublic, createdBy, tagIDs, user.(*domain.User))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
