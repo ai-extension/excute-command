@@ -18,28 +18,19 @@ RUN go build -o main cmd/server/main.go
 # Final Stage
 FROM ubuntu:22.04
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates tzdata nginx bash \
+    ca-certificates tzdata bash \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy backend binary into backend folder
-COPY --from=backend-builder /app/backend/main ./backend/main
+# Copy backend binary
+COPY --from=backend-builder /app/backend/main ./main
 
-# Copy frontend build into frontend folder
+# Copy frontend build into the location the backend expects
 COPY --from=frontend-builder /app/frontend/dist ./frontend/public
 
-# Copy Nginx config
-COPY docker/nginx.conf /etc/nginx/http.d/default.conf
-
-# Copy entrypoint script
-COPY docker/entrypoint.sh ./entrypoint.sh
-RUN chmod +x ./entrypoint.sh
-
-# Expose port 80 (Nginx)
-EXPOSE 80
-# Backend port (internal)
+# Expose backend port
 EXPOSE 8080
 
-# Use entrypoint script to start both processes
-ENTRYPOINT ["./entrypoint.sh"]
+# Start the backend directly
+CMD ["./main"]

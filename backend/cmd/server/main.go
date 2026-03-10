@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -296,7 +297,20 @@ func main() {
 		api.POST("/public/pages/:slug/verify", middleware.LoginRateLimiter(), optionalAuth, pageHandler.VerifyPublicPage)
 		api.POST("/public/pages/:slug/run/:workflow_id", middleware.LoginRateLimiter(), optionalAuth, pageHandler.RunPublicWorkflow)
 		api.POST("/public/pages/:slug/executions/:exec_id/stop", middleware.LoginRateLimiter(), optionalAuth, pageHandler.StopPublicExecution)
-	}
+	// Serve static files
+	r.StaticFile("/", "./frontend/public/index.html")
+	r.Static("/assets", "./frontend/public/assets")
+	r.StaticFile("/favicon.ico", "./frontend/public/favicon.ico")
+
+	// Fallback for SPA routing - serve index.html for any route not starting with /api or /assets
+	r.NoRoute(func(c *gin.Context) {
+		path := c.Request.URL.Path
+		// If the request is for an API or assets, let it be handled by others or return 404
+		// Otherwise, serve the frontend app's index.html
+		if !strings.HasPrefix(path, "/api") && !strings.HasPrefix(path, "/assets") {
+			c.File("./frontend/public/index.html")
+		}
+	})
 
 	serverPort := os.Getenv("SERVER_PORT")
 	if serverPort == "" {

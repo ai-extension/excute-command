@@ -23,8 +23,7 @@ services:
     container_name: csm-orchestrator
     restart: always
     ports:
-      - "80:80"
-      - "8080:8080"
+      - "80:8080"
     environment:
       DB_HOST: db
       DB_USER: ${DB_USER:-csm_user}
