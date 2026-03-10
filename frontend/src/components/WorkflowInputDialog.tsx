@@ -92,7 +92,7 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
 
     const validate = () => {
         const newErrors: Record<string, string> = {};
-        const safeRegex = /^[a-zA-Z0-9_\-\.\ \/\{\},]*$/;
+        const safeRegex = /^[\p{L}0-9_\-\. \/:\[\]{}"',@#%!+=?]*$/u;
 
         inputs.forEach(input => {
             const val = values[input.key];
@@ -124,7 +124,7 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                 for (const row of rows) {
                     for (const k in row) {
                         if (!safeRegex.test(String(row[k]))) {
-                            newErrors[input.key] = `Invalid characters in ${k}`;
+                            newErrors[input.key] = `Invalid characters in ${k}. Allowed: Letters, 0-9, _, -, ., /, :, [, ], {, }, ", ', @, #, %, !, +, =, ? and Space`;
                             return;
                         }
                     }
@@ -139,7 +139,7 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                         }
                     } else {
                         if (!safeRegex.test(val)) {
-                            newErrors[input.key] = 'Invalid characters. Allowed: A-Z, 0-9, _, -, ., /, {, } and Space';
+                            newErrors[input.key] = 'Invalid characters. Allowed: Letters, 0-9, _, -, ., /, :, [, ], {, }, ", \', @, #, %, !, +, =, ? and Space';
                         }
                     }
                 }

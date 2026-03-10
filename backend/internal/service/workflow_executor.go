@@ -20,6 +20,11 @@ import (
 	"github.com/user/csm-backend/internal/domain"
 )
 
+var (
+	// SecurityRegex blocks dangerous shell metacharacters: $, (, ), `, ;, &, |, <, >, *, ^
+	SecurityRegex = regexp.MustCompile(`^[\pL0-9_\-\.\ \/\:\[\]\{\}\"\'\,\@\#\%\!\+\=\?]*$`)
+)
+
 type WorkflowExecutor struct {
 	wfRepo        domain.WorkflowRepository
 	groupRepo     domain.WorkflowGroupRepository
@@ -52,6 +57,13 @@ func NewWorkflowExecutor(
 			}
 		}
 		return pongo2.AsSafeValue(string(b)), nil
+	})
+
+	pongo2.RegisterFilter("shellquote", func(in *pongo2.Value, param *pongo2.Value) (*pongo2.Value, *pongo2.Error) {
+		s := in.String()
+		// Basic POSIX shell quoting: wrap in single quotes, escape single quotes
+		quoted := "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
+		return pongo2.AsSafeValue(quoted), nil
 	})
 
 	return &WorkflowExecutor{
@@ -564,8 +576,6 @@ func (e *WorkflowExecutor) RunHooks(ctx context.Context, hooks []domain.Workflow
 }
 
 func (e *WorkflowExecutor) validateInputs(wf *domain.Workflow, provided map[string]string) error {
-	// Allow most characters including JSON structural ones, but block dangerous shell metacharacters
-	securityRegex := regexp.MustCompile(`^[\pL0-9_\-\.\ \/\:\[\]\{\}\"\'\,\@\#\$\%\^\!\*\+\=\?\(\)]*$`)
 	for _, input := range wf.Inputs {
 		val, ok := provided[input.Key]
 		if !ok {
@@ -645,7 +655,7 @@ func (e *WorkflowExecutor) validateInputs(wf *domain.Workflow, provided map[stri
 					if v == "" {
 						continue
 					}
-					if !securityRegex.MatchString(v) {
+					if !SecurityRegex.MatchString(v) {
 						return fmt.Errorf("field %s contains invalid characters in value '%s'", input.Label, v)
 					}
 				}
@@ -656,14 +666,14 @@ func (e *WorkflowExecutor) validateInputs(wf *domain.Workflow, provided map[stri
 						if strV == "" {
 							continue
 						}
-						if !securityRegex.MatchString(strV) {
+						if !SecurityRegex.MatchString(strV) {
 							return fmt.Errorf("field %s contains invalid characters in field '%s': '%s'", input.Label, k, strV)
 						}
 					}
 				}
 			}
 		default: // "input"
-			if !securityRegex.MatchString(val) {
+			if !SecurityRegex.MatchString(val) {
 				return fmt.Errorf("field %s contains invalid characters", input.Label)
 			}
 		}
@@ -1454,8 +1464,6 @@ func (e *WorkflowExecutor) renderTemplate(templateStr string, ctx pongo2.Context
 
 func (e *WorkflowExecutor) getInterpolationContext(inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, namespaceID uuid.UUID, user *domain.User) pongo2.Context {
 	ctx := make(pongo2.Context)
-	// Allow most characters including JSON structural ones, but block dangerous shell metacharacters
-	securityRegex := regexp.MustCompile(`^[\pL0-9_\-\.\ \/\:\[\]\{\}\"\'\,\@\#\$\%\^\!\*\+\=\?\(\)]*$`)
 
 	// 1. Global Variables: global.key
 	global := make(map[string]string)
@@ -1463,7 +1471,7 @@ func (e *WorkflowExecutor) getInterpolationContext(inputs map[string]string, var
 		scope := domain.PermissionScope{IsGlobal: true}
 		gvs, _ := e.globalVarRepo.List(namespaceID, &scope)
 		for _, v := range gvs {
-			if v.Value == "" || securityRegex.MatchString(v.Value) {
+			if v.Value == "" || SecurityRegex.MatchString(v.Value) {
 				global[v.Key] = v.Value
 			}
 		}
@@ -1473,7 +1481,7 @@ func (e *WorkflowExecutor) getInterpolationContext(inputs map[string]string, var
 	// 2. Variables: variable.key
 	vars := make(map[string]string)
 	for _, v := range variables {
-		if v.Value == "" || securityRegex.MatchString(v.Value) {
+		if v.Value == "" || SecurityRegex.MatchString(v.Value) {
 			vars[v.Key] = v.Value
 		}
 	}
@@ -1499,7 +1507,7 @@ func (e *WorkflowExecutor) getInterpolationContext(inputs map[string]string, var
 			}
 		}
 
-		if securityRegex.MatchString(v) {
+		if SecurityRegex.MatchString(v) {
 			in[k] = v
 		}
 	}
@@ -1508,7 +1516,7 @@ func (e *WorkflowExecutor) getInterpolationContext(inputs map[string]string, var
 	// 4. Step/Group Status: step.key.status
 	steps := make(map[string]interface{})
 	for k, v := range groupResults {
-		if v == "" || securityRegex.MatchString(v) {
+		if v == "" || SecurityRegex.MatchString(v) {
 			steps[k] = map[string]string{"status": v}
 		}
 	}
