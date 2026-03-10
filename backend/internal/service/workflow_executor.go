@@ -1149,8 +1149,6 @@ func (e *WorkflowExecutor) runWorkflowStep(ctx context.Context, step *domain.Wor
 			fmt.Fprintf(mainLogFile, "\033[1;31m✖ Failed to unmarshal TargetWorkflowInputs: %v\033[0m\n", err)
 		}
 	}
-	fmt.Fprintf(mainLogFile, "\033[90mDEBUG Step [TargetWorkflowInputs] raw: %s\033[0m\n", step.TargetWorkflowInputs)
-	fmt.Fprintf(mainLogFile, "\033[90mDEBUG Step [rawInputs] map: %v\033[0m\n", rawInputs)
 
 	// NEW: Fetch target workflow to get its default inputs
 	targetWf, err := e.wfRepo.GetByID(*step.TargetWorkflowID, nil)
@@ -1167,7 +1165,6 @@ func (e *WorkflowExecutor) runWorkflowStep(ctx context.Context, step *domain.Wor
 		for _, in := range targetWf.Inputs {
 			resolvedInputs[in.Key] = in.DefaultValue
 		}
-		fmt.Fprintf(mainLogFile, "\033[90mDEBUG Target Workflow Defaults: %v\033[0m\n", resolvedInputs)
 	}
 
 	// 2. Then, apply overrides from step inputs
@@ -1181,7 +1178,6 @@ func (e *WorkflowExecutor) runWorkflowStep(ctx context.Context, step *domain.Wor
 			v = string(b)
 		}
 		isForeach := false
-		fmt.Fprintf(mainLogFile, "\033[90mDEBUG evaluating input [%s]: value_len=%d\033[0m\n", k, len(v))
 		// New JSON-based Foreach logic
 		var foreachData struct {
 			Type     string      `json:"_type"`
@@ -1198,8 +1194,6 @@ func (e *WorkflowExecutor) runWorkflowStep(ctx context.Context, step *domain.Wor
 				if len(trimmedV) < limit {
 					limit = len(trimmedV)
 				}
-				logDetail := fmt.Sprintf("\033[93mDEBUG Not Foreach [%s]: err=%v type=%s prefix=%s\033[0m\n", k, unmarshalErr, foreachData.Type, trimmedV[:limit])
-				fmt.Fprint(mainLogFile, logDetail)
 			}
 		}
 
@@ -1268,12 +1262,6 @@ func (e *WorkflowExecutor) runWorkflowStep(ctx context.Context, step *domain.Wor
 
 			items = parseJsonItems(sourceJson)
 
-			// Debug logging
-			debugMsg := fmt.Sprintf("\033[90mDEBUG Foreach [%s]: source=\"%s\" raw_rendered=\"%s\" parsed_items_count=%d\033[0m\n", k, renderSource, sourceJson, len(items))
-			fmt.Fprint(mainLogFile, debugMsg)
-			fmt.Fprint(stepLogFile, debugMsg)
-			e.hub.BroadcastLog(workflowID.String(), executionID.String(), debugMsg)
-
 			// 3. Render template for each item
 			var results []interface{}
 			for i, item := range items {
@@ -1283,15 +1271,6 @@ func (e *WorkflowExecutor) runWorkflowStep(ctx context.Context, step *domain.Wor
 					subContext[pk] = pv
 				}
 				subContext["item"] = item
-
-				// Debug: Log item structure for the first few items
-				if i < 3 {
-					itemJson, _ := json.Marshal(item)
-					itemDebug := fmt.Sprintf("\033[90mDEBUG Item [%d]: %s\033[0m\n", i, string(itemJson))
-					fmt.Fprint(mainLogFile, itemDebug)
-					fmt.Fprint(stepLogFile, itemDebug)
-					e.hub.BroadcastLog(workflowID.String(), executionID.String(), itemDebug)
-				}
 
 				// Determine template string based on type (string for multi-select, map for multi-input)
 				switch t := foreachData.Template.(type) {
@@ -1360,13 +1339,6 @@ func (e *WorkflowExecutor) runWorkflowStep(ctx context.Context, step *domain.Wor
 		fmt.Fprint(stepLogFile, asyncMsg)
 		return "async", nil
 	}
-
-	// Synchronous: wait for the target workflow to complete
-	resolvedInputsJson, _ := json.Marshal(resolvedInputs)
-	resolvedLogMsg := fmt.Sprintf("\033[90mDEBUG Final Resolved Inputs: %s\033[0m\n", string(resolvedInputsJson))
-	fmt.Fprint(mainLogFile, resolvedLogMsg)
-	fmt.Fprint(stepLogFile, resolvedLogMsg)
-	e.hub.BroadcastLog(workflowID.String(), executionID.String(), resolvedLogMsg)
 
 	err = e.RunWithDepth(ctx, *step.TargetWorkflowID, hookExecID, resolvedInputs, nil, nil, "STEP", 1, user, nil, nil, fromExecutionID)
 	if err != nil {
@@ -1559,10 +1531,7 @@ func (e *WorkflowExecutor) getInterpolationContext(inputs map[string]string, var
 			decoder.UseNumber()
 			if err := decoder.Decode(&jsonVal); err == nil {
 				in[k] = jsonVal
-				// fmt.Printf("DEBUG getInterpolationContext: parsed [%s] as JSON: %v\n", k, jsonVal)
 				continue
-			} else {
-				// fmt.Printf("DEBUG getInterpolationContext: failed to parse [%s] as JSON (treating as string): %v\n", k, err)
 			}
 		}
 
