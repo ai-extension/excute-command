@@ -138,7 +138,7 @@ const ServerPage = () => {
 
     useEffect(() => {
         fetchServers();
-    }, [offset, limit, selectedUser]);
+    }, [offset, limit, searchTerm, authTypeFilter, vpnFilter, selectedUser]);
 
     useEffect(() => {
         if (servers.length > 0) {
@@ -259,6 +259,12 @@ const ServerPage = () => {
                 selectedUser={selectedUser}
                 availableUsers={availableUsers}
                 onFetchUsers={fetchUsers}
+                onReset={() => {
+                    setSearchTerm('');
+                    setAuthTypeFilter('ALL');
+                    setVpnFilter('ALL');
+                    setSelectedUser(undefined);
+                }}
             />
 
             {error ? (

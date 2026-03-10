@@ -105,6 +105,10 @@ const RolesPage = () => {
                 onApply={handleApplyFilter}
                 searchPlaceholder="Search roles by name or description..."
                 isLoading={isLoading}
+                onReset={() => {
+                    setSearchTerm('');
+                    setOffset(0);
+                }}
                 primaryAction={
                     <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                         <DialogTrigger asChild>

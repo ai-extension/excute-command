@@ -66,7 +66,7 @@ const PagesListPage = () => {
 
     useEffect(() => {
         fetchPages();
-    }, [activeNamespace, offset, limit, visibilityFilter, selectedCreatedBy]);
+    }, [activeNamespace, offset, limit, searchQuery, visibilityFilter, selectedCreatedBy]);
 
     const handleApplyFilter = (search: string, filters: { [key: string]: any }) => {
         setSearchQuery(search);
@@ -170,6 +170,11 @@ const PagesListPage = () => {
                 ]}
                 searchPlaceholder="Search pages by title or slug..."
                 isLoading={isLoading}
+                onReset={() => {
+                    setSearchQuery('');
+                    setVisibilityFilter('ALL');
+                    setSelectedCreatedBy(undefined);
+                }}
                 primaryAction={
                     <Button
                         onClick={handleCreatePage}

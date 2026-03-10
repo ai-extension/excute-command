@@ -14,6 +14,7 @@ interface ScheduleHeaderProps {
     selectedCreatedBy?: string;
     availableUsers: any[];
     onFetchUsers: (query: string) => Promise<void>;
+    onReset?: () => void;
 }
 
 export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
@@ -25,7 +26,8 @@ export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
     onApplyFilter,
     selectedCreatedBy,
     availableUsers,
-    onFetchUsers
+    onFetchUsers,
+    onReset
 }) => {
     return (
         <div className="space-y-6">
@@ -75,6 +77,7 @@ export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
                     searchTerm={searchTerm}
                     onSearchChange={setSearchTerm}
                     onApply={onApplyFilter}
+                    onReset={onReset}
                     filters={{ createdBy: selectedCreatedBy }}
                     filterConfigs={[
                         {

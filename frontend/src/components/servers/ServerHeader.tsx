@@ -17,6 +17,7 @@ interface ServerHeaderProps {
     selectedUser?: string;
     availableUsers: any[];
     onFetchUsers: (query: string) => Promise<void>;
+    onReset?: () => void;
 }
 
 export const ServerHeader: React.FC<ServerHeaderProps> = ({
@@ -31,7 +32,8 @@ export const ServerHeader: React.FC<ServerHeaderProps> = ({
     onFetchVpns,
     selectedUser,
     availableUsers,
-    onFetchUsers
+    onFetchUsers,
+    onReset
 }) => {
     return (
         <>
@@ -48,6 +50,7 @@ export const ServerHeader: React.FC<ServerHeaderProps> = ({
                 searchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
                 onApply={onApplyFilter}
+                onReset={onReset}
                 filters={{ authType: authTypeFilter, vpn: vpnFilter, user: selectedUser }}
                 filterConfigs={[
                     {

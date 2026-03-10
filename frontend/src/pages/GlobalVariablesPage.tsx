@@ -211,6 +211,10 @@ const GlobalVariablesPage = () => {
                 ]}
                 searchPlaceholder="Search by key or description..."
                 isLoading={isLoading}
+                onReset={() => {
+                    setSearchTerm('');
+                    setSelectedCreatedBy(undefined);
+                }}
                 primaryAction={
                     <Dialog open={isCreateOpen} onOpenChange={(open) => {
                         setIsCreateOpen(open);

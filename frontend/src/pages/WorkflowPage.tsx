@@ -253,7 +253,7 @@ const WorkflowPage = () => {
             fetchTags();
             fetchServers();
         }
-    }, [activeNamespace, limit, offset, searchTerm, selectedTagIds, showTemplates]);
+    }, [activeNamespace, limit, offset, searchTerm, selectedTagIds, showTemplates, selectedCreatedBy]);
 
     const handleApplyFilter = (search: string, filters: { [key: string]: any }) => {
         setSearchTerm(search);
@@ -420,6 +420,11 @@ const WorkflowPage = () => {
                                 ]}
                                 searchPlaceholder={showTemplates ? "Search blueprint library..." : "Search workflows by name or description..."}
                                 isLoading={isLoading}
+                                onReset={() => {
+                                    setSearchTerm('');
+                                    setSelectedTagIds([]);
+                                    setSelectedCreatedBy(undefined);
+                                }}
                             />
 
                             <div className="rounded-2xl border border-border bg-card shadow-card overflow-hidden transition-all duration-500">

@@ -95,7 +95,7 @@ const UsersPage = () => {
 
     useEffect(() => {
         fetchUsers();
-    }, [offset, limit]);
+    }, [offset, limit, searchTerm, roleFilter]);
 
     const handleApplyFilter = (search: string, filters: { [key: string]: string }) => {
         setSearchTerm(search);
@@ -500,8 +500,12 @@ const UsersPage = () => {
                         onSearch: (query) => fetchRoles(query)
                     }
                 ]}
-                searchPlaceholder="Search by name, email, or role..."
+                searchPlaceholder="Filter search by user identity or access level..."
                 isLoading={isLoading}
+                onReset={() => {
+                    setSearchTerm('');
+                    setRoleFilter('ALL');
+                }}
             />
 
             <Card className="border-border bg-card shadow-premium overflow-hidden rounded-2xl">

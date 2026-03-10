@@ -102,7 +102,7 @@ const VpnPage = () => {
 
     useEffect(() => {
         fetchVpns();
-    }, [offset, limit]);
+    }, [offset, limit, searchTerm, authTypeFilter, selectedCreatedBy]);
 
     const handleApplyFilter = (search: string, filters: { [key: string]: any }) => {
         setSearchTerm(search);
@@ -243,8 +243,13 @@ const VpnPage = () => {
                         width: 'w-48'
                     }
                 ]}
-                searchPlaceholder="Filter by name, ip..."
+                searchPlaceholder="Search by name, host or type..."
                 isLoading={isLoading}
+                onReset={() => {
+                    setSearchTerm('');
+                    setAuthTypeFilter('ALL');
+                    setSelectedCreatedBy(undefined);
+                }}
                 primaryAction={
                     <Button
                         onClick={() => handleOpenForm()}

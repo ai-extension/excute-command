@@ -204,6 +204,10 @@ const TagsPage = () => {
                 ]}
                 searchPlaceholder="Search tags..."
                 isLoading={isLoading}
+                onReset={() => {
+                    setSearchTerm('');
+                    setSelectedCreatedBy(undefined);
+                }}
                 primaryAction={
                     <Dialog open={isCreateOpen} onOpenChange={(open) => {
                         setIsCreateOpen(open);

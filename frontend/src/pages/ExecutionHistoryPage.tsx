@@ -213,23 +213,12 @@ const ExecutionHistoryPage = () => {
                         ]}
                         searchPlaceholder="SEARCH BY WORKFLOW OR ID..."
                         isLoading={loading}
-                        primaryAction={
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                    setSearchQuery('');
-                                    setStatusFilter('ALL');
-                                    setWorkflowFilter('ALL');
-                                    setSelectedExecutedBy(undefined);
-                                }}
-                                disabled={loading}
-                                className="h-9 px-4 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 bg-card hover:bg-muted"
-                            >
-                                {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Filter className="w-3.5 h-3.5" />}
-                                Reset
-                            </Button>
-                        }
+                        onReset={() => {
+                            setSearchQuery('');
+                            setStatusFilter('ALL');
+                            setWorkflowFilter('ALL');
+                            setSelectedExecutedBy(undefined);
+                        }}
                     />
 
                     {/* Main Content */}

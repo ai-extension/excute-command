@@ -24,6 +24,7 @@ interface ResourceFiltersProps {
     primaryAction?: React.ReactNode;
     searchPlaceholder?: string;
     isLoading?: boolean;
+    onReset?: () => void;
 }
 
 export const ResourceFilters: React.FC<ResourceFiltersProps> = ({
@@ -34,7 +35,8 @@ export const ResourceFilters: React.FC<ResourceFiltersProps> = ({
     filterConfigs = [],
     primaryAction,
     searchPlaceholder = "Search...",
-    isLoading = false
+    isLoading = false,
+    onReset
 }) => {
     const [localSearch, setLocalSearch] = React.useState(searchTerm);
     const [localFilters, setLocalFilters] = React.useState(filters);
@@ -104,6 +106,21 @@ export const ResourceFilters: React.FC<ResourceFiltersProps> = ({
                     <Filter className="w-3 h-3" />
                     {isLoading ? "Syncing..." : "Apply"}
                 </Button>
+
+                {onReset && (
+                    <Button
+                        variant="outline"
+                        onClick={() => {
+                            setLocalSearch('');
+                            setLocalFilters({});
+                            onReset();
+                        }}
+                        disabled={isLoading}
+                        className="px-4 rounded-lg border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground font-black uppercase tracking-widest text-[10px] transition-all active:scale-95 shrink-0"
+                    >
+                        Reset
+                    </Button>
+                )}
 
                 {primaryAction && (
                     <div className="shrink-0">

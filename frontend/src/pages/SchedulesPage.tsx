@@ -266,6 +266,11 @@ const SchedulesPage = () => {
                 selectedCreatedBy={selectedCreatedBy}
                 availableUsers={availableUsers}
                 onFetchUsers={fetchUsers}
+                onReset={() => {
+                    setSearchTerm('');
+                    setAppliedSearchTerm('');
+                    setSelectedCreatedBy(undefined);
+                }}
             />
 
             {viewMode === 'list' ? (
