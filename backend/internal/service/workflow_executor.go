@@ -676,60 +676,18 @@ func (e *WorkflowExecutor) evaluateCondition(condition string, inputs map[string
 		return true, nil // Empty condition = always run
 	}
 
-	// 1. Resolve variables using Pongo2
 	pcontext := e.getInterpolationContext(inputs, variables, groupResults, namespaceID, user)
-	resolved, err := e.renderTemplate(condition, pcontext)
+
+	// Wrap the condition in an if block to evaluate it as a boolean expression
+	// We use a unique marker to detect if the block was executed and the result
+	tmpl := fmt.Sprintf("{%% if %s %%}TRUE{%% else %%}FALSE{%% endif %%}", condition)
+
+	rendered, err := e.renderTemplate(tmpl, pcontext)
 	if err != nil {
-		return false, fmt.Errorf("failed to interpolate condition: %w", err)
+		return false, fmt.Errorf("failed to evaluate condition logic: %w", err)
 	}
 
-	// Evaluate with || (lower precedence) then && (higher precedence)
-	return e.evalOr(resolved, condition)
-}
-
-// evalOr evaluates an expression split by ||
-func (e *WorkflowExecutor) evalOr(expr, original string) (bool, error) {
-	orParts := strings.Split(expr, "||")
-	for _, part := range orParts {
-		result, err := e.evalAnd(strings.TrimSpace(part), original)
-		if err != nil {
-			return false, err
-		}
-		if result {
-			return true, nil // Short-circuit OR
-		}
-	}
-	return false, nil
-}
-
-// evalAnd evaluates an expression split by &&
-func (e *WorkflowExecutor) evalAnd(expr, original string) (bool, error) {
-	andParts := strings.Split(expr, "&&")
-	for _, part := range andParts {
-		result, err := e.evalAtom(strings.TrimSpace(part), original)
-		if err != nil {
-			return false, err
-		}
-		if !result {
-			return false, nil // Short-circuit AND
-		}
-	}
-	return true, nil
-}
-
-// evalAtom evaluates a single comparison: LHS == RHS or LHS != RHS
-func (e *WorkflowExecutor) evalAtom(expr, original string) (bool, error) {
-	if idx := strings.Index(expr, "!="); idx != -1 {
-		lhs := strings.TrimSpace(strings.Trim(expr[:idx], `"' `))
-		rhs := strings.TrimSpace(strings.Trim(expr[idx+2:], `"' `))
-		return lhs != rhs, nil
-	}
-	if idx := strings.Index(expr, "=="); idx != -1 {
-		lhs := strings.TrimSpace(strings.Trim(expr[:idx], `"' `))
-		rhs := strings.TrimSpace(strings.Trim(expr[idx+2:], `"' `))
-		return lhs == rhs, nil
-	}
-	return false, fmt.Errorf("unsupported condition syntax: %q — use ==, !=, && or ||", original)
+	return strings.TrimSpace(rendered) == "TRUE", nil
 }
 
 func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowGroup, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, defaultServerID uuid.UUID, logFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, namespaceID uuid.UUID, user *domain.User, workingDirs *sync.Map, startStepID, fromExecutionID *uuid.UUID, oldStepDirs map[uuid.UUID]string) error {

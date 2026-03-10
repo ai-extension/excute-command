@@ -266,7 +266,10 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
 
                                                                             {/* Condition */}
                                                                             <div className="space-y-2 text-left">
-                                                                                <label className="text-[8px] font-black uppercase tracking-widest text-amber-500">Condition <span className="text-muted-foreground/50 normal-case font-medium">— skip this group unless condition is true</span></label>
+                                                                                <div className="flex items-center justify-between">
+                                                                                    <label className="text-[8px] font-black uppercase tracking-widest text-amber-500">Condition <span className="text-muted-foreground/50 normal-case font-medium">— skip this group unless true</span></label>
+                                                                                    <span className="text-[8px] font-mono text-muted-foreground/40">Pongo2 Syntax</span>
+                                                                                </div>
                                                                                 <input
                                                                                     type="text"
                                                                                     value={group.condition || ''}
@@ -275,9 +278,14 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                         ng[gIdx].condition = e.target.value;
                                                                                         setGroups(ng);
                                                                                     }}
-                                                                                    placeholder={`{{step.${group.key || 'group_1'}.status}} == "SUCCESS"`}
+                                                                                    placeholder={`input.env == 'prod' && global.enabled == 'true'`}
                                                                                     className="w-full h-9 px-3 text-[11px] font-mono rounded-lg border border-border bg-background text-amber-500 placeholder:text-muted-foreground/25 outline-none focus:ring-1 focus:ring-amber-500/30 focus:border-amber-500/30"
                                                                                 />
+                                                                                <p className="text-[8px] text-muted-foreground/60 leading-tight">
+                                                                                    Available: <code className="text-amber-500/70">input.key</code>, <code className="text-amber-500/70">variable.key</code>, <code className="text-amber-500/70">global.key</code>, <code className="text-amber-500/70">step.key.status</code>.
+                                                                                    <br />
+                                                                                    Ops: <code className="text-foreground/50">==</code>, <code className="text-foreground/50">!=</code>, <code className="text-foreground/50">&gt;</code>, <code className="text-foreground/50">&lt;</code>, <code className="text-foreground/50">&amp;&amp;</code>, <code className="text-foreground/50">||</code>. No <code className="text-foreground/50">{"{{ }}"}</code> needed.
+                                                                                </p>
                                                                             </div>
                                                                             {/* Server override */}
                                                                             <div className="space-y-2 text-left">
