@@ -244,6 +244,7 @@ func main() {
 			protected.PUT("/workflow-files/:file_id/target-path", middleware.RBACMiddleware(userRepo, "workflows", "WRITE"), workflowFileHandler.UpdateTargetPath)
 			protected.PUT("/workflow-files/:file_id/substitution", middleware.RBACMiddleware(userRepo, "workflows", "WRITE"), workflowFileHandler.UpdateSubstitution)
 			protected.DELETE("/workflow-files/:file_id", middleware.RBACMiddleware(userRepo, "workflows", "DELETE"), workflowFileHandler.Delete)
+			protected.GET("/workflow-files/:file_id/download", middleware.RBACMiddleware(userRepo, "workflows", "READ"), workflowFileHandler.Download)
 
 			protected.GET("/workflows/:id/executions", middleware.RBACMiddleware(userRepo, "workflows", "READ"), workflowHandler.ListExecutions)
 			protected.GET("/executions/:exec_id", middleware.RBACMiddleware(userRepo, "workflows", "READ"), workflowHandler.GetExecution)

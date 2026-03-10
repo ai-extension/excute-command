@@ -124,3 +124,20 @@ func (h *WorkflowFileHandler) UpdateSubstitution(c *gin.Context) {
 
 	c.JSON(http.StatusOK, updatedFile)
 }
+
+func (h *WorkflowFileHandler) Download(c *gin.Context) {
+	fileID, err := uuid.Parse(c.Param("file_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid file id"})
+		return
+	}
+
+	user, _ := c.Get("user")
+	file, err := h.service.GetFileByID(fileID, user.(*domain.User))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.FileAttachment(file.LocalPath, file.FileName)
+}

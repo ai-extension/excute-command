@@ -134,3 +134,8 @@ func (s *WorkflowFileService) UpdateSubstitution(fileID uuid.UUID, useSubstituti
 
 	return file, nil
 }
+
+func (s *WorkflowFileService) GetFileByID(fileID uuid.UUID, user *domain.User) (*domain.WorkflowFile, error) {
+	scope := domain.GetPermissionScope(user, "workflows", "READ")
+	return s.repo.GetByID(fileID, &scope)
+}

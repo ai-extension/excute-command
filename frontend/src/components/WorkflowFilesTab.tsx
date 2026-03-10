@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Upload, Trash2, Save, File, RefreshCw } from 'lucide-react';
+import { Upload, Trash2, Save, File, RefreshCw, Download } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Switch } from '../components/ui/switch';
@@ -108,6 +108,24 @@ export const WorkflowFilesTab: React.FC<WorkflowFilesTabProps> = ({ workflowId, 
         } finally {
             setIsDeleting(false);
             setDeleteTargetId(null);
+        }
+    };
+
+    const handleDownload = async (fileId: string, fileName: string) => {
+        try {
+            const response = await apiFetch(`${API_BASE_URL}/workflow-files/${fileId}/download`);
+            if (!response.ok) throw new Error('Failed to download file');
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', fileName);
+            document.body.appendChild(link);
+            link.click();
+            link.parentNode?.removeChild(link);
+        } catch (error: any) {
+            showToast(error.message || 'An error occurred', 'error');
         }
     };
 
@@ -269,14 +287,24 @@ export const WorkflowFilesTab: React.FC<WorkflowFilesTabProps> = ({ workflowId, 
                                     </div>
                                 </div>
 
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                    onClick={() => handleDelete(f.id!)}
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </Button>
+                                <div className="flex items-center gap-1">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="shrink-0 text-primary hover:text-primary hover:bg-primary/10"
+                                        onClick={() => handleDownload(f.id!, f.file_name)}
+                                    >
+                                        <Download className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                        onClick={() => handleDelete(f.id!)}
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                </div>
                             </div>
                         ))}
                     </div>
