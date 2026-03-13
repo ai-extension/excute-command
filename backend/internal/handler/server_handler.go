@@ -152,14 +152,25 @@ func (h *ServerHandler) DeleteServer(c *gin.Context) {
 	}
 
 	user, _ := c.Get("user")
+	// Fetch existing for audit log context
+	existing, _ := h.service.GetServer(id, user.(*domain.User))
+	var metadata map[string]string
+	if existing != nil {
+		metadata = map[string]string{"name": existing.Name, "host": existing.Host}
+	}
+
 	resID := id.String()
 	if err := h.service.DeleteServer(id, user.(*domain.User)); err != nil {
-		h.auditLog.LogAction(c, "DELETE", "SERVER", resID, map[string]string{"error": err.Error()}, "FAILED")
+		if metadata == nil {
+			metadata = make(map[string]string)
+		}
+		metadata["error"] = err.Error()
+		h.auditLog.LogAction(c, "DELETE", "SERVER", resID, metadata, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	h.auditLog.LogAction(c, "DELETE", "SERVER", resID, nil, "SUCCESS")
-	c.JSON(http.StatusNoContent, nil)
+	h.auditLog.LogAction(c, "DELETE", "SERVER", resID, metadata, "SUCCESS")
+	c.Status(http.StatusNoContent)
 }
 
 func (h *ServerHandler) ExecuteCommand(c *gin.Context) {

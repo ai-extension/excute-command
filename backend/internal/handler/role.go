@@ -122,3 +122,64 @@ func (h *RoleHandler) UpdateRolePermissions(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "role permissions updated successfully"})
 }
+
+func (h *RoleHandler) UpdateRole(c *gin.Context) {
+	idStr := c.Param("id")
+	roleID, err := uuid.Parse(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid role id"})
+		return
+	}
+
+	var input struct {
+		Name        string `json:"name" binding:"required"`
+		Description string `json:"description"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	role, err := h.roleRepo.GetByID(roleID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "role not found"})
+		return
+	}
+
+	role.Name = input.Name
+	role.Description = input.Description
+
+	if err := h.roleRepo.Update(role); err != nil {
+		h.auditLog.LogAction(c, "UPDATE_ROLE", "RBAC", roleID.String(), map[string]string{"name": role.Name, "error": err.Error()}, "FAILED")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	h.auditLog.LogAction(c, "UPDATE_ROLE", "RBAC", roleID.String(), map[string]string{"name": role.Name}, "SUCCESS")
+	c.JSON(http.StatusOK, role)
+}
+
+func (h *RoleHandler) DeleteRole(c *gin.Context) {
+	idStr := c.Param("id")
+	roleID, err := uuid.Parse(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid role id"})
+		return
+	}
+
+	role, err := h.roleRepo.GetByID(roleID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "role not found"})
+		return
+	}
+
+	if err := h.roleRepo.Delete(roleID); err != nil {
+		h.auditLog.LogAction(c, "DELETE_ROLE", "RBAC", roleID.String(), map[string]string{"name": role.Name, "error": err.Error()}, "FAILED")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	h.auditLog.LogAction(c, "DELETE_ROLE", "RBAC", roleID.String(), map[string]string{"name": role.Name}, "SUCCESS")
+	c.JSON(http.StatusOK, gin.H{"message": "role deleted successfully"})
+}

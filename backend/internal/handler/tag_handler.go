@@ -156,17 +156,23 @@ func (h *TagHandler) Delete(c *gin.Context) {
 
 	// Fetch to set namespace_id
 	existing, err := h.service.GetByID(id, user)
+	var metadata map[string]string
 	if err == nil {
 		c.Set("namespace_id", existing.NamespaceID)
+		metadata = map[string]string{"name": existing.Name}
 	}
 
 	resID := id.String()
 	if err := h.service.Delete(id, user); err != nil {
-		h.auditLog.LogAction(c, "DELETE", "TAG", resID, map[string]string{"error": err.Error()}, "FAILED")
+		if metadata == nil {
+			metadata = make(map[string]string)
+		}
+		metadata["error"] = err.Error()
+		h.auditLog.LogAction(c, "DELETE", "TAG", resID, metadata, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	h.auditLog.LogAction(c, "DELETE", "TAG", resID, nil, "SUCCESS")
-	c.Status(http.StatusNoContent)
+	h.auditLog.LogAction(c, "DELETE", "TAG", resID, metadata, "SUCCESS")
+	c.JSON(http.StatusOK, gin.H{"message": "tag deleted"})
 }

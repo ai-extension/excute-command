@@ -150,17 +150,23 @@ func (h *GlobalVariableHandler) Delete(c *gin.Context) {
 
 	// Fetch to get namespace_id
 	existing, err := h.service.GetByID(id, user)
+	var metadata map[string]string
 	if err == nil {
 		c.Set("namespace_id", existing.NamespaceID)
+		metadata = map[string]string{"key": existing.Key}
 	}
 
 	resID := id.String()
 	if err := h.service.Delete(id, user); err != nil {
-		h.auditLog.LogAction(c, "DELETE", "VARIABLE", resID, map[string]string{"error": err.Error()}, "FAILED")
+		if metadata == nil {
+			metadata = make(map[string]string)
+		}
+		metadata["error"] = err.Error()
+		h.auditLog.LogAction(c, "DELETE", "VARIABLE", resID, metadata, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	h.auditLog.LogAction(c, "DELETE", "VARIABLE", resID, nil, "SUCCESS")
-	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
+	h.auditLog.LogAction(c, "DELETE", "VARIABLE", resID, metadata, "SUCCESS")
+	c.JSON(http.StatusOK, gin.H{"message": "variable deleted"})
 }

@@ -55,7 +55,7 @@ type Role struct {
 	ID          uuid.UUID        `json:"id" gorm:"type:uuid;primaryKey"`
 	Name        string           `json:"name" gorm:"uniqueIndex;not null"`
 	Description string           `json:"description"`
-	Permissions []RolePermission `json:"permissions" gorm:"foreignKey:RoleID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Permissions []RolePermission `json:"permissions" gorm:"foreignKey:RoleID;"`
 	CreatedAt   time.Time        `json:"created_at" gorm:"<-:create"`
 	UpdatedAt   time.Time        `json:"updated_at"`
 	DeletedAt   gorm.DeletedAt   `json:"-" gorm:"index"`
@@ -169,8 +169,8 @@ type Server struct {
 	AuthType           string         `json:"auth_type" gorm:"not null"` // PASSWORD, PUBLIC_KEY, or NONE
 	Password           string         `json:"password,omitempty"`
 	PrivateKey         string         `json:"private_key,omitempty"`
-	VpnID              *uuid.UUID     `json:"vpn_id,omitempty" gorm:"type:uuid"`
-	Vpn                *VpnConfig     `json:"vpn,omitempty" gorm:"foreignKey:VpnID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
+	VpnID              *uuid.UUID     `json:"vpn_id,omitempty" gorm:"type:uuid;index"`
+	Vpn                *VpnConfig     `json:"vpn,omitempty" gorm:"foreignKey:VpnID;"`
 	HostKeyFingerprint string         `json:"host_key_fingerprint,omitempty"` // For strict host key checking (TOFU or manual)
 	CreatedBy          *uuid.UUID     `json:"created_by,omitempty" gorm:"type:uuid;<-:create"`
 	CreatedByUsername  string         `json:"created_by_username,omitempty" gorm:"<-:create"`
@@ -240,7 +240,7 @@ type WorkflowHook struct {
 	ID               uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey"`
 	WorkflowID       *uuid.UUID `json:"workflow_id,omitempty" gorm:"type:uuid;index"`
 	ScheduleID       *uuid.UUID `json:"schedule_id,omitempty" gorm:"type:uuid;index"`
-	TargetWorkflowID uuid.UUID  `json:"target_workflow_id" gorm:"type:uuid;not null"`
+	TargetWorkflowID uuid.UUID  `json:"target_workflow_id" gorm:"type:uuid;not null;index"`
 	HookType         HookType   `json:"hook_type" gorm:"not null"`
 	Inputs           string     `json:"inputs"` // JSON string
 	Order            int        `json:"order"`
@@ -252,21 +252,21 @@ type Workflow struct {
 	NamespaceID       uuid.UUID          `json:"namespace_id" gorm:"type:uuid;index"`
 	Name              string             `json:"name" gorm:"not null"`
 	Description       string             `json:"description"`
-	DefaultServerID   *uuid.UUID         `json:"default_server_id,omitempty" gorm:"type:uuid"`
+	DefaultServerID   *uuid.UUID         `json:"default_server_id,omitempty" gorm:"type:uuid;index"`
 	DefaultServer     *Server            `json:"default_server,omitempty" gorm:"foreignKey:DefaultServerID;"`
 	Status            Status             `json:"status"`
 	TimeoutMinutes    int                `json:"timeout_minutes" gorm:"default:15"`
 	IsTemplate        bool               `json:"is_template" gorm:"default:false"`
 	TriggerSource     string             `json:"trigger_source,omitempty" gorm:"size:50"` // For templates or specific defaults
-	Inputs            []WorkflowInput    `json:"inputs,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Variables         []WorkflowVariable `json:"variables,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Groups            []WorkflowGroup    `json:"groups,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Inputs            []WorkflowInput    `json:"inputs,omitempty" gorm:"foreignKey:WorkflowID;"`
+	Variables         []WorkflowVariable `json:"variables,omitempty" gorm:"foreignKey:WorkflowID;"`
+	Groups            []WorkflowGroup    `json:"groups,omitempty" gorm:"foreignKey:WorkflowID;"`
 	Tags              []Tag              `json:"tags,omitempty" gorm:"many2many:workflow_tags;"`
-	Files             []WorkflowFile     `json:"files,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Files             []WorkflowFile     `json:"files,omitempty" gorm:"foreignKey:WorkflowID;"`
 	TargetFolder      string             `json:"target_folder,omitempty" gorm:"default:''"`
 	CleanupFiles      bool               `json:"cleanup_files,omitempty" gorm:"default:false"`
-	Hooks             []WorkflowHook     `json:"hooks,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	CreatedBy         *uuid.UUID         `json:"created_by,omitempty" gorm:"type:uuid;<-:create"`
+	Hooks             []WorkflowHook     `json:"hooks,omitempty" gorm:"foreignKey:WorkflowID;"`
+	CreatedBy         *uuid.UUID         `json:"created_by,omitempty" gorm:"type:uuid;index;<-:create"`
 	CreatedByUsername string             `json:"created_by_username,omitempty" gorm:"<-:create"`
 	CreatedAt         time.Time          `json:"created_at" gorm:"<-:create"`
 	UpdatedAt         time.Time          `json:"updated_at"`
@@ -292,15 +292,15 @@ type WorkflowGroup struct {
 	Name               string         `json:"name" gorm:"not null"`
 	Key                string         `json:"key" gorm:"not null;default:''"`
 	Condition          string         `json:"condition" gorm:"default:''"`
-	DefaultServerID    *uuid.UUID     `json:"default_server_id,omitempty" gorm:"type:uuid"`
+	DefaultServerID    *uuid.UUID     `json:"default_server_id,omitempty" gorm:"type:uuid;index"`
 	DefaultServer      *Server        `json:"default_server,omitempty" gorm:"foreignKey:DefaultServerID;"`
 	Order              int            `json:"order"`
 	IsParallel         bool           `json:"is_parallel"`
 	Status             Status         `json:"status"`
-	Steps              []WorkflowStep `json:"steps,omitempty" gorm:"foreignKey:GroupID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Steps              []WorkflowStep `json:"steps,omitempty" gorm:"foreignKey:GroupID;"`
 	IsCopyEnabled      bool           `json:"is_copy_enabled" gorm:"default:false"`
 	CopySourcePath     string         `json:"copy_source_path,omitempty" gorm:"default:''"`
-	CopyTargetServerID *uuid.UUID     `json:"copy_target_server_id,omitempty" gorm:"type:uuid"`
+	CopyTargetServerID *uuid.UUID     `json:"copy_target_server_id,omitempty" gorm:"type:uuid;index"`
 	CopyTargetServer   *Server        `json:"copy_target_server,omitempty" gorm:"foreignKey:CopyTargetServerID;"`
 	CopyTargetPath     string         `json:"copy_target_path,omitempty" gorm:"default:''"`
 	ContinueOnFailure  bool           `json:"continue_on_failure" gorm:"default:false"`
@@ -314,11 +314,11 @@ type WorkflowGroup struct {
 type WorkflowStep struct {
 	ID                   uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey"`
 	GroupID              uuid.UUID  `json:"group_id" gorm:"type:uuid;index"`
-	ServerID             uuid.UUID  `json:"server_id,omitempty" gorm:"type:uuid"` // Optional: If empty, run locally
+	ServerID             uuid.UUID  `json:"server_id,omitempty" gorm:"type:uuid;index"` // Optional: If empty, run locally
 	Name                 string     `json:"name" gorm:"not null"`
 	ActionType           string     `json:"action_type" gorm:"not null;default:'COMMAND'"` // COMMAND or WORKFLOW
 	CommandText          string     `json:"command_text"`
-	TargetWorkflowID     *uuid.UUID `json:"target_workflow_id,omitempty" gorm:"type:uuid"`
+	TargetWorkflowID     *uuid.UUID `json:"target_workflow_id,omitempty" gorm:"type:uuid;index"`
 	TargetWorkflowInputs string     `json:"target_workflow_inputs,omitempty"` // JSON string of inputs for the target workflow
 	WaitToFinish         *bool      `json:"wait_to_finish" gorm:"default:true"`
 	Order                int        `json:"order"`
@@ -348,15 +348,16 @@ type WorkflowVariable struct {
 }
 
 type GlobalVariable struct {
-	ID                uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey"`
-	NamespaceID       uuid.UUID  `json:"namespace_id" gorm:"type:uuid;index"`
-	Key               string     `json:"key" gorm:"not null"`
-	Value             string     `json:"value"`
-	Description       string     `json:"description"`
-	CreatedBy         *uuid.UUID `json:"created_by,omitempty" gorm:"type:uuid;<-:create"`
-	CreatedByUsername string     `json:"created_by_username,omitempty" gorm:"<-:create"`
-	CreatedAt         time.Time  `json:"created_at" gorm:"<-:create"`
-	UpdatedAt         time.Time  `json:"updated_at"`
+	ID                uuid.UUID      `json:"id" gorm:"type:uuid;primaryKey"`
+	NamespaceID       uuid.UUID      `json:"namespace_id" gorm:"type:uuid;index"`
+	Key               string         `json:"key" gorm:"not null"`
+	Value             string         `json:"value"`
+	Description       string         `json:"description"`
+	CreatedBy         *uuid.UUID     `json:"created_by,omitempty" gorm:"type:uuid;index;<-:create"`
+	CreatedByUsername string         `json:"created_by_username,omitempty" gorm:"<-:create"`
+	CreatedAt         time.Time      `json:"created_at" gorm:"<-:create"`
+	UpdatedAt         time.Time      `json:"updated_at"`
+	DeletedAt         gorm.DeletedAt `json:"-" gorm:"index"`
 }
 
 type Tag struct {
@@ -364,7 +365,7 @@ type Tag struct {
 	NamespaceID       uuid.UUID      `json:"namespace_id" gorm:"type:uuid;index"`
 	Name              string         `json:"name" gorm:"not null"`
 	Color             string         `json:"color" gorm:"not null;default:'#6366f1'"`
-	CreatedBy         *uuid.UUID     `json:"created_by,omitempty" gorm:"type:uuid;<-:create"`
+	CreatedBy         *uuid.UUID     `json:"created_by,omitempty" gorm:"type:uuid;index;<-:create"`
 	CreatedByUsername string         `json:"created_by_username,omitempty" gorm:"<-:create"`
 	CreatedAt         time.Time      `json:"created_at" gorm:"<-:create"`
 	UpdatedAt         time.Time      `json:"updated_at"`
@@ -388,13 +389,13 @@ type Schedule struct {
 	Status             string             `json:"status" gorm:"default:'ACTIVE'"` // ACTIVE, PAUSED
 	Retries            int                `json:"retries" gorm:"default:0"`
 	CatchUp            bool               `json:"catch_up" gorm:"default:false"`
-	CreatedBy          *uuid.UUID         `json:"created_by,omitempty" gorm:"type:uuid;<-:create"`
+	CreatedBy          *uuid.UUID         `json:"created_by,omitempty" gorm:"type:uuid;index;<-:create"`
 	CreatedByUsername  string             `json:"created_by_username,omitempty" gorm:"<-:create"`
 	User               *User              `json:"user,omitempty" gorm:"foreignKey:CreatedBy"`
 	CreatedAt          time.Time          `json:"created_at" gorm:"<-:create"`
 	UpdatedAt          time.Time          `json:"updated_at"`
-	ScheduledWorkflows []ScheduleWorkflow `json:"scheduled_workflows" gorm:"foreignKey:ScheduleID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Hooks              []WorkflowHook     `json:"hooks,omitempty" gorm:"foreignKey:ScheduleID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	ScheduledWorkflows []ScheduleWorkflow `json:"scheduled_workflows" gorm:"foreignKey:ScheduleID;"`
+	Hooks              []WorkflowHook     `json:"hooks,omitempty" gorm:"foreignKey:ScheduleID;"`
 	Tags               []Tag              `json:"tags,omitempty" gorm:"many2many:schedule_tags;"`
 	TotalRuns          int                `json:"total_runs" gorm:"-"`
 	LastRunStatus      string             `json:"last_run_status" gorm:"-"`
@@ -417,7 +418,7 @@ type WorkflowExecution struct {
 	TriggerSource     string                  `json:"trigger_source" gorm:"size:50;index"` // MANUAL, PAGE, SCHEDULE, HOOK
 	Status            Status                  `json:"status"`
 	Inputs            string                  `json:"inputs"` // JSON string
-	ExecutedBy        *uuid.UUID              `json:"executed_by" gorm:"type:uuid"`
+	ExecutedBy        *uuid.UUID              `json:"executed_by" gorm:"type:uuid;index"`
 	User              *User                   `json:"user,omitempty" gorm:"foreignKey:ExecutedBy"`
 	LogPath           string                  `json:"log_path"`
 	StartedAt         time.Time               `json:"started_at"`
@@ -428,7 +429,7 @@ type WorkflowExecution struct {
 	Workflow          *Workflow               `json:"workflow,omitempty" gorm:"foreignKey:WorkflowID"`
 	Schedule          *Schedule               `json:"schedule,omitempty" gorm:"foreignKey:ScheduledID"`
 	Page              *Page                   `json:"page,omitempty" gorm:"foreignKey:PageID"`
-	Steps             []WorkflowExecutionStep `json:"steps,omitempty" gorm:"foreignKey:ExecutionID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Steps             []WorkflowExecutionStep `json:"steps,omitempty" gorm:"foreignKey:ExecutionID;"`
 }
 
 type WorkflowExecutionStep struct {
@@ -544,9 +545,9 @@ type Page struct {
 	TokenTTLMinutes   int            `json:"token_ttl_minutes" gorm:"default:15"`
 	ExpiresAt         *time.Time     `json:"expires_at" gorm:"index"`
 	Layout            string         `json:"layout" gorm:"type:text"`
-	Workflows         []PageWorkflow `json:"workflows,omitempty" gorm:"foreignKey:PageID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Workflows         []PageWorkflow `json:"workflows,omitempty" gorm:"foreignKey:PageID;"`
 	Tags              []Tag          `json:"tags,omitempty" gorm:"many2many:page_tags;"`
-	CreatedBy         *uuid.UUID     `json:"created_by,omitempty" gorm:"type:uuid;<-:create"`
+	CreatedBy         *uuid.UUID     `json:"created_by,omitempty" gorm:"type:uuid;index;<-:create"`
 	CreatedByUsername string         `json:"created_by_username,omitempty" gorm:"<-:create"`
 	CreatedAt         time.Time      `json:"created_at" gorm:"<-:create"`
 	UpdatedAt         time.Time      `json:"updated_at"`
@@ -590,17 +591,17 @@ type SystemSettingRepository interface {
 	List() ([]SystemSetting, error)
 }
 type AuditLog struct {
-	ID           uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
-	Timestamp    time.Time `json:"timestamp" gorm:"index:idx_audit_logs_timestamp,sort:desc;index:idx_audit_logs_res_timestamp,priority:3"`
+	ID           uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey"`
+	Timestamp    time.Time  `json:"timestamp" gorm:"index:idx_audit_logs_timestamp,sort:desc;index:idx_audit_logs_res_timestamp,priority:3"`
 	NamespaceID  *uuid.UUID `json:"namespace_id" gorm:"type:uuid;index:idx_audit_logs_ns_timestamp,priority:1"`
 	UserID       *uuid.UUID `json:"user_id" gorm:"type:uuid;index"`
-	Username     string    `json:"username"`
-	Action       string    `json:"action" gorm:"index"`
-	ResourceType string    `json:"resource_type" gorm:"index:idx_audit_logs_res_timestamp,priority:1"`
-	ResourceID   *string   `json:"resource_id" gorm:"index:idx_audit_logs_res_timestamp,priority:2"`
-	Metadata     string    `json:"metadata" gorm:"type:jsonb"`
-	Status       string    `json:"status"`
-	IPAddress    string    `json:"ip_address"`
+	Username     string     `json:"username"`
+	Action       string     `json:"action" gorm:"index"`
+	ResourceType string     `json:"resource_type" gorm:"index:idx_audit_logs_res_timestamp,priority:1"`
+	ResourceID   *string    `json:"resource_id" gorm:"index:idx_audit_logs_res_timestamp,priority:2"`
+	Metadata     string     `json:"metadata" gorm:"type:jsonb"`
+	Status       string     `json:"status"`
+	IPAddress    string     `json:"ip_address"`
 }
 
 type AuditLogRepository interface {

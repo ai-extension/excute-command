@@ -200,19 +200,25 @@ func (h *ScheduleHandler) Delete(c *gin.Context) {
 
 	// Fetch to set namespace_id in context
 	existing, err := h.service.GetByID(id, user)
+	var metadata map[string]string
 	if err == nil {
 		c.Set("namespace_id", existing.NamespaceID)
+		metadata = map[string]string{"name": existing.Name}
 	}
 
 	resID := id.String()
 	if err := h.service.Delete(id, user); err != nil {
-		h.auditLog.LogAction(c, "DELETE", "SCHEDULE", resID, map[string]string{"error": err.Error()}, "FAILED")
+		if metadata == nil {
+			metadata = make(map[string]string)
+		}
+		metadata["error"] = err.Error()
+		h.auditLog.LogAction(c, "DELETE", "SCHEDULE", resID, metadata, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	h.auditLog.LogAction(c, "DELETE", "SCHEDULE", resID, nil, "SUCCESS")
-	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
+	h.auditLog.LogAction(c, "DELETE", "SCHEDULE", resID, metadata, "SUCCESS")
+	c.JSON(http.StatusOK, gin.H{"message": "schedule deleted"})
 }
 
 func (h *ScheduleHandler) ToggleStatus(c *gin.Context) {

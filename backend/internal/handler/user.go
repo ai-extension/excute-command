@@ -294,10 +294,12 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 	user.Email = input.Email
 
 	if err := h.userRepo.Update(user); err != nil {
+		h.auditLog.LogAction(c, "UPDATE_USER", "USER", userID.String(), map[string]string{"username": user.Username, "error": err.Error()}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	h.auditLog.LogAction(c, "UPDATE_USER", "USER", userID.String(), map[string]string{"username": user.Username}, "SUCCESS")
 	c.JSON(http.StatusOK, user)
 }
 
@@ -491,9 +493,11 @@ func (h *UserHandler) DeleteAPIKey(c *gin.Context) {
 	}
 
 	if err := h.apiKeyRepo.Delete(id); err != nil {
+		h.auditLog.LogAction(c, "DELETE_API_KEY", "USER", id.String(), map[string]string{"name": key.Name, "error": err.Error()}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	h.auditLog.LogAction(c, "DELETE_API_KEY", "USER", id.String(), map[string]string{"name": key.Name}, "SUCCESS")
 	c.JSON(http.StatusOK, gin.H{"message": "api key deleted"})
 }

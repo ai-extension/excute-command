@@ -34,7 +34,9 @@ func main() {
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=%s",
 		dbHost, dbUser, dbPassword, dbName, dbPort, dbSSLMode, dbTimeZone)
 
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		DisableForeignKeyConstraintWhenMigrating: true,
+	})
 	if err != nil {
 		log.Fatalf("Failed to connect to database (DSN: host=%s user=%s dbname=%s port=%s): %v", dbHost, dbUser, dbName, dbPort, err)
 	}
@@ -142,7 +144,7 @@ func main() {
 	authHandler := handler.NewAuthHandler(authService, auditLogService)
 	userHandler := handler.NewUserHandler(userRepo, roleRepo, apiKeyRepo, auditLogService)
 	roleHandler := handler.NewRoleHandler(roleRepo, permRepo, auditLogService)
-	permHandler := handler.NewPermissionHandler(permRepo, workflowRepo, globalVarRepo, scheduleRepo, pageRepo, tagRepo, serverRepo, namespaceRepo, execRepo, userRepo, roleRepo, vpnRepo)
+	permHandler := handler.NewPermissionHandler(permRepo, workflowRepo, globalVarRepo, scheduleRepo, pageRepo, tagRepo, serverRepo, namespaceRepo, execRepo, userRepo, roleRepo, vpnRepo, auditLogService)
 	serverHandler := handler.NewServerHandler(serverService, terminalService, auditLogService)
 	wsHandler := handler.NewWSHandler(hub, terminalService, authService, pageService, workflowService)
 	workflowHandler := handler.NewWorkflowHandler(workflowService, workflowExecutor, auditLogService)
@@ -150,10 +152,10 @@ func main() {
 	scheduleHandler := handler.NewScheduleHandler(scheduleService, auditLogService)
 	tagHandler := handler.NewTagHandler(tagService, auditLogService)
 	workflowFileService := service.NewWorkflowFileService(workflowFileRepo)
-	workflowFileHandler := handler.NewWorkflowFileHandler(workflowFileService)
+	workflowFileHandler := handler.NewWorkflowFileHandler(workflowFileService, auditLogService)
 	vpnHandler := handler.NewVpnConfigHandler(vpnService, auditLogService)
 	pageHandler := handler.NewPageHandler(pageService, workflowService, workflowExecutor, terminalService, auditLogService)
-	settingsHandler := handler.NewSettingsHandler(settingsService)
+	settingsHandler := handler.NewSettingsHandler(settingsService, auditLogService)
 	auditLogHandler := handler.NewAuditLogHandler(auditLogService)
 	dashboardHandler := handler.NewDashboardHandler(dashboardService)
 
@@ -218,9 +220,12 @@ func main() {
 			protected.PUT("/users/:id/password", middleware.RBACMiddleware(userRepo, "users", "WRITE"), userHandler.ResetPassword)
 			protected.GET("/roles", middleware.RBACMiddleware(userRepo, "roles", "READ"), roleHandler.ListRoles)
 			protected.POST("/roles", middleware.RBACMiddleware(userRepo, "roles", "WRITE"), roleHandler.CreateRole)
+			protected.PUT("/roles/:id", middleware.RBACMiddleware(userRepo, "roles", "WRITE"), roleHandler.UpdateRole)
+			protected.DELETE("/roles/:id", middleware.RBACMiddleware(userRepo, "roles", "DELETE"), roleHandler.DeleteRole)
 			protected.POST("/roles/:id/permissions", middleware.RBACMiddleware(userRepo, "roles", "WRITE"), roleHandler.UpdateRolePermissions)
 			protected.GET("/permissions", middleware.RBACMiddleware(userRepo, "roles", "READ"), permHandler.ListPermissions)
 			protected.GET("/permissions/resource-items", middleware.RBACMiddleware(userRepo, "roles", "READ"), permHandler.ListResourceItems)
+			protected.DELETE("/permissions/:id", middleware.RBACMiddleware(userRepo, "roles", "DELETE"), permHandler.DeletePermission)
 
 			protected.GET("/servers", middleware.RBACMiddleware(userRepo, "servers", "READ"), serverHandler.ListServers)
 			protected.POST("/servers", middleware.RBACMiddleware(userRepo, "servers", "WRITE"), serverHandler.CreateServer)

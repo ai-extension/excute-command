@@ -101,9 +101,11 @@ func (h *VpnConfigHandler) Update(c *gin.Context) {
 
 	user, _ := c.Get("user")
 	if err := h.service.Update(&vpn, user.(*domain.User)); err != nil {
+		h.auditLog.LogAction(c, "UPDATE", "VPN", id.String(), map[string]string{"name": vpn.Name, "error": err.Error()}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	h.auditLog.LogAction(c, "UPDATE", "VPN", id.String(), map[string]string{"name": vpn.Name}, "SUCCESS")
 	c.JSON(http.StatusOK, vpn)
 }
 

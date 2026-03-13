@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/user/csm-backend/internal/domain"
 )
 
@@ -22,6 +23,7 @@ type PermissionHandler struct {
 	userRepo      domain.UserRepository
 	roleRepo      domain.RoleRepository
 	vpnRepo       domain.VpnConfigRepository
+	auditLog      domain.AuditLogService
 }
 
 func NewPermissionHandler(
@@ -37,6 +39,7 @@ func NewPermissionHandler(
 	userRepo domain.UserRepository,
 	roleRepo domain.RoleRepository,
 	vpnRepo domain.VpnConfigRepository,
+	auditLog domain.AuditLogService,
 ) *PermissionHandler {
 	return &PermissionHandler{
 		permRepo:      permRepo,
@@ -51,6 +54,7 @@ func NewPermissionHandler(
 		userRepo:      userRepo,
 		roleRepo:      roleRepo,
 		vpnRepo:       vpnRepo,
+		auditLog:      auditLog,
 	}
 }
 
@@ -164,4 +168,32 @@ func (h *PermissionHandler) ListResourceItems(c *gin.Context) {
 
 func contains(s, substr string) bool {
 	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
+}
+func (h *PermissionHandler) DeletePermission(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid permission id"})
+		return
+	}
+
+	// Permission logic usually doesn't need to fetch name for audit log if ID is enough
+	// but let's be consistent if possible. PermissionRepository doesn't usually have GetByID in the interface I saw.
+	// Oh wait, I didn't see GetByID in PermissionRepository interface in models.go.
+	// Line 121:
+	// type PermissionRepository interface {
+	// 	Create(perm *Permission) error
+	// 	List() ([]Permission, error)
+	// 	GetByIDs(ids []uuid.UUID) ([]Permission, error)
+	// 	Delete(id uuid.UUID) error
+	// }
+
+	if err := h.permRepo.Delete(id); err != nil {
+		h.auditLog.LogAction(c, "DELETE_PERMISSION", "RBAC", id.String(), map[string]string{"error": err.Error()}, "FAILED")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	h.auditLog.LogAction(c, "DELETE_PERMISSION", "RBAC", id.String(), nil, "SUCCESS")
+	c.JSON(http.StatusOK, gin.H{"message": "permission deleted successfully"})
 }

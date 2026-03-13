@@ -204,18 +204,24 @@ func (h *WorkflowHandler) DeleteWorkflow(c *gin.Context) {
 	userVal, _ := c.Get("user")
 	user := userVal.(*domain.User)
 
-	// Fetch existing to get NamespaceID for audit log
+	// Fetch existing to get NamespaceID and Name for audit log
 	existing, err := h.service.GetWorkflow(id, user)
+	var metadata map[string]string
 	if err == nil {
 		c.Set("namespace_id", existing.NamespaceID)
+		metadata = map[string]string{"name": existing.Name}
 	}
 
 	if err := h.service.DeleteWorkflow(id, user); err != nil {
-		h.auditLog.LogAction(c, "DELETE", "WORKFLOW", id.String(), gin.H{"error": err.Error()}, "FAILED")
+		if metadata == nil {
+			metadata = make(map[string]string)
+		}
+		metadata["error"] = err.Error()
+		h.auditLog.LogAction(c, "DELETE", "WORKFLOW", id.String(), metadata, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	h.auditLog.LogAction(c, "DELETE", "WORKFLOW", id.String(), nil, "SUCCESS")
+	h.auditLog.LogAction(c, "DELETE", "WORKFLOW", id.String(), metadata, "SUCCESS")
 	c.JSON(http.StatusOK, gin.H{"message": "workflow deleted"})
 }
 

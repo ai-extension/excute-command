@@ -4,15 +4,17 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/user/csm-backend/internal/domain"
 	"github.com/user/csm-backend/internal/service"
 )
 
 type SettingsHandler struct {
 	settingsService *service.SettingsService
+	auditLog        domain.AuditLogService
 }
 
-func NewSettingsHandler(settingsService *service.SettingsService) *SettingsHandler {
-	return &SettingsHandler{settingsService: settingsService}
+func NewSettingsHandler(settingsService *service.SettingsService, auditLog domain.AuditLogService) *SettingsHandler {
+	return &SettingsHandler{settingsService: settingsService, auditLog: auditLog}
 }
 
 func (h *SettingsHandler) GetSettings(c *gin.Context) {
@@ -42,10 +44,12 @@ func (h *SettingsHandler) UpdateSetting(c *gin.Context) {
 	}
 
 	if err := h.settingsService.SetSetting(req.Key, req.Value); err != nil {
+		h.auditLog.LogAction(c, "UPDATE_SETTING", "SETTINGS", "", map[string]string{"key": req.Key, "value": req.Value, "error": err.Error()}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	h.auditLog.LogAction(c, "UPDATE_SETTING", "SETTINGS", "", map[string]string{"key": req.Key, "value": req.Value}, "SUCCESS")
 	c.JSON(http.StatusOK, gin.H{"message": "Setting updated successfully"})
 }
 
