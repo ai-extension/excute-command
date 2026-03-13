@@ -7,16 +7,22 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/user/csm-backend/internal/domain"
+	"github.com/user/csm-backend/internal/lib/utils"
 	"github.com/user/csm-backend/internal/service"
 )
 
 type ServerHandler struct {
 	service         *service.ServerService
 	terminalService *service.TerminalService
+	auditLog        domain.AuditLogService
 }
 
-func NewServerHandler(service *service.ServerService, terminalService *service.TerminalService) *ServerHandler {
-	return &ServerHandler{service: service, terminalService: terminalService}
+func NewServerHandler(service *service.ServerService, terminalService *service.TerminalService, auditLog domain.AuditLogService) *ServerHandler {
+	return &ServerHandler{
+		service:         service,
+		terminalService: terminalService,
+		auditLog:        auditLog,
+	}
 }
 
 func (h *ServerHandler) ListServers(c *gin.Context) {
@@ -85,9 +91,12 @@ func (h *ServerHandler) CreateServer(c *gin.Context) {
 	}
 
 	if err := h.service.CreateServer(&server, user); err != nil {
+		h.auditLog.LogAction(c, "CREATE", "SERVER", server.ID.String(), map[string]string{"name": server.Name, "error": err.Error()}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	resID := server.ID.String()
+	h.auditLog.LogAction(c, "CREATE", "SERVER", resID, map[string]string{"name": server.Name}, "SUCCESS")
 	c.JSON(http.StatusCreated, server)
 }
 
@@ -106,11 +115,31 @@ func (h *ServerHandler) UpdateServer(c *gin.Context) {
 	}
 	server.ID = id
 
-	user, _ := c.Get("user")
-	if err := h.service.UpdateServer(&server, user.(*domain.User)); err != nil {
+	userVal, _ := c.Get("user")
+	user := userVal.(*domain.User)
+
+	// Fetch existing to calculate diff
+	existing, err := h.service.GetServer(id, user)
+	var diff map[string]interface{}
+	if err == nil {
+		diff = utils.CalculateDiff(existing, &server)
+	}
+
+	if err := h.service.UpdateServer(&server, user); err != nil {
+		var meta map[string]interface{}
+		if diff != nil {
+			meta = diff
+		}
+		if meta == nil {
+			meta = make(map[string]interface{})
+		}
+		meta["error"] = err.Error()
+		h.auditLog.LogAction(c, "UPDATE", "SERVER", id.String(), meta, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	h.auditLog.LogAction(c, "UPDATE", "SERVER", id.String(), diff, "SUCCESS")
 	c.JSON(http.StatusOK, server)
 }
 
@@ -123,10 +152,13 @@ func (h *ServerHandler) DeleteServer(c *gin.Context) {
 	}
 
 	user, _ := c.Get("user")
+	resID := id.String()
 	if err := h.service.DeleteServer(id, user.(*domain.User)); err != nil {
+		h.auditLog.LogAction(c, "DELETE", "SERVER", resID, map[string]string{"error": err.Error()}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	h.auditLog.LogAction(c, "DELETE", "SERVER", resID, nil, "SUCCESS")
 	c.JSON(http.StatusNoContent, nil)
 }
 
@@ -147,12 +179,15 @@ func (h *ServerHandler) ExecuteCommand(c *gin.Context) {
 	}
 
 	user, _ := c.Get("user")
+	resID := id.String()
 	output, err := h.service.ExecuteCommand(c.Request.Context(), id, req.CommandText, user.(*domain.User))
 	if err != nil {
+		h.auditLog.LogAction(c, "EXECUTE_COMMAND", "SERVER", resID, map[string]string{"command": req.CommandText, "error": err.Error()}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "output": output})
 		return
 	}
 
+	h.auditLog.LogAction(c, "EXECUTE_COMMAND", "SERVER", resID, map[string]string{"command": req.CommandText}, "SUCCESS")
 	c.JSON(http.StatusOK, gin.H{"output": output})
 }
 

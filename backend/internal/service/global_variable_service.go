@@ -36,7 +36,6 @@ func (s *GlobalVariableService) ListPaginated(namespaceID uuid.UUID, limit, offs
 	scope := domain.GetPermissionScope(user, "namespaces", "READ")
 	return s.repo.ListPaginated(namespaceID, limit, offset, searchTerm, createdBy, &scope)
 }
-
 func (s *GlobalVariableService) Update(gv *domain.GlobalVariable, user *domain.User) error {
 	scope := domain.GetPermissionScope(user, "namespaces", "WRITE")
 	existing, err := s.repo.GetByID(gv.ID, &scope)
@@ -44,11 +43,18 @@ func (s *GlobalVariableService) Update(gv *domain.GlobalVariable, user *domain.U
 		return err
 	}
 
-	gv.CreatedBy = existing.CreatedBy
-	gv.CreatedByUsername = existing.CreatedByUsername
-	gv.CreatedAt = existing.CreatedAt
+	// Merge fields from partial gv into existing record
+	if gv.Key != "" {
+		existing.Key = gv.Key
+	}
+	if gv.Value != "" {
+		existing.Value = gv.Value
+	}
+	if gv.Description != "" {
+		existing.Description = gv.Description
+	}
 
-	return s.repo.Update(gv)
+	return s.repo.Update(existing)
 }
 
 func (s *GlobalVariableService) Delete(id uuid.UUID, user *domain.User) error {

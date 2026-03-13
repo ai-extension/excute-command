@@ -90,11 +90,32 @@ func (s *ScheduleService) Update(schedule *domain.Schedule, workflowConfigs []do
 		return err
 	}
 
-	schedule.CreatedBy = existing.CreatedBy
-	schedule.CreatedByUsername = existing.CreatedByUsername
-	schedule.CreatedAt = existing.CreatedAt
+	// Merge fields from partial schedule into existing record
+	if schedule.Name != "" {
+		existing.Name = schedule.Name
+	}
+	if schedule.CronExpression != "" {
+		existing.CronExpression = schedule.CronExpression
+	}
+	if schedule.Type != "" {
+		existing.Type = schedule.Type
+	}
+	if schedule.Status != "" {
+		existing.Status = schedule.Status
+	}
+	if schedule.NextRunAt != nil {
+		existing.NextRunAt = schedule.NextRunAt
+	}
+	existing.CatchUp = schedule.CatchUp
+	existing.Retries = schedule.Retries
+	if len(schedule.Tags) > 0 {
+		existing.Tags = schedule.Tags
+	}
+	if len(schedule.Hooks) > 0 {
+		existing.Hooks = schedule.Hooks
+	}
 
-	if err := s.repo.Update(schedule); err != nil {
+	if err := s.repo.Update(existing); err != nil {
 		return err
 	}
 

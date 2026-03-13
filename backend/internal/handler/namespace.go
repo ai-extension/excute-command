@@ -10,11 +10,12 @@ import (
 )
 
 type NamespaceHandler struct {
-	repo domain.NamespaceRepository
+	repo     domain.NamespaceRepository
+	auditLog domain.AuditLogService
 }
 
-func NewNamespaceHandler(repo domain.NamespaceRepository) *NamespaceHandler {
-	return &NamespaceHandler{repo: repo}
+func NewNamespaceHandler(repo domain.NamespaceRepository, auditLog domain.AuditLogService) *NamespaceHandler {
+	return &NamespaceHandler{repo: repo, auditLog: auditLog}
 }
 
 func (h *NamespaceHandler) ListNamespaces(c *gin.Context) {
@@ -38,9 +39,11 @@ func (h *NamespaceHandler) CreateNamespace(c *gin.Context) {
 	}
 	ns.ID = uuid.New()
 	if err := h.repo.Create(&ns); err != nil {
+		h.auditLog.LogAction(c, "CREATE", "NAMESPACE", ns.ID.String(), gin.H{"name": ns.Name, "error": err.Error()}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	h.auditLog.LogAction(c, "CREATE", "NAMESPACE", ns.ID.String(), gin.H{"name": ns.Name}, "SUCCESS")
 	c.JSON(http.StatusCreated, ns)
 }
 
@@ -73,9 +76,11 @@ func (h *NamespaceHandler) UpdateNamespace(c *gin.Context) {
 	existing.Description = ns.Description
 
 	if err := h.repo.Update(existing); err != nil {
+		h.auditLog.LogAction(c, "UPDATE", "NAMESPACE", id.String(), gin.H{"name": ns.Name, "error": err.Error()}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	h.auditLog.LogAction(c, "UPDATE", "NAMESPACE", id.String(), gin.H{"name": ns.Name}, "SUCCESS")
 	c.JSON(http.StatusOK, existing)
 }
 
@@ -122,8 +127,10 @@ func (h *NamespaceHandler) DeleteNamespace(c *gin.Context) {
 	}
 
 	if err := h.repo.Delete(id); err != nil {
+		h.auditLog.LogAction(c, "DELETE", "NAMESPACE", id.String(), gin.H{"name": target.Name, "error": err.Error()}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	h.auditLog.LogAction(c, "DELETE", "NAMESPACE", id.String(), gin.H{"name": target.Name}, "SUCCESS")
 	c.JSON(http.StatusOK, gin.H{"status": "deleted"})
 }

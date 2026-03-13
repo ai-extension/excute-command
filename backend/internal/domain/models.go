@@ -589,3 +589,29 @@ type SystemSettingRepository interface {
 	Upsert(setting *SystemSetting) error
 	List() ([]SystemSetting, error)
 }
+type AuditLog struct {
+	ID           uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
+	Timestamp    time.Time `json:"timestamp" gorm:"index:idx_audit_logs_timestamp,sort:desc;index:idx_audit_logs_res_timestamp,priority:3"`
+	NamespaceID  *uuid.UUID `json:"namespace_id" gorm:"type:uuid;index:idx_audit_logs_ns_timestamp,priority:1"`
+	UserID       *uuid.UUID `json:"user_id" gorm:"type:uuid;index"`
+	Username     string    `json:"username"`
+	Action       string    `json:"action" gorm:"index"`
+	ResourceType string    `json:"resource_type" gorm:"index:idx_audit_logs_res_timestamp,priority:1"`
+	ResourceID   *string   `json:"resource_id" gorm:"index:idx_audit_logs_res_timestamp,priority:2"`
+	Metadata     string    `json:"metadata" gorm:"type:jsonb"`
+	Status       string    `json:"status"`
+	IPAddress    string    `json:"ip_address"`
+}
+
+type AuditLogRepository interface {
+	Create(log *AuditLog) error
+	CreateBatch(logs []AuditLog) error
+	List(namespaceID *uuid.UUID, resourceType *string, resourceID *string, userID *uuid.UUID, username *string, action *string, limit, offset int) ([]AuditLog, int64, error)
+	DeleteOldLogs(days int) error
+}
+
+type AuditLogService interface {
+	LogAction(c context.Context, action string, resourceType string, resourceID string, metadata interface{}, status string)
+	ListLogs(namespaceID *uuid.UUID, resourceType *string, resourceID *string, userID *uuid.UUID, username *string, action *string, limit, offset int) ([]AuditLog, int64, error)
+	Cleanup(days int) error
+}

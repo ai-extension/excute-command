@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/user/csm-backend/internal/domain"
 	"github.com/user/csm-backend/internal/service"
 	"golang.org/x/crypto/bcrypt"
@@ -199,6 +200,18 @@ func RBACMiddleware(userRepo domain.UserRepository, permType, action string) gin
 		// Check for hierarchical permission
 		resourceID := c.Param("id")
 		namespaceID := c.Param("ns_id")
+
+		// Add UUIDs to context for Audit Logging
+		if namespaceID != "" {
+			if nsUUID, err := uuid.Parse(namespaceID); err == nil {
+				c.Set("namespace_id", nsUUID)
+			}
+		}
+		if resourceID != "" {
+			if resUUID, err := uuid.Parse(resourceID); err == nil {
+				c.Set("resource_id", resUUID)
+			}
+		}
 
 		var resIDPtr, nsIDPtr *string
 		if resourceID != "" {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Terminal, Settings, Box, ChevronsLeft, ChevronsRight, Zap, LogOut, Users, Shield, Server, Network, History, Globe, Calendar, Tag, Layout } from 'lucide-react';
+import { LayoutDashboard, Terminal, Settings, Box, ChevronsLeft, ChevronsRight, Zap, LogOut, Users, Shield, Server, Network, History, Globe, Calendar, Tag, Layout, ShieldCheck } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 import { useAuth } from '../context/AuthContext';
@@ -39,6 +39,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
     const identityItems = [
         { name: 'Users', path: '/users', icon: Users, type: 'users' },
         { name: 'Roles', path: '/roles', icon: Shield, type: 'roles' },
+        { name: 'Audit Logs', path: '/audit-logs', icon: ShieldCheck, type: 'audit_logs' },
     ].filter(item => hasPermission(item.type, 'READ'));
 
     const systemItems = [

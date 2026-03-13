@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/user/csm-backend/internal/domain"
+	"github.com/user/csm-backend/internal/lib/utils"
 	"github.com/user/csm-backend/internal/service"
 )
 
@@ -17,14 +18,16 @@ type PageHandler struct {
 	workflowService *service.WorkflowService
 	executor        *service.WorkflowExecutor
 	terminalService *service.TerminalService
+	auditLog        domain.AuditLogService
 }
 
-func NewPageHandler(s *service.PageService, ws *service.WorkflowService, e *service.WorkflowExecutor, ts *service.TerminalService) *PageHandler {
+func NewPageHandler(s *service.PageService, ws *service.WorkflowService, e *service.WorkflowExecutor, ts *service.TerminalService, auditLog domain.AuditLogService) *PageHandler {
 	return &PageHandler{
 		service:         s,
 		workflowService: ws,
 		executor:        e,
 		terminalService: ts,
+		auditLog:        auditLog,
 	}
 }
 
@@ -108,9 +111,11 @@ func (h *PageHandler) CreatePage(c *gin.Context) {
 	}
 
 	if err := h.service.CreatePage(&page, userObj); err != nil {
+		h.auditLog.LogAction(c, "CREATE", "PAGE", "", map[string]string{"title": page.Title, "error": err.Error()}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	h.auditLog.LogAction(c, "CREATE", "PAGE", page.ID.String(), map[string]string{"title": page.Title}, "SUCCESS")
 	c.JSON(http.StatusCreated, page)
 }
 
@@ -146,11 +151,28 @@ func (h *PageHandler) UpdatePage(c *gin.Context) {
 	}
 	page.ID = id
 
-	user, _ := c.Get("user")
-	if err := h.service.UpdatePage(&page, user.(*domain.User)); err != nil {
+	userVal, _ := c.Get("user")
+	user := userVal.(*domain.User)
+
+	// Fetch existing to get NamespaceID and calculate diff
+	existing, err := h.service.GetPage(id, user)
+	if err == nil {
+		c.Set("namespace_id", existing.NamespaceID)
+	}
+
+	diff := utils.CalculateDiff(existing, &page)
+
+	if err := h.service.UpdatePage(&page, user); err != nil {
+		meta := diff
+		if meta == nil {
+			meta = make(map[string]interface{})
+		}
+		meta["error"] = err.Error()
+		h.auditLog.LogAction(c, "UPDATE", "PAGE", page.ID.String(), meta, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	h.auditLog.LogAction(c, "UPDATE", "PAGE", page.ID.String(), diff, "SUCCESS")
 	c.JSON(http.StatusOK, page)
 }
 
@@ -162,11 +184,22 @@ func (h *PageHandler) DeletePage(c *gin.Context) {
 		return
 	}
 
-	user, _ := c.Get("user")
-	if err := h.service.DeletePage(id, user.(*domain.User)); err != nil {
+	userVal, _ := c.Get("user")
+	user := userVal.(*domain.User)
+
+	// Fetch existing to get NamespaceID for audit log
+	existing, err := h.service.GetPage(id, user)
+	if err == nil {
+		c.Set("namespace_id", existing.NamespaceID)
+	}
+
+	resID := id.String()
+	if err := h.service.DeletePage(id, user); err != nil {
+		h.auditLog.LogAction(c, "DELETE", "PAGE", resID, map[string]string{"error": err.Error()}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	h.auditLog.LogAction(c, "DELETE", "PAGE", resID, nil, "SUCCESS")
 	c.JSON(http.StatusOK, gin.H{"message": "page deleted"})
 }
 
@@ -345,6 +378,8 @@ func (h *PageHandler) RunPublicWorkflow(c *gin.Context) {
 		// Public run uses background context
 		h.executor.Run(context.Background(), workflowID, execID, inputReq.Inputs, nil, &page.ID, "PAGE", nil, nil, nil, nil)
 	}()
+
+	h.auditLog.LogAction(c, "RUN_WORKFLOW", "PAGE", page.ID.String(), map[string]string{"workflow_id": workflowID.String(), "execution_id": execID.String()}, "SUCCESS")
 
 	c.JSON(http.StatusAccepted, gin.H{
 		"message":      "Workflow started",

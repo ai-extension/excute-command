@@ -7,15 +7,20 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/user/csm-backend/internal/domain"
+	"github.com/user/csm-backend/internal/lib/utils"
 	"github.com/user/csm-backend/internal/service"
 )
 
 type TagHandler struct {
-	service *service.TagService
+	service  *service.TagService
+	auditLog domain.AuditLogService
 }
 
-func NewTagHandler(service *service.TagService) *TagHandler {
-	return &TagHandler{service: service}
+func NewTagHandler(service *service.TagService, auditLog domain.AuditLogService) *TagHandler {
+	return &TagHandler{
+		service:  service,
+		auditLog: auditLog,
+	}
 }
 
 func (h *TagHandler) List(c *gin.Context) {
@@ -88,10 +93,12 @@ func (h *TagHandler) Create(c *gin.Context) {
 	}
 
 	if err := h.service.Create(&tag, u); err != nil {
+		h.auditLog.LogAction(c, "CREATE", "TAG", "", map[string]string{"name": tag.Name, "error": err.Error()}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	h.auditLog.LogAction(c, "CREATE", "TAG", tag.ID.String(), map[string]string{"name": tag.Name}, "SUCCESS")
 	c.JSON(http.StatusCreated, tag)
 }
 
@@ -110,14 +117,29 @@ func (h *TagHandler) Update(c *gin.Context) {
 	}
 	tag.ID = id
 
-	currentUser, _ := c.Get("user")
-	user, _ := currentUser.(*domain.User)
+	userVal, _ := c.Get("user")
+	user := userVal.(*domain.User)
+
+	// Fetch to set namespace_id and calculate diff
+	existing, err := h.service.GetByID(id, user)
+	if err == nil {
+		c.Set("namespace_id", existing.NamespaceID)
+	}
+
+	diff := utils.CalculateDiff(existing, &tag)
 
 	if err := h.service.Update(&tag, user); err != nil {
+		meta := diff
+		if meta == nil {
+			meta = make(map[string]interface{})
+		}
+		meta["error"] = err.Error()
+		h.auditLog.LogAction(c, "UPDATE", "TAG", tag.ID.String(), meta, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	h.auditLog.LogAction(c, "UPDATE", "TAG", tag.ID.String(), diff, "SUCCESS")
 	c.JSON(http.StatusOK, tag)
 }
 
@@ -129,11 +151,22 @@ func (h *TagHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	user, _ := c.Get("user")
-	if err := h.service.Delete(id, user.(*domain.User)); err != nil {
+	userVal, _ := c.Get("user")
+	user := userVal.(*domain.User)
+
+	// Fetch to set namespace_id
+	existing, err := h.service.GetByID(id, user)
+	if err == nil {
+		c.Set("namespace_id", existing.NamespaceID)
+	}
+
+	resID := id.String()
+	if err := h.service.Delete(id, user); err != nil {
+		h.auditLog.LogAction(c, "DELETE", "TAG", resID, map[string]string{"error": err.Error()}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	h.auditLog.LogAction(c, "DELETE", "TAG", resID, nil, "SUCCESS")
 	c.Status(http.StatusNoContent)
 }

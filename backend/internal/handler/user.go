@@ -18,10 +18,16 @@ type UserHandler struct {
 	userRepo   domain.UserRepository
 	roleRepo   domain.RoleRepository
 	apiKeyRepo domain.APIKeyRepository
+	auditLog   domain.AuditLogService
 }
 
-func NewUserHandler(userRepo domain.UserRepository, roleRepo domain.RoleRepository, apiKeyRepo domain.APIKeyRepository) *UserHandler {
-	return &UserHandler{userRepo: userRepo, roleRepo: roleRepo, apiKeyRepo: apiKeyRepo}
+func NewUserHandler(userRepo domain.UserRepository, roleRepo domain.RoleRepository, apiKeyRepo domain.APIKeyRepository, auditLog domain.AuditLogService) *UserHandler {
+	return &UserHandler{
+		userRepo:   userRepo,
+		roleRepo:   roleRepo,
+		apiKeyRepo: apiKeyRepo,
+		auditLog:   auditLog,
+	}
 }
 
 func (h *UserHandler) GetMe(c *gin.Context) {
@@ -89,10 +95,12 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 	user.Email = input.Email
 
 	if err := h.userRepo.Update(user); err != nil {
+		h.auditLog.LogAction(c, "UPDATE_PROFILE", "USER", "", map[string]string{"error": err.Error()}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	h.auditLog.LogAction(c, "UPDATE_PROFILE", "USER", "", nil, "SUCCESS")
 	c.JSON(http.StatusOK, user)
 }
 
@@ -141,10 +149,12 @@ func (h *UserHandler) UpdatePassword(c *gin.Context) {
 	user.PasswordHash = string(hashedPassword)
 
 	if err := h.userRepo.Update(user); err != nil {
+		h.auditLog.LogAction(c, "UPDATE_PASSWORD", "USER", "", map[string]string{"error": err.Error()}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	h.auditLog.LogAction(c, "UPDATE_PASSWORD", "USER", "", nil, "SUCCESS")
 	c.JSON(http.StatusOK, gin.H{"message": "password updated successfully"})
 }
 
@@ -209,10 +219,13 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 	}
 
 	if err := h.userRepo.Create(user); err != nil {
+		h.auditLog.LogAction(c, "CREATE_USER", "USER", "", map[string]string{"username": user.Username, "error": err.Error()}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	resID := user.ID.String()
+	h.auditLog.LogAction(c, "CREATE_USER", "USER", resID, map[string]string{"username": user.Username}, "SUCCESS")
 	c.JSON(http.StatusCreated, user)
 }
 
@@ -239,11 +252,15 @@ func (h *UserHandler) UpdateUserRoles(c *gin.Context) {
 		return
 	}
 
+	resID := userID.String()
+
 	if err := h.userRepo.SetRoles(userID, roles); err != nil {
+		h.auditLog.LogAction(c, "UPDATE_USER_ROLES", "USER", resID, map[string]string{"error": err.Error()}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	h.auditLog.LogAction(c, "UPDATE_USER_ROLES", "USER", resID, nil, "SUCCESS")
 	c.JSON(http.StatusOK, gin.H{"message": "user roles updated successfully"})
 }
 
@@ -292,11 +309,15 @@ func (h *UserHandler) DeleteUser(c *gin.Context) {
 		return
 	}
 
+	resID := userID.String()
+
 	if err := h.userRepo.Delete(userID); err != nil {
+		h.auditLog.LogAction(c, "DELETE", "USER", resID, map[string]string{"error": err.Error()}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	h.auditLog.LogAction(c, "DELETE", "USER", resID, nil, "SUCCESS")
 	c.JSON(http.StatusOK, gin.H{"message": "user soft deleted successfully"})
 }
 
@@ -331,11 +352,15 @@ func (h *UserHandler) ResetPassword(c *gin.Context) {
 
 	user.PasswordHash = string(hashedPassword)
 
+	resID := userID.String()
+
 	if err := h.userRepo.Update(user); err != nil {
+		h.auditLog.LogAction(c, "RESET_PASSWORD", "USER", resID, map[string]string{"error": err.Error()}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	h.auditLog.LogAction(c, "RESET_PASSWORD", "USER", resID, nil, "SUCCESS")
 	c.JSON(http.StatusOK, gin.H{"message": "password reset successfully"})
 }
 

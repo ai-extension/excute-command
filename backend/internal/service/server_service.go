@@ -56,11 +56,42 @@ func (s *ServerService) UpdateServer(server *domain.Server, user *domain.User) e
 		return err
 	}
 
-	server.CreatedBy = existing.CreatedBy
-	server.CreatedByUsername = existing.CreatedByUsername
-	server.CreatedAt = existing.CreatedAt
+	// Merge updatable fields from partial server into existing record
+	if server.Name != "" {
+		existing.Name = server.Name
+	}
+	if server.Description != "" {
+		existing.Description = server.Description
+	}
+	if server.ConnectionType != "" {
+		existing.ConnectionType = server.ConnectionType
+	}
+	if server.Host != "" {
+		existing.Host = server.Host
+	}
+	if server.Port > 0 {
+		existing.Port = server.Port
+	}
+	if server.User != "" {
+		existing.User = server.User
+	}
+	if server.AuthType != "" {
+		existing.AuthType = server.AuthType
+	}
+	if server.Password != "" {
+		existing.Password = server.Password
+	}
+	if server.PrivateKey != "" {
+		existing.PrivateKey = server.PrivateKey
+	}
+	if server.VpnID != nil {
+		existing.VpnID = server.VpnID
+	}
+	if server.HostKeyFingerprint != "" {
+		existing.HostKeyFingerprint = server.HostKeyFingerprint
+	}
 
-	return s.repo.Update(server)
+	return s.repo.Update(existing)
 }
 
 func (s *ServerService) DeleteServer(id uuid.UUID, user *domain.User) error {

@@ -7,15 +7,20 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/user/csm-backend/internal/domain"
+	"github.com/user/csm-backend/internal/lib/utils"
 	"github.com/user/csm-backend/internal/service"
 )
 
 type GlobalVariableHandler struct {
-	service *service.GlobalVariableService
+	service  *service.GlobalVariableService
+	auditLog domain.AuditLogService
 }
 
-func NewGlobalVariableHandler(service *service.GlobalVariableService) *GlobalVariableHandler {
-	return &GlobalVariableHandler{service: service}
+func NewGlobalVariableHandler(service *service.GlobalVariableService, auditLog domain.AuditLogService) *GlobalVariableHandler {
+	return &GlobalVariableHandler{
+		service:  service,
+		auditLog: auditLog,
+	}
 }
 
 func (h *GlobalVariableHandler) List(c *gin.Context) {
@@ -84,10 +89,12 @@ func (h *GlobalVariableHandler) Create(c *gin.Context) {
 	}
 
 	if err := h.service.Create(&gv, user); err != nil {
+		h.auditLog.LogAction(c, "CREATE", "VARIABLE", "", map[string]string{"key": gv.Key, "error": err.Error()}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	h.auditLog.LogAction(c, "CREATE", "VARIABLE", gv.ID.String(), map[string]string{"key": gv.Key}, "SUCCESS")
 	c.JSON(http.StatusCreated, gv)
 }
 
@@ -105,12 +112,29 @@ func (h *GlobalVariableHandler) Update(c *gin.Context) {
 	}
 	gv.ID = id
 
-	user, _ := c.Get("user")
-	if err := h.service.Update(&gv, user.(*domain.User)); err != nil {
+	userVal, _ := c.Get("user")
+	user := userVal.(*domain.User)
+
+	// Fetch to get namespace_id and calculate diff
+	existing, err := h.service.GetByID(id, user)
+	if err == nil {
+		c.Set("namespace_id", existing.NamespaceID)
+	}
+
+	diff := utils.CalculateDiff(existing, &gv)
+
+	if err := h.service.Update(&gv, user); err != nil {
+		meta := diff
+		if meta == nil {
+			meta = make(map[string]interface{})
+		}
+		meta["error"] = err.Error()
+		h.auditLog.LogAction(c, "UPDATE", "VARIABLE", gv.ID.String(), meta, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	h.auditLog.LogAction(c, "UPDATE", "VARIABLE", gv.ID.String(), diff, "SUCCESS")
 	c.JSON(http.StatusOK, gv)
 }
 
@@ -124,10 +148,19 @@ func (h *GlobalVariableHandler) Delete(c *gin.Context) {
 	userVal, _ := c.Get("user")
 	user := userVal.(*domain.User)
 
+	// Fetch to get namespace_id
+	existing, err := h.service.GetByID(id, user)
+	if err == nil {
+		c.Set("namespace_id", existing.NamespaceID)
+	}
+
+	resID := id.String()
 	if err := h.service.Delete(id, user); err != nil {
+		h.auditLog.LogAction(c, "DELETE", "VARIABLE", resID, map[string]string{"error": err.Error()}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	h.auditLog.LogAction(c, "DELETE", "VARIABLE", resID, nil, "SUCCESS")
 	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
 }

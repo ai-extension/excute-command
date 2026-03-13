@@ -79,37 +79,38 @@ func (s *PageService) UpdatePage(page *domain.Page, user *domain.User) error {
 		return err
 	}
 
-	// If password is being updated (not empty), hash it
-	// If it's a special marker "__CLEAR_PASSWORD__", explicitly clear it.
-	// If it's empty, keep the existing one.
-	if page.Password == "__CLEAR_PASSWORD__" {
-		page.Password = ""
-	} else if page.Password != "" {
-		if len(page.Password) < 4 || page.Password[:4] != "$2a$" {
-			hashed, err := bcrypt.GenerateFromPassword([]byte(page.Password), bcrypt.DefaultCost)
-			if err != nil {
-				return err
-			}
-			page.Password = string(hashed)
-		}
-	} else {
-		page.Password = existing.Password
+	// Merge updatable fields from partial page into existing record
+	if page.Title != "" {
+		existing.Title = page.Title
+	}
+	if page.Description != "" {
+		existing.Description = page.Description
+	}
+	if page.Slug != "" {
+		existing.Slug = page.Slug
+	}
+	existing.IsPublic = page.IsPublic
+	existing.TokenTTLMinutes = page.TokenTTLMinutes
+	if page.ExpiresAt != nil {
+		existing.ExpiresAt = page.ExpiresAt
+	}
+	if page.Layout != "" {
+		existing.Layout = page.Layout
+	}
+	if len(page.Tags) > 0 {
+		existing.Tags = page.Tags
 	}
 
-	// Preserve non-updatable fields
-	page.CreatedBy = existing.CreatedBy
-	page.CreatedByUsername = existing.CreatedByUsername
-	page.CreatedAt = existing.CreatedAt
-
-	// Regenerate IDs for workflows to simplify repo implementation (delete/create)
-	for i := range page.Workflows {
-		if page.Workflows[i].ID == uuid.Nil {
-			page.Workflows[i].ID = uuid.New()
+	// Always generate IDs for workflows if they don't exist
+	existing.Workflows = page.Workflows
+	for i := range existing.Workflows {
+		if existing.Workflows[i].ID == uuid.Nil {
+			existing.Workflows[i].ID = uuid.New()
 		}
-		page.Workflows[i].PageID = page.ID
+		existing.Workflows[i].PageID = existing.ID
 	}
 
-	return s.repo.Update(page)
+	return s.repo.Update(existing)
 }
 
 func (s *PageService) DeletePage(id uuid.UUID, user *domain.User) error {

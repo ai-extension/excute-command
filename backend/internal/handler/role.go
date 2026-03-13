@@ -12,10 +12,15 @@ import (
 type RoleHandler struct {
 	roleRepo domain.RoleRepository
 	permRepo domain.PermissionRepository
+	auditLog domain.AuditLogService
 }
 
-func NewRoleHandler(roleRepo domain.RoleRepository, permRepo domain.PermissionRepository) *RoleHandler {
-	return &RoleHandler{roleRepo: roleRepo, permRepo: permRepo}
+func NewRoleHandler(roleRepo domain.RoleRepository, permRepo domain.PermissionRepository, auditLog domain.AuditLogService) *RoleHandler {
+	return &RoleHandler{
+		roleRepo: roleRepo,
+		permRepo: permRepo,
+		auditLog: auditLog,
+	}
 }
 
 func (h *RoleHandler) ListRoles(c *gin.Context) {
@@ -64,9 +69,13 @@ func (h *RoleHandler) CreateRole(c *gin.Context) {
 	}
 
 	if err := h.roleRepo.Create(role); err != nil {
+		h.auditLog.LogAction(c, "CREATE_ROLE", "RBAC", role.ID.String(), map[string]string{"name": role.Name, "error": err.Error()}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	resID := role.ID.String()
+	h.auditLog.LogAction(c, "CREATE_ROLE", "RBAC", resID, map[string]string{"name": role.Name}, "SUCCESS")
 
 	c.JSON(http.StatusCreated, role)
 }
@@ -101,10 +110,15 @@ func (h *RoleHandler) UpdateRolePermissions(c *gin.Context) {
 		})
 	}
 
+	resID := roleID.String()
+
 	if err := h.roleRepo.SetPermissions(roleID, rolePerms); err != nil {
+		h.auditLog.LogAction(c, "UPDATE_ROLE_PERMISSIONS", "RBAC", resID, map[string]string{"error": err.Error()}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	h.auditLog.LogAction(c, "UPDATE_ROLE_PERMISSIONS", "RBAC", resID, nil, "SUCCESS")
 
 	c.JSON(http.StatusOK, gin.H{"message": "role permissions updated successfully"})
 }

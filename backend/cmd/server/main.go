@@ -75,6 +75,7 @@ func main() {
 		&domain.PageWorkflow{},
 		&domain.APIKey{},
 		&domain.SystemSetting{},
+		&domain.AuditLog{},
 	); err != nil {
 		log.Fatal("Failed to migrate database:", err)
 	}
@@ -99,6 +100,7 @@ func main() {
 	pageRepo := repository.NewPostgresPageRepo(db)
 	apiKeyRepo := repository.NewPostgresAPIKeyRepo(db)
 	settingRepo := repository.NewPostgresSystemSettingRepo(db)
+	auditLogRepo := repository.NewPostgresAuditLogRepo(db)
 
 	// Seed Admin User and Default Namespace
 	seedAdmin(db)
@@ -113,6 +115,7 @@ func main() {
 	// Initialize Services
 	sshPool := service.NewSSHPool()
 	vpnConnector := service.NewVpnConnector()
+	auditLogService := service.NewAuditLogService(auditLogRepo)
 	authService := service.NewAuthService(userRepo, settingRepo)
 	serverService := service.NewServerService(serverRepo, hub, vpnConnector, sshPool)
 	terminalService := service.NewTerminalService(serverRepo, hub, vpnConnector, sshPool)
@@ -135,22 +138,23 @@ func main() {
 	}
 
 	// Initialize Handlers
-	namespaceHandler := handler.NewNamespaceHandler(namespaceRepo)
-	authHandler := handler.NewAuthHandler(authService)
-	userHandler := handler.NewUserHandler(userRepo, roleRepo, apiKeyRepo)
-	roleHandler := handler.NewRoleHandler(roleRepo, permRepo)
+	namespaceHandler := handler.NewNamespaceHandler(namespaceRepo, auditLogService)
+	authHandler := handler.NewAuthHandler(authService, auditLogService)
+	userHandler := handler.NewUserHandler(userRepo, roleRepo, apiKeyRepo, auditLogService)
+	roleHandler := handler.NewRoleHandler(roleRepo, permRepo, auditLogService)
 	permHandler := handler.NewPermissionHandler(permRepo, workflowRepo, globalVarRepo, scheduleRepo, pageRepo, tagRepo, serverRepo, namespaceRepo, execRepo, userRepo, roleRepo, vpnRepo)
-	serverHandler := handler.NewServerHandler(serverService, terminalService)
+	serverHandler := handler.NewServerHandler(serverService, terminalService, auditLogService)
 	wsHandler := handler.NewWSHandler(hub, terminalService, authService, pageService, workflowService)
-	workflowHandler := handler.NewWorkflowHandler(workflowService, workflowExecutor)
-	globalVarHandler := handler.NewGlobalVariableHandler(globalVarService)
-	scheduleHandler := handler.NewScheduleHandler(scheduleService)
-	tagHandler := handler.NewTagHandler(tagService)
+	workflowHandler := handler.NewWorkflowHandler(workflowService, workflowExecutor, auditLogService)
+	globalVarHandler := handler.NewGlobalVariableHandler(globalVarService, auditLogService)
+	scheduleHandler := handler.NewScheduleHandler(scheduleService, auditLogService)
+	tagHandler := handler.NewTagHandler(tagService, auditLogService)
 	workflowFileService := service.NewWorkflowFileService(workflowFileRepo)
 	workflowFileHandler := handler.NewWorkflowFileHandler(workflowFileService)
-	vpnHandler := handler.NewVpnConfigHandler(vpnService)
-	pageHandler := handler.NewPageHandler(pageService, workflowService, workflowExecutor, terminalService)
+	vpnHandler := handler.NewVpnConfigHandler(vpnService, auditLogService)
+	pageHandler := handler.NewPageHandler(pageService, workflowService, workflowExecutor, terminalService, auditLogService)
 	settingsHandler := handler.NewSettingsHandler(settingsService)
+	auditLogHandler := handler.NewAuditLogHandler(auditLogService)
 	dashboardHandler := handler.NewDashboardHandler(dashboardService)
 
 	// Initialize Router
@@ -289,6 +293,10 @@ func main() {
 			// System Settings
 			protected.GET("/settings", middleware.RBACMiddleware(userRepo, "settings", "READ"), settingsHandler.GetSettings)
 			protected.PUT("/settings", middleware.RBACMiddleware(userRepo, "settings", "WRITE"), settingsHandler.UpdateSetting)
+
+			// Audit Logs
+			protected.GET("/audit-logs", middleware.RBACMiddleware(userRepo, "audit_logs", "READ"), auditLogHandler.ListAuditLogs)
+			protected.GET("/audit-logs/resource/:type/:id", middleware.RBACMiddleware(userRepo, "audit_logs", "READ"), auditLogHandler.ListResourceLogs)
 		}
 
 		// Public Page access (optional auth for private pages)
@@ -401,6 +409,8 @@ func seedAdmin(db *gorm.DB) {
 		{Name: "Write Resources in Namespace", Type: "namespaces", Action: "RESOURCE_WRITE"},
 		{Name: "Execute Resources in Namespace", Type: "namespaces", Action: "RESOURCE_EXECUTE"},
 		{Name: "Delete Resources in Namespace", Type: "namespaces", Action: "RESOURCE_DELETE"},
+
+		{Name: "Read Audit Logs", Type: "audit_logs", Action: "READ"},
 	}
 
 	var perms []domain.Permission

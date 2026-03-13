@@ -10,15 +10,20 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/user/csm-backend/internal/domain"
+	"github.com/user/csm-backend/internal/lib/utils"
 	"github.com/user/csm-backend/internal/service"
 )
 
 type ScheduleHandler struct {
-	service *service.ScheduleService
+	service  *service.ScheduleService
+	auditLog domain.AuditLogService
 }
 
-func NewScheduleHandler(service *service.ScheduleService) *ScheduleHandler {
-	return &ScheduleHandler{service: service}
+func NewScheduleHandler(service *service.ScheduleService, auditLog domain.AuditLogService) *ScheduleHandler {
+	return &ScheduleHandler{
+		service:  service,
+		auditLog: auditLog,
+	}
 }
 
 func (h *ScheduleHandler) List(c *gin.Context) {
@@ -174,10 +179,12 @@ func (h *ScheduleHandler) Create(c *gin.Context) {
 	}
 
 	if err := h.service.Create(schedule, workflowConfigs, u); err != nil {
+		h.auditLog.LogAction(c, "CREATE", "SCHEDULE", "", map[string]string{"name": schedule.Name, "error": err.Error()}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	h.auditLog.LogAction(c, "CREATE", "SCHEDULE", schedule.ID.String(), map[string]string{"name": schedule.Name}, "SUCCESS")
 	c.JSON(http.StatusCreated, schedule)
 }
 
@@ -188,12 +195,23 @@ func (h *ScheduleHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	user, _ := c.Get("user")
-	if err := h.service.Delete(id, user.(*domain.User)); err != nil {
+	userVal, _ := c.Get("user")
+	user := userVal.(*domain.User)
+
+	// Fetch to set namespace_id in context
+	existing, err := h.service.GetByID(id, user)
+	if err == nil {
+		c.Set("namespace_id", existing.NamespaceID)
+	}
+
+	resID := id.String()
+	if err := h.service.Delete(id, user); err != nil {
+		h.auditLog.LogAction(c, "DELETE", "SCHEDULE", resID, map[string]string{"error": err.Error()}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	h.auditLog.LogAction(c, "DELETE", "SCHEDULE", resID, nil, "SUCCESS")
 	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
 }
 
@@ -204,12 +222,23 @@ func (h *ScheduleHandler) ToggleStatus(c *gin.Context) {
 		return
 	}
 
-	user, _ := c.Get("user")
-	if err := h.service.ToggleStatus(id, user.(*domain.User)); err != nil {
+	userVal, _ := c.Get("user")
+	user := userVal.(*domain.User)
+
+	// Fetch to set namespace_id in context
+	existing, err := h.service.GetByID(id, user)
+	if err == nil {
+		c.Set("namespace_id", existing.NamespaceID)
+	}
+
+	resID := id.String()
+	if err := h.service.ToggleStatus(id, user); err != nil {
+		h.auditLog.LogAction(c, "TOGGLE_STATUS", "SCHEDULE", resID, map[string]string{"error": err.Error()}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	h.auditLog.LogAction(c, "TOGGLE_STATUS", "SCHEDULE", resID, nil, "SUCCESS")
 	c.JSON(http.StatusOK, gin.H{"message": "status toggled"})
 }
 
@@ -241,8 +270,9 @@ func (h *ScheduleHandler) Update(c *gin.Context) {
 		return
 	}
 
-	user, _ := c.Get("user")
-	schedule, err := h.service.GetByID(id, user.(*domain.User))
+	userVal, _ := c.Get("user")
+	user := userVal.(*domain.User)
+	schedule, err := h.service.GetByID(id, user)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "schedule not found"})
 		return
@@ -275,12 +305,26 @@ func (h *ScheduleHandler) Update(c *gin.Context) {
 		})
 	}
 
-	userVal, _ := c.Get("user")
-	if err := h.service.Update(schedule, workflowConfigs, userVal.(*domain.User)); err != nil {
+	// Fetch existing again to calculate diff (or use original fetch if it wasn't mutated yet)
+	// Actually, we mutated the object already. To get a clean diff, we should have fetched it twice or copied it.
+	// Let's refetch it or use the already fetched one before mutation.
+	
+	// Re-fetching the unmodified state for diff
+	existing, _ := h.service.GetByID(id, user)
+	diff := utils.CalculateDiff(existing, schedule)
+
+	if err := h.service.Update(schedule, workflowConfigs, user); err != nil {
+		meta := diff
+		if meta == nil {
+			meta = make(map[string]interface{})
+		}
+		meta["error"] = err.Error()
+		h.auditLog.LogAction(c, "UPDATE", "SCHEDULE", schedule.ID.String(), meta, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	h.auditLog.LogAction(c, "UPDATE", "SCHEDULE", schedule.ID.String(), diff, "SUCCESS")
 	c.JSON(http.StatusOK, schedule)
 }
 func parseTimestamp(ts string) (time.Time, error) {

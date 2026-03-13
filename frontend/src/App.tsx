@@ -22,6 +22,7 @@ import PublicPageView from './pages/PublicPageView';
 import ProfilePage from './pages/ProfilePage';
 import APIKeysPage from './pages/APIKeysPage';
 import RegisterPage from './pages/RegisterPage';
+import AuditLogPage from './pages/AuditLogPage';
 import { useAuth } from './context/AuthContext';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -91,6 +92,7 @@ function App() {
                     <Route path="pages/:id/edit" element={<PageDesignerPage />} />
                     <Route path="profile" element={<ProfilePage />} />
                     <Route path="api-keys" element={<APIKeysPage />} />
+                    <Route path="audit-logs" element={<AuditLogPage />} />
                 </Route>
                 <Route path="/public/pages/:slug" element={<PublicPageView />} />
                 <Route path="*" element={<Navigate to="/" replace />} />

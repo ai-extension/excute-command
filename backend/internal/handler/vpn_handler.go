@@ -11,11 +11,15 @@ import (
 )
 
 type VpnConfigHandler struct {
-	service *service.VpnConfigService
+	service  *service.VpnConfigService
+	auditLog domain.AuditLogService
 }
 
-func NewVpnConfigHandler(service *service.VpnConfigService) *VpnConfigHandler {
-	return &VpnConfigHandler{service: service}
+func NewVpnConfigHandler(service *service.VpnConfigService, auditLog domain.AuditLogService) *VpnConfigHandler {
+	return &VpnConfigHandler{
+		service:  service,
+		auditLog: auditLog,
+	}
 }
 
 func (h *VpnConfigHandler) List(c *gin.Context) {
@@ -71,9 +75,12 @@ func (h *VpnConfigHandler) Create(c *gin.Context) {
 	}
 
 	if err := h.service.Create(&vpn, user); err != nil {
+		h.auditLog.LogAction(c, "CREATE", "VPN", "", map[string]string{"name": vpn.Name, "error": err.Error()}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	resID := vpn.ID.String()
+	h.auditLog.LogAction(c, "CREATE", "VPN", resID, map[string]string{"name": vpn.Name}, "SUCCESS")
 	c.JSON(http.StatusCreated, vpn)
 }
 
@@ -109,9 +116,12 @@ func (h *VpnConfigHandler) Delete(c *gin.Context) {
 	}
 
 	user, _ := c.Get("user")
+	resID := id.String()
 	if err := h.service.Delete(id, user.(*domain.User)); err != nil {
+		h.auditLog.LogAction(c, "DELETE", "VPN", resID, map[string]string{"error": err.Error()}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	h.auditLog.LogAction(c, "DELETE", "VPN", resID, nil, "SUCCESS")
 	c.JSON(http.StatusNoContent, nil)
 }

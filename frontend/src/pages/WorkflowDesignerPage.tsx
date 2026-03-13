@@ -43,6 +43,7 @@ import { GeneralSettingsTab } from '../components/workflow-designer/GeneralSetti
 import { VariablesTab } from '../components/workflow-designer/VariablesTab';
 import { StepsBuilderTab } from '../components/workflow-designer/StepsBuilderTab';
 import { Switch } from '../components/ui/switch';
+import ResourceHistoryTab from '../components/ResourceHistoryTab';
 
 const WorkflowDesignerPage = () => {
     const { id } = useParams();
@@ -58,7 +59,7 @@ const WorkflowDesignerPage = () => {
     const [groups, setGroups] = useState<Partial<WorkflowGroup>[]>([]);
     const [availableServers, setAvailableServers] = useState<ServerType[]>([]);
     const [isSaving, setIsSaving] = useState(false);
-    const [activeTab, setActiveTab] = useState<'general' | 'steps' | 'variables' | 'files' | 'hooks' | 'history'>('general');
+    const [activeTab, setActiveTab] = useState<'general' | 'steps' | 'variables' | 'files' | 'hooks' | 'history' | 'audit'>('general');
     const [hooks, setHooks] = useState<WorkflowHook[]>([]);
     const [allWorkflows, setAllWorkflows] = useState<Workflow[]>([]);
     const [defaultServerId, setDefaultServerId] = useState<string | undefined>(undefined);
@@ -511,6 +512,17 @@ const WorkflowDesignerPage = () => {
                                                 <History className="w-3 h-3 text-emerald-500" /> History
                                             </button>
                                         )}
+                                        {id && (
+                                            <button
+                                                onClick={() => setActiveTab('audit')}
+                                                className={cn(
+                                                    "flex items-center gap-2 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all",
+                                                    activeTab === 'audit' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                                                )}
+                                            >
+                                                <History className="w-3 h-3 text-blue-500" /> Audit
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -615,6 +627,8 @@ const WorkflowDesignerPage = () => {
                                                 onReRun={(wf: any, inputs: any, gId: any, sId: any, execId: any) => runWorkflow({ ...wf, id: id as string }, inputs, gId, sId, execId)}
                                             />
                                         </div>
+                                    ) : activeTab === 'audit' ? (
+                                        <ResourceHistoryTab resourceType="WORKFLOW" resourceId={id as string} />
                                     ) : null}
                                 </div>
                             </div>

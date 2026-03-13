@@ -12,18 +12,21 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/user/csm-backend/internal/domain"
+	"github.com/user/csm-backend/internal/lib/utils"
 	"github.com/user/csm-backend/internal/service"
 )
 
 type WorkflowHandler struct {
 	service  *service.WorkflowService
 	executor *service.WorkflowExecutor
+	auditLog *service.AuditLogService
 }
 
-func NewWorkflowHandler(s *service.WorkflowService, e *service.WorkflowExecutor) *WorkflowHandler {
+func NewWorkflowHandler(s *service.WorkflowService, e *service.WorkflowExecutor, al *service.AuditLogService) *WorkflowHandler {
 	return &WorkflowHandler{
 		service:  s,
 		executor: e,
+		auditLog: al,
 	}
 }
 
@@ -122,9 +125,13 @@ func (h *WorkflowHandler) CreateWorkflow(c *gin.Context) {
 	}
 
 	if err := h.service.CreateWorkflow(&wf, userObj); err != nil {
+		h.auditLog.LogAction(c, "CREATE", "WORKFLOW", wf.ID.String(), map[string]string{"error": err.Error(), "name": wf.Name}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	resID := wf.ID.String()
+	h.auditLog.LogAction(c, "CREATE", "WORKFLOW", resID, map[string]string{"name": wf.Name}, "SUCCESS")
 	c.JSON(http.StatusCreated, wf)
 }
 
@@ -164,10 +171,25 @@ func (h *WorkflowHandler) UpdateWorkflow(c *gin.Context) {
 	userVal, _ := c.Get("user")
 	user := userVal.(*domain.User)
 
+	// Fetch existing to get NamespaceID and calculate diff
+	existing, err := h.service.GetWorkflow(id, user)
+	if err == nil {
+		c.Set("namespace_id", existing.NamespaceID)
+	}
+
+	diff := utils.CalculateDiff(existing, &wf)
+
 	if err := h.service.UpdateWorkflow(&wf, user); err != nil {
+		meta := diff
+		if meta == nil {
+			meta = make(map[string]interface{})
+		}
+		meta["error"] = err.Error()
+		h.auditLog.LogAction(c, "UPDATE", "WORKFLOW", id.String(), meta, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	h.auditLog.LogAction(c, "UPDATE", "WORKFLOW", id.String(), diff, "SUCCESS")
 	c.JSON(http.StatusOK, wf)
 }
 
@@ -182,10 +204,18 @@ func (h *WorkflowHandler) DeleteWorkflow(c *gin.Context) {
 	userVal, _ := c.Get("user")
 	user := userVal.(*domain.User)
 
+	// Fetch existing to get NamespaceID for audit log
+	existing, err := h.service.GetWorkflow(id, user)
+	if err == nil {
+		c.Set("namespace_id", existing.NamespaceID)
+	}
+
 	if err := h.service.DeleteWorkflow(id, user); err != nil {
+		h.auditLog.LogAction(c, "DELETE", "WORKFLOW", id.String(), gin.H{"error": err.Error()}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	h.auditLog.LogAction(c, "DELETE", "WORKFLOW", id.String(), nil, "SUCCESS")
 	c.JSON(http.StatusOK, gin.H{"message": "workflow deleted"})
 }
 
@@ -243,9 +273,12 @@ func (h *WorkflowHandler) RunWorkflow(c *gin.Context) {
 	}
 
 	if err := h.service.CreateExecution(execution); err != nil {
+		h.auditLog.LogAction(c, "EXECUTE", "WORKFLOW", resIDStr, map[string]string{"error": "failed to create execution record"}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create execution record"})
 		return
 	}
+
+	h.auditLog.LogAction(c, "EXECUTE", "WORKFLOW", resIDStr, map[string]string{"execution_id": execID.String()}, "SUCCESS")
 
 	// Run inside a goroutine to not block the request
 	go func() {
@@ -552,12 +585,20 @@ func (h *WorkflowHandler) CloneWorkflow(c *gin.Context) {
 	userVal, _ := c.Get("user")
 	user := userVal.(*domain.User)
 
+	// Fetch to set namespace_id in context
+	existing, err := h.service.GetWorkflow(id, user)
+	if err == nil {
+		c.Set("namespace_id", existing.NamespaceID)
+	}
+
 	clone, err := h.service.CloneWorkflow(id, req.TargetNamespaceID, user)
 	if err != nil {
+		h.auditLog.LogAction(c, "CLONE", "WORKFLOW", id.String(), gin.H{"error": err.Error(), "target_ns": req.TargetNamespaceID}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	h.auditLog.LogAction(c, "CLONE", "WORKFLOW", id.String(), gin.H{"clone_id": clone.ID, "target_ns": req.TargetNamespaceID}, "SUCCESS")
 	c.JSON(http.StatusCreated, clone)
 }
 
@@ -592,9 +633,11 @@ func (h *WorkflowHandler) StopExecution(c *gin.Context) {
 	}
 
 	if err := h.executor.StopExecution(id); err != nil {
+		h.auditLog.LogAction(c, "STOP", "WORKFLOW_EXECUTION", id.String(), gin.H{"error": err.Error()}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	h.auditLog.LogAction(c, "STOP", "WORKFLOW_EXECUTION", id.String(), nil, "SUCCESS")
 	c.JSON(http.StatusOK, gin.H{"message": "Execution stop signal sent"})
 }

@@ -103,39 +103,68 @@ func (s *WorkflowService) UpdateWorkflow(wf *domain.Workflow, user *domain.User)
 		return err
 	}
 
-	// Preserve non-updatable fields
-	wf.CreatedBy = existing.CreatedBy
-	wf.CreatedByUsername = existing.CreatedByUsername
-	wf.CreatedAt = existing.CreatedAt
+	// Merge top-level fields from partial wf into existing record
+	if wf.Name != "" {
+		existing.Name = wf.Name
+	}
+	if wf.Description != "" {
+		existing.Description = wf.Description
+	}
+	if wf.DefaultServerID != nil {
+		existing.DefaultServerID = wf.DefaultServerID
+	}
+	if wf.Status != "" {
+		existing.Status = wf.Status
+	}
+	if wf.TimeoutMinutes > 0 {
+		existing.TimeoutMinutes = wf.TimeoutMinutes
+	}
+	existing.IsTemplate = wf.IsTemplate
+	existing.IsPublic = wf.IsPublic
+	if wf.TriggerSource != "" {
+		existing.TriggerSource = wf.TriggerSource
+	}
+	if wf.TargetFolder != "" {
+		existing.TargetFolder = wf.TargetFolder
+	}
+	existing.CleanupFiles = wf.CleanupFiles
+
+	// Copy associations from wf to existing (the repo handle syncing these)
+	existing.Inputs = wf.Inputs
+	existing.Variables = wf.Variables
+	existing.Groups = wf.Groups
+	existing.Tags = wf.Tags
+	existing.Hooks = wf.Hooks
+	existing.Files = wf.Files
 
 	// Recursively assign IDs to new inputs, variables, groups and steps
-	for i := range wf.Inputs {
-		if wf.Inputs[i].ID == uuid.Nil {
-			wf.Inputs[i].ID = uuid.New()
+	for i := range existing.Inputs {
+		if existing.Inputs[i].ID == uuid.Nil {
+			existing.Inputs[i].ID = uuid.New()
 		}
-		wf.Inputs[i].WorkflowID = wf.ID
+		existing.Inputs[i].WorkflowID = existing.ID
 	}
 
-	for i := range wf.Variables {
-		if wf.Variables[i].ID == uuid.Nil {
-			wf.Variables[i].ID = uuid.New()
+	for i := range existing.Variables {
+		if existing.Variables[i].ID == uuid.Nil {
+			existing.Variables[i].ID = uuid.New()
 		}
-		wf.Variables[i].WorkflowID = wf.ID
+		existing.Variables[i].WorkflowID = existing.ID
 	}
 
-	for i := range wf.Groups {
-		if wf.Groups[i].ID == uuid.Nil {
-			wf.Groups[i].ID = uuid.New()
+	for i := range existing.Groups {
+		if existing.Groups[i].ID == uuid.Nil {
+			existing.Groups[i].ID = uuid.New()
 		}
-		wf.Groups[i].WorkflowID = wf.ID
-		for j := range wf.Groups[i].Steps {
-			if wf.Groups[i].Steps[j].ID == uuid.Nil {
-				wf.Groups[i].Steps[j].ID = uuid.New()
+		existing.Groups[i].WorkflowID = existing.ID
+		for j := range existing.Groups[i].Steps {
+			if existing.Groups[i].Steps[j].ID == uuid.Nil {
+				existing.Groups[i].Steps[j].ID = uuid.New()
 			}
-			wf.Groups[i].Steps[j].GroupID = wf.Groups[i].ID
+			existing.Groups[i].Steps[j].GroupID = existing.Groups[i].ID
 		}
 	}
-	return s.repo.Update(wf)
+	return s.repo.Update(existing)
 }
 
 func (s *WorkflowService) DeleteWorkflow(id uuid.UUID, user *domain.User) error {
