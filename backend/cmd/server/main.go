@@ -35,7 +35,7 @@ func main() {
 		dbHost, dbUser, dbPassword, dbName, dbPort, dbSSLMode, dbTimeZone)
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-		DisableForeignKeyConstraintWhenMigrating: true,
+		DisableForeignKeyConstraintWhenMigrating: false,
 	})
 	if err != nil {
 		log.Fatalf("Failed to connect to database (DSN: host=%s user=%s dbname=%s port=%s): %v", dbHost, dbUser, dbName, dbPort, err)
