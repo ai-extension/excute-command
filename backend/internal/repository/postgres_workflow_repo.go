@@ -241,8 +241,13 @@ func (r *PostgresWorkflowRepo) Update(wf *domain.Workflow) error {
 			return err
 		}
 
+		// Sync Files
+		if err := tx.Model(wf).Association("Files").Replace(wf.Files); err != nil {
+			return err
+		}
+
 		// Update top-level fields (omit associations to avoid double-processing)
-		return tx.Omit("Groups", "Inputs", "Variables", "Tags", "Hooks").Save(wf).Error
+		return tx.Omit("Groups", "Inputs", "Variables", "Tags", "Hooks", "Files").Save(wf).Error
 	})
 }
 

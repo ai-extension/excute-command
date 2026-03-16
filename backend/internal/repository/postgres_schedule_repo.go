@@ -140,6 +140,11 @@ func (r *PostgresScheduleRepo) Update(s *domain.Schedule) error {
 			return err
 		}
 
+		// Sync ScheduledWorkflows
+		if err := tx.Model(s).Association("ScheduledWorkflows").Replace(s.ScheduledWorkflows); err != nil {
+			return err
+		}
+
 		// Sync Hooks
 		if err := tx.Where("schedule_id = ?", s.ID).Delete(&domain.WorkflowHook{}).Error; err != nil {
 			return err
