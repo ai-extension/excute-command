@@ -18,7 +18,7 @@ var (
 	limits = make(map[string]*rateLimit)
 	mu     sync.Mutex
 
-	MaxAttempts     = 5
+	MaxAttempts     = 100
 	LockoutDuration = 5 * time.Minute
 	ResetDuration   = 15 * time.Minute // Clean up if no attempts for 15 mins
 )

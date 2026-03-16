@@ -8,6 +8,7 @@ import { Page, PageWidget, PageLayout, WorkflowInput } from '../types';
 import { Button } from '../components/ui/button';
 import WorkflowInputDialog from '../components/WorkflowInputDialog';
 import { API_BASE_URL } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 
 // Extracted Components
 import PasswordProtection from '../components/PasswordProtection';
@@ -25,6 +26,7 @@ const PublicPageView = () => {
     const [isVerifying, setIsVerifying] = useState(false);
     const [requiresPassword, setRequiresPassword] = useState(false);
     const [widgets, setWidgets] = useState<PageWidget[]>([]);
+    const { showToast } = useAuth();
 
     // Token state
     const [pageToken, setPageToken] = useState<string | null>(null);
@@ -213,17 +215,7 @@ const PublicPageView = () => {
         return () => clearInterval(check);
     }, [tokenExpiresAt, isAuthorized]);
 
-    const [completionAlert, setCompletionAlert] = useState<{ show: boolean, status: string, message: string } | null>(null);
-
-    // Auto-close completion alert
-    useEffect(() => {
-        if (completionAlert?.show) {
-            const timer = setTimeout(() => {
-                setCompletionAlert(null);
-            }, 5000);
-            return () => clearTimeout(timer);
-        }
-    }, [completionAlert]);
+    // Auto-close completion alert removed in favor of global toast
 
     // Logs Polling replaced by WebSocket in PageExecutionTerminal
 
@@ -281,27 +273,15 @@ const PublicPageView = () => {
                     setExecutionLogs('Initializing trace...');
                     setTerminalState('normal');
                 } else {
-                    setCompletionAlert({
-                        show: true,
-                        status: 'SUCCESS',
-                        message: 'Workflow execution initiated.'
-                    });
+                    showToast('Workflow execution initiated.', 'success');
                 }
             } else {
                 setExecutionResults(prev => ({ ...prev, [widget.id]: { success: false, message: data.error || 'FAILED' } }));
-                setCompletionAlert({
-                    show: true,
-                    status: 'FAILED',
-                    message: `Execution failed: ${data.error || 'Unknown error'}`
-                });
+                showToast(`Execution failed: ${data.error || 'Unknown error'}`, 'error');
             }
         } catch (err) {
             setExecutionResults(prev => ({ ...prev, [widget.id]: { success: false, message: 'ERROR' } }));
-            setCompletionAlert({
-                show: true,
-                status: 'FAILED',
-                message: 'Error connecting to server.'
-            });
+            showToast('Error connecting to server.', 'error');
         } finally {
             // No-op: We wait for WebSocket status broadcast to cleanup running state
         }
@@ -494,12 +474,10 @@ const PublicPageView = () => {
                                             [activeWidgetId]: { success: status === 'SUCCESS', message: status }
                                         }));
 
-                                        setCompletionAlert({
-                                            show: true,
-                                            status: status,
-                                            message: status === 'SUCCESS' ? 'Workflow executed successfully!' :
-                                                status === 'CANCELLED' ? 'Workflow cancelled.' : 'Workflow execution failed.'
-                                        });
+                                        showToast(status === 'SUCCESS' ? 'Workflow executed successfully!' :
+                                            status === 'CANCELLED' ? 'Workflow cancelled.' : 'Workflow execution failed.',
+                                            status === 'SUCCESS' ? 'success' : 'error'
+                                        );
 
                                         if (!currentShowLog) {
                                             // Auto cleanup for hidden trackers
