@@ -132,6 +132,11 @@ func (r *PostgresPageRepo) Update(page *domain.Page) error {
 			return err
 		}
 
+		// Sync Workflows
+		if err := tx.Model(page).Association("Workflows").Replace(page.Workflows); err != nil {
+			return err
+		}
+
 		// Update top-level fields
 		return tx.Omit("Workflows", "Tags").Save(page).Error
 	})
