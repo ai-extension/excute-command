@@ -166,37 +166,32 @@ func (r *PostgresWorkflowRepo) UpdateStatus(id uuid.UUID, status domain.Status) 
 
 func (r *PostgresWorkflowRepo) Update(wf *domain.Workflow) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		// Sync Inputs: explicitly delete all old inputs and recreate them.
-		// This avoids GORM's ON CONFLICT DO UPDATE which silently skips the `type` column
-		// (a PostgreSQL reserved word) in the SET clause.
-		if err := tx.Where("workflow_id = ?", wf.ID).Delete(&domain.WorkflowInput{}).Error; err != nil {
-			return err
-		}
+		// Sync Inputs
 		for i := range wf.Inputs {
-			wf.Inputs[i].ID = uuid.New()
+			if wf.Inputs[i].ID == uuid.Nil {
+				wf.Inputs[i].ID = uuid.New()
+			}
 			wf.Inputs[i].WorkflowID = wf.ID
 			if wf.Inputs[i].Type == "" {
 				wf.Inputs[i].Type = "input"
 			}
-			if err := tx.Create(&wf.Inputs[i]).Error; err != nil {
-				return err
-			}
 		}
-
-		// Sync Variables: explicitly delete all old variables and recreate them.
-		if err := tx.Where("workflow_id = ?", wf.ID).Delete(&domain.WorkflowVariable{}).Error; err != nil {
+		if err := tx.Model(wf).Association("Inputs").Replace(wf.Inputs); err != nil {
 			return err
 		}
+
+		// Sync Variables
 		for i := range wf.Variables {
-			wf.Variables[i].ID = uuid.New()
-			wf.Variables[i].WorkflowID = wf.ID
-			if err := tx.Create(&wf.Variables[i]).Error; err != nil {
-				return err
+			if wf.Variables[i].ID == uuid.Nil {
+				wf.Variables[i].ID = uuid.New()
 			}
+			wf.Variables[i].WorkflowID = wf.ID
+		}
+		if err := tx.Model(wf).Association("Variables").Replace(wf.Variables); err != nil {
+			return err
 		}
 
 		// Step 1: Upsert each group first to ensure it exists in the DB before touching steps.
-		// This prevents FK violations when steps reference a new group that hasn't been saved yet.
 		for i := range wf.Groups {
 			wf.Groups[i].WorkflowID = wf.ID
 			if err := tx.Omit("Steps").Save(&wf.Groups[i]).Error; err != nil {
@@ -206,9 +201,11 @@ func (r *PostgresWorkflowRepo) Update(wf *domain.Workflow) error {
 
 		// Step 2: Now that all groups exist, sync their steps.
 		for i := range wf.Groups {
-			// Explicitly save each step to ensure fields like CommandText are updated
 			for j := range wf.Groups[i].Steps {
 				wf.Groups[i].Steps[j].GroupID = wf.Groups[i].ID
+				if wf.Groups[i].Steps[j].ID == uuid.Nil {
+					wf.Groups[i].Steps[j].ID = uuid.New()
+				}
 				if err := tx.Save(&wf.Groups[i].Steps[j]).Error; err != nil {
 					return err
 				}
@@ -225,15 +222,14 @@ func (r *PostgresWorkflowRepo) Update(wf *domain.Workflow) error {
 		}
 
 		// Sync Hooks
-		if err := tx.Where("workflow_id = ?", wf.ID).Delete(&domain.WorkflowHook{}).Error; err != nil {
-			return err
-		}
 		for i := range wf.Hooks {
-			wf.Hooks[i].ID = uuid.New()
-			wf.Hooks[i].WorkflowID = &wf.ID
-			if err := tx.Omit("TargetWorkflow").Create(&wf.Hooks[i]).Error; err != nil {
-				return err
+			if wf.Hooks[i].ID == uuid.Nil {
+				wf.Hooks[i].ID = uuid.New()
 			}
+			wf.Hooks[i].WorkflowID = &wf.ID
+		}
+		if err := tx.Model(wf).Association("Hooks").Replace(wf.Hooks); err != nil {
+			return err
 		}
 
 		// Sync Tags Many-to-Many

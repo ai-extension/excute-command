@@ -44,8 +44,8 @@ type User struct {
 	SocialProvider string         `json:"social_provider"` // google, facebook, etc.
 	SocialID       string         `json:"social_id"`
 	AvatarURL      string         `json:"avatar_url"`
-	Roles          []Role         `json:"roles" gorm:"many2many:user_roles;"`
-	Permissions    []Permission   `json:"permissions" gorm:"many2many:user_permissions;"`
+	Roles          []Role         `json:"roles" gorm:"many2many:user_roles;constraint:OnDelete:CASCADE;"`
+	Permissions    []Permission   `json:"permissions" gorm:"many2many:user_permissions;constraint:OnDelete:CASCADE;"`
 	CreatedAt      time.Time      `json:"created_at" gorm:"<-:create"`
 	UpdatedAt      time.Time      `json:"updated_at"`
 	DeletedAt      gorm.DeletedAt `json:"-" gorm:"index"`
@@ -55,7 +55,7 @@ type Role struct {
 	ID          uuid.UUID        `json:"id" gorm:"type:uuid;primaryKey"`
 	Name        string           `json:"name" gorm:"uniqueIndex;not null"`
 	Description string           `json:"description"`
-	Permissions []RolePermission `json:"permissions" gorm:"foreignKey:RoleID;"`
+	Permissions []RolePermission `json:"permissions" gorm:"foreignKey:RoleID;constraint:OnDelete:CASCADE;"`
 	CreatedAt   time.Time        `json:"created_at" gorm:"<-:create"`
 	UpdatedAt   time.Time        `json:"updated_at"`
 	DeletedAt   gorm.DeletedAt   `json:"-" gorm:"index"`
@@ -66,7 +66,7 @@ type RolePermission struct {
 	RoleID       uuid.UUID   `json:"role_id" gorm:"type:uuid;index;not null"`
 	PermissionID uuid.UUID   `json:"permission_id" gorm:"type:uuid;index;not null"`
 	ResourceID   *string     `json:"resource_id,omitempty"` // nullable UUID string or identifier
-	Permission   *Permission `json:"permission,omitempty" gorm:"foreignKey:PermissionID"`
+	Permission   *Permission `json:"permission,omitempty" gorm:"foreignKey:PermissionID;constraint:OnDelete:CASCADE;"`
 }
 
 type Permission struct {
@@ -258,14 +258,14 @@ type Workflow struct {
 	TimeoutMinutes    int                `json:"timeout_minutes" gorm:"default:15"`
 	IsTemplate        bool               `json:"is_template" gorm:"default:false"`
 	TriggerSource     string             `json:"trigger_source,omitempty" gorm:"size:50"` // For templates or specific defaults
-	Inputs            []WorkflowInput    `json:"inputs,omitempty" gorm:"foreignKey:WorkflowID;"`
-	Variables         []WorkflowVariable `json:"variables,omitempty" gorm:"foreignKey:WorkflowID;"`
-	Groups            []WorkflowGroup    `json:"groups,omitempty" gorm:"foreignKey:WorkflowID;"`
-	Tags              []Tag              `json:"tags,omitempty" gorm:"many2many:workflow_tags;"`
-	Files             []WorkflowFile     `json:"files,omitempty" gorm:"foreignKey:WorkflowID;"`
+	Inputs            []WorkflowInput    `json:"inputs,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnDelete:CASCADE;"`
+	Variables         []WorkflowVariable `json:"variables,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnDelete:CASCADE;"`
+	Groups            []WorkflowGroup    `json:"groups,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnDelete:CASCADE;"`
+	Tags              []Tag              `json:"tags,omitempty" gorm:"many2many:workflow_tags;constraint:OnDelete:CASCADE;"`
+	Files             []WorkflowFile     `json:"files,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnDelete:CASCADE;"`
 	TargetFolder      string             `json:"target_folder,omitempty" gorm:"default:''"`
 	CleanupFiles      bool               `json:"cleanup_files,omitempty" gorm:"default:false"`
-	Hooks             []WorkflowHook     `json:"hooks,omitempty" gorm:"foreignKey:WorkflowID;"`
+	Hooks             []WorkflowHook     `json:"hooks,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnDelete:CASCADE;"`
 	CreatedBy         *uuid.UUID         `json:"created_by,omitempty" gorm:"type:uuid;index;<-:create"`
 	CreatedByUsername string             `json:"created_by_username,omitempty" gorm:"<-:create"`
 	CreatedAt         time.Time          `json:"created_at" gorm:"<-:create"`
@@ -297,7 +297,7 @@ type WorkflowGroup struct {
 	Order              int            `json:"order"`
 	IsParallel         bool           `json:"is_parallel"`
 	Status             Status         `json:"status"`
-	Steps              []WorkflowStep `json:"steps,omitempty" gorm:"foreignKey:GroupID;"`
+	Steps              []WorkflowStep `json:"steps,omitempty" gorm:"foreignKey:GroupID;constraint:OnDelete:CASCADE;"`
 	IsCopyEnabled      bool           `json:"is_copy_enabled" gorm:"default:false"`
 	CopySourcePath     string         `json:"copy_source_path,omitempty" gorm:"default:''"`
 	CopyTargetServerID *uuid.UUID     `json:"copy_target_server_id,omitempty" gorm:"type:uuid;index"`

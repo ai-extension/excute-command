@@ -6,8 +6,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/user/csm-backend/internal/domain"
 )
 
@@ -65,6 +65,7 @@ func (s *AuditLogService) logInternal(user *domain.User, namespaceID *uuid.UUID,
 		ResourceID:   resourceID,
 		Status:       status,
 		IPAddress:    ipAddress,
+		Metadata:     "{}",
 	}
 
 	if user != nil {

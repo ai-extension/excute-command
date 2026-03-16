@@ -185,7 +185,20 @@ func (r *PostgresUserRepo) ListPaginated(limit, offset int, searchTerm string, r
 }
 
 func (r *PostgresUserRepo) Update(user *domain.User) error {
-	return r.db.Save(user).Error
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		// Sync Roles many-to-many
+		if err := tx.Model(user).Association("Roles").Replace(user.Roles); err != nil {
+			return err
+		}
+
+		// Sync Permissions many-to-many
+		if err := tx.Model(user).Association("Permissions").Replace(user.Permissions); err != nil {
+			return err
+		}
+
+		// Update top-level fields (omit associations to avoid double-processing)
+		return tx.Omit("Roles", "Permissions").Save(user).Error
+	})
 }
 
 func (r *PostgresUserRepo) Delete(id uuid.UUID) error {
@@ -256,7 +269,15 @@ func (r *PostgresRoleRepo) ListPaginated(limit, offset int, searchTerm string) (
 }
 
 func (r *PostgresRoleRepo) Update(role *domain.Role) error {
-	return r.db.Save(role).Error
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		// Sync Permissions (role_permissions table)
+		if err := tx.Model(role).Association("Permissions").Replace(role.Permissions); err != nil {
+			return err
+		}
+
+		// Update top-level fields (omit associations)
+		return tx.Omit("Permissions").Save(role).Error
+	})
 }
 
 func (r *PostgresRoleRepo) Delete(id uuid.UUID) error {
