@@ -79,10 +79,14 @@ func (s *WorkflowService) CreateWorkflow(wf *domain.Workflow, user *domain.User)
 }
 
 func (s *WorkflowService) GetWorkflow(id uuid.UUID, user *domain.User) (*domain.Workflow, error) {
+	return s.GetWorkflowWithAction(id, user, "READ")
+}
+
+func (s *WorkflowService) GetWorkflowWithAction(id uuid.UUID, user *domain.User, action string) (*domain.Workflow, error) {
 	if user == nil {
 		return s.repo.GetByID(id, &domain.PermissionScope{IsGlobal: true})
 	}
-	scope := domain.GetPermissionScope(user, "workflows", "READ")
+	scope := domain.GetPermissionScope(user, "workflows", action)
 	return s.repo.GetByID(id, &scope)
 }
 

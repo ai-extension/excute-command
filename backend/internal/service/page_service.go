@@ -53,7 +53,11 @@ func (s *PageService) CreatePage(page *domain.Page, user *domain.User) error {
 }
 
 func (s *PageService) GetPage(id uuid.UUID, user *domain.User) (*domain.Page, error) {
-	scope := domain.GetPermissionScope(user, "pages", "READ")
+	return s.GetPageWithAction(id, user, "READ")
+}
+
+func (s *PageService) GetPageWithAction(id uuid.UUID, user *domain.User, action string) (*domain.Page, error) {
+	scope := domain.GetPermissionScope(user, "pages", action)
 	return s.repo.GetByID(id, &scope)
 }
 

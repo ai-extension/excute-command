@@ -198,19 +198,17 @@ func (h *ScheduleHandler) Delete(c *gin.Context) {
 	userVal, _ := c.Get("user")
 	user := userVal.(*domain.User)
 
-	// Fetch to set namespace_id in context
-	existing, err := h.service.GetByID(id, user)
-	var metadata map[string]string
-	if err == nil {
-		c.Set("namespace_id", existing.NamespaceID)
-		metadata = map[string]string{"name": existing.Name}
+	// Fetch to verify permission and get metadata
+	existing, err := h.service.GetByIDWithAction(id, user, "DELETE")
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "schedule not found or permission denied"})
+		return
 	}
+	c.Set("namespace_id", existing.NamespaceID)
+	metadata := map[string]string{"name": existing.Name}
 
 	resID := id.String()
 	if err := h.service.Delete(id, user); err != nil {
-		if metadata == nil {
-			metadata = make(map[string]string)
-		}
 		metadata["error"] = err.Error()
 		h.auditLog.LogAction(c, "DELETE", "SCHEDULE", resID, metadata, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -231,11 +229,13 @@ func (h *ScheduleHandler) ToggleStatus(c *gin.Context) {
 	userVal, _ := c.Get("user")
 	user := userVal.(*domain.User)
 
-	// Fetch to set namespace_id in context
-	existing, err := h.service.GetByID(id, user)
-	if err == nil {
-		c.Set("namespace_id", existing.NamespaceID)
+	// Fetch to verify permission
+	existing, err := h.service.GetByIDWithAction(id, user, "WRITE")
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "schedule not found or permission denied"})
+		return
 	}
+	c.Set("namespace_id", existing.NamespaceID)
 
 	resID := id.String()
 	if err := h.service.ToggleStatus(id, user); err != nil {
@@ -314,18 +314,18 @@ func (h *ScheduleHandler) Update(c *gin.Context) {
 	// Fetch existing again to calculate diff (or use original fetch if it wasn't mutated yet)
 	// Actually, we mutated the object already. To get a clean diff, we should have fetched it twice or copied it.
 	// Let's refetch it or use the already fetched one before mutation.
-	
+
 	// Re-fetching the unmodified state for diff
 	existing, _ := h.service.GetByID(id, user)
 	diff := utils.CalculateDiff(existing, schedule)
 
 	if err := h.service.Update(schedule, workflowConfigs, user); err != nil {
-		meta := diff
-		if meta == nil {
-			meta = make(map[string]interface{})
+		// Ensure diff is not nil before adding error
+		if diff == nil {
+			diff = make(map[string]interface{})
 		}
-		meta["error"] = err.Error()
-		h.auditLog.LogAction(c, "UPDATE", "SCHEDULE", schedule.ID.String(), meta, "FAILED")
+		diff["error"] = err.Error()
+		h.auditLog.LogAction(c, "UPDATE", "SCHEDULE", schedule.ID.String(), diff, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

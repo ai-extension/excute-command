@@ -247,18 +247,13 @@ func (h *WorkflowHandler) RunWorkflow(c *gin.Context) {
 	userVal, _ := c.Get("user")
 	user := userVal.(*domain.User)
 
-	// Immediate EXECUTE check
-	wf, err := h.service.GetWorkflow(id, user)
+	// Fetch workflow with explicit EXECUTE action check
+	wf, err := h.service.GetWorkflowWithAction(id, user, "EXECUTE")
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "workflow not found or permission denied"})
 		return
 	}
-	nsIDStr := wf.NamespaceID.String()
 	resIDStr := wf.ID.String()
-	if !domain.HasPermission(user, "workflows", "EXECUTE", &nsIDStr, &resIDStr, nil) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "permission denied to execute this workflow"})
-		return
-	}
 
 	// Generate execution ID
 	execID := uuid.New()

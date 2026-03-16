@@ -9,6 +9,7 @@ import (
 	"github.com/user/csm-backend/internal/domain"
 	"github.com/user/csm-backend/internal/service"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 func AuthMiddleware(authService *service.AuthService, userRepo domain.UserRepository, apiKeyRepo domain.APIKeyRepository) gin.HandlerFunc {
@@ -142,9 +143,9 @@ func OptionalAuthMiddleware(authService *service.AuthService, userRepo domain.Us
 	}
 }
 
-func RBACMiddleware(userRepo domain.UserRepository, permType, action string) gin.HandlerFunc {
+func RBACMiddleware(db *gorm.DB, userRepo domain.UserRepository, permType, action string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		currentUser, _ := c.Get("user") // Attempt to get user object directly if set by previous middleware
+		currentUser, _ := c.Get("user")
 		var user *domain.User
 		var ok bool
 
@@ -153,7 +154,6 @@ func RBACMiddleware(userRepo domain.UserRepository, permType, action string) gin
 		}
 
 		if !ok {
-			// fallback to fetching by username from context
 			username := c.GetString("username")
 			if username == "" {
 				c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
@@ -171,7 +171,7 @@ func RBACMiddleware(userRepo domain.UserRepository, permType, action string) gin
 			c.Set("user", user)
 		}
 
-		// 1. API Key Scope Check (if authenticated via API key)
+		// 1. API Key Scope Check
 		if scopesVal, exists := c.Get("api_key_scopes"); exists {
 			scopes := scopesVal.(string)
 			if scopes != "" {
@@ -197,9 +197,17 @@ func RBACMiddleware(userRepo domain.UserRepository, permType, action string) gin
 			return
 		}
 
-		// Check for hierarchical permission
 		resourceID := c.Param("id")
 		namespaceID := c.Param("ns_id")
+		var tagIDs []string
+
+		// Hierarchical Resolution: If we have a resource ID but no namespace ID in URL, try to resolve it from DB
+		if resourceID != "" && isNamespaceScoped(permType) {
+			if namespaceID == "" {
+				namespaceID = resolveNamespaceFromDB(db, permType, resourceID)
+			}
+			tagIDs = resolveTagsFromDB(db, permType, resourceID)
+		}
 
 		// Add UUIDs to context for Audit Logging
 		if namespaceID != "" {
@@ -221,8 +229,7 @@ func RBACMiddleware(userRepo domain.UserRepository, permType, action string) gin
 			nsIDPtr = &namespaceID
 		}
 
-		// Tags logic skip for generic middleware
-		if domain.HasPermission(user, permType, action, nsIDPtr, resIDPtr, nil) {
+		if domain.HasPermission(user, permType, action, nsIDPtr, resIDPtr, tagIDs) {
 			c.Next()
 			return
 		}
@@ -230,4 +237,80 @@ func RBACMiddleware(userRepo domain.UserRepository, permType, action string) gin
 		c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions"})
 		c.Abort()
 	}
+}
+
+func isNamespaceScoped(permType string) bool {
+	switch permType {
+	case "workflows", "history", "executions", "variables", "global-variables", "schedules", "pages", "tags":
+		return true
+	default:
+		return false
+	}
+}
+
+func resolveNamespaceFromDB(db *gorm.DB, permType string, resourceID string) string {
+	if resourceID == "" {
+		return ""
+	}
+	var nsID string
+	var table string
+
+	switch permType {
+	case "workflows":
+		table = "workflows"
+	case "schedules":
+		table = "schedules"
+	case "pages":
+		table = "pages"
+	case "tags":
+		table = "tags"
+	case "global-variables":
+		table = "global_variables"
+	case "executions":
+		// For executions, we might need to join with workflows
+		db.Table("workflow_executions").
+			Select("workflows.namespace_id").
+			Joins("join workflows on workflows.id = workflow_executions.workflow_id").
+			Where("workflow_executions.id = ?", resourceID).
+			Limit(1).Scan(&nsID)
+		return nsID
+	default:
+		return ""
+	}
+
+	db.Table(table).Select("namespace_id").Where("id = ?", resourceID).Limit(1).Scan(&nsID)
+	return nsID
+}
+
+func resolveTagsFromDB(db *gorm.DB, permType string, resourceID string) []string {
+	if resourceID == "" {
+		return nil
+	}
+	var tagIDs []string
+	var joinTable, joinCol string
+
+	switch permType {
+	case "workflows":
+		joinTable = "workflow_tags"
+		joinCol = "workflow_id"
+	case "schedules":
+		joinTable = "schedule_tags"
+		joinCol = "schedule_id"
+	case "pages":
+		joinTable = "page_tags"
+		joinCol = "page_id"
+	case "executions":
+		// For executions, we resolve tags from the associated workflow
+		db.Table("workflow_tags").
+			Select("tag_id").
+			Joins("join workflow_executions on workflow_executions.workflow_id = workflow_tags.workflow_id").
+			Where("workflow_executions.id = ?", resourceID).
+			Scan(&tagIDs)
+		return tagIDs
+	default:
+		return nil
+	}
+
+	db.Table(joinTable).Select("tag_id").Where(joinCol+" = ?", resourceID).Scan(&tagIDs)
+	return tagIDs
 }

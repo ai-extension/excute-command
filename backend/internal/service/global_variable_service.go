@@ -23,7 +23,11 @@ func (s *GlobalVariableService) Create(gv *domain.GlobalVariable, user *domain.U
 }
 
 func (s *GlobalVariableService) GetByID(id uuid.UUID, user *domain.User) (*domain.GlobalVariable, error) {
-	scope := domain.GetPermissionScope(user, "namespaces", "READ") // Global vars belong to namespace
+	return s.GetByIDWithAction(id, user, "READ")
+}
+
+func (s *GlobalVariableService) GetByIDWithAction(id uuid.UUID, user *domain.User, action string) (*domain.GlobalVariable, error) {
+	scope := domain.GetPermissionScope(user, "variables", action)
 	return s.repo.GetByID(id, &scope)
 }
 

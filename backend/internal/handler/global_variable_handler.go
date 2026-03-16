@@ -115,11 +115,13 @@ func (h *GlobalVariableHandler) Update(c *gin.Context) {
 	userVal, _ := c.Get("user")
 	user := userVal.(*domain.User)
 
-	// Fetch to get namespace_id and calculate diff
-	existing, err := h.service.GetByID(id, user)
-	if err == nil {
-		c.Set("namespace_id", existing.NamespaceID)
+	// Fetch to verify permission and get NamespaceID
+	existing, err := h.service.GetByIDWithAction(id, user, "WRITE")
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "variable not found or permission denied"})
+		return
 	}
+	c.Set("namespace_id", existing.NamespaceID)
 
 	diff := utils.CalculateDiff(existing, &gv)
 
@@ -148,19 +150,17 @@ func (h *GlobalVariableHandler) Delete(c *gin.Context) {
 	userVal, _ := c.Get("user")
 	user := userVal.(*domain.User)
 
-	// Fetch to get namespace_id
-	existing, err := h.service.GetByID(id, user)
-	var metadata map[string]string
-	if err == nil {
-		c.Set("namespace_id", existing.NamespaceID)
-		metadata = map[string]string{"key": existing.Key}
+	// Fetch to verify permission and get NamespaceID
+	existing, err := h.service.GetByIDWithAction(id, user, "WRITE") // Variables use WRITE for delete in original service?
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "variable not found or permission denied"})
+		return
 	}
+	c.Set("namespace_id", existing.NamespaceID)
+	metadata := map[string]string{"key": existing.Key}
 
 	resID := id.String()
 	if err := h.service.Delete(id, user); err != nil {
-		if metadata == nil {
-			metadata = make(map[string]string)
-		}
 		metadata["error"] = err.Error()
 		h.auditLog.LogAction(c, "DELETE", "VARIABLE", resID, metadata, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

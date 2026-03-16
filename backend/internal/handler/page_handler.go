@@ -154,11 +154,13 @@ func (h *PageHandler) UpdatePage(c *gin.Context) {
 	userVal, _ := c.Get("user")
 	user := userVal.(*domain.User)
 
-	// Fetch existing to get NamespaceID and calculate diff
-	existing, err := h.service.GetPage(id, user)
-	if err == nil {
-		c.Set("namespace_id", existing.NamespaceID)
+	// Fetch existing to verify permission and get NamespaceID
+	existing, err := h.service.GetPageWithAction(id, user, "WRITE")
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "page not found or permission denied"})
+		return
 	}
+	c.Set("namespace_id", existing.NamespaceID)
 
 	diff := utils.CalculateDiff(existing, &page)
 
@@ -187,18 +189,16 @@ func (h *PageHandler) DeletePage(c *gin.Context) {
 	userVal, _ := c.Get("user")
 	user := userVal.(*domain.User)
 
-	// Fetch existing to get NamespaceID for audit log
-	existing, err := h.service.GetPage(id, user)
-	var metadata map[string]string
-	if err == nil {
-		c.Set("namespace_id", existing.NamespaceID)
-		metadata = map[string]string{"title": existing.Title}
+	// Fetch existing to verify permission and get metadata
+	existing, err := h.service.GetPageWithAction(id, user, "DELETE")
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "page not found or permission denied"})
+		return
 	}
+	c.Set("namespace_id", existing.NamespaceID)
+	metadata := map[string]string{"title": existing.Title}
 
 	if err := h.service.DeletePage(id, user); err != nil {
-		if metadata == nil {
-			metadata = make(map[string]string)
-		}
 		metadata["error"] = err.Error()
 		h.auditLog.LogAction(c, "DELETE", "PAGE", id.String(), metadata, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
