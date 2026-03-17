@@ -9,7 +9,7 @@ import WorkflowInputDialog from './WorkflowInputDialog';
 interface WorkflowRunnerProps {
     children: (
         runWorkflow: (workflow: Partial<Workflow> & { id: string }, inputs?: Record<string, string>, startGroupID?: string, startStepID?: string, fromExecutionID?: string) => void,
-        runTestGroup: (workflowID: string, group: Partial<WorkflowGroup>) => void
+        runTestGroup: (workflowID: string, group: Partial<WorkflowGroup>, startStepID?: string) => void
     ) => React.ReactNode;
     onRunComplete?: () => void;
     onCloseMonitor?: () => void;
@@ -41,10 +41,10 @@ export const WorkflowRunner: React.FC<WorkflowRunnerProps> = ({ children, onRunC
         await executeWorkflow(workflow, inputsValues || {});
     };
 
-    const handleRunTestGroup = async (workflowID: string, group: Partial<WorkflowGroup>) => {
+    const handleRunTestGroup = async (workflowID: string, group: Partial<WorkflowGroup>, startStepID?: string) => {
         setIsStarting(true);
         try {
-            const execID = await triggerTestGroup(workflowID, group);
+            const execID = await triggerTestGroup(workflowID, group, startStepID);
             if (execID) {
                 setRunKey(prev => prev + 1);
                 // Create a virtual workflow for the monitor
@@ -66,12 +66,16 @@ export const WorkflowRunner: React.FC<WorkflowRunnerProps> = ({ children, onRunC
         }
     };
 
-    const triggerTestGroup = useCallback(async (workflowID: string, group: Partial<WorkflowGroup>) => {
+    const triggerTestGroup = useCallback(async (workflowID: string, group: Partial<WorkflowGroup>, startStepID?: string) => {
         try {
             const response = await apiFetch(`${API_BASE_URL}/workflows/${workflowID}/test-group`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ group, inputs: {} })
+                body: JSON.stringify({
+                    group,
+                    inputs: {},
+                    start_step_id: startStepID
+                })
             });
 
             if (!response.ok) {
@@ -91,11 +95,13 @@ export const WorkflowRunner: React.FC<WorkflowRunnerProps> = ({ children, onRunC
     const executeWorkflow = async (
         workflow: Partial<Workflow> & { id: string },
         inputs: Record<string, string>,
-        openMonitor: boolean = true
+        openMonitor: boolean = true,
+        startGroupID?: string,
+        startStepID?: string
     ) => {
         setIsStarting(true);
 
-        const execID = await triggerExecution(workflow.id, inputs);
+        const execID = await triggerExecution(workflow.id, inputs, startGroupID, startStepID);
         if (execID) {
             setRunKey(prev => prev + 1);
             setRunningWorkflow({ ...workflow, execution_id: execID, status: 'PENDING' });
@@ -109,11 +115,14 @@ export const WorkflowRunner: React.FC<WorkflowRunnerProps> = ({ children, onRunC
         if (onRunComplete) onRunComplete();
     };
 
-    const triggerExecution = useCallback(async (workflowID: string, inputs: Record<string, string>) => {
+    const triggerExecution = useCallback(async (workflowID: string, inputs: Record<string, string>, startGroupID?: string, startStepID?: string) => {
         try {
-            const body = {
+            const body: any = {
                 inputs
             };
+
+            if (startGroupID) body.start_group_id = startGroupID;
+            if (startStepID) body.start_step_id = startStepID;
 
             const response = await apiFetch(`${API_BASE_URL}/workflows/${workflowID}/run`, {
                 method: 'POST',
@@ -159,9 +168,13 @@ export const WorkflowRunner: React.FC<WorkflowRunnerProps> = ({ children, onRunC
                             workflow={runningWorkflow as any}
                             onReady={handleMonitorReady}
                             onStatusChange={(status) => setRunningWorkflow(prev => prev ? { ...prev, status: status as any } : null)}
-                            onReRun={(workflow, inputs) => {
+                            onReRun={(workflow, inputs, startGroupID, startStepID) => {
                                 setIsStarting(false);
-                                executeWorkflow(workflow, inputs, true);
+                                if ((workflow as any).isTest) {
+                                    handleRunTestGroup(workflow.id, (workflow as any).groups[0], startStepID);
+                                } else {
+                                    executeWorkflow(workflow, inputs, true, startGroupID, startStepID);
+                                }
                             }}
                             onClose={() => {
                                 setIsMonitorOpen(false);

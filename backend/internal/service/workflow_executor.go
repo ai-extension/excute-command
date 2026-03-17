@@ -276,8 +276,12 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, wf *domain.Workflow, exe
 	}
 
 	// 0. Execute BEFORE hooks
-	if err := e.RunHooks(ctx, wf.Hooks, domain.HookTypeBefore, wf.NamespaceID, logFile, depth, execution.User, execution.ID, fromExecutionID, inputsMap, wf.Variables, groupResults); err != nil {
-		runErr = fmt.Errorf("before hook failed: %w", err)
+	var hookErr error
+	if execution.TriggerSource != "TEST" {
+		hookErr = e.RunHooks(ctx, wf.Hooks, domain.HookTypeBefore, wf.NamespaceID, logFile, depth, execution.User, execution.ID, fromExecutionID, inputsMap, wf.Variables, groupResults)
+	}
+	if hookErr != nil {
+		runErr = fmt.Errorf("before hook failed: %w", hookErr)
 		e.hub.BroadcastLog(workflowID.String(), execution.ID.String(), fmt.Sprintf("Error: %v", runErr))
 		goto finalize
 	}
@@ -504,7 +508,9 @@ finalize:
 			e.hub.BroadcastLog(wf.ID.String(), execution.ID.String(), fmt.Sprintf("\n\033[1;31m✖ WORKFLOW FAILED: %v\033[0m", runErr))
 
 			// Execute AFTER_FAILED hooks
-			e.RunHooks(ctx, wf.Hooks, domain.HookTypeAfterFailed, wf.NamespaceID, logFile, depth, execution.User, execution.ID, fromExecutionID, inputsMap, wf.Variables, groupResults)
+			if execution.TriggerSource != "TEST" {
+				e.RunHooks(ctx, wf.Hooks, domain.HookTypeAfterFailed, wf.NamespaceID, logFile, depth, execution.User, execution.ID, fromExecutionID, inputsMap, wf.Variables, groupResults)
+			}
 		}
 	} else {
 		wf.Status = domain.StatusSuccess
@@ -513,7 +519,9 @@ finalize:
 		e.hub.BroadcastLog(wf.ID.String(), execution.ID.String(), "\n\033[1;32m✔ WORKFLOW SUCCESS\033[0m")
 
 		// Execute AFTER_SUCCESS hooks
-		e.RunHooks(ctx, wf.Hooks, domain.HookTypeAfterSuccess, wf.NamespaceID, logFile, depth, execution.User, execution.ID, fromExecutionID, inputsMap, wf.Variables, groupResults)
+		if execution.TriggerSource != "TEST" {
+			e.RunHooks(ctx, wf.Hooks, domain.HookTypeAfterSuccess, wf.NamespaceID, logFile, depth, execution.User, execution.ID, fromExecutionID, inputsMap, wf.Variables, groupResults)
+		}
 	}
 
 	e.execRepo.Update(execution)
@@ -1541,7 +1549,7 @@ func (e *WorkflowExecutor) getInterpolationContext(inputs map[string]string, var
 	return ctx
 }
 
-func (e *WorkflowExecutor) RunTestGroup(ctx context.Context, workflowID uuid.UUID, group domain.WorkflowGroup, inputs map[string]string, user *domain.User) (uuid.UUID, error) {
+func (e *WorkflowExecutor) RunTestGroup(ctx context.Context, workflowID uuid.UUID, group domain.WorkflowGroup, inputs map[string]string, user *domain.User, startStepID *uuid.UUID) (uuid.UUID, error) {
 	execID := uuid.New()
 
 	// Create a cancellable context for this execution
@@ -1587,7 +1595,8 @@ func (e *WorkflowExecutor) RunTestGroup(ctx context.Context, workflowID uuid.UUI
 		// Create execution record in DB so logs can be fetched
 		e.execRepo.Create(execution)
 
-		err := e.Execute(execCtx, wf, execution, 0, nil, nil, nil)
+		// Pass startStepID to Execute (startGroupID will be &group.ID)
+		err := e.Execute(execCtx, wf, execution, 0, &group.ID, startStepID, nil)
 		if err != nil {
 			fmt.Printf("Test execution failed: %v\n", err)
 		}

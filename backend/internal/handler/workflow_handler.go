@@ -305,8 +305,9 @@ func (h *WorkflowHandler) TestGroup(c *gin.Context) {
 	}
 
 	var req struct {
-		Group  domain.WorkflowGroup `json:"group"`
-		Inputs map[string]string    `json:"inputs"`
+		Group       domain.WorkflowGroup `json:"group"`
+		Inputs      map[string]string    `json:"inputs"`
+		StartStepID *uuid.UUID           `json:"start_step_id"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -323,7 +324,7 @@ func (h *WorkflowHandler) TestGroup(c *gin.Context) {
 		return
 	}
 
-	execID, err := h.executor.RunTestGroup(context.Background(), id, req.Group, req.Inputs, user)
+	execID, err := h.executor.RunTestGroup(context.Background(), id, req.Group, req.Inputs, user, req.StartStepID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
