@@ -296,6 +296,45 @@ func (h *WorkflowHandler) RunWorkflow(c *gin.Context) {
 	})
 }
 
+func (h *WorkflowHandler) TestGroup(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	var req struct {
+		Group  domain.WorkflowGroup `json:"group"`
+		Inputs map[string]string    `json:"inputs"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	userVal, _ := c.Get("user")
+	user := userVal.(*domain.User)
+
+	// Fetch workflow only to check permissions
+	_, err = h.service.GetWorkflowWithAction(id, user, "EXECUTE")
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "workflow not found or permission denied"})
+		return
+	}
+
+	execID, err := h.executor.RunTestGroup(context.Background(), id, req.Group, req.Inputs, user)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusAccepted, gin.H{
+		"message":      "Group test started",
+		"execution_id": execID,
+	})
+}
+
 func (h *WorkflowHandler) CreateGroup(c *gin.Context) {
 	var group domain.WorkflowGroup
 	if err := c.ShouldBindJSON(&group); err != nil {

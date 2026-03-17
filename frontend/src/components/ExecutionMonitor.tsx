@@ -94,7 +94,7 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
     };
 
     const syncStatus = useCallback(async () => {
-        if (!workflowID) return;
+        if (!workflowID || (workflow as any)?.isTest) return;
         try {
             const data = await apiFetch(`${API_BASE_URL}/workflows/${workflowID}`, {});
             const updatedWF = await data.json();

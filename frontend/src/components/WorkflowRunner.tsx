@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../lib/api';
-import { Workflow, WorkflowInput } from '../types';
+import { Workflow, WorkflowInput, WorkflowGroup } from '../types';
 import { Dialog, DialogContent } from "./ui/dialog";
 import WorkflowMonitor from './WorkflowMonitor';
 import WorkflowInputDialog from './WorkflowInputDialog';
 
 interface WorkflowRunnerProps {
-    children: (runWorkflow: (workflow: Partial<Workflow> & { id: string }, inputs?: Record<string, string>, startGroupID?: string, startStepID?: string, fromExecutionID?: string) => void) => React.ReactNode;
+    children: (
+        runWorkflow: (workflow: Partial<Workflow> & { id: string }, inputs?: Record<string, string>, startGroupID?: string, startStepID?: string, fromExecutionID?: string) => void,
+        runTestGroup: (workflowID: string, group: Partial<WorkflowGroup>) => void
+    ) => React.ReactNode;
     onRunComplete?: () => void;
     onCloseMonitor?: () => void;
 }
@@ -37,6 +40,53 @@ export const WorkflowRunner: React.FC<WorkflowRunnerProps> = ({ children, onRunC
         // Individual run (e.g. from history rerun or simple workflow)
         await executeWorkflow(workflow, inputsValues || {});
     };
+
+    const handleRunTestGroup = async (workflowID: string, group: Partial<WorkflowGroup>) => {
+        setIsStarting(true);
+        try {
+            const execID = await triggerTestGroup(workflowID, group);
+            if (execID) {
+                setRunKey(prev => prev + 1);
+                // Create a virtual workflow for the monitor
+                const virtualWf = {
+                    id: workflowID,
+                    name: `Test: ${group.name}`,
+                    groups: [group],
+                    execution_id: execID,
+                    status: 'RUNNING',
+                    isTest: true
+                };
+                setRunningWorkflow(virtualWf as any);
+                setIsMonitorOpen(true);
+            }
+        } catch (error) {
+            console.error('Failed to run test group:', error);
+        } finally {
+            setIsStarting(false);
+        }
+    };
+
+    const triggerTestGroup = useCallback(async (workflowID: string, group: Partial<WorkflowGroup>) => {
+        try {
+            const response = await apiFetch(`${API_BASE_URL}/workflows/${workflowID}/test-group`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ group, inputs: {} })
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.error || 'Test trigger failed');
+            }
+
+            const data = await response.json();
+            return data.execution_id as string;
+        } catch (error) {
+            console.error('Failed to trigger test group:', error);
+            showToast(`Test failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+            return null;
+        }
+    }, [apiFetch, showToast]);
 
     const executeWorkflow = async (
         workflow: Partial<Workflow> & { id: string },
@@ -98,7 +148,7 @@ export const WorkflowRunner: React.FC<WorkflowRunnerProps> = ({ children, onRunC
                 } else {
                     handleRunWorkflow(workflow);
                 }
-            })}
+            }, handleRunTestGroup)}
 
             {/* Workflow Monitor Dialog */}
             <Dialog open={isMonitorOpen} onOpenChange={setIsMonitorOpen}>

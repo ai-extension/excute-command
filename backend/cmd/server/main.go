@@ -245,6 +245,7 @@ func main() {
 			protected.GET("/workflows/:id", middleware.RBACMiddleware(db, userRepo, "workflows", "READ"), workflowHandler.GetWorkflow)
 			protected.PUT("/workflows/:id", middleware.RBACMiddleware(db, userRepo, "workflows", "WRITE"), workflowHandler.UpdateWorkflow)
 			protected.POST("/workflows/:id/run", middleware.RBACMiddleware(db, userRepo, "workflows", "EXECUTE"), workflowHandler.RunWorkflow)
+			protected.POST("/workflows/:id/test-group", middleware.RBACMiddleware(db, userRepo, "workflows", "EXECUTE"), workflowHandler.TestGroup)
 			protected.POST("/workflows/:id/clone", middleware.RBACMiddleware(db, userRepo, "workflows", "WRITE"), workflowHandler.CloneWorkflow)
 			protected.DELETE("/workflows/:id", middleware.RBACMiddleware(db, userRepo, "workflows", "DELETE"), workflowHandler.DeleteWorkflow)
 			protected.POST("/workflow-groups", middleware.RBACMiddleware(db, userRepo, "workflows", "WRITE"), workflowHandler.CreateGroup)

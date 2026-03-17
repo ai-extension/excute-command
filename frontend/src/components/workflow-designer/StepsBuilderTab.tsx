@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Layers, Plus, GripVertical, AlertCircle, Server, SlidersHorizontal, File, Trash2, RefreshCw } from 'lucide-react';
+import { Layers, Plus, GripVertical, AlertCircle, Server, SlidersHorizontal, File, Trash2, RefreshCw, Play } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
@@ -29,6 +29,7 @@ interface StepsBuilderTabProps {
     handleSearchServers: (query: string) => void;
     handleSearchWorkflows: (query: string) => void;
     id: string | undefined;
+    onTestGroup?: (group: Partial<WorkflowGroup>) => void;
 }
 
 export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
@@ -37,7 +38,8 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
     handleAddGroup,
     handleSearchServers,
     handleSearchWorkflows,
-    id
+    id,
+    onTestGroup
 }) => {
     const [openSettingsGroupIdx, setOpenSettingsGroupIdx] = useState<number | null>(null);
 
@@ -155,6 +157,13 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                             )}
                                                         >
                                                             {group.is_parallel ? 'Parallel' : 'Sequence'}
+                                                        </button>
+                                                        <button
+                                                            onClick={onTestGroup ? () => onTestGroup(group) : undefined}
+                                                            className="px-3 py-1 rounded-md text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/20 transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
+                                                            title="Run Test for this group"
+                                                        >
+                                                            <Play className="w-3 h-3 fill-current" /> Run Test
                                                         </button>
                                                         <div className="relative">
                                                             <button

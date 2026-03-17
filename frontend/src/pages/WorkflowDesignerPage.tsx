@@ -396,8 +396,8 @@ const WorkflowDesignerPage = () => {
     };
 
     return (
-        <WorkflowRunner>
-            {(runWorkflow) => (
+        <WorkflowRunner onRunComplete={id ? undefined : undefined /* Placeholder for now */}>
+            {(runWorkflow, runTestGroup) => (
                 <div className="flex flex-col h-[calc(100vh-2rem)] bg-background rounded-xl border border-border overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-500">
                     {/* Loading/Error States */}
                     {isLoading ? (
@@ -622,6 +622,9 @@ const WorkflowDesignerPage = () => {
                                             handleSearchServers={handleSearchServers}
                                             handleSearchWorkflows={handleSearchWorkflows}
                                             id={id}
+                                            onTestGroup={(group) => {
+                                                if (id) runTestGroup(id, group as WorkflowGroup);
+                                            }}
                                         />
                                     ) : activeTab === 'files' ? (
                                         <div className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-300">
