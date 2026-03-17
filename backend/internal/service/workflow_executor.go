@@ -86,7 +86,40 @@ func (e *WorkflowExecutor) Run(ctx context.Context, workflowID uuid.UUID, execID
 	e.activeExecs.Store(execID, cancel)
 	defer e.activeExecs.Delete(execID)
 
-	return e.RunWithDepth(execCtx, workflowID, execID, inputs, scheduledID, pageID, triggerSource, 0, user, startGroupID, startStepID, fromExecutionID)
+	return e.RunWithDepth(execCtx, workflowID, execID, inputs, scheduledID, pageID, triggerSource, 0, user, startGroupID, startStepID, fromExecutionID, false)
+}
+
+func (e *WorkflowExecutor) RunTestGroup(transientID uuid.UUID, namespaceID uuid.UUID, workflowID uuid.UUID, defaultServerID *uuid.UUID, group domain.WorkflowGroup, steps []domain.WorkflowStep, inputs map[string]string, user *domain.User) error {
+	// 1. Create stream
+	e.hub.CreateStream(transientID.String(), nil)
+	// For test runs, we delay closing the stream to ensure the frontend has time to catch up
+	// and connect. The hub handles long-term cleanup of orphaned streams.
+	defer func() {
+		go func(id uuid.UUID) {
+			time.Sleep(15 * time.Second)
+			e.hub.CloseStream(id.String())
+		}(transientID)
+	}()
+
+	// 2. Setup group structure
+	group.Steps = steps
+	groupResults := make(map[string]string)
+
+	// 3. Initialize working dirs
+	workingDirs := &sync.Map{}
+	if homeDir, err := os.UserHomeDir(); err == nil {
+		workingDirs.Store(uuid.Nil, homeDir)
+	}
+
+	// 4. Default server fallback
+	var effDefaultServerID uuid.UUID
+	if defaultServerID != nil {
+		effDefaultServerID = *defaultServerID
+	}
+
+	// 5. Run group with isTest = true
+	// Use io.Discard for file logging as we only want WebSocket broadcast
+	return e.runGroup(context.Background(), &group, inputs, nil, groupResults, effDefaultServerID, io.Discard, workflowID, transientID, namespaceID, user, workingDirs, nil, nil, nil, true)
 }
 
 func (e *WorkflowExecutor) StopExecution(execID uuid.UUID) error {
@@ -98,7 +131,7 @@ func (e *WorkflowExecutor) StopExecution(execID uuid.UUID) error {
 	return fmt.Errorf("execution %s not found or already finished", execID)
 }
 
-func (e *WorkflowExecutor) RunWithDepth(ctx context.Context, workflowID uuid.UUID, execID uuid.UUID, inputs map[string]string, scheduledID *uuid.UUID, pageID *uuid.UUID, triggerSource string, depth int, user *domain.User, startGroupID, startStepID, fromExecutionID *uuid.UUID) error {
+func (e *WorkflowExecutor) RunWithDepth(ctx context.Context, workflowID uuid.UUID, execID uuid.UUID, inputs map[string]string, scheduledID *uuid.UUID, pageID *uuid.UUID, triggerSource string, depth int, user *domain.User, startGroupID, startStepID, fromExecutionID *uuid.UUID, isTest bool) error {
 	if depth > 3 {
 		return fmt.Errorf("maximum hook depth exceeded (circular dependency?)")
 	}
@@ -123,18 +156,62 @@ func (e *WorkflowExecutor) RunWithDepth(ctx context.Context, workflowID uuid.UUI
 		return err
 	}
 
-	// Setup log directory
-	baseDir, _ := os.Getwd()
-	execLogDir := filepath.Join(baseDir, "data", "logs", "executions", execID.String())
-	if err := os.MkdirAll(execLogDir, 0755); err != nil {
-		return fmt.Errorf("failed to create log directory: %w", err)
-	}
-	mainLogPath := filepath.Join(execLogDir, "workflow.log")
+	var execution *domain.WorkflowExecution
+	var mainLogPath string
 
-	// Get existing execution record (created by handler to avoid race condition)
-	execution, err := e.execRepo.GetByID(execID, nil)
-	if err != nil {
-		// Fallback if not found
+	if !isTest {
+		// Setup log directory
+		baseDir, _ := os.Getwd()
+		execLogDir := filepath.Join(baseDir, "data", "logs", "executions", execID.String())
+		if err := os.MkdirAll(execLogDir, 0755); err != nil {
+			return fmt.Errorf("failed to create log directory: %w", err)
+		}
+		mainLogPath = filepath.Join(execLogDir, "workflow.log")
+
+		// Get existing execution record (created by handler to avoid race condition)
+		execution, err = e.execRepo.GetByID(execID, nil)
+		if err != nil {
+			// Fallback if not found
+			inputsJSON, _ := json.Marshal(inputs)
+			execution = &domain.WorkflowExecution{
+				ID:            execID,
+				WorkflowID:    workflowID,
+				Status:        domain.StatusRunning,
+				Inputs:        string(inputsJSON),
+				StartedAt:     time.Now(),
+				ScheduledID:   scheduledID,
+				PageID:        pageID,
+				TriggerSource: triggerSource,
+			}
+			if user != nil {
+				execution.ExecutedBy = &user.ID
+				execution.User = user
+			} else if execution.User == nil && execution.ExecutedBy != nil {
+				// If we have an ID but still no user object (repo fallback/missing preload),
+				// and we were passed a user, use it.
+				execution.User = user
+			}
+			if fromExecutionID != nil {
+				execution.ParentExecutionID = fromExecutionID
+			}
+			e.execRepo.Create(execution)
+		} else {
+			// Even if record exists, update with trigger info if missing
+			execution.PageID = pageID
+			execution.TriggerSource = triggerSource
+			if scheduledID != nil {
+				execution.ScheduledID = scheduledID
+			}
+			if fromExecutionID != nil {
+				execution.ParentExecutionID = fromExecutionID
+			}
+		}
+
+		// Update with log path
+		execution.LogPath = mainLogPath
+		e.execRepo.Update(execution)
+	} else {
+		// Mock execution for test
 		inputsJSON, _ := json.Marshal(inputs)
 		execution = &domain.WorkflowExecution{
 			ID:            execID,
@@ -142,49 +219,22 @@ func (e *WorkflowExecutor) RunWithDepth(ctx context.Context, workflowID uuid.UUI
 			Status:        domain.StatusRunning,
 			Inputs:        string(inputsJSON),
 			StartedAt:     time.Now(),
-			ScheduledID:   scheduledID,
-			PageID:        pageID,
-			TriggerSource: triggerSource,
-		}
-		if user != nil {
-			execution.ExecutedBy = &user.ID
-			execution.User = user
-		} else if execution.User == nil && execution.ExecutedBy != nil {
-			// If we have an ID but still no user object (repo fallback/missing preload),
-			// and we were passed a user, use it.
-			execution.User = user
-		}
-		if fromExecutionID != nil {
-			execution.ParentExecutionID = fromExecutionID
-		}
-		e.execRepo.Create(execution)
-	} else {
-		// Even if record exists, update with trigger info if missing
-		execution.PageID = pageID
-		execution.TriggerSource = triggerSource
-		if scheduledID != nil {
-			execution.ScheduledID = scheduledID
-		}
-		if fromExecutionID != nil {
-			execution.ParentExecutionID = fromExecutionID
+			TriggerSource: "TEST",
+			User:          user,
 		}
 	}
-
-	// Update with log path
-	execution.LogPath = mainLogPath
-	e.execRepo.Update(execution)
 
 	// Apply Timeout if configured (> 0)
 	if wf.TimeoutMinutes > 0 {
 		timeoutCtx, cancelTimeout := context.WithTimeout(ctx, time.Duration(wf.TimeoutMinutes)*time.Minute)
 		defer cancelTimeout()
-		return e.Execute(timeoutCtx, workflowID, execution, depth, startGroupID, startStepID, fromExecutionID)
+		return e.Execute(timeoutCtx, workflowID, execution, depth, startGroupID, startStepID, fromExecutionID, isTest)
 	}
 
-	return e.Execute(ctx, workflowID, execution, depth, startGroupID, startStepID, fromExecutionID)
+	return e.Execute(ctx, workflowID, execution, depth, startGroupID, startStepID, fromExecutionID, isTest)
 }
 
-func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, execution *domain.WorkflowExecution, depth int, startGroupID, startStepID, fromExecutionID *uuid.UUID) error {
+func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, execution *domain.WorkflowExecution, depth int, startGroupID, startStepID, fromExecutionID *uuid.UUID, isTest bool) error {
 	var runErr error
 	var serverIDs []uuid.UUID
 	var transferServerIDs []uuid.UUID
@@ -200,11 +250,13 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 	e.hub.CreateStream(execution.ID.String(), execution.PageID)
 	defer e.hub.CloseStream(execution.ID.String())
 
-	logFile, err := os.OpenFile(execution.LogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return fmt.Errorf("failed to open log file: %w", err)
+	var logFile io.Writer = io.Discard
+	if !isTest && execution.LogPath != "" {
+		if f, err := os.OpenFile(execution.LogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+			defer f.Close()
+			logFile = f
+		}
 	}
-	defer logFile.Close()
 
 	// Determine who is running the workflow
 	executedBy := "System"
@@ -236,18 +288,21 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 
 	// Write to file
 	fmt.Fprint(logFile, header)
-	logFile.Sync()
 	// Broadcast to hub (using workflow ID as target for global view)
 	e.hub.BroadcastLog(workflowID.String(), execution.ID.String(), header)
 
-	wf.Status = domain.StatusRunning
-	e.wfRepo.UpdateStatus(wf.ID, domain.StatusRunning)
+	if !isTest {
+		wf.Status = domain.StatusRunning
+		e.wfRepo.UpdateStatus(wf.ID, domain.StatusRunning)
+	}
 	e.hub.BroadcastStatus(wf.ID.String(), execution.ID.String(), "workflow", string(domain.StatusRunning))
 
 	// Reset groups and steps to PENDING for new execution visualization
 	for i := range wf.Groups {
-		wf.Groups[i].Status = domain.StatusRunning
-		e.groupRepo.UpdateStatus(wf.Groups[i].ID, domain.StatusRunning)
+		if !isTest {
+			wf.Groups[i].Status = domain.StatusRunning
+			e.groupRepo.UpdateStatus(wf.Groups[i].ID, domain.StatusRunning)
+		}
 		e.hub.BroadcastStatus(wf.Groups[i].ID.String(), execution.ID.String(), "group", string(domain.StatusRunning))
 		for j := range wf.Groups[i].Steps {
 			e.hub.BroadcastStatus(wf.Groups[i].Steps[j].ID.String(), execution.ID.String(), "step", string(domain.StatusPending))
@@ -256,7 +311,7 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 
 	// Get old step working directories for partial reruns
 	oldStepDirs := make(map[uuid.UUID]string)
-	if fromExecutionID != nil {
+	if !isTest && fromExecutionID != nil {
 		oldExec, err := e.execRepo.GetByID(*fromExecutionID, nil)
 		if err == nil {
 			for _, step := range oldExec.Steps {
@@ -275,7 +330,7 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 	}
 
 	// 0. Execute BEFORE hooks
-	if err := e.RunHooks(ctx, wf.Hooks, domain.HookTypeBefore, wf.NamespaceID, logFile, depth, execution.User, execution.ID, fromExecutionID, inputsMap, wf.Variables, groupResults); err != nil {
+	if err := e.RunHooks(ctx, wf.Hooks, domain.HookTypeBefore, wf.NamespaceID, logFile, depth, execution.User, execution.ID, fromExecutionID, inputsMap, wf.Variables, groupResults, isTest); err != nil {
 		runErr = fmt.Errorf("before hook failed: %w", err)
 		e.hub.BroadcastLog(workflowID.String(), execution.ID.String(), fmt.Sprintf("Error: %v", runErr))
 		goto finalize
@@ -393,7 +448,6 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 				isSkipping = false
 				msg := fmt.Sprintf("\033[1;33m▶ RERUN STARTING FROM GROUP: %s\033[0m\n", g.Name)
 				fmt.Fprint(logFile, msg)
-				logFile.Sync()
 				e.hub.BroadcastLog(workflowID.String(), execution.ID.String(), msg)
 			}
 
@@ -407,8 +461,10 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 				msg := fmt.Sprintf("\033[90m⏭ SKIPPING GROUP (Partial Rerun): %s\033[0m\n", g.Name)
 				fmt.Fprint(logFile, msg)
 				e.hub.BroadcastLog(workflowID.String(), execution.ID.String(), msg)
-				wf.Groups[i].Status = "SKIPPED"
-				e.groupRepo.UpdateStatus(wf.Groups[i].ID, "SKIPPED")
+				if !isTest {
+					wf.Groups[i].Status = "SKIPPED"
+					e.groupRepo.UpdateStatus(wf.Groups[i].ID, "SKIPPED")
+				}
 				e.hub.BroadcastStatus(wf.Groups[i].ID.String(), execution.ID.String(), "group", "SKIPPED")
 
 				// Simulate directory updates for skipped steps
@@ -444,7 +500,7 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 				groupStartStepID = startStepID
 			}
 
-			err := e.runGroup(ctx, &g, inputsMap, wf.Variables, groupResults, groupDefaultServerID, logFile, workflowID, execution.ID, wf.NamespaceID, execution.User, workingDirs, groupStartStepID, fromExecutionID, oldStepDirs)
+			err := e.runGroup(ctx, &g, inputsMap, wf.Variables, groupResults, groupDefaultServerID, logFile, workflowID, execution.ID, wf.NamespaceID, execution.User, workingDirs, groupStartStepID, fromExecutionID, oldStepDirs, isTest)
 			groupResults[wf.Groups[i].Key] = string(wf.Groups[i].Status)
 			if err != nil {
 				runErr = err
@@ -456,12 +512,51 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 		}
 	}
 
+finalize:
+	finalStatus := domain.StatusSuccess
+	if runErr != nil {
+		if ctx.Err() == context.Canceled {
+			finalStatus = domain.StatusCancelled
+			msg := fmt.Sprintf("\n\033[1;33m⏹ WORKFLOW CANCELLED: %v\033[0m\n", runErr)
+			fmt.Fprint(logFile, msg)
+			e.hub.BroadcastLog(workflowID.String(), execution.ID.String(), "\n\033[1;33m⏹ WORKFLOW CANCELLED\033[0m")
+		} else if ctx.Err() == context.DeadlineExceeded {
+			finalStatus = domain.StatusFailed
+			msg := fmt.Sprintf("\n\033[1;31m✖ WORKFLOW TIMED OUT (Exceeded %d minutes)\033[0m\n", wf.TimeoutMinutes)
+			fmt.Fprint(logFile, msg)
+			e.hub.BroadcastLog(workflowID.String(), execution.ID.String(), fmt.Sprintf("\n\033[1;31m✖ WORKFLOW TIMED OUT (Exceeded %d minutes)\033[0m", wf.TimeoutMinutes))
+		} else {
+			finalStatus = domain.StatusFailed
+			msg := fmt.Sprintf("\n\033[1;31m✖ WORKFLOW FAILED: %v\033[0m\n", runErr)
+			fmt.Fprint(logFile, msg)
+			e.hub.BroadcastLog(workflowID.String(), execution.ID.String(), fmt.Sprintf("\n\033[1;31m✖ WORKFLOW FAILED: %v\033[0m", runErr))
+		}
+	} else {
+		finalStatus = domain.StatusSuccess
+		msg := "\n\033[1;32m✔ WORKFLOW SUCCESS\033[0m\n"
+		fmt.Fprint(logFile, msg)
+		e.hub.BroadcastLog(workflowID.String(), execution.ID.String(), "\n\033[1;32m✔ WORKFLOW SUCCESS\033[0m")
+	}
+
+	if !isTest {
+		finishedAt := time.Now()
+		execution.Status = finalStatus
+		execution.FinishedAt = &finishedAt
+		e.execRepo.Update(execution)
+
+		wf.Status = finalStatus
+		e.wfRepo.UpdateStatus(wf.ID, finalStatus)
+	}
+
+	e.hub.BroadcastStatus(wf.ID.String(), execution.ID.String(), "workflow", string(finalStatus))
+
+	// Post-execution cleanup
 	if wf.CleanupFiles && len(cleanupPaths) > 0 && len(serverIDs) > 0 {
 		fmt.Fprintf(logFile, "\n\033[1;34m🗑 CLEANUP OPERATION\033[0m\n")
 		for _, path := range cleanupPaths {
 			cmdStr := fmt.Sprintf("rm -f %s", path)
 			for _, serverID := range serverIDs {
-				_, err := e.serverService.ExecuteCommand(ctx, serverID, cmdStr, nil) // Trusted: pass nil user
+				_, err := e.serverService.ExecuteCommand(context.Background(), serverID, cmdStr, nil) // Trusted: pass nil user
 				if err != nil {
 					fmt.Fprintf(logFile, "\033[1;31m✖ Failed: %s (%v)\033[0m\n", path, err)
 				}
@@ -470,108 +565,53 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 		}
 	}
 
-	e.hub.BroadcastStatus(wf.ID.String(), execution.ID.String(), "workflow", string(wf.Status))
-
-finalize:
-	finishedAt := time.Now()
-	execution.FinishedAt = &finishedAt
-
-	if runErr != nil {
-		if ctx.Err() == context.Canceled {
-			// Cancelled explicitly by user
-			wf.Status = domain.StatusCancelled
-			execution.Status = domain.StatusCancelled
-			fmt.Fprintf(logFile, "\n\033[1;33m⏹ WORKFLOW CANCELLED: %v\033[0m\n", runErr)
-			e.hub.BroadcastLog(wf.ID.String(), execution.ID.String(), "\n\033[1;33m⏹ WORKFLOW CANCELLED\033[0m")
-			// We intentionally skip AFTER_FAILED hooks on cancellation as per requirements
-		} else if ctx.Err() == context.DeadlineExceeded {
-			// Timeout
-			wf.Status = domain.StatusFailed
-			execution.Status = domain.StatusFailed
-			fmt.Fprintf(logFile, "\n\033[1;31m✖ WORKFLOW TIMED OUT (Exceeded %d minutes)\033[0m\n", wf.TimeoutMinutes)
-			e.hub.BroadcastLog(wf.ID.String(), execution.ID.String(), fmt.Sprintf("\n\033[1;31m✖ WORKFLOW TIMED OUT (Exceeded %d minutes)\033[0m", wf.TimeoutMinutes))
-
-			// Execute AFTER_FAILED hooks
-			e.RunHooks(context.Background(), wf.Hooks, domain.HookTypeAfterFailed, wf.NamespaceID, logFile, depth, execution.User, execution.ID, fromExecutionID, inputsMap, wf.Variables, groupResults)
-		} else {
-			// Actual failure
-			wf.Status = domain.StatusFailed
-			execution.Status = domain.StatusFailed
-			fmt.Fprintf(logFile, "\n\033[1;31m✖ WORKFLOW FAILED: %v\033[0m\n", runErr)
-			e.hub.BroadcastLog(wf.ID.String(), execution.ID.String(), fmt.Sprintf("\n\033[1;31m✖ WORKFLOW FAILED: %v\033[0m", runErr))
-
-			// Execute AFTER_FAILED hooks
-			e.RunHooks(ctx, wf.Hooks, domain.HookTypeAfterFailed, wf.NamespaceID, logFile, depth, execution.User, execution.ID, fromExecutionID, inputsMap, wf.Variables, groupResults)
-		}
-	} else {
-		wf.Status = domain.StatusSuccess
-		execution.Status = domain.StatusSuccess
-		fmt.Fprintf(logFile, "\n\033[1;32m✔ WORKFLOW SUCCESS\033[0m\n")
-		e.hub.BroadcastLog(wf.ID.String(), execution.ID.String(), "\n\033[1;32m✔ WORKFLOW SUCCESS\033[0m")
-
-		// Execute AFTER_SUCCESS hooks
-		e.RunHooks(ctx, wf.Hooks, domain.HookTypeAfterSuccess, wf.NamespaceID, logFile, depth, execution.User, execution.ID, fromExecutionID, inputsMap, wf.Variables, groupResults)
+	// 3. Run hooks based on result
+	if finalStatus == domain.StatusSuccess {
+		e.RunHooks(ctx, wf.Hooks, domain.HookTypeAfterSuccess, wf.NamespaceID, logFile, depth, execution.User, execution.ID, fromExecutionID, inputsMap, wf.Variables, groupResults, isTest)
+	} else if finalStatus == domain.StatusFailed {
+		e.RunHooks(ctx, wf.Hooks, domain.HookTypeAfterFailed, wf.NamespaceID, logFile, depth, execution.User, execution.ID, fromExecutionID, inputsMap, wf.Variables, groupResults, isTest)
 	}
-
-	e.execRepo.Update(execution)
-	wf.Status = execution.Status
-	e.wfRepo.UpdateStatus(wf.ID, execution.Status)
-	e.hub.BroadcastStatus(wf.ID.String(), execution.ID.String(), "workflow", string(execution.Status))
 
 	return runErr
 }
 
-func (e *WorkflowExecutor) RunHooks(ctx context.Context, hooks []domain.WorkflowHook, hookType domain.HookType, namespaceID uuid.UUID, logFile *os.File, depth int, user *domain.User, executionID uuid.UUID, fromExecutionID *uuid.UUID, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string) error {
-	for _, hook := range hooks {
-		if err := ctx.Err(); err != nil {
+func (e *WorkflowExecutor) RunHooks(ctx context.Context, hooks []domain.WorkflowHook, hookType domain.HookType, namespaceID uuid.UUID, logFile io.Writer, depth int, user *domain.User, executionID uuid.UUID, fromExecutionID *uuid.UUID, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, isTest bool) error {
+	relevantHooks := make([]domain.WorkflowHook, 0)
+	for _, h := range hooks {
+		if h.HookType == hookType {
+			relevantHooks = append(relevantHooks, h)
+		}
+	}
+
+	if len(relevantHooks) == 0 {
+		return nil
+	}
+
+	fmt.Fprintf(logFile, "\033[1;34m⚓ RUNNING %s HOOKS (%d)\033[0m\n", hookType, len(relevantHooks))
+
+	for _, hook := range relevantHooks {
+		// Interpolate hook inputs
+		hookInputs := make(map[string]string)
+		if hook.Inputs != "" {
+			var rawInputs map[string]string
+			if err := json.Unmarshal([]byte(hook.Inputs), &rawInputs); err == nil {
+				pcontext := e.getInterpolationContext(inputs, variables, groupResults, namespaceID, user)
+				for k, v := range rawInputs {
+					rendered, _ := e.renderTemplate(v, pcontext)
+					hookInputs[k] = rendered
+				}
+			}
+		}
+
+		fmt.Fprintf(logFile, "\033[34m→ Hook Workflow: %s\033[0m\n", hook.TargetWorkflowID)
+		hookExecID := uuid.New()
+		err := e.RunWithDepth(ctx, hook.TargetWorkflowID, hookExecID, hookInputs, nil, nil, "HOOK", depth+1, user, nil, nil, fromExecutionID, isTest)
+		if err != nil {
+			fmt.Fprintf(logFile, "\033[1;31m✖ Hook failed: %v\033[0m\n", err)
 			return err
 		}
-		if hook.HookType != hookType {
-			continue
-		}
-
-		if logFile != nil {
-			fmt.Fprintf(logFile, "\n\033[1;34m↪ TRIGGER HOOK: %s\033[0m\n", hookType)
-		}
-		if hook.WorkflowID != nil {
-			e.hub.BroadcastLog(hook.WorkflowID.String(), executionID.String(), fmt.Sprintf("\033[1;34m↪ Hook: %s (Running in background)\033[0m", hookType))
-		}
-
-		var hookInputs map[string]string
-		if hook.Inputs != "" {
-			json.Unmarshal([]byte(hook.Inputs), &hookInputs)
-		}
-
-		// Substitute variables in hook inputs
-		pcontext := e.getInterpolationContext(inputs, variables, groupResults, namespaceID, user)
-
-		resolvedInputs := make(map[string]string)
-		for k, v := range hookInputs {
-			rendered, err := e.renderTemplate(v, pcontext)
-			if err != nil {
-				rendered = v // fallback to raw
-			}
-			resolvedInputs[k] = rendered
-		}
-
-		hookExecID := uuid.New()
-
-		// Run hook asynchronously so it doesn't block the progress of the workflow/schedule
-		go func(h domain.WorkflowHook, execID uuid.UUID, resolvedInputs map[string]string) {
-			bgCtx := context.Background()
-			err := e.RunWithDepth(bgCtx, h.TargetWorkflowID, execID, resolvedInputs, nil, nil, "HOOK", depth+1, user, nil, nil, &executionID)
-			if err != nil {
-				errMsg := fmt.Sprintf("\033[1;33m⚠ Warning: %s hook failed (%v)\033[0m", hookType, err)
-				if h.WorkflowID != nil {
-					e.hub.BroadcastLog(h.WorkflowID.String(), executionID.String(), errMsg)
-				}
-			} else {
-				if h.WorkflowID != nil {
-					e.hub.BroadcastLog(h.WorkflowID.String(), executionID.String(), fmt.Sprintf("\033[1;32m✔ %s HOOK SUCCESS\033[0m", hookType))
-				}
-			}
-		}(hook, hookExecID, resolvedInputs)
 	}
+
 	return nil
 }
 
@@ -700,7 +740,7 @@ func (e *WorkflowExecutor) evaluateCondition(condition string, inputs map[string
 	return strings.TrimSpace(rendered) == "TRUE", nil
 }
 
-func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowGroup, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, defaultServerID uuid.UUID, logFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, namespaceID uuid.UUID, user *domain.User, workingDirs *sync.Map, startStepID, fromExecutionID *uuid.UUID, oldStepDirs map[uuid.UUID]string) error {
+func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowGroup, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, defaultServerID uuid.UUID, logFile io.Writer, workflowID uuid.UUID, executionID uuid.UUID, namespaceID uuid.UUID, user *domain.User, workingDirs *sync.Map, startStepID, fromExecutionID *uuid.UUID, oldStepDirs map[uuid.UUID]string, isTest bool) error {
 	// Evaluate condition before running
 	if shouldRun, err := e.evaluateCondition(group.Condition, inputs, variables, groupResults, namespaceID, user); err != nil {
 		errStr := fmt.Sprintf("\n\033[1;31m✖ GROUP CONDITION ERROR: %s\033[0m\n\033[31mCondition: %s\nError: %v\033[0m\n", group.Name, group.Condition, err)
@@ -719,8 +759,7 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 
 	groupHeader := fmt.Sprintf("\n\n\033[1;35m❖ GROUP START: %s\033[0m \033[90m[Parallel: %v]\033[0m\n", group.Name, group.IsParallel)
 	fmt.Fprint(logFile, groupHeader)
-	logFile.Sync()
-	e.hub.BroadcastLog(group.WorkflowID.String(), executionID.String(), groupHeader)
+	e.hub.BroadcastLog(workflowID.String(), executionID.String(), groupHeader)
 
 	effectiveServerID := defaultServerID
 	if group.DefaultServerID != nil {
@@ -742,42 +781,28 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 		if attempt > 1 {
 			msg := fmt.Sprintf("\n\033[1;33m↻ GROUP RETRY ATTEMPT %d/%d (Delay: %ds): %s\033[0m\n", attempt-1, group.RetryLimit, group.RetryDelay, group.Name)
 			fmt.Fprint(logFile, msg)
-			e.hub.BroadcastLog(group.WorkflowID.String(), executionID.String(), msg)
-
-			if group.RetryDelay > 0 {
-				select {
-				case <-ctx.Done():
-					return ctx.Err()
-				case <-time.After(time.Duration(group.RetryDelay) * time.Second):
-				}
-			}
-
-			// Reset step statuses for visual clarity in UI
-			for i := range group.Steps {
-				e.hub.BroadcastStatus(group.Steps[i].ID.String(), executionID.String(), "step", string(domain.StatusPending))
-			}
+			retryMsg := fmt.Sprintf("\n\033[1;33m↻ RETRYING GROUP %q (Attempt %d/%d) in %ds...\033[0m\n", group.Name, attempt, maxAttempts, group.RetryDelay)
+			fmt.Fprint(logFile, retryMsg)
+			e.hub.BroadcastLog(workflowID.String(), executionID.String(), retryMsg)
+			time.Sleep(time.Duration(group.RetryDelay) * time.Second)
 		}
 
-		group.Status = domain.StatusRunning
-		e.groupRepo.UpdateStatus(group.ID, domain.StatusRunning)
-		e.hub.BroadcastStatus(group.ID.String(), executionID.String(), "group", string(domain.StatusRunning))
-
-		lastErr = e.runGroupAttempt(ctx, group, inputs, variables, groupResults, effectiveServerID, logFile, workflowID, executionID, namespaceID, user, workingDirs, startStepID, fromExecutionID, oldStepDirs)
-
+		lastErr = e.runGroupAttempt(ctx, group, inputs, variables, groupResults, effectiveServerID, logFile, workflowID, executionID, namespaceID, user, workingDirs, startStepID, fromExecutionID, oldStepDirs, isTest)
 		if lastErr == nil {
-			group.Status = domain.StatusSuccess
+			if !isTest {
+				group.Status = domain.StatusSuccess
+				e.groupRepo.UpdateStatus(group.ID, domain.StatusSuccess)
+			}
 			e.hub.BroadcastStatus(group.ID.String(), executionID.String(), "group", string(domain.StatusSuccess))
-			return e.groupRepo.UpdateStatus(group.ID, domain.StatusSuccess)
+			return nil
 		}
 
-		// Handle cancellation immediately
 		if ctx.Err() != nil {
-			group.Status = domain.StatusCancelled
-			e.groupRepo.UpdateStatus(group.ID, domain.StatusCancelled)
+			if !isTest {
+				group.Status = domain.StatusCancelled
+				e.groupRepo.UpdateStatus(group.ID, domain.StatusCancelled)
+			}
 			e.hub.BroadcastStatus(group.ID.String(), executionID.String(), "group", string(domain.StatusCancelled))
-			msg := fmt.Sprintf("\n\033[1;33m⏹ GROUP CANCELLED: %s\033[0m\n", group.Name)
-			fmt.Fprint(logFile, msg)
-			e.hub.BroadcastLog(workflowID.String(), executionID.String(), msg)
 			return lastErr
 		}
 
@@ -786,8 +811,10 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 		}
 
 		// Final failure after all retries
-		group.Status = domain.StatusFailed
-		e.groupRepo.UpdateStatus(group.ID, domain.StatusFailed)
+		if !isTest {
+			group.Status = domain.StatusFailed
+			e.groupRepo.UpdateStatus(group.ID, domain.StatusFailed)
+		}
 		e.hub.BroadcastStatus(group.ID.String(), executionID.String(), "group", string(domain.StatusFailed))
 
 		if group.ContinueOnFailure {
@@ -802,7 +829,7 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 	return nil
 }
 
-func (e *WorkflowExecutor) runGroupAttempt(ctx context.Context, group *domain.WorkflowGroup, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, effectiveServerID uuid.UUID, logFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, namespaceID uuid.UUID, user *domain.User, workingDirs *sync.Map, startStepID, fromExecutionID *uuid.UUID, oldStepDirs map[uuid.UUID]string) error {
+func (e *WorkflowExecutor) runGroupAttempt(ctx context.Context, group *domain.WorkflowGroup, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, effectiveServerID uuid.UUID, logFile io.Writer, workflowID uuid.UUID, executionID uuid.UUID, namespaceID uuid.UUID, user *domain.User, workingDirs *sync.Map, startStepID, fromExecutionID *uuid.UUID, oldStepDirs map[uuid.UUID]string, isTest bool) error {
 	if group.IsParallel {
 		// Parralel groups don't support partial reruns from steps as easily, usually it's better to rerun the whole group
 		// For simplicity, if a startStepID is provided in a parallel group, we just run all steps (or we could filter, but let's stick to simple logic)
@@ -813,7 +840,7 @@ func (e *WorkflowExecutor) runGroupAttempt(ctx context.Context, group *domain.Wo
 			wg.Add(1)
 			go func(step *domain.WorkflowStep) {
 				defer wg.Done()
-				if err := e.runStep(ctx, step, inputs, variables, groupResults, effectiveServerID, logFile, workflowID, executionID, namespaceID, user, workingDirs, fromExecutionID); err != nil {
+				if err := e.runStep(ctx, step, inputs, variables, groupResults, effectiveServerID, logFile, workflowID, executionID, namespaceID, user, workingDirs, fromExecutionID, isTest); err != nil {
 					errs <- err
 				}
 			}(&group.Steps[i])
@@ -863,7 +890,7 @@ func (e *WorkflowExecutor) runGroupAttempt(ctx context.Context, group *domain.Wo
 				continue
 			}
 
-			if err := e.runStep(ctx, step, inputs, variables, groupResults, effectiveServerID, logFile, workflowID, executionID, namespaceID, user, workingDirs, fromExecutionID); err != nil {
+			if err := e.runStep(ctx, step, inputs, variables, groupResults, effectiveServerID, logFile, workflowID, executionID, namespaceID, user, workingDirs, fromExecutionID, isTest); err != nil {
 				return err
 			}
 			// Sequential Step Delay: 200ms gap between steps to prevent race conditions
@@ -880,7 +907,7 @@ func (e *WorkflowExecutor) runGroupAttempt(ctx context.Context, group *domain.Wo
 		e.hub.BroadcastLog(workflowID.String(), executionID.String(), msg)
 
 		if group.CopySourcePath != "" && group.CopyTargetPath != "" {
-			if err := e.relayCopy(ctx, group, inputs, variables, groupResults, namespaceID, effectiveServerID, logFile, workflowID, executionID, user); err != nil {
+			if err := e.relayCopy(ctx, group, inputs, variables, groupResults, namespaceID, effectiveServerID, logFile, workflowID, executionID, user, isTest); err != nil {
 				return fmt.Errorf("relay copy failed: %w", err)
 			}
 		} else {
@@ -897,59 +924,49 @@ func (e *WorkflowExecutor) runGroupAttempt(ctx context.Context, group *domain.Wo
 	return nil
 }
 
-func (e *WorkflowExecutor) relayCopy(ctx context.Context, group *domain.WorkflowGroup, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, namespaceID uuid.UUID, sourceServerID uuid.UUID, logFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, user *domain.User) error {
-	sourcePath := filepath.Clean(group.CopySourcePath)
-	targetPath := filepath.Clean(group.CopyTargetPath)
-
-	// Perform variable substitution
-	substitute := func(val string) (string, error) {
-		pcontext := e.getInterpolationContext(inputs, variables, groupResults, namespaceID, user)
-		return e.renderTemplate(val, pcontext)
-	}
-
-	var err error
-	sourcePath, err = substitute(sourcePath)
+func (e *WorkflowExecutor) relayCopy(ctx context.Context, group *domain.WorkflowGroup, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, namespaceID uuid.UUID, sourceServerID uuid.UUID, logFile io.Writer, workflowID uuid.UUID, executionID uuid.UUID, user *domain.User, isTest bool) error {
+	// 1. Interpolate paths
+	pcontext := e.getInterpolationContext(inputs, variables, groupResults, namespaceID, user)
+	sourcePath, err := e.renderTemplate(group.CopySourcePath, pcontext)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to interpolate source path: %w", err)
 	}
-	targetPath, err = substitute(targetPath)
+	targetPath, err := e.renderTemplate(group.CopyTargetPath, pcontext)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to interpolate target path: %w", err)
 	}
 
-	msgRef := fmt.Sprintf("\033[1;34m📦 RELAY COPY: %s -> Server(%s):%s\033[0m\n", sourcePath, group.CopyTargetServerID, targetPath)
-	fmt.Fprint(logFile, msgRef)
-	e.hub.BroadcastLog(workflowID.String(), executionID.String(), msgRef)
-	fmt.Fprintf(logFile, "\033[34mStarting relay copy...\033[0m\n")
-	e.hub.BroadcastLog(workflowID.String(), executionID.String(), "\033[34mStarting relay copy...\033[0m\n")
+	msg := fmt.Sprintf("\033[34m➡ Relay copy: %s:%s -> %s:%s\033[0m\n", sourceServerID, sourcePath, group.CopyTargetServerID, targetPath)
+	fmt.Fprint(logFile, msg)
+	e.hub.BroadcastLog(workflowID.String(), executionID.String(), msg)
 
-	// 1. Create tarball on source server
-	tmpTarName := fmt.Sprintf("relay_%s.tar.gz", uuid.New().String())
-	sourceDir := filepath.Dir(sourcePath)
-	sourceBase := filepath.Base(sourcePath)
-
-	// Use tar -czf to create a compressed archive. Use -C to change directory so the path in tar is relative.
-	tarCmd := fmt.Sprintf("tar -czf /tmp/%s -C %s %s", tmpTarName, strconv.Quote(sourceDir), strconv.Quote(sourceBase))
-	_, err = e.serverService.ExecuteCommand(ctx, sourceServerID, tarCmd, nil) // Trusted: pass nil user
-	if err != nil {
-		return fmt.Errorf("failed to create tarball on source: %w", err)
-	}
-	defer e.serverService.ExecuteCommand(context.Background(), sourceServerID, fmt.Sprintf("rm -f /tmp/%s", tmpTarName), nil) // Trusted: pass nil user
-
-	// 2. Download tarball to backend
+	// 2. Local temporary path
+	tmpTarName := fmt.Sprintf("relay_%s.tar.gz", executionID.String())
 	localTmpDir := filepath.Join("data", "tmp", "relay")
-	if err := os.MkdirAll(localTmpDir, 0755); err != nil {
-		return fmt.Errorf("failed to create local relay directory: %w", err)
-	}
+	os.MkdirAll(localTmpDir, 0755)
 	localTarPath := filepath.Join(localTmpDir, tmpTarName)
-	err = e.serverService.DownloadFileFromServer(ctx, sourceServerID, "/tmp/"+tmpTarName, localTarPath, nil) // Trusted: pass nil user
-	if err != nil {
-		return fmt.Errorf("failed to download tarball to backend: %w", err)
-	}
-	defer os.Remove(localTarPath)
+	defer os.Remove(localTarPath) // Clean up local tarball
 
-	// 3. Upload tarball to target server
-	err = e.serverService.UploadFileToServers(ctx, []uuid.UUID{*group.CopyTargetServerID}, localTarPath, "/tmp/"+tmpTarName, nil) // Trusted: pass nil user
+	// 3. Create tarball on source server and download to backend
+	// Use tar -czf - -C <source_dir> . to create a tarball of the directory content
+	// and stream it to stdout, then capture that stdout to a local file.
+	// This handles both files and directories correctly.
+	f, err := os.Create(localTarPath)
+	if err != nil {
+		return fmt.Errorf("failed to create local file: %w", err)
+	}
+	defer f.Close()
+
+	tarCmd := fmt.Sprintf("tar -czf - -C %s %s", strconv.Quote(filepath.Dir(sourcePath)), strconv.Quote(filepath.Base(sourcePath)))
+	_, err = e.serverService.ExecuteCommand(ctx, sourceServerID, tarCmd, nil, f)
+	if err != nil {
+		return fmt.Errorf("failed to create and download tarball from source: %w", err)
+	}
+	f.Close() // Ensure flushed
+
+	// 4. Upload tarball to target server
+	remoteTmpTarPath := "/tmp/" + tmpTarName
+	err = e.serverService.UploadFileToServers(ctx, []uuid.UUID{*group.CopyTargetServerID}, localTarPath, remoteTmpTarPath, nil) // Trusted: pass nil user
 	if err != nil {
 		return fmt.Errorf("failed to upload tarball to target: %w", err)
 	}
@@ -971,28 +988,35 @@ func (e *WorkflowExecutor) relayCopy(ctx context.Context, group *domain.Workflow
 	return nil
 }
 
-func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowStep, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, defaultServerID uuid.UUID, mainLogFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, namespaceID uuid.UUID, user *domain.User, workingDirs *sync.Map, fromExecutionID *uuid.UUID) error {
+func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowStep, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, defaultServerID uuid.UUID, mainLogFile io.Writer, workflowID uuid.UUID, executionID uuid.UUID, namespaceID uuid.UUID, user *domain.User, workingDirs *sync.Map, fromExecutionID *uuid.UUID, isTest bool) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 	e.hub.BroadcastStatus(step.ID.String(), executionID.String(), "step", string(domain.StatusRunning))
 
-	// Create execution step record
-	stepExec := &domain.WorkflowExecutionStep{
-		ID:          uuid.New(),
-		ExecutionID: executionID,
-		StepID:      step.ID,
-		Name:        step.Name,
-		Status:      domain.StatusRunning,
-		StartedAt:   time.Now(),
-	}
-	e.execRepo.CreateStepResult(stepExec)
+	var stepExec *domain.WorkflowExecutionStep
+	var stepLogFile io.Writer = io.Discard
 
-	// Create step-specific log file
-	baseDir, _ := os.Getwd()
-	stepLogPath := filepath.Join(baseDir, "data", "logs", "executions", executionID.String(), step.ID.String()+".log")
-	stepLogFile, _ := os.OpenFile(stepLogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	defer stepLogFile.Close()
+	if !isTest {
+		// Create execution step record
+		stepExec = &domain.WorkflowExecutionStep{
+			ID:          uuid.New(),
+			ExecutionID: executionID,
+			StepID:      step.ID,
+			Name:        step.Name,
+			Status:      domain.StatusRunning,
+			StartedAt:   time.Now(),
+		}
+		e.execRepo.CreateStepResult(stepExec)
+
+		// Create step-specific log file
+		baseDir, _ := os.Getwd()
+		stepLogPath := filepath.Join(baseDir, "data", "logs", "executions", executionID.String(), step.ID.String()+".log")
+		if f, err := os.OpenFile(stepLogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+			defer f.Close()
+			stepLogFile = f
+		}
+	}
 
 	msg := fmt.Sprintf("\033[1;36m>> STEP: %s\033[0m\n", step.Name)
 	fmt.Fprint(mainLogFile, msg)
@@ -1006,7 +1030,7 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 
 	// Dispatch based on action type
 	if step.ActionType == "WORKFLOW" {
-		output, err = e.runWorkflowStep(ctx, step, inputs, variables, groupResults, namespaceID, mainLogFile, stepLogFile, workflowID, executionID, user, fromExecutionID)
+		output, err = e.runWorkflowStep(ctx, step, inputs, variables, groupResults, namespaceID, mainLogFile, stepLogFile, workflowID, executionID, user, fromExecutionID, isTest)
 	} else {
 		// Default: COMMAND action type
 		if step.CommandText == "" {
@@ -1050,7 +1074,7 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 			outWriter := io.Writer(&out) // capture output without broadcasting
 			mw := io.MultiWriter(
 				&wsWriter{hub: e.hub, targetID: workflowID.String(), executionID: executionID.String(), buffer: mainLogFile},
-				&fileWriter{file: stepLogFile},
+				stepLogFile,
 				outWriter,
 			)
 			filter := &cwdFilteredWriter{
@@ -1064,54 +1088,45 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 				newDir := filepath.Clean(strings.TrimSpace(filter.cwdBuffer.String()))
 				if newDir != "" {
 					workingDirs.Store(targetServerID, newDir)
-					stepExec.WorkingDir = newDir // Persist for reruns
+					if !isTest && stepExec != nil {
+						stepExec.WorkingDir = newDir // Persist for reruns
+					}
 				}
 			}
 		} else {
 			var localNewDir string
-			output, localNewDir, err = e.runLocalStep(ctx, step, command, mainLogFile, stepLogFile, workflowID, executionID, workingDirs)
-			if localNewDir != "" {
+			output, localNewDir, err = e.runLocalStep(ctx, step, command, mainLogFile, stepLogFile, workflowID, executionID, workingDirs, isTest)
+			if localNewDir != "" && !isTest && stepExec != nil {
 				stepExec.WorkingDir = localNewDir
 			}
 		}
 	}
 
+	finalStatus := domain.StatusSuccess
 	if err != nil {
 		if ctx.Err() != nil {
-			e.hub.BroadcastStatus(step.ID.String(), executionID.String(), "step", string(domain.StatusCancelled))
-
-			stepExec.Status = domain.StatusCancelled
-			stepExec.Output = output
-			finishedAt := time.Now()
-			stepExec.FinishedAt = &finishedAt
-			e.execRepo.CreateStepResult(stepExec)
-			return err
+			finalStatus = domain.StatusCancelled
+		} else {
+			finalStatus = domain.StatusFailed
 		}
-		e.hub.BroadcastStatus(step.ID.String(), executionID.String(), "step", string(domain.StatusFailed))
+	}
 
-		stepExec.Status = domain.StatusFailed
+	e.hub.BroadcastStatus(step.ID.String(), executionID.String(), "step", string(finalStatus))
+
+	if !isTest && stepExec != nil {
+		stepExec.Status = finalStatus
 		stepExec.Output = output
 		finishedAt := time.Now()
 		stepExec.FinishedAt = &finishedAt
 		e.execRepo.CreateStepResult(stepExec)
-		return err
 	}
 
-	e.hub.BroadcastStatus(step.ID.String(), executionID.String(), "step", string(domain.StatusSuccess))
-
-	// Finalize execution step record
-	stepExec.Status = domain.StatusSuccess
-	stepExec.Output = output
-	finishedAt := time.Now()
-	stepExec.FinishedAt = &finishedAt
-	e.execRepo.CreateStepResult(stepExec)
-
-	return nil
+	return err
 }
 
 // runWorkflowStep handles a step of action_type=WORKFLOW, running a target workflow either
 // synchronously (WaitToFinish=true) or asynchronously as a spawned goroutine.
-func (e *WorkflowExecutor) runWorkflowStep(ctx context.Context, step *domain.WorkflowStep, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, namespaceID uuid.UUID, mainLogFile *os.File, stepLogFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, user *domain.User, fromExecutionID *uuid.UUID) (string, error) {
+func (e *WorkflowExecutor) runWorkflowStep(ctx context.Context, step *domain.WorkflowStep, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, namespaceID uuid.UUID, mainLogFile io.Writer, stepLogFile io.Writer, workflowID uuid.UUID, executionID uuid.UUID, user *domain.User, fromExecutionID *uuid.UUID, isTest bool) (string, error) {
 	if step.TargetWorkflowID == nil {
 		return "", fmt.Errorf("step %q has action_type=WORKFLOW but no target_workflow_id set", step.Name)
 	}
@@ -1291,7 +1306,6 @@ func (e *WorkflowExecutor) runWorkflowStep(ctx context.Context, step *domain.Wor
 		}
 	}
 
-	hookExecID := uuid.New()
 	logMsg := fmt.Sprintf("\033[1;34m↪ RUN WORKFLOW: %s\033[0m\n", step.TargetWorkflowID)
 	fmt.Fprint(mainLogFile, logMsg)
 	fmt.Fprint(stepLogFile, logMsg)
@@ -1299,22 +1313,24 @@ func (e *WorkflowExecutor) runWorkflowStep(ctx context.Context, step *domain.Wor
 
 	if step.WaitToFinish != nil && !*step.WaitToFinish {
 		// Async: spawn the workflow and immediately return success
-		go func(targetID uuid.UUID, execID uuid.UUID, in map[string]string) {
+		go func(targetID uuid.UUID, in map[string]string) {
 			bgCtx := context.Background()
-			err := e.RunWithDepth(bgCtx, targetID, execID, in, nil, nil, "STEP", 1, user, nil, nil, &executionID)
+			hookExecID := uuid.New()
+			err := e.RunWithDepth(bgCtx, targetID, hookExecID, in, nil, nil, "STEP", 1, user, nil, nil, &executionID, isTest)
 			if err != nil {
 				e.hub.BroadcastLog(workflowID.String(), executionID.String(), fmt.Sprintf("\033[1;33m⚠ Async workflow %s failed: %v\033[0m", targetID, err))
 			} else {
 				e.hub.BroadcastLog(workflowID.String(), executionID.String(), fmt.Sprintf("\033[1;32m✔ Async workflow %s succeeded\033[0m", targetID))
 			}
-		}(*step.TargetWorkflowID, hookExecID, resolvedInputs)
+		}(*step.TargetWorkflowID, resolvedInputs)
 		asyncMsg := "\033[90m⚡ Workflow spawned asynchronously, continuing...\033[0m\n"
 		fmt.Fprint(mainLogFile, asyncMsg)
 		fmt.Fprint(stepLogFile, asyncMsg)
 		return "async", nil
 	}
 
-	err = e.RunWithDepth(ctx, *step.TargetWorkflowID, hookExecID, resolvedInputs, nil, nil, "STEP", 1, user, nil, nil, &executionID)
+	hookExecID := uuid.New()
+	err = e.RunWithDepth(ctx, *step.TargetWorkflowID, hookExecID, resolvedInputs, nil, nil, "STEP", 1, user, nil, nil, &executionID, isTest)
 	if err != nil {
 		return "", fmt.Errorf("target workflow %s failed: %w", step.TargetWorkflowID, err)
 	}
@@ -1324,30 +1340,29 @@ func (e *WorkflowExecutor) runWorkflowStep(ctx context.Context, step *domain.Wor
 	return "success", nil
 }
 
-func (e *WorkflowExecutor) runLocalStep(ctx context.Context, step *domain.WorkflowStep, command string, mainLogFile *os.File, stepLogFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, workingDirs *sync.Map) (string, string, error) {
-	// Persist CWD for local execution
-	localID := uuid.Nil // Use Nil UUID as key for local server
-	cwdMarker := "::CWD::"
-	var startingDir string
-	if val, ok := workingDirs.Load(localID); ok {
-		startingDir = val.(string)
-		if startingDir != "" {
-			// Use curly braces for grouping in the same shell context
-			command = fmt.Sprintf("cd %s && { %s; }", strconv.Quote(startingDir), command)
-		}
-	}
-	// Use -P for local consistency as well
-	command = fmt.Sprintf("%s; printf '%s' && pwd -P", command, cwdMarker)
-
-	c := exec.CommandContext(ctx, "sh", "-c", command)
+func (e *WorkflowExecutor) runLocalStep(ctx context.Context, step *domain.WorkflowStep, command string, mainLogFile io.Writer, stepLogFile io.Writer, workflowID uuid.UUID, executionID uuid.UUID, workingDirs *sync.Map, isTest bool) (string, string, error) {
 	var out bytes.Buffer
 
-	// Multi-writer for all destinations we want cleaned
-	outWriter := io.Writer(&out) // capture output without broadcasting
+	// Retrieve current working directory for local server
+	var currentDir string
+	if val, ok := workingDirs.Load(uuid.Nil); ok {
+		currentDir = val.(string)
+	}
+
+	// Persist CWD for local execution
+	cwdMarker := "::CWD::"
+	if currentDir != "" {
+		command = fmt.Sprintf("cd %s && { %s; }", strconv.Quote(currentDir), command)
+	}
+	command = fmt.Sprintf("%s; printf '%s' && pwd -P", command, cwdMarker)
+
+	cmd := exec.CommandContext(ctx, "sh", "-c", command)
+	// Don't set cmd.Dir because we handle it in the command string for consistency with remote
+
 	mw := io.MultiWriter(
 		&wsWriter{hub: e.hub, targetID: workflowID.String(), executionID: executionID.String(), buffer: mainLogFile},
-		&fileWriter{file: stepLogFile},
-		outWriter,
+		stepLogFile,
+		&out,
 	)
 
 	// Filter out the CWD marker and capture the directory
@@ -1355,20 +1370,22 @@ func (e *WorkflowExecutor) runLocalStep(ctx context.Context, step *domain.Workfl
 		underlying: mw,
 		marker:     cwdMarker,
 	}
+	cmd.Stdout = filter
+	cmd.Stderr = filter
 
-	c.Stdout = filter
-	c.Stderr = filter
-
-	err := c.Run()
+	err := cmd.Run()
 	filter.Finalize()
+	output := out.String()
+
 	if filter.found {
 		newDir := filepath.Clean(strings.TrimSpace(filter.cwdBuffer.String()))
 		if newDir != "" {
-			workingDirs.Store(localID, newDir)
-			return out.String(), newDir, err
+			workingDirs.Store(uuid.Nil, newDir)
+			currentDir = newDir
 		}
 	}
-	return out.String(), "", err
+
+	return output, currentDir, err
 }
 
 // Helper for io.MultiWriter with os.File

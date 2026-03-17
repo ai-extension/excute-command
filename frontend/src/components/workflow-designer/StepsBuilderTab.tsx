@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Layers, Plus, GripVertical, AlertCircle, Server, SlidersHorizontal, File, Trash2, RefreshCw } from 'lucide-react';
+import { Layers, Plus, GripVertical, AlertCircle, Server, SlidersHorizontal, File, Trash2, RefreshCw, Play } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
@@ -18,6 +18,9 @@ import {
 } from "../ui/dropdown-menu";
 
 import { WorkflowGroup, WorkflowStep, Server as ServerType, Workflow } from '../../types';
+import { useAuth } from '../../context/AuthContext';
+import { useNamespace } from '../../context/NamespaceContext';
+import { TestRunModal } from './TestRunModal';
 
 interface StepsBuilderTabProps {
     groups: Partial<WorkflowGroup>[];
@@ -39,7 +42,87 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
     handleSearchWorkflows,
     id
 }) => {
+    const { apiFetch } = useAuth();
+    const { activeNamespace } = useNamespace();
     const [openSettingsGroupIdx, setOpenSettingsGroupIdx] = useState<number | null>(null);
+
+    // Test Run State
+    const [testRunState, setTestRunState] = useState<{
+        isOpen: boolean;
+        isRunning: boolean;
+        transientID: string | null;
+        groupName: string;
+    }>({
+        isOpen: false,
+        isRunning: false,
+        transientID: null,
+        groupName: ''
+    });
+
+    const handleTestRun = async (group: Partial<WorkflowGroup>) => {
+        if (!id) {
+            alert("Please save the workflow before running a test.");
+            return;
+        }
+
+        setTestRunState({
+            isOpen: true,
+            isRunning: true,
+            transientID: null,
+            groupName: group.name || 'Untitled Group'
+        });
+
+        try {
+            const response = await apiFetch(`/api/workflows/${id}/test-group`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    namespace_id: activeNamespace?.id,
+                    default_server_id: group.default_server_id,
+                    group: {
+                        name: group.name,
+                        key: group.key,
+                        condition: group.condition,
+                        is_parallel: group.is_parallel,
+                        continue_on_failure: group.continue_on_failure,
+                        retry_enabled: group.retry_enabled,
+                        retry_limit: group.retry_limit,
+                        retry_delay: group.retry_delay,
+                        is_copy_enabled: group.is_copy_enabled,
+                        copy_source_path: group.copy_source_path,
+                        copy_target_server_id: group.copy_target_server_id,
+                        copy_target_path: group.copy_target_path
+                    },
+                    steps: group.steps?.map(s => ({
+                        name: s.name,
+                        action_type: s.action_type,
+                        command_text: s.command_text,
+                        target_workflow_id: s.target_workflow_id,
+                        target_workflow_inputs: s.target_workflow_inputs,
+                        wait_to_finish: s.wait_to_finish,
+                        order: s.order
+                    })),
+                    inputs: {} // Default to empty inputs for test
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.message || 'Failed to start test run');
+            }
+
+            const data = await response.json();
+            setTestRunState(prev => ({
+                ...prev,
+                transientID: data.transient_id,
+                isRunning: true
+            }));
+
+            // User manually closes or we can listen for completion if we had status.
+        } catch (error: any) {
+            alert(error.message);
+            setTestRunState(prev => ({ ...prev, isRunning: false }));
+        }
+    };
 
     const parentWf = allWorkflows.find(w => w.id === id);
     const parentInputs = parentWf?.inputs || [];
@@ -156,6 +239,13 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                         >
                                                             {group.is_parallel ? 'Parallel' : 'Sequence'}
                                                         </button>
+                                                        <Button
+                                                            variant="outline"
+                                                            onClick={() => handleTestRun(group)}
+                                                            className="h-6 px-2 rounded-md text-[8px] font-black uppercase tracking-widest bg-emerald-500/10 border-emerald-500/20 text-emerald-500 hover:bg-emerald-500 hover:text-white transition-all duration-300"
+                                                        >
+                                                            <Play className="w-2.5 h-2.5 mr-1" /> Test Run
+                                                        </Button>
                                                         <div className="relative">
                                                             <button
                                                                 onClick={() => setOpenSettingsGroupIdx(openSettingsGroupIdx === gIdx ? null : gIdx)}
@@ -791,8 +881,18 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                             </div>
                         )}
                     </Droppable>
-                </DragDropContext >
+                </DragDropContext>
             )}
+
+            <TestRunModal
+                isOpen={testRunState.isOpen}
+                onClose={() => setTestRunState(prev => ({ ...prev, isOpen: false }))}
+                workflowID={id || ""}
+                transientID={testRunState.transientID}
+                groupName={testRunState.groupName}
+                isRunning={testRunState.isRunning}
+                onComplete={() => setTestRunState(prev => ({ ...prev, isRunning: false }))}
+            />
         </div >
     );
 };

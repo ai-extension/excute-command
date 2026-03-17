@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"log"
 	"sync"
 	"time"
@@ -278,7 +279,7 @@ func (s *ScheduleService) runScheduledWorkflows(scheduleID uuid.UUID) {
 	ctx := context.Background()
 
 	// 1. Run BEFORE hooks
-	if err := s.executor.RunHooks(ctx, schedule.Hooks, domain.HookTypeBefore, schedule.NamespaceID, nil, 0, nil, schedule.ID, nil, nil, nil, nil); err != nil {
+	if err := s.executor.RunHooks(ctx, schedule.Hooks, domain.HookTypeBefore, schedule.NamespaceID, io.Discard, 0, nil, schedule.ID, nil, nil, nil, nil, false); err != nil {
 		log.Printf("[ScheduleService] Before hook failed for schedule %s: %v", schedule.Name, err)
 		return
 	}
@@ -328,9 +329,9 @@ func (s *ScheduleService) runScheduledWorkflows(scheduleID uuid.UUID) {
 
 	// 2. Run AFTER hooks
 	if hasFailure {
-		s.executor.RunHooks(ctx, schedule.Hooks, domain.HookTypeAfterFailed, schedule.NamespaceID, nil, 0, nil, schedule.ID, nil, nil, nil, nil)
+		s.executor.RunHooks(ctx, schedule.Hooks, domain.HookTypeAfterFailed, schedule.NamespaceID, io.Discard, 0, nil, schedule.ID, nil, nil, nil, nil, false)
 	} else {
-		s.executor.RunHooks(ctx, schedule.Hooks, domain.HookTypeAfterSuccess, schedule.NamespaceID, nil, 0, nil, schedule.ID, nil, nil, nil, nil)
+		s.executor.RunHooks(ctx, schedule.Hooks, domain.HookTypeAfterSuccess, schedule.NamespaceID, io.Discard, 0, nil, schedule.ID, nil, nil, nil, nil, false)
 	}
 
 	// Update NextRunAt for recurring

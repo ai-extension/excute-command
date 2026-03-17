@@ -17,6 +17,7 @@ type BufferedStatus struct {
 
 type LogStream struct {
 	Ch           chan string
+	Logs         []string   // In-memory buffer for transient/test runs
 	PageID       *uuid.UUID // Associated page if this is a public execution
 	LastActivity time.Time
 	StepStatuses map[string]BufferedStatus // targetID -> BufferedStatus
@@ -70,6 +71,7 @@ func (h *Hub) CreateStream(executionID string, pageID *uuid.UUID) *LogStream {
 	defer h.mu.Unlock()
 	stream := &LogStream{
 		Ch:           make(chan string, 200),
+		Logs:         make([]string, 0, 100),
 		PageID:       pageID,
 		LastActivity: time.Now(),
 		StepStatuses: make(map[string]BufferedStatus),
@@ -258,6 +260,12 @@ func (h *Hub) BroadcastLog(targetID string, executionID string, content string) 
 	if s, ok := h.streams[executionID]; ok {
 		s.mu.Lock()
 		s.LastActivity = time.Now()
+		// Buffer logs for catchup (important for test runs)
+		s.Logs = append(s.Logs, content)
+		if len(s.Logs) > 1000 {
+			s.Logs = s.Logs[len(s.Logs)-1000:]
+		}
+
 		select {
 		case s.Ch <- content:
 		default:
@@ -321,6 +329,19 @@ func (h *Hub) Subscribe(client *Client, executionID string) {
 
 func (h *Hub) Unsubscribe(client *Client, executionID string) {
 	h.unsubscribe <- subscription{client: client, topicID: executionID}
+}
+
+func (h *Hub) GetLogBuffer(executionID string) []string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if s, ok := h.streams[executionID]; ok {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		cp := make([]string, len(s.Logs))
+		copy(cp, s.Logs)
+		return cp
+	}
+	return nil
 }
 
 func (h *Hub) GetStepStatuses(executionID string) map[string]BufferedStatus {

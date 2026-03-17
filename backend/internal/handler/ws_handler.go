@@ -266,8 +266,29 @@ func (h *WSHandler) HandleWS(c *gin.Context) {
 						conn.WriteMessage(websocket.TextMessage, jsonStartMsg)
 						client.Mu.Unlock()
 
+						// Defer sending catchup_end to ensure it always happens
+						defer func() {
+							endMsg := map[string]string{
+								"type":         "catchup_end",
+								"execution_id": msg.ExecutionID,
+							}
+							jsonEndMsg, _ := json.Marshal(endMsg)
+							client.Mu.Lock()
+							conn.WriteMessage(websocket.TextMessage, jsonEndMsg)
+							client.Mu.Unlock()
+						}()
+
 						// 1.5 Replay buffered step/group statuses
 						h.replayBufferedStatuses(conn, client, msg.ExecutionID)
+
+						// 1.6 Replay buffered logs (crucial for transient/test runs)
+						ramLogs := h.hub.GetLogBuffer(msg.ExecutionID)
+						if len(ramLogs) > 0 {
+							targetID := msg.TargetID
+							for _, line := range ramLogs {
+								h.sendLogMessage(client, msg.ExecutionID, targetID, line, true)
+							}
+						}
 
 						// 2. Fetch execution details to find parent if not provided
 						execID, _ := uuid.Parse(msg.ExecutionID)
@@ -324,15 +345,7 @@ func (h *WSHandler) HandleWS(c *gin.Context) {
 							}
 						}
 
-						// Indicate catchup end
-						endMsg := map[string]string{
-							"type":         "catchup_end",
-							"execution_id": msg.ExecutionID,
-						}
-						jsonEndMsg, _ := json.Marshal(endMsg)
-						client.Mu.Lock()
-						conn.WriteMessage(websocket.TextMessage, jsonEndMsg)
-						client.Mu.Unlock()
+						// If execution logic below fails, defer above will still send catchup_end
 					}()
 				} else if msg.Type == "subscribe" && msg.ExecutionID != "" {
 					h.hub.Subscribe(client, msg.ExecutionID)

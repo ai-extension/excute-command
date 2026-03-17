@@ -18,6 +18,7 @@ interface TerminalLogProps {
     showHeader?: boolean;
     onClear?: () => void;
     onReady?: () => void;
+    onComplete?: () => void;
     className?: string;
 }
 
@@ -33,6 +34,7 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
     showHeader = true,
     onClear,
     onReady,
+    onComplete,
     className
 }) => {
     const [logs, setLogs] = useState<string[]>(initialLogs);
@@ -95,6 +97,11 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
                         setLogs(prev => [...prev, ...messageQueueRef.current]);
                         messageQueueRef.current = [];
                     }
+                    return;
+                }
+
+                if (data.type === 'close_stream' && data.execution_id === executionID) {
+                    if (onComplete) onComplete();
                     return;
                 }
 

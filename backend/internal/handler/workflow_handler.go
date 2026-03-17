@@ -567,6 +567,47 @@ func (h *WorkflowHandler) GetExecutionAnalytics(c *gin.Context) {
 	c.JSON(http.StatusOK, data)
 }
 
+type TestRunGroupRequest struct {
+	NamespaceID     uuid.UUID             `json:"namespace_id"`
+	WorkflowID      uuid.UUID             `json:"workflow_id"`
+	DefaultServerID *uuid.UUID            `json:"default_server_id"`
+	Group           domain.WorkflowGroup  `json:"group"`
+	Steps           []domain.WorkflowStep `json:"steps"`
+	Inputs          map[string]string     `json:"inputs"`
+}
+
+func (h *WorkflowHandler) TestRunGroup(c *gin.Context) {
+	workflowIDStr := c.Param("id")
+	workflowID, err := uuid.Parse(workflowIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid workflow id"})
+		return
+	}
+
+	var req TestRunGroupRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request payload"})
+		return
+	}
+
+	currentUser, _ := c.Get("user")
+	user, _ := currentUser.(*domain.User)
+
+	// Since it's a test run, we don't persist anything to DB.
+	// We just generate a transient ID for the WebSocket stream.
+	transientID := uuid.New()
+
+	// Run in background
+	go func() {
+		h.executor.RunTestGroup(transientID, req.NamespaceID, workflowID, req.DefaultServerID, req.Group, req.Steps, req.Inputs, user)
+	}()
+
+	c.JSON(http.StatusOK, gin.H{
+		"transient_id": transientID,
+		"message":      "Test run initiated",
+	})
+}
+
 func (h *WorkflowHandler) CloneWorkflow(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
