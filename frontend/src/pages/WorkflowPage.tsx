@@ -375,22 +375,25 @@ const WorkflowPage = () => {
 
                                 {!showTemplates && (
                                     <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-                                        <Button
-                                            onClick={() => setIsCreateDialogOpen(true)}
-                                            className="h-8 px-4 rounded-xl premium-gradient font-black uppercase tracking-widest text-[9px] shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
-                                        >
-                                            <Plus className="w-3.5 h-3.5" />
-                                            New Workflow
-                                        </Button>
-                                        <Button
-                                            onClick={handleImportClick}
-                                            disabled={isImporting}
-                                            variant="outline"
-                                            className="h-8 px-4 rounded-xl border-dashed border-primary/30 text-primary hover:bg-primary/5 font-black uppercase tracking-widest text-[9px] transition-all gap-2"
-                                        >
-                                            <Upload className="w-3.5 h-3.5" />
-                                            {isImporting ? 'Importing...' : 'Import Workflow'}
-                                        </Button>
+                                        <div>
+                                            <Button
+                                                onClick={handleImportClick}
+                                                disabled={isImporting}
+                                                variant="outline"
+                                                className="h-8 px-4 mx-2 rounded-xl border-dashed border-primary/30 text-primary hover:bg-primary/5 font-black uppercase tracking-widest text-[9px] transition-all gap-2"
+                                            >
+                                                <Upload className="w-3.5 h-3.5" />
+                                                {isImporting ? 'Importing...' : 'Import Workflow'}
+                                            </Button>
+
+                                            <Button
+                                                onClick={() => setIsCreateDialogOpen(true)}
+                                                className="h-8 px-4 mx-2 rounded-xl premium-gradient font-black uppercase tracking-widest text-[9px] shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
+                                            >
+                                                <Plus className="w-3.5 h-3.5" />
+                                                New Workflow
+                                            </Button>
+                                        </div>
                                         <input
                                             type="file"
                                             ref={fileInputRef}

@@ -476,6 +476,14 @@ const WorkflowDesignerPage = () => {
                                                 </div>
                                             </div>
                                         </div>
+                                        <Button
+                                            onClick={handleExport}
+                                            variant="outline"
+                                            className="h-8 px-3 rounded-lg border-indigo-500/30 text-indigo-500 hover:bg-indigo-500/10 hover:text-indigo-400 text-[9px] font-bold uppercase tracking-widest transition-all"
+                                        >
+                                            <Download className="w-3 h-3 mr-1.5" />
+                                            Export
+                                        </Button>
                                         {id && (
                                             <Button
                                                 onClick={() => runWorkflow({ id: id as string, name, description, inputs: inputs as any, groups: groups as any })}
@@ -486,14 +494,7 @@ const WorkflowDesignerPage = () => {
                                                 Run
                                             </Button>
                                         )}
-                                        <Button
-                                            onClick={handleExport}
-                                            variant="outline"
-                                            className="h-8 px-3 rounded-lg border-indigo-500/30 text-indigo-500 hover:bg-indigo-500/10 hover:text-indigo-400 text-[9px] font-bold uppercase tracking-widest transition-all"
-                                        >
-                                            <Download className="w-3 h-3 mr-1.5" />
-                                            Export
-                                        </Button>
+
                                         <Button
                                             onClick={handleSave}
                                             disabled={isSaving}
