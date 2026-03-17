@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Terminal, X, Play, Loader2, StopCircle } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import TerminalLog from '../TerminalLog';
 import { cn } from '../../lib/utils';
+import { useAuth } from '../../context/AuthContext';
 
 interface TestRunModalProps {
     isOpen: boolean;
@@ -24,6 +25,29 @@ export const TestRunModal: React.FC<TestRunModalProps> = ({
     isRunning,
     onComplete
 }) => {
+    const { apiFetch, showToast } = useAuth();
+    const [isTerminating, setIsTerminating] = useState(false);
+
+    const handleTerminate = async () => {
+        if (!transientID) return;
+
+        setIsTerminating(true);
+        try {
+            const response = await apiFetch(`/api/executions/${transientID}/stop`, {
+                method: 'POST'
+            });
+
+            if (response.ok) {
+                showToast("Test run termination requested", "info");
+            }
+        } catch (err) {
+            console.error("Failed to terminate test run", err);
+            showToast("Failed to terminate test run", "error");
+        } finally {
+            setIsTerminating(false);
+        }
+    };
+
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="sm:max-w-[90vw] md:max-w-[1000px] h-[85vh] flex flex-col p-0 overflow-hidden border-border bg-background shadow-xl">
@@ -56,13 +80,17 @@ export const TestRunModal: React.FC<TestRunModalProps> = ({
                         <div className="flex items-center gap-3 pr-10">
                             <Button
                                 variant="destructive"
-                                onClick={onClose}
-                                disabled={!isRunning}
+                                onClick={handleTerminate}
+                                disabled={!isRunning || isTerminating}
                                 className="h-6 px-3 text-xs font-semibold gap-2 border-none shadow-lg shadow-destructive/10"
                             >
-                                <StopCircle className="w-4 h-4" /> Terminate
+                                {isTerminating ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    <StopCircle className="w-4 h-4" />
+                                )}
+                                Terminate
                             </Button>
-
                         </div>
                     </div>
                 </DialogHeader>

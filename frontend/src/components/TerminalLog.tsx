@@ -105,6 +105,11 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
                     return;
                 }
 
+                if (data.type === 'status' && data.execution_id === executionID && data.target_type === 'execution') {
+                    if (onComplete) onComplete();
+                    return;
+                }
+
                 if (data.type === 'log' && data.execution_id === executionID && data.target_id === targetID && data.content) {
                     const newLines = data.content.split('\n').filter((line: string) => line.length > 0);
 

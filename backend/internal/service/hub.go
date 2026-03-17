@@ -18,6 +18,7 @@ type BufferedStatus struct {
 type LogStream struct {
 	Ch           chan string
 	Logs         []string   // In-memory buffer for transient/test runs
+	IsTransient  bool       // If true, this execution is not persisted in DB
 	PageID       *uuid.UUID // Associated page if this is a public execution
 	LastActivity time.Time
 	StepStatuses map[string]BufferedStatus // targetID -> BufferedStatus
@@ -260,10 +261,12 @@ func (h *Hub) BroadcastLog(targetID string, executionID string, content string) 
 	if s, ok := h.streams[executionID]; ok {
 		s.mu.Lock()
 		s.LastActivity = time.Now()
-		// Buffer logs for catchup (important for test runs)
-		s.Logs = append(s.Logs, content)
-		if len(s.Logs) > 1000 {
-			s.Logs = s.Logs[len(s.Logs)-1000:]
+		// Buffer logs for catchup (important for test runs, not needed for normal runs as they use files)
+		if s.IsTransient {
+			s.Logs = append(s.Logs, content)
+			if len(s.Logs) > 1000 {
+				s.Logs = s.Logs[len(s.Logs)-1000:]
+			}
 		}
 
 		select {
@@ -291,7 +294,7 @@ func (h *Hub) BroadcastStatus(targetID string, executionID string, targetType st
 	if s, ok := h.streams[executionID]; ok {
 		s.mu.Lock()
 		s.LastActivity = time.Now()
-		if targetType == "step" || targetType == "group" {
+		if targetType == "step" || targetType == "group" || targetType == "execution" {
 			s.StepStatuses[targetID] = BufferedStatus{Status: status, Type: targetType}
 		}
 		s.mu.Unlock()
@@ -342,6 +345,15 @@ func (h *Hub) GetLogBuffer(executionID string) []string {
 		return cp
 	}
 	return nil
+}
+
+func (h *Hub) IsTransient(executionID string) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if s, ok := h.streams[executionID]; ok {
+		return s.IsTransient
+	}
+	return false
 }
 
 func (h *Hub) GetStepStatuses(executionID string) map[string]BufferedStatus {

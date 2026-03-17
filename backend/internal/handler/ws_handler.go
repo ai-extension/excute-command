@@ -278,10 +278,7 @@ func (h *WSHandler) HandleWS(c *gin.Context) {
 							client.Mu.Unlock()
 						}()
 
-						// 1.5 Replay buffered step/group statuses
-						h.replayBufferedStatuses(conn, client, msg.ExecutionID)
-
-						// 1.6 Replay buffered logs (crucial for transient/test runs)
+						// 1.5 Replay buffered logs (crucial for transient/test runs)
 						ramLogs := h.hub.GetLogBuffer(msg.ExecutionID)
 						if len(ramLogs) > 0 {
 							targetID := msg.TargetID
@@ -290,7 +287,15 @@ func (h *WSHandler) HandleWS(c *gin.Context) {
 							}
 						}
 
+						// 1.6 Replay buffered step/group/execution statuses
+						h.replayBufferedStatuses(conn, client, msg.ExecutionID)
+
 						// 2. Fetch execution details to find parent if not provided
+						// Skip DB lookup if this is a transient (test) execution to avoid log noise
+						if h.hub.IsTransient(msg.ExecutionID) {
+							return
+						}
+
 						execID, _ := uuid.Parse(msg.ExecutionID)
 						execution, err := h.workflowService.GetExecution(execID, userObj)
 

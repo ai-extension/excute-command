@@ -91,12 +91,13 @@ func (e *WorkflowExecutor) Run(ctx context.Context, workflowID uuid.UUID, execID
 
 func (e *WorkflowExecutor) RunTestGroup(transientID uuid.UUID, namespaceID uuid.UUID, workflowID uuid.UUID, defaultServerID *uuid.UUID, group domain.WorkflowGroup, steps []domain.WorkflowStep, inputs map[string]string, user *domain.User) error {
 	// 1. Create stream
-	e.hub.CreateStream(transientID.String(), nil)
+	stream := e.hub.CreateStream(transientID.String(), nil)
+	stream.IsTransient = true
 	// For test runs, we delay closing the stream to ensure the frontend has time to catch up
 	// and connect. The hub handles long-term cleanup of orphaned streams.
 	defer func() {
 		go func(id uuid.UUID) {
-			time.Sleep(15 * time.Second)
+			time.Sleep(10 * time.Second)
 			e.hub.CloseStream(id.String())
 		}(transientID)
 	}()
@@ -111,6 +112,14 @@ func (e *WorkflowExecutor) RunTestGroup(transientID uuid.UUID, namespaceID uuid.
 		workingDirs.Store(uuid.Nil, homeDir)
 	}
 
+	// 3b. Setup cancellable context for termination
+	ctx, cancel := context.WithCancel(context.Background())
+	e.activeExecs.Store(transientID, cancel)
+	defer func() {
+		e.activeExecs.Delete(transientID)
+		cancel()
+	}()
+
 	// 4. Default server fallback
 	var effDefaultServerID uuid.UUID
 	if defaultServerID != nil {
@@ -119,7 +128,16 @@ func (e *WorkflowExecutor) RunTestGroup(transientID uuid.UUID, namespaceID uuid.
 
 	// 5. Run group with isTest = true
 	// Use io.Discard for file logging as we only want WebSocket broadcast
-	return e.runGroup(context.Background(), &group, inputs, nil, groupResults, effDefaultServerID, io.Discard, workflowID, transientID, namespaceID, user, workingDirs, nil, nil, nil, true)
+	err := e.runGroup(ctx, &group, inputs, nil, groupResults, effDefaultServerID, io.Discard, workflowID, transientID, namespaceID, user, workingDirs, nil, nil, nil, true)
+
+	finalStatus := "success"
+	if err != nil {
+		finalStatus = "failed"
+	}
+	// Broadcast final status for the overall execution to trigger onComplete in FE
+	e.hub.BroadcastStatus(transientID.String(), transientID.String(), "execution", finalStatus)
+
+	return err
 }
 
 func (e *WorkflowExecutor) StopExecution(execID uuid.UUID) error {
@@ -129,6 +147,10 @@ func (e *WorkflowExecutor) StopExecution(execID uuid.UUID) error {
 		return nil
 	}
 	return fmt.Errorf("execution %s not found or already finished", execID)
+}
+
+func (e *WorkflowExecutor) IsTransient(execID uuid.UUID) bool {
+	return e.hub.IsTransient(execID.String())
 }
 
 func (e *WorkflowExecutor) RunWithDepth(ctx context.Context, workflowID uuid.UUID, execID uuid.UUID, inputs map[string]string, scheduledID *uuid.UUID, pageID *uuid.UUID, triggerSource string, depth int, user *domain.User, startGroupID, startStepID, fromExecutionID *uuid.UUID, isTest bool) error {

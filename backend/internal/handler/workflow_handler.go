@@ -655,6 +655,16 @@ func (h *WorkflowHandler) StopExecution(c *gin.Context) {
 	userVal, _ := c.Get("user")
 	user := userVal.(*domain.User)
 
+	// If it's a transient execution (test run), it won't be in the DB
+	if h.executor.IsTransient(id) {
+		if err := h.executor.StopExecution(id); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "Transient execution stop signal sent"})
+		return
+	}
+
 	execution, err := h.service.GetExecution(id, user)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "execution not found"})
