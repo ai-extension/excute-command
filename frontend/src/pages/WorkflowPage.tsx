@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { usePersistentState } from '../hooks/usePersistentState';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -14,7 +14,8 @@ import {
     FileText,
     Settings as SettingsIcon,
     Globe,
-    Lock, SquareChartGantt
+    Lock, SquareChartGantt,
+    Upload
 } from 'lucide-react';
 import {
     Table,
@@ -83,6 +84,52 @@ const WorkflowPage = () => {
     // Delete workflow state
     const [deleteTarget, setDeleteTarget] = useState<Workflow | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [isImporting, setIsImporting] = useState(false);
+
+    const handleImportClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !activeNamespace) return;
+
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            try {
+                const content = event.target?.result as string;
+                const workflowData = JSON.parse(content);
+
+                setIsImporting(true);
+                const response = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/workflows/import`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(workflowData),
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    showToast('Workflow imported successfully', 'success');
+                    navigate(`/workflows/${data.id}/edit`);
+                } else {
+                    const error = await response.json();
+                    showToast(error.error || 'Failed to import workflow', 'error');
+                }
+            } catch (error) {
+                console.error('Failed to import workflow:', error);
+                showToast('Invalid workflow file format', 'error');
+            } finally {
+                setIsImporting(false);
+                // Clear the input so the same file can be selected again
+                if (fileInputRef.current) fileInputRef.current.value = '';
+            }
+        };
+        reader.readAsText(file);
+    };
 
     const fetchWorkflows = async (searchOverride?: string, tagIdsOverride?: string[], templatesOverride?: boolean) => {
         if (!activeNamespace) return;
@@ -335,6 +382,22 @@ const WorkflowPage = () => {
                                             <Plus className="w-3.5 h-3.5" />
                                             New Workflow
                                         </Button>
+                                        <Button
+                                            onClick={handleImportClick}
+                                            disabled={isImporting}
+                                            variant="outline"
+                                            className="h-8 px-4 rounded-xl border-dashed border-primary/30 text-primary hover:bg-primary/5 font-black uppercase tracking-widest text-[9px] transition-all gap-2"
+                                        >
+                                            <Upload className="w-3.5 h-3.5" />
+                                            {isImporting ? 'Importing...' : 'Import Workflow'}
+                                        </Button>
+                                        <input
+                                            type="file"
+                                            ref={fileInputRef}
+                                            onChange={handleFileChange}
+                                            accept=".json"
+                                            className="hidden"
+                                        />
                                         <DialogContent className="sm:max-w-md">
                                             <DialogHeader>
                                                 <DialogTitle className="flex items-center gap-2">

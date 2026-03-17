@@ -642,3 +642,36 @@ func (h *WorkflowHandler) StopExecution(c *gin.Context) {
 	h.auditLog.LogAction(c, "STOP", "WORKFLOW_EXECUTION", id.String(), nil, "SUCCESS")
 	c.JSON(http.StatusOK, gin.H{"message": "Execution stop signal sent"})
 }
+
+func (h *WorkflowHandler) ImportWorkflow(c *gin.Context) {
+	nsIDStr := c.Param("ns_id")
+	nsID, err := uuid.Parse(nsIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid namespace id"})
+		return
+	}
+
+	var wf domain.Workflow
+	if err := c.ShouldBindJSON(&wf); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	wf.NamespaceID = nsID
+
+	authUser, _ := c.Get("user")
+	userObj := authUser.(*domain.User)
+	nsIDStr = nsID.String()
+	if !domain.HasPermission(userObj, "workflows", "WRITE", &nsIDStr, nil, nil) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "permission denied to import workflow in this namespace"})
+		return
+	}
+
+	if err := h.service.ImportWorkflow(&wf, userObj); err != nil {
+		h.auditLog.LogAction(c, "IMPORT", "WORKFLOW", wf.ID.String(), map[string]string{"error": err.Error(), "name": wf.Name}, "FAILED")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	h.auditLog.LogAction(c, "IMPORT", "WORKFLOW", wf.ID.String(), map[string]string{"name": wf.Name}, "SUCCESS")
+	c.JSON(http.StatusCreated, wf)
+}

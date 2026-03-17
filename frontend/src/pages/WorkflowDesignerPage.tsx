@@ -13,7 +13,8 @@ import {
     Settings as SettingsIcon,
     Globe,
     Pencil,
-    Info
+    Info,
+    Download
 } from 'lucide-react';
 import { DropResult } from '@hello-pangea/dnd';
 
@@ -290,6 +291,49 @@ const WorkflowDesignerPage = () => {
         }
     };
 
+    const handleExport = () => {
+        const stripIds = (obj: any): any => {
+            if (Array.isArray(obj)) {
+                return obj.map(stripIds);
+            } else if (obj !== null && typeof obj === 'object') {
+                const newObj: any = {};
+                for (const key in obj) {
+                    if (['id', 'workflow_id', 'group_id', 'step_id', 'created_at', 'updated_at', 'server_id', 'default_server_id', 'copy_target_server_id', 'target_workflow', 'created_by', 'created_by_username'].includes(key)) {
+                        continue;
+                    }
+                    newObj[key] = stripIds(obj[key]);
+                }
+                return newObj;
+            }
+            return obj;
+        };
+
+        const exportData = stripIds({
+            name,
+            description,
+            is_template: isTemplate,
+            is_public: isPublic,
+            timeout_minutes: timeoutMinutes,
+            target_folder: targetFolder,
+            cleanup_files: cleanupFiles,
+            tags,
+            inputs,
+            variables,
+            groups,
+            hooks
+        });
+
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${name.replace(/\s+/g, '-').toLowerCase()}-export.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+
     const handleAddGroup = () => {
         let maxNum = 0;
         groups.forEach(g => {
@@ -442,6 +486,14 @@ const WorkflowDesignerPage = () => {
                                                 Run
                                             </Button>
                                         )}
+                                        <Button
+                                            onClick={handleExport}
+                                            variant="outline"
+                                            className="h-8 px-3 rounded-lg border-indigo-500/30 text-indigo-500 hover:bg-indigo-500/10 hover:text-indigo-400 text-[9px] font-bold uppercase tracking-widest transition-all"
+                                        >
+                                            <Download className="w-3 h-3 mr-1.5" />
+                                            Export
+                                        </Button>
                                         <Button
                                             onClick={handleSave}
                                             disabled={isSaving}

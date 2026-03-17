@@ -237,6 +237,7 @@ func main() {
 
 			protected.GET("/namespaces/:ns_id/workflows", middleware.RBACMiddleware(db, userRepo, "workflows", "READ"), workflowHandler.ListWorkflows)
 			protected.POST("/namespaces/:ns_id/workflows", middleware.RBACMiddleware(db, userRepo, "workflows", "WRITE"), workflowHandler.CreateWorkflow)
+			protected.POST("/namespaces/:ns_id/workflows/import", middleware.RBACMiddleware(db, userRepo, "workflows", "WRITE"), workflowHandler.ImportWorkflow)
 			protected.GET("/namespaces/:ns_id/analytics/executions", middleware.RBACMiddleware(db, userRepo, "workflows", "READ"), workflowHandler.GetExecutionAnalytics)
 			protected.GET("/namespaces/:ns_id/executions", middleware.RBACMiddleware(db, userRepo, "history", "READ"), workflowHandler.ListAllExecutions)
 			protected.GET("/namespaces/:ns_id/dashboard-stats", middleware.RBACMiddleware(db, userRepo, "dashboard", "READ"), dashboardHandler.GetStats)
