@@ -28,7 +28,7 @@ func (r *PostgresPageRepo) GetByID(id uuid.UUID, scope *domain.PermissionScope) 
 		Preload("Workflows", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
 		Preload("Workflows.Workflow").
 		Preload("Workflows.Workflow.Inputs").
-		First(&page, "id = ?", id).Error
+		Take(&page, "id = ?", id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +41,7 @@ func (r *PostgresPageRepo) GetBySlug(slug string) (*domain.Page, error) {
 		Preload("Workflows", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
 		Preload("Workflows.Workflow").
 		Preload("Workflows.Workflow.Inputs").
-		First(&page, "slug = ?", slug).Error
+		Take(&page, "slug = ?", slug).Error
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +145,7 @@ func (r *PostgresPageRepo) Update(page *domain.Page) error {
 func (r *PostgresPageRepo) Delete(id uuid.UUID) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		var page domain.Page
-		if err := tx.First(&page, "id = ?", id).Error; err != nil {
+		if err := tx.Take(&page, "id = ?", id).Error; err != nil {
 			return err
 		}
 

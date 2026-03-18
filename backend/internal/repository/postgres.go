@@ -23,7 +23,7 @@ func (r *PostgresAPIKeyRepo) Create(apiKey *domain.APIKey) error {
 
 func (r *PostgresAPIKeyRepo) GetByID(id uuid.UUID) (*domain.APIKey, error) {
 	var apiKey domain.APIKey
-	if err := r.db.First(&apiKey, "id = ?", id).Error; err != nil {
+	if err := r.db.Take(&apiKey, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	return &apiKey, nil
@@ -31,7 +31,7 @@ func (r *PostgresAPIKeyRepo) GetByID(id uuid.UUID) (*domain.APIKey, error) {
 
 func (r *PostgresAPIKeyRepo) GetByHash(hash string) (*domain.APIKey, error) {
 	var apiKey domain.APIKey
-	if err := r.db.First(&apiKey, "key_hash = ?", hash).Error; err != nil {
+	if err := r.db.Take(&apiKey, "key_hash = ?", hash).Error; err != nil {
 		return nil, err
 	}
 	return &apiKey, nil
@@ -100,7 +100,7 @@ func (r *PostgresNamespaceRepo) GetByID(id uuid.UUID, scope *domain.PermissionSc
 		// Namespaces only filter by their own IDs
 		db = db.Where("id IN ?", scope.AllowedItemIDs)
 	}
-	if err := db.First(&ns, "id = ?", id).Error; err != nil {
+	if err := db.Take(&ns, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	return &ns, nil
@@ -140,7 +140,7 @@ func (r *PostgresUserRepo) Create(user *domain.User) error {
 
 func (r *PostgresUserRepo) GetByID(id uuid.UUID) (*domain.User, error) {
 	var user domain.User
-	if err := r.db.Preload("Roles.Permissions.Permission").Preload("Permissions").First(&user, "id = ?", id).Error; err != nil {
+	if err := r.db.Preload("Roles.Permissions.Permission").Preload("Permissions").Take(&user, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil
@@ -148,7 +148,7 @@ func (r *PostgresUserRepo) GetByID(id uuid.UUID) (*domain.User, error) {
 
 func (r *PostgresUserRepo) GetByUsername(username string) (*domain.User, error) {
 	var user domain.User
-	if err := r.db.Preload("Roles.Permissions.Permission").Preload("Permissions").First(&user, "username = ?", username).Error; err != nil {
+	if err := r.db.Preload("Roles.Permissions.Permission").Preload("Permissions").Take(&user, "username = ?", username).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil
@@ -204,7 +204,7 @@ func (r *PostgresUserRepo) Update(user *domain.User) error {
 func (r *PostgresUserRepo) Delete(id uuid.UUID) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		var user domain.User
-		if err := tx.First(&user, "id = ?", id).Error; err != nil {
+		if err := tx.Take(&user, "id = ?", id).Error; err != nil {
 			return err
 		}
 
@@ -236,7 +236,7 @@ func (r *PostgresRoleRepo) Create(role *domain.Role) error {
 
 func (r *PostgresRoleRepo) GetByID(id uuid.UUID) (*domain.Role, error) {
 	var role domain.Role
-	if err := r.db.Preload("Permissions.Permission").First(&role, "id = ?", id).Error; err != nil {
+	if err := r.db.Preload("Permissions.Permission").Take(&role, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	return &role, nil
@@ -283,7 +283,7 @@ func (r *PostgresRoleRepo) Update(role *domain.Role) error {
 func (r *PostgresRoleRepo) Delete(id uuid.UUID) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		var role domain.Role
-		if err := tx.First(&role, "id = ?", id).Error; err != nil {
+		if err := tx.Take(&role, "id = ?", id).Error; err != nil {
 			return err
 		}
 
@@ -360,7 +360,7 @@ func NewPostgresSystemSettingRepo(db *gorm.DB) *PostgresSystemSettingRepo {
 
 func (r *PostgresSystemSettingRepo) GetByKey(key string) (*domain.SystemSetting, error) {
 	var setting domain.SystemSetting
-	if err := r.db.First(&setting, "key = ?", key).Error; err != nil {
+	if err := r.db.Take(&setting, "key = ?", key).Error; err != nil {
 		return nil, err
 	}
 	return &setting, nil
@@ -368,7 +368,7 @@ func (r *PostgresSystemSettingRepo) GetByKey(key string) (*domain.SystemSetting,
 
 func (r *PostgresSystemSettingRepo) Upsert(setting *domain.SystemSetting) error {
 	var existing domain.SystemSetting
-	if err := r.db.First(&existing, "key = ?", setting.Key).Error; err == nil {
+	if err := r.db.Take(&existing, "key = ?", setting.Key).Error; err == nil {
 		setting.ID = existing.ID
 		return r.db.Save(setting).Error
 	}

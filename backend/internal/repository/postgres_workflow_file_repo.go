@@ -25,7 +25,7 @@ func (r *PostgresWorkflowFileRepo) GetByID(id uuid.UUID, scope *domain.Permissio
 		db = db.Joins("JOIN workflows ON workflows.id = workflow_files.workflow_id").
 			Where("workflows.namespace_id IN ? OR workflow_files.workflow_id IN ?", scope.AllowedNamespaceIDs, scope.AllowedItemIDs)
 	}
-	if err := db.First(&file, "id = ?", id).Error; err != nil {
+	if err := db.Take(&file, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	return &file, nil

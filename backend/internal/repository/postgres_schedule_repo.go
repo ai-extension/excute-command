@@ -28,7 +28,7 @@ func (r *PostgresScheduleRepo) GetByID(id uuid.UUID, scope *domain.PermissionSco
 		Preload("Hooks", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
 		Preload("Hooks.TargetWorkflow").
 		Preload("Tags").
-		First(&s, "id = ?", id).Error; err != nil {
+		Take(&s, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	r.populateStats(&s)
@@ -203,7 +203,7 @@ func (r *PostgresScheduleRepo) populateStats(s *domain.Schedule) {
 	s.TotalRuns = int(count)
 
 	var lastExec domain.WorkflowExecution
-	if err := r.db.Where("scheduled_id = ?", s.ID).Order("started_at desc").First(&lastExec).Error; err == nil {
+	if err := r.db.Where("scheduled_id = ?", s.ID).Order("started_at desc").Take(&lastExec).Error; err == nil {
 		s.LastRunStatus = string(lastExec.Status)
 		s.LastRunAt = &lastExec.StartedAt
 	}

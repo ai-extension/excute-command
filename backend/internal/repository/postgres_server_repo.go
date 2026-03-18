@@ -32,7 +32,7 @@ func (r *PostgresServerRepo) Create(server *domain.Server) error {
 func (r *PostgresServerRepo) GetByID(id uuid.UUID, scope *domain.PermissionScope) (*domain.Server, error) {
 	var server domain.Server
 	db := applyScope(r.db, scope, "server_tags", "server_id")
-	if err := db.Preload("Vpn").First(&server, "id = ?", id).Error; err != nil {
+	if err := db.Preload("Vpn").Take(&server, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 

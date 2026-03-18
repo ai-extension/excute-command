@@ -21,7 +21,7 @@ func (r *PostgresGlobalVariableRepo) Create(gv *domain.GlobalVariable) error {
 func (r *PostgresGlobalVariableRepo) GetByID(id uuid.UUID, scope *domain.PermissionScope) (*domain.GlobalVariable, error) {
 	var gv domain.GlobalVariable
 	db := applyScope(r.db, scope, "", "")
-	if err := db.First(&gv, "id = ?", id).Error; err != nil {
+	if err := db.Take(&gv, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	return &gv, nil

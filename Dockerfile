@@ -7,13 +7,15 @@ COPY frontend/ .
 RUN npm run build
 
 # Build Backend
-FROM golang:alpine AS backend-builder
+FROM --platform=$BUILDPLATFORM golang:alpine AS backend-builder
+ARG TARGETOS
+ARG TARGETARCH
 WORKDIR /app/backend
 RUN apk add --no-cache gcc musl-dev
 COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 COPY backend/ .
-RUN CGO_ENABLED=0 go build -o main cmd/server/main.go
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o main cmd/server/main.go
 
 # Final Stage
 FROM ubuntu:22.04

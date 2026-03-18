@@ -1,4 +1,4 @@
-.PHONY: help install-be install-fe install db-up db-down db-init run-be run-fe dev
+.PHONY: help install-be install-fe install db-up db-down db-init run-be run-fe dev docker-build-push
 
 
 help: ## Display this help
@@ -49,3 +49,6 @@ run-fe: ## Run frontend development server
 dev: ## Run both BE and FE (requires manual control or background execution)
 	@echo "Starting development environment..."
 	@make -j 2 run-be run-fe
+
+docker-build-push: ## Build and push docker image for EC2 (x86_64)
+	docker buildx build --platform linux/amd64 -t deeair/excute-command-orchestrator:latest --push .

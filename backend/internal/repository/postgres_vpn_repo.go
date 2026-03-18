@@ -42,7 +42,7 @@ func (r *PostgresVpnConfigRepo) Create(vpn *domain.VpnConfig) error {
 func (r *PostgresVpnConfigRepo) GetByID(id uuid.UUID, scope *domain.PermissionScope) (*domain.VpnConfig, error) {
 	var vpn domain.VpnConfig
 	db := applyScope(r.db, scope, "", "")
-	if err := db.First(&vpn, "id = ?", id).Error; err != nil {
+	if err := db.Take(&vpn, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 

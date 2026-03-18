@@ -21,7 +21,7 @@ func (r *PostgresTagRepo) Create(tag *domain.Tag) error {
 func (r *PostgresTagRepo) GetByID(id uuid.UUID, scope *domain.PermissionScope) (*domain.Tag, error) {
 	var tag domain.Tag
 	db := applyScope(r.db, scope, "", "")
-	err := db.First(&tag, "id = ?", id).Error
+	err := db.Take(&tag, "id = ?", id).Error
 	return &tag, err
 }
 

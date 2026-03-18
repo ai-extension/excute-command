@@ -35,7 +35,7 @@ func (r *PostgresWorkflowRepo) GetByID(id uuid.UUID, scope *domain.PermissionSco
 		Preload("Hooks.TargetWorkflow").
 		Preload("Files").
 		Preload("Tags").
-		First(&wf, "id = ?", id).Error
+		Take(&wf, "id = ?", id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -386,7 +386,7 @@ func (r *PostgresWorkflowExecutionRepo) GetByID(id uuid.UUID, scope *domain.Perm
 		db = db.Joins("JOIN workflows ON workflows.id = workflow_executions.workflow_id").
 			Where("workflows.namespace_id IN ? OR workflow_executions.workflow_id IN ?", scope.AllowedNamespaceIDs, scope.AllowedItemIDs)
 	}
-	if err := db.Preload("User").Preload("Workflow.Groups.Steps").Preload("Steps").First(&exec, "id = ?", id).Error; err != nil {
+	if err := db.Preload("User").Preload("Workflow.Groups.Steps").Preload("Steps").Take(&exec, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	return &exec, nil
