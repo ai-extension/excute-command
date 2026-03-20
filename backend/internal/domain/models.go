@@ -435,6 +435,8 @@ type WorkflowExecutionStep struct {
 	ID          uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey"`
 	ExecutionID uuid.UUID  `json:"execution_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
 	StepID      uuid.UUID  `json:"step_id" gorm:"type:uuid;index"`
+	GroupID     uuid.UUID  `json:"group_id" gorm:"type:uuid;index"`
+	GroupName   string     `json:"group_name"`
 	Name        string     `json:"name"`
 	Status      Status     `json:"status"`
 	Output      string     `json:"output"`

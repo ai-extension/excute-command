@@ -482,22 +482,13 @@ func (h *WorkflowHandler) GetExecutionLogs(c *gin.Context) {
 			return
 		}
 
-		workflow, err := h.service.GetWorkflow(execution.WorkflowID, user)
-		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "workflow not found"})
-			return
-		}
-
 		var logs string
-		for _, group := range workflow.Groups {
-			if group.ID == groupUUID {
-				for _, step := range group.Steps {
-					stepLogPath := filepath.Join(execLogDir, step.ID.String()+".log")
-					if content, err := os.ReadFile(stepLogPath); err == nil {
-						logs += string(content) + "\n"
-					}
+		for _, step := range execution.Steps {
+			if step.GroupID == groupUUID {
+				stepLogPath := filepath.Join(execLogDir, step.StepID.String()+".log")
+				if content, err := os.ReadFile(stepLogPath); err == nil {
+					logs += string(content) + "\n"
 				}
-				break
 			}
 		}
 		c.String(http.StatusOK, logs)

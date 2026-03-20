@@ -197,13 +197,17 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                         if (stepIndex >= 0) {
                             steps[stepIndex] = { ...steps[stepIndex], status };
                         } else {
-                            // Find step name from workflow if possible
-                            const stepName = workflow?.groups?.flatMap(g => g.steps || []).find(s => s.id === targetID)?.name || 'Unknown Step';
+                            // Find step and group info from workflow if possible
+                            const workflowStep = workflow?.groups?.flatMap(g => g.steps || []).find(s => s.id === targetID);
+                            const workflowGroup = workflow?.groups?.find(g => g.id === workflowStep?.group_id);
+                            
                             steps.push({
                                 id: '', // Temporary ID
                                 execution_id: msg.execution_id,
                                 step_id: targetID,
-                                name: stepName,
+                                group_id: workflowGroup?.id || '',
+                                group_name: workflowGroup?.name || '',
+                                name: workflowStep?.name || 'Unknown Step',
                                 status: status,
                                 output: '',
                                 started_at: new Date().toISOString()
@@ -261,6 +265,67 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                 .catch(err => console.error('Failed to fetch execution details:', err));
         }
     }, [execution?.id, (workflow as any)?.execution_id, apiFetch]);
+
+    const displayGroups = React.useMemo(() => {
+        if (!workflow) return [];
+        if (mode === 'LIVE') return workflow.groups || [];
+
+        // For HISTORICAL mode, we need to show steps from execution.steps
+        // even if their groups are missing from workflow.groups
+        const workflowGroups = [...(workflow.groups || [])];
+        const executionSteps = execution?.steps || [];
+
+        const resultGroups = [...workflowGroups.map(g => ({ ...g, steps: [...(g.steps || [])] }))];
+
+        // Find steps in execution that are not accounted for in resultGroups
+        executionSteps.forEach(execStep => {
+            if (!execStep.group_id) return;
+            const groupExists = resultGroups.some(g => g.id === execStep.group_id);
+            if (!groupExists) {
+                resultGroups.push({
+                    id: execStep.group_id,
+                    workflow_id: workflow.id,
+                    name: execStep.group_name || 'Deleted Group',
+                    key: 'deleted_' + execStep.group_id.substring(0, 8),
+                    steps: [],
+                    order: 999, // Put at the end
+                    is_parallel: false,
+                    status: 'SUCCESS' as any,
+                    is_copy_enabled: false,
+                    continue_on_failure: false,
+                    retry_enabled: false,
+                    retry_limit: 0,
+                    retry_delay: 0,
+                    created_at: '',
+                    updated_at: ''
+                });
+            }
+        });
+
+        // Now find steps that are missing from their groups
+        executionSteps.forEach(execStep => {
+            const group = resultGroups.find(g => g.id === execStep.group_id);
+            if (group) {
+                if (!group.steps) group.steps = [];
+                const stepExists = group.steps.some(s => s.id === execStep.step_id);
+                if (!stepExists) {
+                    group.steps.push({
+                        id: execStep.step_id,
+                        group_id: execStep.group_id,
+                        name: execStep.name,
+                        action_type: 'COMMAND',
+                        command_text: '',
+                        wait_to_finish: true,
+                        order: (group.steps.length || 0) + 1,
+                        created_at: execStep.started_at,
+                        updated_at: execStep.finished_at || execStep.started_at
+                    } as any);
+                }
+            }
+        });
+
+        return resultGroups.sort((a, b) => a.order - b.order);
+    }, [workflow, execution, mode]);
 
     // Effect for Data Fetching (Historical Mode logs)
     useEffect(() => {
@@ -475,7 +540,7 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                 {/* Workflow Structure */}
                 <div className="w-80 shrink-0 overflow-auto border-r border-border p-6 bg-muted/20 custom-scrollbar">
                     <div className="space-y-6">
-                        {workflow.groups?.map((group) => (
+                        {displayGroups?.map((group) => (
                             <div key={group.id} className="space-y-3">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">

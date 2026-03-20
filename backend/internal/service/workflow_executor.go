@@ -813,7 +813,7 @@ func (e *WorkflowExecutor) runGroupAttempt(ctx context.Context, group *domain.Wo
 			wg.Add(1)
 			go func(step *domain.WorkflowStep) {
 				defer wg.Done()
-				if err := e.runStep(ctx, step, inputs, variables, groupResults, effectiveServerID, logFile, workflowID, executionID, namespaceID, user, workingDirs, fromExecutionID); err != nil {
+				if err := e.runStep(ctx, step, inputs, variables, groupResults, effectiveServerID, logFile, workflowID, executionID, namespaceID, user, workingDirs, fromExecutionID, group.ID, group.Name); err != nil {
 					errs <- err
 				}
 			}(&group.Steps[i])
@@ -863,7 +863,7 @@ func (e *WorkflowExecutor) runGroupAttempt(ctx context.Context, group *domain.Wo
 				continue
 			}
 
-			if err := e.runStep(ctx, step, inputs, variables, groupResults, effectiveServerID, logFile, workflowID, executionID, namespaceID, user, workingDirs, fromExecutionID); err != nil {
+			if err := e.runStep(ctx, step, inputs, variables, groupResults, effectiveServerID, logFile, workflowID, executionID, namespaceID, user, workingDirs, fromExecutionID, group.ID, group.Name); err != nil {
 				return err
 			}
 			// Sequential Step Delay: 200ms gap between steps to prevent race conditions
@@ -971,7 +971,7 @@ func (e *WorkflowExecutor) relayCopy(ctx context.Context, group *domain.Workflow
 	return nil
 }
 
-func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowStep, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, defaultServerID uuid.UUID, mainLogFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, namespaceID uuid.UUID, user *domain.User, workingDirs *sync.Map, fromExecutionID *uuid.UUID) error {
+func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowStep, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, defaultServerID uuid.UUID, mainLogFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, namespaceID uuid.UUID, user *domain.User, workingDirs *sync.Map, fromExecutionID *uuid.UUID, groupID uuid.UUID, groupName string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -982,6 +982,8 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 		ID:          uuid.New(),
 		ExecutionID: executionID,
 		StepID:      step.ID,
+		GroupID:     groupID,
+		GroupName:   groupName,
 		Name:        step.Name,
 		Status:      domain.StatusRunning,
 		StartedAt:   time.Now(),
@@ -1050,6 +1052,7 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 			outWriter := io.Writer(&out) // capture output without broadcasting
 			mw := io.MultiWriter(
 				&wsWriter{hub: e.hub, targetID: workflowID.String(), executionID: executionID.String(), buffer: mainLogFile},
+				&wsWriter{hub: e.hub, targetID: step.ID.String(), executionID: executionID.String(), buffer: nil}, // Broadcast to step trace
 				&fileWriter{file: stepLogFile},
 				outWriter,
 			)
@@ -1346,6 +1349,7 @@ func (e *WorkflowExecutor) runLocalStep(ctx context.Context, step *domain.Workfl
 	outWriter := io.Writer(&out) // capture output without broadcasting
 	mw := io.MultiWriter(
 		&wsWriter{hub: e.hub, targetID: workflowID.String(), executionID: executionID.String(), buffer: mainLogFile},
+		&wsWriter{hub: e.hub, targetID: step.ID.String(), executionID: executionID.String(), buffer: nil}, // Broadcast to step trace
 		&fileWriter{file: stepLogFile},
 		outWriter,
 	)
@@ -1388,7 +1392,11 @@ type wsWriter struct {
 }
 
 func (w *wsWriter) Write(p []byte) (n int, err error) {
-	n, err = w.buffer.Write(p)
+	if w.buffer != nil {
+		n, err = w.buffer.Write(p)
+	} else {
+		n = len(p)
+	}
 	w.hub.BroadcastLog(w.targetID, w.executionID, string(p))
 	return n, err
 }

@@ -166,6 +166,8 @@ export interface WorkflowExecutionStep {
     id: string;
     execution_id: string;
     step_id: string;
+    group_id: string;
+    group_name: string;
     name: string;
     status: string;
     output: string;
