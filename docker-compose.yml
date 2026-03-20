@@ -36,6 +36,8 @@ services:
       ALLOWED_ORIGIN: http://localhost
     depends_on:
       - db
+    volumes:
+      - ./backend/data:/app/data
     networks:
       - csm-network
 
