@@ -44,8 +44,8 @@ type User struct {
 	SocialProvider string         `json:"social_provider"` // google, facebook, etc.
 	SocialID       string         `json:"social_id"`
 	AvatarURL      string         `json:"avatar_url"`
-	Roles          []Role         `json:"roles" gorm:"many2many:user_roles;constraint:OnDelete:CASCADE;"`
-	Permissions    []Permission   `json:"permissions" gorm:"many2many:user_permissions;constraint:OnDelete:CASCADE;"`
+	Roles          []Role         `json:"roles" gorm:"many2many:user_roles"`
+	Permissions    []Permission   `json:"permissions" gorm:"many2many:user_permissions"`
 	CreatedAt      time.Time      `json:"created_at" gorm:"<-:create"`
 	UpdatedAt      time.Time      `json:"updated_at"`
 	DeletedAt      gorm.DeletedAt `json:"-" gorm:"index"`

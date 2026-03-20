@@ -187,13 +187,17 @@ func (r *PostgresUserRepo) ListPaginated(limit, offset int, searchTerm string, r
 func (r *PostgresUserRepo) Update(user *domain.User) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		// Sync Roles many-to-many
-		if err := tx.Model(user).Association("Roles").Replace(user.Roles); err != nil {
-			return err
+		if user.Roles != nil {
+			if err := tx.Model(user).Association("Roles").Replace(user.Roles); err != nil {
+				return err
+			}
 		}
 
 		// Sync Permissions many-to-many
-		if err := tx.Model(user).Association("Permissions").Replace(user.Permissions); err != nil {
-			return err
+		if user.Permissions != nil {
+			if err := tx.Model(user).Association("Permissions").Replace(user.Permissions); err != nil {
+				return err
+			}
 		}
 
 		// Update top-level fields (omit associations to avoid double-processing)
@@ -271,8 +275,10 @@ func (r *PostgresRoleRepo) ListPaginated(limit, offset int, searchTerm string) (
 func (r *PostgresRoleRepo) Update(role *domain.Role) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		// Sync Permissions (role_permissions table)
-		if err := tx.Model(role).Association("Permissions").Replace(role.Permissions); err != nil {
-			return err
+		if role.Permissions != nil {
+			if err := tx.Model(role).Association("Permissions").Replace(role.Permissions); err != nil {
+				return err
+			}
 		}
 
 		// Update top-level fields (omit associations)
