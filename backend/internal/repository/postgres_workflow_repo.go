@@ -167,79 +167,110 @@ func (r *PostgresWorkflowRepo) UpdateStatus(id uuid.UUID, status domain.Status) 
 func (r *PostgresWorkflowRepo) Update(wf *domain.Workflow) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		// Sync Inputs
-		for i := range wf.Inputs {
-			if wf.Inputs[i].ID == uuid.Nil {
-				wf.Inputs[i].ID = uuid.New()
+		if wf.Inputs != nil {
+			for i := range wf.Inputs {
+				if wf.Inputs[i].ID == uuid.Nil {
+					wf.Inputs[i].ID = uuid.New()
+				}
+				wf.Inputs[i].WorkflowID = wf.ID
+				if wf.Inputs[i].Type == "" {
+					wf.Inputs[i].Type = "input"
+				}
+				if err := tx.Save(&wf.Inputs[i]).Error; err != nil {
+					return err
+				}
 			}
-			wf.Inputs[i].WorkflowID = wf.ID
-			if wf.Inputs[i].Type == "" {
-				wf.Inputs[i].Type = "input"
-			}
-		}
-		if err := tx.Model(wf).Association("Inputs").Replace(wf.Inputs); err != nil {
-			return err
-		}
-
-		// Sync Variables
-		for i := range wf.Variables {
-			if wf.Variables[i].ID == uuid.Nil {
-				wf.Variables[i].ID = uuid.New()
-			}
-			wf.Variables[i].WorkflowID = wf.ID
-		}
-		if err := tx.Model(wf).Association("Variables").Replace(wf.Variables); err != nil {
-			return err
-		}
-
-		// Step 1: Upsert each group first to ensure it exists in the DB before touching steps.
-		for i := range wf.Groups {
-			wf.Groups[i].WorkflowID = wf.ID
-			if err := tx.Omit("Steps").Save(&wf.Groups[i]).Error; err != nil {
+			if err := tx.Model(wf).Association("Inputs").Replace(wf.Inputs); err != nil {
 				return err
 			}
 		}
 
-		// Step 2: Now that all groups exist, sync their steps.
-		for i := range wf.Groups {
-			for j := range wf.Groups[i].Steps {
-				wf.Groups[i].Steps[j].GroupID = wf.Groups[i].ID
-				if wf.Groups[i].Steps[j].ID == uuid.Nil {
-					wf.Groups[i].Steps[j].ID = uuid.New()
+		// Sync Variables
+		if wf.Variables != nil {
+			for i := range wf.Variables {
+				if wf.Variables[i].ID == uuid.Nil {
+					wf.Variables[i].ID = uuid.New()
 				}
-				if err := tx.Save(&wf.Groups[i].Steps[j]).Error; err != nil {
+				wf.Variables[i].WorkflowID = wf.ID
+				if err := tx.Save(&wf.Variables[i]).Error; err != nil {
+					return err
+				}
+			}
+			if err := tx.Model(wf).Association("Variables").Replace(wf.Variables); err != nil {
+				return err
+			}
+		}
+
+		// Sync Groups & Steps
+		if wf.Groups != nil {
+			// Step 1: Upsert each group first to ensure it exists in the DB before touching steps.
+			for i := range wf.Groups {
+				wf.Groups[i].WorkflowID = wf.ID
+				if err := tx.Omit("Steps").Save(&wf.Groups[i]).Error; err != nil {
 					return err
 				}
 			}
 
-			if err := tx.Model(&wf.Groups[i]).Association("Steps").Replace(wf.Groups[i].Steps); err != nil {
+			// Step 2: Handle steps for each group
+			for i := range wf.Groups {
+				for j := range wf.Groups[i].Steps {
+					if wf.Groups[i].Steps[j].ID == uuid.Nil {
+						wf.Groups[i].Steps[j].ID = uuid.New()
+					}
+					wf.Groups[i].Steps[j].GroupID = wf.Groups[i].ID
+					if err := tx.Save(&wf.Groups[i].Steps[j]).Error; err != nil {
+						return err
+					}
+				}
+				// Sync steps within this group
+				if err := tx.Model(&wf.Groups[i]).Association("Steps").Replace(wf.Groups[i].Steps); err != nil {
+					return err
+				}
+			}
+
+			// Step 3: Sync the workflow's group collection
+			if err := tx.Model(wf).Association("Groups").Replace(wf.Groups); err != nil {
 				return err
 			}
 		}
 
-		// Step 3: Sync the groups list at the association level to remove deleted groups.
-		if err := tx.Model(wf).Association("Groups").Replace(wf.Groups); err != nil {
-			return err
-		}
-
 		// Sync Hooks
-		for i := range wf.Hooks {
-			if wf.Hooks[i].ID == uuid.Nil {
-				wf.Hooks[i].ID = uuid.New()
+		if wf.Hooks != nil {
+			for i := range wf.Hooks {
+				if wf.Hooks[i].ID == uuid.Nil {
+					wf.Hooks[i].ID = uuid.New()
+				}
+				wf.Hooks[i].WorkflowID = &wf.ID
+				if err := tx.Save(&wf.Hooks[i]).Error; err != nil {
+					return err
+				}
 			}
-			wf.Hooks[i].WorkflowID = &wf.ID
-		}
-		if err := tx.Model(wf).Association("Hooks").Replace(wf.Hooks); err != nil {
-			return err
+			if err := tx.Model(wf).Association("Hooks").Replace(wf.Hooks); err != nil {
+				return err
+			}
 		}
 
-		// Sync Tags Many-to-Many
-		if err := tx.Model(wf).Association("Tags").Replace(wf.Tags); err != nil {
-			return err
+		// Sync Tags
+		if wf.Tags != nil {
+			if err := tx.Model(wf).Association("Tags").Replace(wf.Tags); err != nil {
+				return err
+			}
 		}
 
 		// Sync Files
-		if err := tx.Model(wf).Association("Files").Replace(wf.Files); err != nil {
-			return err
+		if wf.Files != nil {
+			for i := range wf.Files {
+				if wf.Files[i].ID == uuid.Nil {
+					wf.Files[i].ID = uuid.New()
+				}
+				wf.Files[i].WorkflowID = wf.ID
+				if err := tx.Save(&wf.Files[i]).Error; err != nil {
+					return err
+				}
+			}
+			if err := tx.Model(wf).Association("Files").Replace(wf.Files); err != nil {
+				return err
+			}
 		}
 
 		// Update top-level fields (omit associations to avoid double-processing)

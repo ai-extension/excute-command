@@ -28,11 +28,13 @@ import { APP_VERSION } from '../config/version';
 
 import {
     Workflow,
+    WorkflowGroup,
+    WorkflowStep,
+    WorkflowFile,
     Tag,
-    Server as ServerType,
     WorkflowInput,
     WorkflowVariable,
-    WorkflowGroup,
+    Server as ServerType,
     WorkflowHook
 } from '../types';
 
@@ -62,6 +64,7 @@ const WorkflowDesignerPage = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [activeTab, setActiveTab] = useState<'general' | 'steps' | 'variables' | 'files' | 'hooks' | 'history' | 'audit'>('general');
     const [hooks, setHooks] = useState<WorkflowHook[]>([]);
+    const [files, setFiles] = useState<WorkflowFile[]>([]);
     const [allWorkflows, setAllWorkflows] = useState<Workflow[]>([]);
     const [defaultServerId, setDefaultServerId] = useState<string | undefined>(undefined);
     const [targetFolder, setTargetFolder] = useState<string>('');
@@ -198,6 +201,7 @@ const WorkflowDesignerPage = () => {
                 })));
                 setVariables(data.variables || []);
                 setHooks(data.hooks || []);
+                setFiles(data.files || []);
             } catch (error) {
                 console.error('Failed to fetch workflow:', error);
                 setError(error instanceof Error ? error.message : 'Failed to retrieve blueprint data');
@@ -241,12 +245,12 @@ const WorkflowDesignerPage = () => {
                 tags,
                 inputs: inputs.filter(i => i.key?.trim()),
                 variables: variables.filter(v => v.key?.trim()),
-                groups: groups.map((g, gIdx) => ({
+                groups: groups.map((g: Partial<WorkflowGroup>, gIdx: number) => ({
                     ...g,
                     default_server_id: g.default_server_id || undefined,
                     copy_target_server_id: g.copy_target_server_id || undefined,
                     order: gIdx,
-                    steps: g.steps?.map((s, sIdx) => {
+                    steps: g.steps?.map((s: Partial<WorkflowStep>, sIdx: number) => {
                         const cleanedStep = {
                             ...s,
                             order: sIdx,
@@ -262,7 +266,8 @@ const WorkflowDesignerPage = () => {
                     ...h,
                     order: hIdx,
                     target_workflow: undefined // Don't send cyclic data
-                }))
+                })),
+                files: files
             };
 
             const method = id ? 'PUT' : 'POST';
@@ -631,6 +636,8 @@ const WorkflowDesignerPage = () => {
                                                 setTargetFolder={setTargetFolder}
                                                 cleanupFiles={cleanupFiles}
                                                 setCleanupFiles={setCleanupFiles}
+                                                files={files}
+                                                setFiles={setFiles}
                                             />
                                         </div>
                                     ) : activeTab === 'hooks' ? (

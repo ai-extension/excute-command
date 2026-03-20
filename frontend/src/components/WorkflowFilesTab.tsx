@@ -15,12 +15,13 @@ interface WorkflowFilesTabProps {
     setTargetFolder: (val: string) => void;
     cleanupFiles: boolean;
     setCleanupFiles: (val: boolean) => void;
+    files: WorkflowFile[];
+    setFiles: (files: WorkflowFile[]) => void;
 }
 
 
-export const WorkflowFilesTab: React.FC<WorkflowFilesTabProps> = ({ workflowId, targetFolder, setTargetFolder, cleanupFiles, setCleanupFiles }) => {
+export const WorkflowFilesTab: React.FC<WorkflowFilesTabProps> = ({ workflowId, targetFolder, setTargetFolder, cleanupFiles, setCleanupFiles, files, setFiles }) => {
     const { apiFetch, showToast } = useAuth();
-    const [files, setFiles] = useState<WorkflowFile[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);

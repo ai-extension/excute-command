@@ -111,9 +111,7 @@ func (s *WorkflowService) UpdateWorkflow(wf *domain.Workflow, user *domain.User)
 	if wf.Name != "" {
 		existing.Name = wf.Name
 	}
-	if wf.Description != "" {
-		existing.Description = wf.Description
-	}
+	existing.Description = wf.Description
 	if wf.DefaultServerID != nil {
 		existing.DefaultServerID = wf.DefaultServerID
 	}
@@ -125,21 +123,29 @@ func (s *WorkflowService) UpdateWorkflow(wf *domain.Workflow, user *domain.User)
 	}
 	existing.IsTemplate = wf.IsTemplate
 	existing.IsPublic = wf.IsPublic
-	if wf.TriggerSource != "" {
-		existing.TriggerSource = wf.TriggerSource
-	}
-	if wf.TargetFolder != "" {
-		existing.TargetFolder = wf.TargetFolder
-	}
+	existing.TriggerSource = wf.TriggerSource
+	existing.TargetFolder = wf.TargetFolder
 	existing.CleanupFiles = wf.CleanupFiles
 
 	// Copy associations from wf to existing (the repo handle syncing these)
-	existing.Inputs = wf.Inputs
-	existing.Variables = wf.Variables
-	existing.Groups = wf.Groups
-	existing.Tags = wf.Tags
-	existing.Hooks = wf.Hooks
-	existing.Files = wf.Files
+	if wf.Inputs != nil {
+		existing.Inputs = wf.Inputs
+	}
+	if wf.Variables != nil {
+		existing.Variables = wf.Variables
+	}
+	if wf.Groups != nil {
+		existing.Groups = wf.Groups
+	}
+	if wf.Tags != nil {
+		existing.Tags = wf.Tags
+	}
+	if wf.Hooks != nil {
+		existing.Hooks = wf.Hooks
+	}
+	if wf.Files != nil {
+		existing.Files = wf.Files
+	}
 
 	// Recursively assign IDs to new inputs, variables, groups and steps
 	for i := range existing.Inputs {
