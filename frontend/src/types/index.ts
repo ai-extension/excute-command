@@ -76,6 +76,7 @@ export interface WorkflowGroup {
     retry_enabled: boolean;
     retry_limit: number;
     retry_delay: number;
+    mcp_report_log: boolean;
     created_at: string;
     updated_at: string;
 }

@@ -186,7 +186,10 @@ const WorkflowDesignerPage = () => {
                 setIsPublic(!!data.is_public);
 
                 const cleanGroups = (data.groups || []).map((g: any) => {
-                    const cleanedGroup = { ...g };
+                    const cleanedGroup = { 
+                        ...g,
+                        mcp_report_log: !!g.mcp_report_log
+                    };
                     if (cleanedGroup.steps) {
                         cleanedGroup.steps = cleanedGroup.steps.map((s: any) => {
                             const cleanedStep = { ...s };
@@ -360,6 +363,7 @@ const WorkflowDesignerPage = () => {
             order: groups.length,
             is_parallel: false,
             continue_on_failure: false,
+            mcp_report_log: false,
             steps: []
         } as any]);
         setActiveTab('steps');

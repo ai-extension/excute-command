@@ -1,12 +1,9 @@
 package service
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/google/uuid"
@@ -52,9 +49,9 @@ func (s *MCPService) registerTools() {
 
 	// 2. run_workflow
 	runWorkflowTool := mcp.NewTool("run_workflow",
-		mcp.WithDescription("Chạy một workflow dựa theo ID. Truyền inputs (JSON) nếu cần thiêt. Trả về execution_id."),
+		mcp.WithDescription("Chạy một workflow dựa theo ID. Bạn PHẢI xem danh sách 'inputs' trong 'list_workflows' và truyền vào tham số 'inputs' dưới dạng JSON string."),
 		mcp.WithString("workflow_id", mcp.Required(), mcp.Description("UUID của workflow cần chạy")),
-		mcp.WithString("inputs", mcp.Description("Các biến đầu vào định dạng JSON string")),
+		mcp.WithString("inputs", mcp.Description("Các biến đầu vào định dạng JSON string. Ví dụ: '{\"branch\": \"main\"}'")),
 	)
 	s.server.AddTool(runWorkflowTool, s.handleRunWorkflow)
 
@@ -67,13 +64,13 @@ func (s *MCPService) registerTools() {
 
 	// 4. schedule_workflow
 	scheduleTool := mcp.NewTool("schedule_workflow",
-		mcp.WithDescription("Đặt lịch chạy cho một workflow (One-time hoặc Recurring)."),
+		mcp.WithDescription("Đặt lịch chạy cho một workflow (One-time hoặc Recurring). Bạn PHẢI xem danh sách 'inputs' trong 'list_workflows' và truyền vào tham số 'inputs' dưới dạng JSON string."),
 		mcp.WithString("workflow_id", mcp.Required(), mcp.Description("UUID của workflow cần đặt lịch")),
 		mcp.WithString("name", mcp.Required(), mcp.Description("Tên của lịch trình (ví dụ: 'Daily Backup')")),
 		mcp.WithString("type", mcp.Required(), mcp.Description("Loại lịch: 'ONE_TIME' hoặc 'RECURRING'")),
 		mcp.WithString("cron_expression", mcp.Description("Biểu thức Cron (nếu type = RECURRING, ví dụ: '0 0 * * *' cho hàng ngày lúc 00:00)")),
 		mcp.WithString("next_run_at", mcp.Description("Thời gian chạy (nếu type = ONE_TIME, chuẩn RFC3339)")),
-		mcp.WithString("inputs", mcp.Description("Biến đầu vào định dạng JSON string (nếu có)")),
+		mcp.WithString("inputs", mcp.Description("Biến đầu vào định dạng JSON string. Ví dụ: '{\"branch\": \"main\"}'")),
 	)
 	s.server.AddTool(scheduleTool, s.handleScheduleWorkflow)
 }
@@ -122,11 +119,22 @@ func (s *MCPService) handleListWorkflows(ctx context.Context, request mcp.CallTo
 
 	var result []map[string]interface{}
 	for _, wf := range wfs {
+		inputs := []map[string]interface{}{}
+		for _, in := range wf.Inputs {
+			inputs = append(inputs, map[string]interface{}{
+				"key":      in.Key,
+				"label":    in.Label,
+				"type":     in.Type,
+				"required": in.Required,
+			})
+		}
+
 		result = append(result, map[string]interface{}{
 			"id":          wf.ID,
 			"name":        wf.Name,
 			"description": wf.Description,
 			"ai_guide":    wf.AIGuide,
+			"inputs":      inputs,
 		})
 	}
 
@@ -203,86 +211,111 @@ func (s *MCPService) handleGetExecutionLog(ctx context.Context, request mcp.Call
 		return mcp.NewToolResultError("execution_id không hợp lệ"), nil
 	}
 
-	// Wait and tail loop
-	cwd, _ := os.Getwd()
-	execLogDir := filepath.Join(cwd, "data", "logs", "executions", execID.String())
-	mainLogPath := filepath.Join(execLogDir, "workflow.log")
+	// Fetch execution with steps
+	exec, err := s.workflowService.GetExecution(execID, user)
+	if err != nil {
+		return mcp.NewToolResultError("Không tìm thấy execution hoặc không có quyền"), nil
+	}
 
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
+	// Structured Metadata Result
+	type StepResult struct {
+		Name       string     `json:"name"`
+		Status     string     `json:"status"`
+		StartedAt  time.Time  `json:"started_at"`
+		FinishedAt *time.Time `json:"finished_at,omitempty"`
+		Output     string     `json:"output,omitempty"`
+	}
 
-	timeout := time.After(30 * time.Minute) // Fallback timeout 30 phút
-	var lastPos int64 = 0
+	type GroupResult struct {
+		Name       string       `json:"name"`
+		Status     string       `json:"status"`
+		Retries    int          `json:"retries"`
+		Steps      []StepResult `json:"steps"`
+	}
 
-	var fullLog string
+	type ExecutionSummary struct {
+		ID         uuid.UUID     `json:"id"`
+		Status     string        `json:"status"`
+		StartedAt  time.Time     `json:"started_at"`
+		FinishedAt *time.Time    `json:"finished_at,omitempty"`
+		Groups     []GroupResult `json:"groups"`
+	}
 
-	for {
-		select {
-		case <-ctx.Done():
-			return mcp.NewToolResultError("Bị ngắt kết nối"), nil
-		case <-timeout:
-			return mcp.NewToolResultError("Timeout khi chờ log"), nil
-		case <-ticker.C:
-			// Fetch execution status
-			exec, err := s.workflowService.GetExecution(execID, user)
-			if err != nil {
-				return mcp.NewToolResultError("Không tìm thấy execution hoặc không có quyền"), nil
-			}
+	summary := ExecutionSummary{
+		ID:         exec.ID,
+		Status:     string(exec.Status),
+		StartedAt:  exec.StartedAt,
+		FinishedAt: exec.FinishedAt,
+		Groups:     []GroupResult{},
+	}
 
-			// Read diff log
-			file, err := os.Open(mainLogPath)
-			if err == nil {
-				file.Seek(lastPos, 0)
-				scanner := bufio.NewScanner(file)
-				for scanner.Scan() {
-					line := scanner.Text()
-					fullLog += line + "\n"
+	// Group steps by group ID to calculate retries and structure results
+	groupMap := make(map[uuid.UUID]*GroupResult)
+	stepCounts := make(map[uuid.UUID]int) // StepID -> count
 
-					s.server.SendNotificationToAllClients("notifications/progress", map[string]interface{}{
-						"progress": 0,
-						"total":    0,
-						"message":  line,
-					})
-				}
-				stat, _ := file.Stat()
-				if stat != nil {
-					lastPos = stat.Size()
-				}
-				file.Close()
-			} else {
-				// Nếu file workflow.log chưa được tạo và legacy LogPath cũng không có
-				if exec.LogPath != "" {
-					oldPath := exec.LogPath
-					if !filepath.IsAbs(oldPath) {
-						oldPath = filepath.Join(cwd, oldPath)
-					}
-					f, err := os.Open(oldPath)
-					if err == nil {
-						f.Seek(lastPos, 0)
-						scanner := bufio.NewScanner(f)
-						for scanner.Scan() {
-							line := scanner.Text()
-							fullLog += line + "\n"
-							s.server.SendNotificationToAllClients("notifications/progress", map[string]interface{}{
-								"progress": 0,
-								"total":    0,
-								"message":  line,
-							})
-						}
-						st, _ := f.Stat()
-						if st != nil {
-							lastPos = st.Size()
-						}
-						f.Close()
-					}
-				}
-			}
-
-			if exec.Status != domain.StatusRunning && exec.Status != domain.StatusPending {
-				return mcp.NewToolResultText(fmt.Sprintf("Execution %s kết thúc với trạng thái: %s.\n\nToàn bộ Log:\n%s", execIDStr, exec.Status, fullLog)), nil
-			}
+	// Find the workflow to get group list in order and check log reporting options
+	wf, _ := s.workflowService.GetWorkflow(exec.WorkflowID, user)
+	groupLogOptions := make(map[uuid.UUID]bool)
+	if wf != nil {
+		for _, g := range wf.Groups {
+			groupLogOptions[g.ID] = g.McpReportLog
 		}
 	}
+
+	for _, stepExec := range exec.Steps {
+		if _, exists := groupMap[stepExec.GroupID]; !exists {
+			groupMap[stepExec.GroupID] = &GroupResult{
+				Name:  stepExec.GroupName,
+				Steps: []StepResult{},
+			}
+		}
+		
+		// Map status for group based on last step if needed, but executor updates group status in DB
+		// We'll calculate retries by counting how many times the steps in this group were executed
+		stepCounts[stepExec.StepID]++
+		
+		stepRes := StepResult{
+			Name:       stepExec.Name,
+			Status:     string(stepExec.Status),
+			StartedAt:  stepExec.StartedAt,
+			FinishedAt: stepExec.FinishedAt,
+		}
+
+		// Include output if group level option is enabled
+		if groupLogOptions[stepExec.GroupID] {
+			stepRes.Output = stepExec.Output
+		}
+
+		groupMap[stepExec.GroupID].Steps = append(groupMap[stepExec.GroupID].Steps, stepRes)
+	}
+
+	if wf != nil {
+		for _, g := range wf.Groups {
+			if res, ok := groupMap[g.ID]; ok {
+				// Calculate retries: max attempts for any step in this group - 1
+				maxAttempts := 0
+				for _, step := range g.Steps {
+					if count := stepCounts[step.ID]; count > maxAttempts {
+						maxAttempts = count
+					}
+				}
+				if maxAttempts > 1 {
+					res.Retries = maxAttempts - 1
+				}
+				
+				res.Status = string(g.Status) // This should be updated in DB by executor
+				summary.Groups = append(summary.Groups, *res)
+			}
+		}
+	} else {
+		// Fallback if workflow deleted
+		for _, g := range groupMap {
+			summary.Groups = append(summary.Groups, *g)
+		}
+	}
+
+	bytes, _ := json.MarshalIndent(summary, "", "  ")
+	return mcp.NewToolResultText(string(bytes)), nil
 }
 
 func (s *MCPService) handleScheduleWorkflow(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {

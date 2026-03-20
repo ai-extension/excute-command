@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Layers, Plus, GripVertical, AlertCircle, Server, SlidersHorizontal, File, Trash2, RefreshCw } from 'lucide-react';
+import { Layers, Plus, GripVertical, AlertCircle, Server, SlidersHorizontal, File, Trash2, RefreshCw, FileText } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
@@ -111,8 +111,13 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                     </div>
                                                     <div className="flex items-center gap-2">
                                                         {/* Active config badges */}
-                                                        {(group.condition || group.default_server_id || group.continue_on_failure || group.is_copy_enabled || group.retry_enabled) && (
+                                                        {(group.condition || group.default_server_id || group.continue_on_failure || group.is_copy_enabled || group.retry_enabled || group.mcp_report_log) && (
                                                             <div className="flex items-center gap-2 mr-2 pr-4 border-r border-border/50">
+                                                                {group.mcp_report_log && (
+                                                                    <Badge variant="outline" className="h-5 px-2 text-[8px] font-black uppercase tracking-widest bg-blue-500/10 text-blue-500 border-blue-500/20 whitespace-nowrap">
+                                                                        <FileText className="w-3 h-3 mr-1" /> MCP Log
+                                                                    </Badge>
+                                                                )}
                                                                 {group.retry_enabled && (
                                                                     <Badge variant="outline" className="h-5 px-2 text-[8px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-500 border-amber-500/20 whitespace-nowrap">
                                                                         <RefreshCw className="w-3 h-3 mr-1" /> Retry
@@ -189,6 +194,25 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                             <span className="text-[9px] text-muted-foreground font-mono opacity-50">{group.name}</span>
                                                                         </div>
                                                                         <div className="p-5 grid grid-cols-1 gap-5">
+                                                                            {/* MCP Log Reporting */}
+                                                                            <div className="flex items-center justify-between gap-5">
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <FileText className="w-3.5 h-3.5 text-blue-500" />
+                                                                                    <div className="flex flex-col">
+                                                                                        <span className="text-[8px] font-black uppercase tracking-widest text-blue-500">MCP Detailed Logging</span>
+                                                                                        <span className="text-[8px] text-muted-foreground/50 lowercase italic leading-none text-left">Include raw step logs in MCP report</span>
+                                                                                    </div>
+                                                                                </div>
+                                                                                <Switch
+                                                                                    checked={!!group.mcp_report_log}
+                                                                                    onCheckedChange={(checked) => {
+                                                                                        const ng = [...groups];
+                                                                                        ng[gIdx].mcp_report_log = checked;
+                                                                                        setGroups(ng);
+                                                                                    }}
+                                                                                />
+                                                                            </div>
+
                                                                             {/* Continue on Failure */}
                                                                             <div className="flex items-center justify-between gap-5">
                                                                                 <div className="flex items-center gap-2">

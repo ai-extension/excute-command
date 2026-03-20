@@ -309,6 +309,7 @@ type WorkflowGroup struct {
 	RetryEnabled       bool           `json:"retry_enabled" gorm:"default:false"`
 	RetryLimit         int            `json:"retry_limit" gorm:"default:0"`
 	RetryDelay         int            `json:"retry_delay" gorm:"default:0"`
+	McpReportLog       bool           `json:"mcp_report_log" gorm:"default:false"`
 	CreatedAt          time.Time      `json:"created_at" gorm:"<-:create"`
 	UpdatedAt          time.Time      `json:"updated_at"`
 }

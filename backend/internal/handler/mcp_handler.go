@@ -14,20 +14,13 @@ import (
 
 type MCPHandler struct {
 	mcpService *service.MCPService
-	sseServer  *server.SSEServer
+	server     *server.StreamableHTTPServer
 }
 
 func NewMCPHandler(mcpService *service.MCPService) *MCPHandler {
-	// Sử dụng WithDynamicBasePath để tự động nhận dạng path từ request
-	// Và WithMessageEndpoint("") để dùng chung path cho cả message
 	return &MCPHandler{
 		mcpService: mcpService,
-		sseServer: server.NewSSEServer(mcpService.GetServer(),
-			server.WithMessageEndpoint(""),
-			server.WithDynamicBasePath(func(r *http.Request, sessionID string) string {
-				return r.URL.Path
-			}),
-		),
+		server:     server.NewStreamableHTTPServer(mcpService.GetServer(), server.WithStateLess(true)),
 	}
 }
 
@@ -73,11 +66,12 @@ func (h *MCPHandler) HandleMCP(c *gin.Context) {
 	ctx := h.enrichContext(c)
 	req := c.Request.WithContext(*ctx)
 
+	if method == "GET" || method == "POST" {
+		h.server.ServeHTTP(c.Writer, req)
+		return
+	}
+
 	switch method {
-	case "GET":
-		h.sseServer.SSEHandler().ServeHTTP(c.Writer, req)
-	case "POST":
-		h.sseServer.MessageHandler().ServeHTTP(c.Writer, req)
 	case "DELETE":
 		c.Status(200)
 	default:
