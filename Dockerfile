@@ -19,7 +19,7 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o main cmd/server/
 
 # Final Stage
 FROM ubuntu:22.04
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     ca-certificates tzdata bash git \
     && rm -rf /var/lib/apt/lists/*
 
