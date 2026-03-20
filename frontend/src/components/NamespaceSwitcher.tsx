@@ -37,7 +37,7 @@ const NamespaceSwitcher = ({ isCollapsed }: NamespaceSwitcherProps) => {
                             </div>
                             {!isCollapsed && (
                                 <div className="flex flex-col items-start overflow-hidden">
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 leading-tight">Environment</span>
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 leading-tight">Namespaces</span>
                                     <span className="text-[13px] font-black tracking-tight truncate w-full">
                                         {activeNamespace?.name || 'Loading...'}
                                     </span>
