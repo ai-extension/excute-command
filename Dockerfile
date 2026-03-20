@@ -20,8 +20,13 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o main cmd/server/
 # Final Stage
 FROM ubuntu:22.04
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates tzdata bash \
+    ca-certificates tzdata bash git \
     && rm -rf /var/lib/apt/lists/*
+
+RUN git config --global user.name "CSM Administrator" && \
+    git config --global user.email "admin@csm.local" && \
+    git config --global init.defaultBranch main && \
+    git config --global --add safe.directory /app
 
 WORKDIR /app
 
