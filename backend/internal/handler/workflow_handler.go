@@ -248,12 +248,11 @@ func (h *WorkflowHandler) RunWorkflow(c *gin.Context) {
 	user := userVal.(*domain.User)
 
 	// Fetch workflow with explicit EXECUTE action check
-	wf, err := h.service.GetWorkflowWithAction(id, user, "EXECUTE")
+	_, err = h.service.GetWorkflowWithAction(id, user, "EXECUTE")
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "workflow not found or permission denied"})
 		return
 	}
-	resIDStr := wf.ID.String()
 
 	// Generate execution ID
 	execID := uuid.New()
@@ -274,12 +273,9 @@ func (h *WorkflowHandler) RunWorkflow(c *gin.Context) {
 	}
 
 	if err := h.service.CreateExecution(execution); err != nil {
-		h.auditLog.LogAction(c, "EXECUTE", "WORKFLOW", resIDStr, map[string]string{"error": "failed to create execution record"}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create execution record"})
 		return
 	}
-
-	h.auditLog.LogAction(c, "EXECUTE", "WORKFLOW", resIDStr, map[string]string{"execution_id": execID.String()}, "SUCCESS")
 
 	// Run inside a goroutine to not block the request
 	go func() {
