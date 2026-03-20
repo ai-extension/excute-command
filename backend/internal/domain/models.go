@@ -80,7 +80,7 @@ type Permission struct {
 
 type APIKey struct {
 	ID        uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey"`
-	UserID    uuid.UUID  `json:"user_id" gorm:"type:uuid;index;not null"`
+	UserID    uuid.UUID  `json:"user_id" gorm:"type:uuid;index;not null;constraint:OnDelete:CASCADE;"`
 	Name      string     `json:"name" gorm:"not null"`
 	KeyPrefix string     `json:"key_prefix" gorm:"not null"`
 	KeyHash   string     `json:"-" gorm:"not null"`
@@ -238,9 +238,9 @@ const (
 
 type WorkflowHook struct {
 	ID               uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey"`
-	WorkflowID       *uuid.UUID `json:"workflow_id,omitempty" gorm:"type:uuid;index"`
-	ScheduleID       *uuid.UUID `json:"schedule_id,omitempty" gorm:"type:uuid;index"`
-	TargetWorkflowID uuid.UUID  `json:"target_workflow_id" gorm:"type:uuid;not null;index"`
+	WorkflowID       *uuid.UUID `json:"workflow_id,omitempty" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
+	ScheduleID       *uuid.UUID `json:"schedule_id,omitempty" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
+	TargetWorkflowID uuid.UUID  `json:"target_workflow_id" gorm:"type:uuid;not null;index;constraint:OnDelete:CASCADE;"`
 	HookType         HookType   `json:"hook_type" gorm:"not null"`
 	Inputs           string     `json:"inputs"` // JSON string
 	Order            int        `json:"order"`
@@ -249,7 +249,7 @@ type WorkflowHook struct {
 
 type Workflow struct {
 	ID                uuid.UUID          `json:"id" gorm:"type:uuid;primaryKey"`
-	NamespaceID       uuid.UUID          `json:"namespace_id" gorm:"type:uuid;index"`
+	NamespaceID       uuid.UUID          `json:"namespace_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
 	Name              string             `json:"name" gorm:"not null"`
 	Description       string             `json:"description"`
 	DefaultServerID   *uuid.UUID         `json:"default_server_id,omitempty" gorm:"type:uuid;index"`
@@ -276,7 +276,7 @@ type Workflow struct {
 
 type WorkflowFile struct {
 	ID                      uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
-	WorkflowID              uuid.UUID `json:"workflow_id" gorm:"type:uuid;index"`
+	WorkflowID              uuid.UUID `json:"workflow_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
 	FileName                string    `json:"file_name" gorm:"not null"`
 	FileSize                int64     `json:"file_size" gorm:"not null"`
 	LocalPath               string    `json:"local_path" gorm:"not null"`
@@ -288,7 +288,7 @@ type WorkflowFile struct {
 
 type WorkflowGroup struct {
 	ID                 uuid.UUID      `json:"id" gorm:"type:uuid;primaryKey"`
-	WorkflowID         uuid.UUID      `json:"workflow_id" gorm:"type:uuid;index"`
+	WorkflowID         uuid.UUID      `json:"workflow_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
 	Name               string         `json:"name" gorm:"not null"`
 	Key                string         `json:"key" gorm:"not null;default:''"`
 	Condition          string         `json:"condition" gorm:"default:''"`
@@ -313,7 +313,7 @@ type WorkflowGroup struct {
 
 type WorkflowStep struct {
 	ID                   uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey"`
-	GroupID              uuid.UUID  `json:"group_id" gorm:"type:uuid;index"`
+	GroupID              uuid.UUID  `json:"group_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
 	ServerID             uuid.UUID  `json:"server_id,omitempty" gorm:"type:uuid;index"` // Optional: If empty, run locally
 	Name                 string     `json:"name" gorm:"not null"`
 	ActionType           string     `json:"action_type" gorm:"not null;default:'COMMAND'"` // COMMAND or WORKFLOW
@@ -328,7 +328,7 @@ type WorkflowStep struct {
 
 type WorkflowInput struct {
 	ID           uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
-	WorkflowID   uuid.UUID `json:"workflow_id" gorm:"type:uuid;index"`
+	WorkflowID   uuid.UUID `json:"workflow_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
 	Key          string    `json:"key" gorm:"not null"`
 	Label        string    `json:"label" gorm:"not null"`
 	Type         string    `json:"type" gorm:"not null;default:'input'"` // input, number, select, multi-select, multi-input
@@ -340,7 +340,7 @@ type WorkflowInput struct {
 
 type WorkflowVariable struct {
 	ID         uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
-	WorkflowID uuid.UUID `json:"workflow_id" gorm:"type:uuid;index"`
+	WorkflowID uuid.UUID `json:"workflow_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
 	Key        string    `json:"key" gorm:"not null"`
 	Value      string    `json:"value"`
 	CreatedAt  time.Time `json:"created_at" gorm:"<-:create"`
@@ -348,28 +348,26 @@ type WorkflowVariable struct {
 }
 
 type GlobalVariable struct {
-	ID                uuid.UUID      `json:"id" gorm:"type:uuid;primaryKey"`
-	NamespaceID       uuid.UUID      `json:"namespace_id" gorm:"type:uuid;index"`
-	Key               string         `json:"key" gorm:"not null"`
-	Value             string         `json:"value"`
-	Description       string         `json:"description"`
-	CreatedBy         *uuid.UUID     `json:"created_by,omitempty" gorm:"type:uuid;index;<-:create"`
-	CreatedByUsername string         `json:"created_by_username,omitempty" gorm:"<-:create"`
-	CreatedAt         time.Time      `json:"created_at" gorm:"<-:create"`
-	UpdatedAt         time.Time      `json:"updated_at"`
-	DeletedAt         gorm.DeletedAt `json:"-" gorm:"index"`
+	ID                uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey"`
+	NamespaceID       uuid.UUID  `json:"namespace_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
+	Key               string     `json:"key" gorm:"not null"`
+	Value             string     `json:"value"`
+	Description       string     `json:"description"`
+	CreatedBy         *uuid.UUID `json:"created_by,omitempty" gorm:"type:uuid;index;<-:create"`
+	CreatedByUsername string     `json:"created_by_username,omitempty" gorm:"<-:create"`
+	CreatedAt         time.Time  `json:"created_at" gorm:"<-:create"`
+	UpdatedAt         time.Time  `json:"updated_at"`
 }
 
 type Tag struct {
-	ID                uuid.UUID      `json:"id" gorm:"type:uuid;primaryKey"`
-	NamespaceID       uuid.UUID      `json:"namespace_id" gorm:"type:uuid;index"`
-	Name              string         `json:"name" gorm:"not null"`
-	Color             string         `json:"color" gorm:"not null;default:'#6366f1'"`
-	CreatedBy         *uuid.UUID     `json:"created_by,omitempty" gorm:"type:uuid;index;<-:create"`
-	CreatedByUsername string         `json:"created_by_username,omitempty" gorm:"<-:create"`
-	CreatedAt         time.Time      `json:"created_at" gorm:"<-:create"`
-	UpdatedAt         time.Time      `json:"updated_at"`
-	DeletedAt         gorm.DeletedAt `json:"-" gorm:"index"`
+	ID                uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey"`
+	NamespaceID       uuid.UUID  `json:"namespace_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
+	Name              string     `json:"name" gorm:"not null"`
+	Color             string     `json:"color" gorm:"not null;default:'#6366f1'"`
+	CreatedBy         *uuid.UUID `json:"created_by,omitempty" gorm:"type:uuid;index;<-:create"`
+	CreatedByUsername string     `json:"created_by_username,omitempty" gorm:"<-:create"`
+	CreatedAt         time.Time  `json:"created_at" gorm:"<-:create"`
+	UpdatedAt         time.Time  `json:"updated_at"`
 }
 
 type ScheduleType string
@@ -381,7 +379,7 @@ const (
 
 type Schedule struct {
 	ID                 uuid.UUID          `json:"id" gorm:"type:uuid;primaryKey"`
-	NamespaceID        uuid.UUID          `json:"namespace_id" gorm:"type:uuid;index"`
+	NamespaceID        uuid.UUID          `json:"namespace_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
 	Name               string             `json:"name" gorm:"not null"`
 	Type               ScheduleType       `json:"type" gorm:"not null"`
 	CronExpression     string             `json:"cron_expression"`
@@ -394,9 +392,9 @@ type Schedule struct {
 	User               *User              `json:"user,omitempty" gorm:"foreignKey:CreatedBy"`
 	CreatedAt          time.Time          `json:"created_at" gorm:"<-:create"`
 	UpdatedAt          time.Time          `json:"updated_at"`
-	ScheduledWorkflows []ScheduleWorkflow `json:"scheduled_workflows" gorm:"foreignKey:ScheduleID;"`
-	Hooks              []WorkflowHook     `json:"hooks,omitempty" gorm:"foreignKey:ScheduleID;"`
-	Tags               []Tag              `json:"tags,omitempty" gorm:"many2many:schedule_tags;"`
+	ScheduledWorkflows []ScheduleWorkflow `json:"scheduled_workflows" gorm:"foreignKey:ScheduleID;constraint:OnDelete:CASCADE;"`
+	Hooks              []WorkflowHook     `json:"hooks,omitempty" gorm:"foreignKey:ScheduleID;constraint:OnDelete:CASCADE;"`
+	Tags               []Tag              `json:"tags,omitempty" gorm:"many2many:schedule_tags;constraint:OnDelete:CASCADE;"`
 	TotalRuns          int                `json:"total_runs" gorm:"-"`
 	LastRunStatus      string             `json:"last_run_status" gorm:"-"`
 	LastRunAt          *time.Time         `json:"last_run_at" gorm:"-"`
@@ -404,8 +402,8 @@ type Schedule struct {
 
 type ScheduleWorkflow struct {
 	ID         uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
-	ScheduleID uuid.UUID `json:"schedule_id" gorm:"type:uuid;index;not null"`
-	WorkflowID uuid.UUID `json:"workflow_id" gorm:"type:uuid;index;not null"`
+	ScheduleID uuid.UUID `json:"schedule_id" gorm:"type:uuid;index;not null;constraint:OnDelete:CASCADE;"`
+	WorkflowID uuid.UUID `json:"workflow_id" gorm:"type:uuid;index;not null;constraint:OnDelete:CASCADE;"`
 	Inputs     string    `json:"inputs"` // JSON string
 	Workflow   *Workflow `json:"workflow,omitempty" gorm:"foreignKey:WorkflowID"`
 }
@@ -425,16 +423,17 @@ type WorkflowExecution struct {
 	FinishedAt        *time.Time              `json:"finished_at,omitempty"`
 	CreatedAt         time.Time               `json:"created_at" gorm:"<-:create"`
 	UpdatedAt         time.Time               `json:"updated_at"`
+	DeletedAt         gorm.DeletedAt          `json:"-" gorm:"index"`
 	ParentExecutionID *uuid.UUID              `json:"parent_execution_id,omitempty" gorm:"type:uuid;index"`
 	Workflow          *Workflow               `json:"workflow,omitempty" gorm:"foreignKey:WorkflowID"`
-	Schedule          *Schedule               `json:"schedule,omitempty" gorm:"foreignKey:ScheduledID"`
-	Page              *Page                   `json:"page,omitempty" gorm:"foreignKey:PageID"`
-	Steps             []WorkflowExecutionStep `json:"steps,omitempty" gorm:"foreignKey:ExecutionID;"`
+	Schedule          *Schedule               `json:"schedule,omitempty" gorm:"foreignKey:ScheduledID;constraint:OnDelete:SET NULL;"`
+	Page              *Page                   `json:"page,omitempty" gorm:"foreignKey:PageID;constraint:OnDelete:SET NULL;"`
+	Steps             []WorkflowExecutionStep `json:"steps,omitempty" gorm:"foreignKey:ExecutionID;constraint:OnDelete:CASCADE;"`
 }
 
 type WorkflowExecutionStep struct {
 	ID          uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey"`
-	ExecutionID uuid.UUID  `json:"execution_id" gorm:"type:uuid;index"`
+	ExecutionID uuid.UUID  `json:"execution_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
 	StepID      uuid.UUID  `json:"step_id" gorm:"type:uuid;index"`
 	Name        string     `json:"name"`
 	Status      Status     `json:"status"`
@@ -536,7 +535,7 @@ type WorkflowFileRepository interface {
 
 type Page struct {
 	ID                uuid.UUID      `json:"id" gorm:"type:uuid;primaryKey"`
-	NamespaceID       uuid.UUID      `json:"namespace_id" gorm:"type:uuid;index"`
+	NamespaceID       uuid.UUID      `json:"namespace_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
 	Title             string         `json:"title" gorm:"not null"`
 	Description       string         `json:"description"`
 	Slug              string         `json:"slug" gorm:"uniqueIndex;not null"`
@@ -545,8 +544,8 @@ type Page struct {
 	TokenTTLMinutes   int            `json:"token_ttl_minutes" gorm:"default:15"`
 	ExpiresAt         *time.Time     `json:"expires_at" gorm:"index"`
 	Layout            string         `json:"layout" gorm:"type:text"`
-	Workflows         []PageWorkflow `json:"workflows,omitempty" gorm:"foreignKey:PageID;"`
-	Tags              []Tag          `json:"tags,omitempty" gorm:"many2many:page_tags;"`
+	Workflows         []PageWorkflow `json:"workflows,omitempty" gorm:"foreignKey:PageID;constraint:OnDelete:CASCADE;"`
+	Tags              []Tag          `json:"tags,omitempty" gorm:"many2many:page_tags;constraint:OnDelete:CASCADE;"`
 	CreatedBy         *uuid.UUID     `json:"created_by,omitempty" gorm:"type:uuid;index;<-:create"`
 	CreatedByUsername string         `json:"created_by_username,omitempty" gorm:"<-:create"`
 	CreatedAt         time.Time      `json:"created_at" gorm:"<-:create"`
@@ -555,8 +554,8 @@ type Page struct {
 
 type PageWorkflow struct {
 	ID         uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
-	PageID     uuid.UUID `json:"page_id" gorm:"type:uuid;index"`
-	WorkflowID uuid.UUID `json:"workflow_id" gorm:"type:uuid;index"`
+	PageID     uuid.UUID `json:"page_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
+	WorkflowID uuid.UUID `json:"workflow_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
 	Order      int       `json:"order"`
 	Label      string    `json:"label"`    // Custom label for the button
 	Style      string    `json:"style"`    // Button style (color, etc.)

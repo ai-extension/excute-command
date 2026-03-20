@@ -128,13 +128,22 @@ func (r *PostgresPageRepo) ListGlobalPaginated(limit, offset int, searchTerm str
 func (r *PostgresPageRepo) Update(page *domain.Page) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		// Sync Tags
-		if err := tx.Model(page).Association("Tags").Replace(page.Tags); err != nil {
-			return err
+		if page.Tags != nil {
+			if err := tx.Model(page).Association("Tags").Replace(page.Tags); err != nil {
+				return err
+			}
 		}
 
 		// Sync Workflows
-		if err := tx.Model(page).Association("Workflows").Replace(page.Workflows); err != nil {
-			return err
+		if page.Workflows != nil {
+			for i := range page.Workflows {
+				if err := tx.Save(&page.Workflows[i]).Error; err != nil {
+					return err
+				}
+			}
+			if err := tx.Model(page).Association("Workflows").Replace(page.Workflows); err != nil {
+				return err
+			}
 		}
 
 		// Update top-level fields

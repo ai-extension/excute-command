@@ -136,24 +136,35 @@ func (r *PostgresScheduleRepo) ListGlobalPaginated(limit, offset int, searchTerm
 
 func (r *PostgresScheduleRepo) Update(s *domain.Schedule) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(s).Association("Tags").Replace(s.Tags); err != nil {
-			return err
+		if s.Tags != nil {
+			if err := tx.Model(s).Association("Tags").Replace(s.Tags); err != nil {
+				return err
+			}
 		}
 
 		// Sync ScheduledWorkflows
-		if err := tx.Model(s).Association("ScheduledWorkflows").Replace(s.ScheduledWorkflows); err != nil {
-			return err
+		if s.ScheduledWorkflows != nil {
+			for i := range s.ScheduledWorkflows {
+				if err := tx.Save(&s.ScheduledWorkflows[i]).Error; err != nil {
+					return err
+				}
+			}
+			if err := tx.Model(s).Association("ScheduledWorkflows").Replace(s.ScheduledWorkflows); err != nil {
+				return err
+			}
 		}
 
 		// Sync Hooks
-		if err := tx.Where("schedule_id = ?", s.ID).Delete(&domain.WorkflowHook{}).Error; err != nil {
-			return err
-		}
-		for i := range s.Hooks {
-			s.Hooks[i].ID = uuid.New()
-			s.Hooks[i].ScheduleID = &s.ID
-			if err := tx.Omit("TargetWorkflow").Create(&s.Hooks[i]).Error; err != nil {
+		if s.Hooks != nil {
+			if err := tx.Where("schedule_id = ?", s.ID).Delete(&domain.WorkflowHook{}).Error; err != nil {
 				return err
+			}
+			for i := range s.Hooks {
+				s.Hooks[i].ID = uuid.New()
+				s.Hooks[i].ScheduleID = &s.ID
+				if err := tx.Omit("TargetWorkflow").Create(&s.Hooks[i]).Error; err != nil {
+					return err
+				}
 			}
 		}
 
