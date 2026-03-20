@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"log"
 	"net/http"
 	"strings"
 
@@ -16,8 +17,8 @@ func AuthMiddleware(authService *service.AuthService, userRepo domain.UserReposi
 	return func(c *gin.Context) {
 		// 1. Try API Key first (automation friendly)
 		apiKeyStr := c.GetHeader("X-API-Key")
-		if apiKeyStr == "" {
-			apiKeyStr = c.Query("api_key")
+		if strings.HasPrefix(c.Request.URL.Path, "/api/mcp") {
+			log.Printf("[Auth] MCP request from %s, X-API-Key present: %v", c.ClientIP(), apiKeyStr != "")
 		}
 		if apiKeyStr != "" && len(apiKeyStr) > 8 {
 			prefix := apiKeyStr[:8]
@@ -86,9 +87,6 @@ func OptionalAuthMiddleware(authService *service.AuthService, userRepo domain.Us
 	return func(c *gin.Context) {
 		// 1. Try API Key first
 		apiKeyStr := c.GetHeader("X-API-Key")
-		if apiKeyStr == "" {
-			apiKeyStr = c.Query("api_key")
-		}
 		if apiKeyStr != "" && len(apiKeyStr) > 8 {
 			prefix := apiKeyStr[:8]
 			keys, err := apiKeyRepo.ListByPrefix(prefix)

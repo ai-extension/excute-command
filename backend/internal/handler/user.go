@@ -475,7 +475,7 @@ func (h *UserHandler) GenerateAPIKey(c *gin.Context) {
 		if forwardedHost := c.GetHeader("X-Forwarded-Host"); forwardedHost != "" {
 			host = forwardedHost
 		}
-		mcpURL := scheme + "://" + host + "/api/mcp/sse?api_key=" + rawKey
+		mcpURL := scheme + "://" + host + "/api/mcp"
 
 		mcpConfig := map[string]interface{}{
 			"mcpServers": map[string]interface{}{

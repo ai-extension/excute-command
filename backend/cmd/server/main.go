@@ -318,8 +318,7 @@ func main() {
 			c.Next()
 		})
 		{
-			mcpRoutes.GET("/sse", mcpHandler.HandleSSE)
-			mcpRoutes.POST("/messages", mcpHandler.HandleMessage)
+			mcpRoutes.Any("", mcpHandler.HandleMCP)
 		}
 
 		// Public Page access (optional auth for private pages)
