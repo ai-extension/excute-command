@@ -100,6 +100,10 @@ func (s *WorkflowService) ListWorkflowsPaginated(namespaceID uuid.UUID, limit, o
 	return s.repo.ListPaginated(namespaceID, limit, offset, searchTerm, tagIDs, isTemplate, isPublic, createdBy, &scope)
 }
 
+func (s *WorkflowService) ListGlobalPaginated(limit, offset int, searchTerm string, isTemplate *bool, scope *domain.PermissionScope) ([]domain.Workflow, int64, error) {
+	return s.repo.ListGlobalPaginated(limit, offset, searchTerm, isTemplate, scope)
+}
+
 func (s *WorkflowService) UpdateWorkflow(wf *domain.Workflow, user *domain.User) error {
 	scope := domain.GetPermissionScope(user, "workflows", "WRITE")
 	existing, err := s.repo.GetByID(wf.ID, &scope)
@@ -112,6 +116,7 @@ func (s *WorkflowService) UpdateWorkflow(wf *domain.Workflow, user *domain.User)
 		existing.Name = wf.Name
 	}
 	existing.Description = wf.Description
+	existing.AIGuide = wf.AIGuide
 	if wf.DefaultServerID != nil {
 		existing.DefaultServerID = wf.DefaultServerID
 	}

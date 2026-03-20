@@ -56,6 +56,7 @@ const WorkflowDesignerPage = () => {
 
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
+    const [aiGuide, setAiGuide] = useState('');
     const [tags, setTags] = useState<Tag[]>([]);
     const [inputs, setInputs] = useState<Partial<WorkflowInput>[]>([]);
     const [variables, setVariables] = useState<Partial<WorkflowVariable>[]>([]);
@@ -174,6 +175,7 @@ const WorkflowDesignerPage = () => {
                 const data = await response.json();
                 setName(data.name);
                 setDescription(data.description);
+                setAiGuide(data.ai_guide || '');
                 const defaultServerIdVal = data.default_server_id || '';
                 setDefaultServerId(defaultServerIdVal || undefined);
                 setTargetFolder(data.target_folder || '');
@@ -234,6 +236,7 @@ const WorkflowDesignerPage = () => {
             const wfData = {
                 name,
                 description,
+                ai_guide: aiGuide,
                 status: 'PENDING',
                 default_server_id: defaultServerId || undefined,
                 target_folder: targetFolder,
@@ -316,6 +319,7 @@ const WorkflowDesignerPage = () => {
         const exportData = stripIds({
             name,
             description,
+            ai_guide: aiGuide,
             is_template: isTemplate,
             is_public: isPublic,
             timeout_minutes: timeoutMinutes,
@@ -594,6 +598,8 @@ const WorkflowDesignerPage = () => {
                                             setName={setName}
                                             description={description}
                                             setDescription={setDescription}
+                                            aiGuide={aiGuide}
+                                            setAiGuide={setAiGuide}
                                             timeoutMinutes={timeoutMinutes}
                                             setTimeoutMinutes={setTimeoutMinutes}
                                             tags={tags}

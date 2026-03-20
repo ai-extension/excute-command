@@ -71,6 +71,8 @@ const APIKeysPage = () => {
     const [isKeyLoading, setIsKeyLoading] = useState(false);
     const [selectedScopes, setSelectedScopes] = useState<string[]>([]);
     const [isDocDialogOpen, setIsDocDialogOpen] = useState(false);
+    const [isMCP, setIsMCP] = useState(false);
+    const [mcpConfig, setMcpConfig] = useState<string | null>(null);
 
     useEffect(() => {
         if (user) {
@@ -99,14 +101,20 @@ const APIKeysPage = () => {
             const response = await apiFetch(`${API_BASE_URL}/me/api-keys`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: newKeyName, scopes: selectedScopes })
+                body: JSON.stringify({ name: newKeyName, scopes: selectedScopes, is_mcp: isMCP })
             });
             if (response.ok) {
                 const data = await response.json();
                 setGeneratedKey(data.key);
+                if (data.mcp_connection) {
+                    setMcpConfig(data.mcp_connection);
+                } else {
+                    setMcpConfig(null);
+                }
                 setIsKeyDialogOpen(true);
                 setNewKeyName('');
                 setSelectedScopes([]);
+                setIsMCP(false);
                 fetchApiKeys();
             }
         } catch (err) {
@@ -227,6 +235,25 @@ const APIKeysPage = () => {
                                 })}
                             </div>
                         </div>
+
+                        <div className="flex items-center gap-3 pt-2">
+                            <input
+                                type="checkbox"
+                                id="is_mcp"
+                                checked={isMCP}
+                                onChange={(e) => setIsMCP(e.target.checked)}
+                                className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20 accent-primary"
+                            />
+                            <div className="space-y-0.5">
+                                <label htmlFor="is_mcp" className="text-[11px] font-black uppercase tracking-widest text-primary cursor-pointer w-fit">
+                                    Enable AI Agent Protocol (MCP)
+                                </label>
+                                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1">
+                                    <Book className="w-3 h-3 text-indigo-500" />
+                                    Generates connection config for Claude Desktop / Cursor
+                                </p>
+                            </div>
+                        </div>
                     </form>
                 </CardContent>
                 <CardContent className="p-6">
@@ -250,6 +277,9 @@ const APIKeysPage = () => {
                                             <h4 className="text-base font-black tracking-tight flex items-center gap-2">
                                                 {key.name}
                                                 <Badge className="bg-indigo-500/10 text-indigo-500 border-none text-[8px] px-2 h-4 uppercase tracking-[0.1em] font-black">ACTIVE</Badge>
+                                                {key.is_mcp && (
+                                                    <Badge className="bg-purple-500/10 text-purple-500 border-none text-[8px] px-2 h-4 uppercase tracking-[0.1em] font-black">MCP</Badge>
+                                                )}
                                             </h4>
                                             <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">
                                                 <span className="flex items-center gap-1.5"><Shield className="w-3 h-3" /> {key.key_prefix}••••••••</span>
@@ -344,6 +374,26 @@ const APIKeysPage = () => {
                                 </Button>
                             </div>
                         </div>
+                        {mcpConfig && (
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 ml-1">MCP Connection Config (mcp.json)</label>
+                                <div className="relative group">
+                                    <textarea
+                                        readOnly
+                                        value={mcpConfig}
+                                        className="w-full h-32 p-3 bg-muted/10 border-border rounded-xl font-mono text-[10px] font-bold text-indigo-400 focus:bg-muted/30 transition-all border-dashed shadow-inner resize-none"
+                                    />
+                                    <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        onClick={() => copyToClipboard(mcpConfig)}
+                                        className="absolute right-3 top-2 text-muted-foreground hover:text-indigo-500 hover:bg-indigo-500/10 rounded-xl w-8 h-8 transition-all"
+                                    >
+                                        <Copy className="w-3 h-3" />
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
                         <div className="p-5 rounded-2xl bg-amber-500/5 border border-amber-500/10 text-amber-500 flex items-start gap-4">
                             <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
                             <div className="space-y-1">

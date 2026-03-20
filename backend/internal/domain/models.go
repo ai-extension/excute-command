@@ -86,6 +86,7 @@ type APIKey struct {
 	KeyHash   string     `json:"-" gorm:"not null"`
 	LastUsed  *time.Time `json:"last_used"`
 	Scopes    string     `json:"scopes" gorm:"default:''"`
+	IsMCP     bool       `json:"is_mcp" gorm:"default:false"`
 	CreatedAt time.Time  `json:"created_at" gorm:"<-:create"`
 }
 
@@ -257,6 +258,7 @@ type Workflow struct {
 	Status            Status             `json:"status"`
 	TimeoutMinutes    int                `json:"timeout_minutes" gorm:"default:15"`
 	IsTemplate        bool               `json:"is_template" gorm:"default:false"`
+	AIGuide           string             `json:"ai_guide" gorm:"type:text"`
 	TriggerSource     string             `json:"trigger_source,omitempty" gorm:"size:50"` // For templates or specific defaults
 	Inputs            []WorkflowInput    `json:"inputs,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnDelete:CASCADE;"`
 	Variables         []WorkflowVariable `json:"variables,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnDelete:CASCADE;"`
@@ -417,6 +419,7 @@ type WorkflowExecution struct {
 	Status            Status                  `json:"status"`
 	Inputs            string                  `json:"inputs"` // JSON string
 	ExecutedBy        *uuid.UUID              `json:"executed_by" gorm:"type:uuid;index"`
+	APIKeyID          *uuid.UUID              `json:"api_key_id,omitempty" gorm:"type:uuid;index"`
 	User              *User                   `json:"user,omitempty" gorm:"foreignKey:ExecutedBy"`
 	LogPath           string                  `json:"log_path"`
 	StartedAt         time.Time               `json:"started_at"`

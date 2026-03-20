@@ -3,6 +3,7 @@ package handler
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -408,6 +409,7 @@ func (h *UserHandler) GenerateAPIKey(c *gin.Context) {
 	var input struct {
 		Name   string   `json:"name" binding:"required"`
 		Scopes []string `json:"scopes"`
+		IsMCP  bool     `json:"is_mcp"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -445,6 +447,7 @@ func (h *UserHandler) GenerateAPIKey(c *gin.Context) {
 		KeyPrefix: prefix,
 		KeyHash:   string(hashedKey),
 		Scopes:    scopesStr,
+		IsMCP:     input.IsMCP,
 		CreatedAt: time.Now(),
 	}
 
@@ -454,13 +457,44 @@ func (h *UserHandler) GenerateAPIKey(c *gin.Context) {
 	}
 
 	// Return the raw key ONLY once
-	c.JSON(http.StatusCreated, gin.H{
+	response := gin.H{
 		"id":         apiKey.ID,
 		"name":       apiKey.Name,
 		"prefix":     apiKey.KeyPrefix,
 		"key":        rawKey, // The raw key to show the user
+		"is_mcp":     apiKey.IsMCP,
 		"created_at": apiKey.CreatedAt,
-	})
+	}
+
+	if apiKey.IsMCP {
+		scheme := "http"
+		if c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https" {
+			scheme = "https"
+		}
+		host := c.Request.Host
+		if forwardedHost := c.GetHeader("X-Forwarded-Host"); forwardedHost != "" {
+			host = forwardedHost
+		}
+		mcpURL := scheme + "://" + host + "/api/mcp/sse?api_key=" + rawKey
+
+		mcpConfig := map[string]interface{}{
+			"mcpServers": map[string]interface{}{
+				"csm-execute": map[string]interface{}{
+					"type":      "sse",
+					"url":       mcpURL,
+					"serverURL": mcpURL, // Some versions of Cursor might look for this
+					"headers": map[string]string{
+						"X-API-Key": rawKey,
+					},
+				},
+			},
+		}
+
+		configBytes, _ := json.MarshalIndent(mcpConfig, "", "  ")
+		response["mcp_connection"] = string(configBytes)
+	}
+
+	c.JSON(http.StatusCreated, response)
 }
 
 func (h *UserHandler) DeleteAPIKey(c *gin.Context) {

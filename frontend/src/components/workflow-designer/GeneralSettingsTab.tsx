@@ -22,6 +22,8 @@ interface GeneralSettingsTabProps {
     setName: (val: string) => void;
     description: string;
     setDescription: (val: string) => void;
+    aiGuide: string;
+    setAiGuide: (val: string) => void;
     timeoutMinutes: number;
     setTimeoutMinutes: (val: number) => void;
     tags: Tag[];
@@ -37,7 +39,7 @@ interface GeneralSettingsTabProps {
 }
 
 export const GeneralSettingsTab: React.FC<GeneralSettingsTabProps> = ({
-    name, setName, description, setDescription,
+    name, setName, description, setDescription, aiGuide, setAiGuide,
     timeoutMinutes, setTimeoutMinutes, tags, setTags,
     availableServers, defaultServerId, setDefaultServerId,
     handleSearchServers, isTemplate, setIsTemplate,
@@ -70,6 +72,15 @@ export const GeneralSettingsTab: React.FC<GeneralSettingsTabProps> = ({
                                 onChange={(e) => setDescription(e.target.value)}
                                 placeholder="What is the objective of this automation?"
                                 className="bg-background border-border h-10 text-sm font-medium"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-primary">AI Agent Guide</label>
+                            <textarea
+                                value={aiGuide || ''}
+                                onChange={(e) => setAiGuide(e.target.value)}
+                                placeholder="Instructions for AI agents (MCP) on when to use this workflow and what it does..."
+                                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                             />
                         </div>
                         <div className="space-y-1.5">

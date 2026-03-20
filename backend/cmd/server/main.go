@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -131,6 +132,8 @@ func main() {
 	settingsService := service.NewSettingsService(settingRepo)
 	dashboardService := service.NewDashboardService(workflowRepo, execRepo, scheduleRepo, serverRepo, vpnRepo, userRepo)
 
+	mcpService := service.NewMCPService(workflowService, workflowExecutor, scheduleService)
+
 	// Initialize scheduling engine
 	scheduleService.Init()
 
@@ -158,6 +161,7 @@ func main() {
 	settingsHandler := handler.NewSettingsHandler(settingsService, auditLogService)
 	auditLogHandler := handler.NewAuditLogHandler(auditLogService)
 	dashboardHandler := handler.NewDashboardHandler(dashboardService)
+	mcpHandler := handler.NewMCPHandler(mcpService)
 
 	// Initialize Router
 	r := gin.Default()
@@ -176,7 +180,7 @@ func main() {
 
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, X-Page-Password, X-Page-Token")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, X-Page-Password, X-Page-Token, X-API-Key")
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
 			return
@@ -303,6 +307,19 @@ func main() {
 			// Audit Logs
 			protected.GET("/audit-logs", middleware.RBACMiddleware(db, userRepo, "audit_logs", "READ"), auditLogHandler.ListAuditLogs)
 			protected.GET("/audit-logs/resource/:type/:id", middleware.RBACMiddleware(db, userRepo, "audit_logs", "READ"), auditLogHandler.ListResourceLogs)
+		}
+
+		mcpRoutes := api.Group("/mcp", middleware.AuthMiddleware(authService, userRepo, apiKeyRepo), func(c *gin.Context) {
+			if isMCP, exists := c.Get("api_key_is_mcp"); !exists || !isMCP.(bool) {
+				c.JSON(http.StatusForbidden, gin.H{"error": "API Key is not authorized for MCP. Please enable MCP for this key in the settings."})
+				c.Abort()
+				return
+			}
+			c.Next()
+		})
+		{
+			mcpRoutes.GET("/sse", mcpHandler.HandleSSE)
+			mcpRoutes.POST("/messages", mcpHandler.HandleMessage)
 		}
 
 		// Public Page access (optional auth for private pages)

@@ -16,6 +16,9 @@ func AuthMiddleware(authService *service.AuthService, userRepo domain.UserReposi
 	return func(c *gin.Context) {
 		// 1. Try API Key first (automation friendly)
 		apiKeyStr := c.GetHeader("X-API-Key")
+		if apiKeyStr == "" {
+			apiKeyStr = c.Query("api_key")
+		}
 		if apiKeyStr != "" && len(apiKeyStr) > 8 {
 			prefix := apiKeyStr[:8]
 			keys, err := apiKeyRepo.ListByPrefix(prefix)
@@ -29,6 +32,8 @@ func AuthMiddleware(authService *service.AuthService, userRepo domain.UserReposi
 							c.Set("username", user.Username)
 							c.Set("user", user)
 							c.Set("api_key_scopes", key.Scopes)
+							c.Set("api_key_id", key.ID)
+							c.Set("api_key_is_mcp", key.IsMCP)
 
 							// Update last used in background
 							go apiKeyRepo.UpdateLastUsed(key.ID)
@@ -81,6 +86,9 @@ func OptionalAuthMiddleware(authService *service.AuthService, userRepo domain.Us
 	return func(c *gin.Context) {
 		// 1. Try API Key first
 		apiKeyStr := c.GetHeader("X-API-Key")
+		if apiKeyStr == "" {
+			apiKeyStr = c.Query("api_key")
+		}
 		if apiKeyStr != "" && len(apiKeyStr) > 8 {
 			prefix := apiKeyStr[:8]
 			keys, err := apiKeyRepo.ListByPrefix(prefix)
@@ -93,6 +101,8 @@ func OptionalAuthMiddleware(authService *service.AuthService, userRepo domain.Us
 							c.Set("username", user.Username)
 							c.Set("user", user)
 							c.Set("api_key_scopes", key.Scopes)
+							c.Set("api_key_id", key.ID)
+							c.Set("api_key_is_mcp", key.IsMCP)
 							go apiKeyRepo.UpdateLastUsed(key.ID)
 							c.Next()
 							return
