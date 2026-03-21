@@ -185,235 +185,300 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                         onClick={() => setOpenSettingsGroupIdx(null)}
                                                                     />
                                                                     {/* Popup card */}
-                                                                    <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[520px] max-h-[90vh] overflow-y-auto bg-card border border-primary/20 rounded-xl shadow-2xl shadow-black/40 animate-in fade-in zoom-in-95 duration-150">
-                                                                        <div className="px-5 pt-4 pb-2 flex items-center justify-between border-b border-border/50">
-                                                                            <div className="flex items-center gap-2">
-                                                                                <SlidersHorizontal className="w-3.5 h-3.5 text-primary" />
-                                                                                <span className="text-[10px] font-black uppercase tracking-widest text-primary">Group Configuration</span>
+                                                                    <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 max-w-4xl w-[calc(100%-2rem)] max-h-[90vh] overflow-y-auto glass rounded-2xl shadow-2xl shadow-indigo-500/10 animate-in fade-in zoom-in-95 duration-200 border-none flex flex-col">
+                                                                        {/* Header with Premium Gradient */}
+                                                                        <div className="px-6 py-5 flex items-center justify-between text-white rounded-t-2xl shrink-0">
+                                                                            <div className="flex items-center gap-3">
+                                                                                <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30">
+                                                                                    <SlidersHorizontal className="w-5 h-5" />
+                                                                                </div>
+
+                                                                                <div className="flex flex-col px-2 pt-3">
+                                                                                    <span className="text-[16px] backdrop-blur-sm font-mono">{group.name}</span>
+                                                                                    <span className="text-[9px] opacity-60 mt-1 font-mono">{group.key}</span>
+                                                                                </div>
+
                                                                             </div>
-                                                                            <span className="text-[9px] text-muted-foreground font-mono opacity-50">{group.name}</span>
+
                                                                         </div>
-                                                                        <div className="p-5 grid grid-cols-1 gap-5">
-                                                                            {/* Condition */}
-                                                                            <div className="space-y-2 text-left">
-                                                                                <div className="flex items-center justify-between">
-                                                                                    <label className="text-[8px] font-black uppercase tracking-widest text-amber-500">Condition <span className="text-muted-foreground/50 normal-case font-medium">— skip this group unless true</span></label>
-                                                                                    <span className="text-[8px] font-mono text-muted-foreground/40">Pongo2 Syntax</span>
-                                                                                </div>
-                                                                                <input
-                                                                                    type="text"
-                                                                                    value={group.condition || ''}
-                                                                                    onChange={(e) => {
-                                                                                        const ng = [...groups];
-                                                                                        ng[gIdx].condition = e.target.value;
-                                                                                        setGroups(ng);
-                                                                                    }}
-                                                                                    placeholder={`input.env == 'prod' && global.enabled == 'true'`}
-                                                                                    className="w-full h-9 px-3 text-[11px] font-mono rounded-lg border border-border bg-background text-amber-500 placeholder:text-muted-foreground/25 outline-none focus:ring-1 focus:ring-amber-500/30 focus:border-amber-500/30"
-                                                                                />
-                                                                                <p className="text-[8px] text-muted-foreground/60 leading-tight">
-                                                                                    Available: <code className="text-amber-500/70">input.key</code>, <code className="text-amber-500/70">variable.key</code>, <code className="text-amber-500/70">global.key</code>, <code className="text-amber-500/70">step.key.status</code>.
-                                                                                    <br />
-                                                                                    Ops: <code className="text-foreground/50">==</code>, <code className="text-foreground/50">!=</code>, <code className="text-foreground/50">&gt;</code>, <code className="text-foreground/50">&lt;</code>, <code className="text-foreground/50">&amp;&amp;</code>, <code className="text-foreground/50">||</code>. No <code className="text-foreground/50">{"{{ }}"}</code> needed.
-                                                                                </p>
-                                                                            </div>
 
-                                                                            {/* Server override */}
-                                                                            <div className="space-y-2 text-left pb-4 border-b border-border/50">
-                                                                                <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Server Override</label>
-                                                                                <SearchableSelect
-                                                                                    options={[
-                                                                                        { label: '— Use workflow default —', value: '' },
-                                                                                        ...(group.default_server && !availableServers.some(s => s.id === group.default_server_id)
-                                                                                            ? [{ label: `${group.default_server.name} (${group.default_server.host || group.default_server.id})`, value: group.default_server_id as string }]
-                                                                                            : []),
-                                                                                        ...availableServers.map(s => ({ label: `${s.name} (${s.host})`, value: s.id }))
-                                                                                    ]}
-                                                                                    value={group.default_server_id || ''}
-                                                                                    onValueChange={(val) => {
-                                                                                        const ng = [...groups];
-                                                                                        ng[gIdx].default_server_id = val || undefined;
-                                                                                        setGroups(ng);
-                                                                                    }}
-                                                                                    onSearch={handleSearchServers}
-                                                                                    placeholder="— Use workflow default —"
-                                                                                    isSearchable={true}
-                                                                                    triggerClassName="h-9 text-xs"
-                                                                                />
-                                                                            </div>
-                                                                            {/* MCP Log Reporting */}
-                                                                            <div className="flex items-center justify-between gap-5">
-                                                                                <div className="flex items-center gap-2">
-                                                                                    <FileText className="w-3.5 h-3.5 text-blue-500" />
-                                                                                    <div className="flex flex-col">
-                                                                                        <span className="text-[8px] font-black uppercase tracking-widest text-blue-500">MCP Detailed Logging</span>
-                                                                                        <span className="text-[8px] text-muted-foreground/50 lowercase italic leading-none text-left">Include raw step logs in MCP report</span>
+                                                                        <div className="px-8 py-3 grid grid-cols-1 lg:grid-cols-2 gap-8 custom-scrollbar">
+                                                                            {/* Left Column: Logic & Routing */}
+                                                                            <div className="space-y-8">
+                                                                                <section className="space-y-4">
+                                                                                    <div className="flex items-center gap-2 mb-2">
+                                                                                        <div className="w-1 h-4 bg-amber-500 rounded-full" />
+                                                                                        <h4 className="text-[11px] font-black uppercase tracking-widest text-foreground/70">Execution Logic</h4>
                                                                                     </div>
-                                                                                </div>
-                                                                                <Switch
-                                                                                    checked={!!group.mcp_report_log}
-                                                                                    onCheckedChange={(checked) => {
-                                                                                        const ng = [...groups];
-                                                                                        ng[gIdx].mcp_report_log = checked;
-                                                                                        setGroups(ng);
-                                                                                    }}
-                                                                                />
-                                                                            </div>
 
-                                                                            {/* Continue on Failure */}
-                                                                            <div className="flex items-center justify-between gap-5">
-                                                                                <div className="flex items-center gap-2">
-                                                                                    <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
-                                                                                    <span className="text-[8px] font-black uppercase tracking-widest text-amber-500">Continue on Failure</span>
-                                                                                </div>
-                                                                                <Switch
-                                                                                    checked={group.continue_on_failure}
-                                                                                    onCheckedChange={(checked) => {
-                                                                                        const ng = [...groups];
-                                                                                        ng[gIdx].continue_on_failure = checked;
-                                                                                        setGroups(ng);
-                                                                                    }}
-                                                                                />
-                                                                            </div>
-
-                                                                            {/* Retry Policy */}
-                                                                            <div className="pt-4 border-t border-border/50">
-                                                                                <div className="flex items-center justify-between gap-5">
-                                                                                    <div className="flex items-center gap-2">
-                                                                                        <RefreshCw className="w-3.5 h-3.5 text-amber-500" />
-                                                                                        <div className="flex flex-col">
-                                                                                            <span className="text-[8px] font-black uppercase tracking-widest text-amber-500">Retry Policy</span>
-                                                                                            <span className="text-[8px] text-muted-foreground/50 lowercase italic leading-none text-left">Auto-retry entire group on failure</span>
+                                                                                    {/* Condition */}
+                                                                                    <div className="space-y-3 p-5 bg-background border border-border/50 rounded-xl shadow-sm">
+                                                                                        <div className="flex items-center justify-between">
+                                                                                            <label className="text-[10px] font-bold text-amber-600 flex items-center gap-1.5 uppercase tracking-wider">
+                                                                                                <AlertCircle className="w-3.5 h-3.5" />
+                                                                                                Active Condition
+                                                                                            </label>
+                                                                                            <span className="text-[9px] font-mono text-muted-foreground/50">Pongo2 Syntax</span>
+                                                                                        </div>
+                                                                                        <input
+                                                                                            type="text"
+                                                                                            value={group.condition || ''}
+                                                                                            onChange={(e) => {
+                                                                                                const ng = [...groups];
+                                                                                                ng[gIdx].condition = e.target.value;
+                                                                                                setGroups(ng);
+                                                                                            }}
+                                                                                            placeholder="e.g. input.env == 'prod'"
+                                                                                            className="w-full h-10 px-4 text-xs font-mono rounded-lg border border-border bg-muted/30 text-amber-600 placeholder:text-muted-foreground/30 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500/40 outline-none transition-all"
+                                                                                        />
+                                                                                        <div className="p-3 bg-amber-500/5 rounded-lg border border-amber-500/10">
+                                                                                            <p className="text-[10px] text-amber-700/70 leading-relaxed">
+                                                                                                Skip this group unless the condition is met.
+                                                                                                <br />
+                                                                                                <span className="opacity-50 text-[9px]">Use: <code className="bg-white/50 px-1 rounded">input.key</code>, <code className="bg-white/50 px-1 rounded">variable.key</code>, <code className="bg-white/50 px-1 rounded">step.key.status</code>.</span>
+                                                                                            </p>
                                                                                         </div>
                                                                                     </div>
-                                                                                    <Switch
-                                                                                        checked={group.retry_enabled || false}
-                                                                                        onCheckedChange={(checked) => {
-                                                                                            const ng = [...groups];
-                                                                                            ng[gIdx].retry_enabled = checked;
-                                                                                            if (checked) {
-                                                                                                if (!ng[gIdx].retry_limit) ng[gIdx].retry_limit = 3;
-                                                                                                if (!ng[gIdx].retry_delay) ng[gIdx].retry_delay = 5;
-                                                                                            }
-                                                                                            setGroups(ng);
-                                                                                        }}
-                                                                                    />
+
+                                                                                    {/* Server override */}
+                                                                                    <div className="space-y-3 p-5 bg-background border border-border/50 rounded-xl shadow-sm">
+                                                                                        <label className="text-[10px] font-bold text-foreground/70 uppercase tracking-wider flex items-center gap-1.5">
+                                                                                            <Server className="w-3.5 h-3.5" />
+                                                                                            Server Override
+                                                                                        </label>
+                                                                                        <SearchableSelect
+                                                                                            options={[
+                                                                                                { label: '— Use workflow default —', value: '' },
+                                                                                                ...(group.default_server && !availableServers.some(s => s.id === group.default_server_id)
+                                                                                                    ? [{ label: `${group.default_server.name} (${group.default_server.host || group.default_server.id})`, value: group.default_server_id as string }]
+                                                                                                    : []),
+                                                                                                ...availableServers.map(s => ({ label: `${s.name} (${s.host})`, value: s.id }))
+                                                                                            ]}
+                                                                                            value={group.default_server_id || ''}
+                                                                                            onValueChange={(val) => {
+                                                                                                const ng = [...groups];
+                                                                                                ng[gIdx].default_server_id = val || undefined;
+                                                                                                setGroups(ng);
+                                                                                            }}
+                                                                                            onSearch={handleSearchServers}
+                                                                                            placeholder="— Use workflow default —"
+                                                                                            isSearchable={true}
+                                                                                            triggerClassName="h-10 text-xs rounded-lg border-border/50"
+                                                                                        />
+                                                                                    </div>
+                                                                                </section>
+                                                                            </div>
+
+                                                                            {/* Right Column: Policies & Toggles */}
+                                                                            <div className="space-y-6">
+                                                                                <div className="flex items-center gap-2 mb-2">
+                                                                                    <div className="w-1 h-4 bg-primary rounded-full" />
+                                                                                    <h4 className="text-[11px] font-black uppercase tracking-widest text-foreground/70">Safety & Compliance</h4>
                                                                                 </div>
 
-                                                                                {group.retry_enabled && (
-                                                                                    <div className="mt-4 grid grid-cols-2 gap-5 animate-in fade-in slide-in-from-top-1 duration-200">
-                                                                                        <div className="space-y-2 text-left">
-                                                                                            <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground block mb-1">Retry Limit</label>
-                                                                                            <Input
-                                                                                                type="number"
-                                                                                                value={group.retry_limit || 0}
-                                                                                                onChange={(e) => {
+                                                                                <div className="grid grid-cols-1 gap-4">
+                                                                                    {/* Toggles Grid */}
+                                                                                    <div className="p-5 bg-background border border-border/50 rounded-xl shadow-sm space-y-5">
+                                                                                        {/* MCP Log Reporting */}
+                                                                                        <div className="flex items-center justify-between">
+                                                                                            <div className="flex items-center gap-3">
+                                                                                                <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                                                                                                    <FileText className="w-4 h-4 text-blue-500" />
+                                                                                                </div>
+                                                                                                <div className="flex flex-col">
+                                                                                                    <span className="text-xs font-bold text-foreground/80 leading-none">MCP Detailed Logs</span>
+                                                                                                    <span className="text-[10px] text-muted-foreground mt-1">Include raw step logs in reports</span>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                            <Switch
+                                                                                                checked={!!group.mcp_report_log}
+                                                                                                onCheckedChange={(checked) => {
                                                                                                     const ng = [...groups];
-                                                                                                    ng[gIdx].retry_limit = parseInt(e.target.value) || 0;
+                                                                                                    ng[gIdx].mcp_report_log = checked;
                                                                                                     setGroups(ng);
                                                                                                 }}
-                                                                                                className="h-9 text-[11px] font-mono"
-                                                                                                min={1}
-                                                                                                max={10}
                                                                                             />
                                                                                         </div>
-                                                                                        <div className="space-y-2 text-left">
-                                                                                            <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground block mb-1">Delay (s)</label>
-                                                                                            <Input
-                                                                                                type="number"
-                                                                                                value={group.retry_delay || 0}
-                                                                                                onChange={(e) => {
-                                                                                                    const ng = [...groups];
-                                                                                                    ng[gIdx].retry_delay = parseInt(e.target.value) || 0;
-                                                                                                    setGroups(ng);
-                                                                                                }}
-                                                                                                className="h-9 text-[11px] font-mono"
-                                                                                                min={0}
-                                                                                            />
-                                                                                        </div>
-                                                                                    </div>
-                                                                                )}
-                                                                            </div>
 
-                                                                            {/* Relay (Copy) */}
-                                                                            <div className="pt-4 border-t border-border/50 space-y-4">
-                                                                                <div className="flex items-center justify-between gap-2">
-                                                                                    <div className="flex items-center gap-2">
-                                                                                        <File className="w-3.5 h-3.5 text-emerald-500" />
-                                                                                        <span className="text-[8px] font-black uppercase tracking-widest text-emerald-500">Relay After Execution</span>
-                                                                                    </div>
-                                                                                    <Switch
-                                                                                        checked={group.is_copy_enabled}
-                                                                                        onCheckedChange={(checked) => {
-                                                                                            const ng = [...groups];
-                                                                                            ng[gIdx].is_copy_enabled = checked;
-                                                                                            setGroups(ng);
-                                                                                        }}
-                                                                                    />
-                                                                                </div>
-                                                                                {group.is_copy_enabled && (
-                                                                                    <div className="grid grid-cols-1 gap-4 animate-in fade-in slide-in-from-top-1 duration-200">
-                                                                                        <div className="space-y-2 text-left">
-                                                                                            <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground block mb-1">Source Path</label>
-                                                                                            <Input
-                                                                                                value={group.copy_source_path || ''}
-                                                                                                onChange={(e) => {
+                                                                                        {/* Continue on Failure */}
+                                                                                        <div className="flex items-center justify-between">
+                                                                                            <div className="flex items-center gap-3">
+                                                                                                <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                                                                                                    <AlertCircle className="w-4 h-4 text-amber-500" />
+                                                                                                </div>
+                                                                                                <div className="flex flex-col">
+                                                                                                    <span className="text-xs font-bold text-foreground/80 leading-none">Fault Tolerance</span>
+                                                                                                    <span className="text-[10px] text-muted-foreground mt-1 text-left">Continue workflow even if group fails</span>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                            <Switch
+                                                                                                checked={group.continue_on_failure}
+                                                                                                onCheckedChange={(checked) => {
                                                                                                     const ng = [...groups];
-                                                                                                    ng[gIdx].copy_source_path = e.target.value;
+                                                                                                    ng[gIdx].continue_on_failure = checked;
                                                                                                     setGroups(ng);
                                                                                                 }}
-                                                                                                placeholder="/var/www/html/dist"
-                                                                                                className="h-9 text-[11px] font-mono"
                                                                                             />
                                                                                         </div>
-                                                                                        <div className="grid grid-cols-2 gap-4">
-                                                                                            <div className="space-y-2 text-left">
-                                                                                                <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground block mb-1">Target Server</label>
-                                                                                                <SearchableSelect
-                                                                                                    options={[
-                                                                                                        ...(group.copy_target_server && !availableServers.some(s => s.id === group.copy_target_server_id)
-                                                                                                            ? [{ label: group.copy_target_server.name, value: group.copy_target_server_id as string }]
-                                                                                                            : []),
-                                                                                                        ...availableServers.map(s => ({ label: s.name, value: s.id }))
-                                                                                                    ]}
-                                                                                                    value={group.copy_target_server_id || ''}
-                                                                                                    onValueChange={(val) => {
+
+                                                                                        {/* Retry Policy */}
+                                                                                        <div className="pt-5 border-t border-border/50 space-y-4">
+                                                                                            <div className="flex items-center justify-between">
+                                                                                                <div className="flex items-center gap-3">
+                                                                                                    <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+                                                                                                        <RefreshCw className="w-4 h-4 text-indigo-500" />
+                                                                                                    </div>
+                                                                                                    <div className="flex flex-col">
+                                                                                                        <span className="text-xs font-bold text-foreground/80 leading-none">Auto-Retry Strategy</span>
+                                                                                                        <span className="text-[10px] text-muted-foreground mt-1">Re-run entire group on error</span>
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                                <Switch
+                                                                                                    checked={group.retry_enabled || false}
+                                                                                                    onCheckedChange={(checked) => {
                                                                                                         const ng = [...groups];
-                                                                                                        ng[gIdx].copy_target_server_id = val;
+                                                                                                        ng[gIdx].retry_enabled = checked;
+                                                                                                        if (checked) {
+                                                                                                            if (!ng[gIdx].retry_limit) ng[gIdx].retry_limit = 3;
+                                                                                                            if (!ng[gIdx].retry_delay) ng[gIdx].retry_delay = 5;
+                                                                                                        }
                                                                                                         setGroups(ng);
                                                                                                     }}
-                                                                                                    onSearch={handleSearchServers}
-                                                                                                    placeholder="Server"
-                                                                                                    triggerClassName="h-9 text-xs"
                                                                                                 />
                                                                                             </div>
-                                                                                            <div className="space-y-2 text-left">
-                                                                                                <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground block mb-1">Target Path</label>
-                                                                                                <Input
-                                                                                                    value={group.copy_target_path || ''}
-                                                                                                    onChange={(e) => {
-                                                                                                        const ng = [...groups];
-                                                                                                        ng[gIdx].copy_target_path = e.target.value;
-                                                                                                        setGroups(ng);
-                                                                                                    }}
-                                                                                                    placeholder="/opt/app/deploy"
-                                                                                                    className="h-9 text-[11px] font-mono"
-                                                                                                />
-                                                                                            </div>
+
+                                                                                            {group.retry_enabled && (
+                                                                                                <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2 duration-200 bg-muted/30 p-4 rounded-xl border border-indigo-500/10 mt-2">
+                                                                                                    <div className="space-y-2 text-left">
+                                                                                                        <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground block">Max Attempts</label>
+                                                                                                        <Input
+                                                                                                            type="number"
+                                                                                                            value={group.retry_limit || 0}
+                                                                                                            onChange={(e) => {
+                                                                                                                const ng = [...groups];
+                                                                                                                ng[gIdx].retry_limit = parseInt(e.target.value) || 0;
+                                                                                                                setGroups(ng);
+                                                                                                            }}
+                                                                                                            className="h-9 text-xs font-mono bg-background"
+                                                                                                            min={1} max={10}
+                                                                                                        />
+                                                                                                    </div>
+                                                                                                    <div className="space-y-2 text-left">
+                                                                                                        <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground block">Delay (seconds)</label>
+                                                                                                        <Input
+                                                                                                            type="number"
+                                                                                                            value={group.retry_delay || 0}
+                                                                                                            onChange={(e) => {
+                                                                                                                const ng = [...groups];
+                                                                                                                ng[gIdx].retry_delay = parseInt(e.target.value) || 0;
+                                                                                                                setGroups(ng);
+                                                                                                            }}
+                                                                                                            className="h-9 text-xs font-mono bg-background"
+                                                                                                            min={0}
+                                                                                                        />
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                            )}
                                                                                         </div>
                                                                                     </div>
-                                                                                )}
+
+                                                                                    {/* Relay Strategy (Separate Section) */}
+                                                                                    <div className="p-5 bg-background border border-border/50 rounded-xl shadow-sm space-y-4">
+                                                                                        <div className="flex items-center justify-between">
+                                                                                            <div className="flex items-center gap-3">
+                                                                                                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                                                                                                    <File className="w-4 h-4 text-emerald-500" />
+                                                                                                </div>
+                                                                                                <div className="flex flex-col text-left">
+                                                                                                    <span className="text-xs font-bold text-foreground/80 leading-none">Relay (SOP Deployment)</span>
+                                                                                                    <span className="text-[10px] text-muted-foreground mt-1">Copy files after group success</span>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                            <Switch
+                                                                                                checked={group.is_copy_enabled}
+                                                                                                onCheckedChange={(checked) => {
+                                                                                                    const ng = [...groups];
+                                                                                                    ng[gIdx].is_copy_enabled = checked;
+                                                                                                    setGroups(ng);
+                                                                                                }}
+                                                                                            />
+                                                                                        </div>
+
+                                                                                        {group.is_copy_enabled && (
+                                                                                            <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-200 pt-4 border-t border-border/50">
+                                                                                                <div className="space-y-2 text-left">
+                                                                                                    <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground block">Source Artifact Path</label>
+                                                                                                    <Input
+                                                                                                        value={group.copy_source_path || ''}
+                                                                                                        onChange={(e) => {
+                                                                                                            const ng = [...groups];
+                                                                                                            ng[gIdx].copy_source_path = e.target.value;
+                                                                                                            setGroups(ng);
+                                                                                                        }}
+                                                                                                        placeholder="/var/www/html/dist"
+                                                                                                        className="h-9 text-xs font-mono bg-background"
+                                                                                                    />
+                                                                                                </div>
+                                                                                                <div className="grid grid-cols-2 gap-4">
+                                                                                                    <div className="space-y-2 text-left">
+                                                                                                        <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground block">Destination Server</label>
+                                                                                                        <SearchableSelect
+                                                                                                            options={[
+                                                                                                                ...(group.copy_target_server && !availableServers.some(s => s.id === group.copy_target_server_id)
+                                                                                                                    ? [{ label: group.copy_target_server.name, value: group.copy_target_server_id as string }]
+                                                                                                                    : []),
+                                                                                                                ...availableServers.map(s => ({ label: s.name, value: s.id }))
+                                                                                                            ]}
+                                                                                                            value={group.copy_target_server_id || ''}
+                                                                                                            onValueChange={(val) => {
+                                                                                                                const ng = [...groups];
+                                                                                                                ng[gIdx].copy_target_server_id = val;
+                                                                                                                setGroups(ng);
+                                                                                                            }}
+                                                                                                            onSearch={handleSearchServers}
+                                                                                                            placeholder="Server"
+                                                                                                            triggerClassName="h-9 text-xs bg-background"
+                                                                                                        />
+                                                                                                    </div>
+                                                                                                    <div className="space-y-2 text-left">
+                                                                                                        <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground block">Destination Path</label>
+                                                                                                        <Input
+                                                                                                            value={group.copy_target_path || ''}
+                                                                                                            onChange={(e) => {
+                                                                                                                const ng = [...groups];
+                                                                                                                ng[gIdx].copy_target_path = e.target.value;
+                                                                                                                setGroups(ng);
+                                                                                                            }}
+                                                                                                            placeholder="/opt/app/deploy"
+                                                                                                            className="h-9 text-xs font-mono bg-background"
+                                                                                                        />
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </div>
+                                                                                </div>
                                                                             </div>
                                                                         </div>
-                                                                        <div className="px-5 pb-5 border-t border-border/50 pt-4 flex justify-end">
+
+                                                                        {/* Footer Action */}
+                                                                        <div className="px-8 py-5 glass border-t border-border/50 flex justify-end gap-3 rounded-b-2xl">
+                                                                            <Button
+                                                                                variant="outline"
+                                                                                onClick={() => setOpenSettingsGroupIdx(null)}
+                                                                                className="h-10 text-xs font-bold uppercase tracking-widest px-8 rounded-lg"
+                                                                            >
+                                                                                Discard
+                                                                            </Button>
                                                                             <Button
                                                                                 onClick={() => setOpenSettingsGroupIdx(null)}
-                                                                                className="h-8 text-[10px] font-bold uppercase tracking-widest px-6 premium-gradient text-white"
+                                                                                className="h-10 text-xs font-bold uppercase tracking-widest px-10 premium-gradient text-white rounded-lg shadow-lg shadow-indigo-500/20 active:scale-95 transition-all"
                                                                             >
-                                                                                Confirm
+                                                                                Apply changes
                                                                             </Button>
                                                                         </div>
                                                                     </div>
+
                                                                 </>
                                                             )}
                                                         </div>
