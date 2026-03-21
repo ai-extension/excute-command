@@ -83,7 +83,7 @@ const MultiInputConfigEditor: React.FC<{
                         {item.type === 'select' && (
                             <div className=" border-t border-border/20 space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
                                 <label className="text-[7px] font-black uppercase tracking-widest text-primary/70">Options (comma-separated)</label>
-                                <Input
+                                <Textarea
                                     value={item.options || ''}
                                     onChange={(e) => {
                                         const ni = [...items];
@@ -91,7 +91,7 @@ const MultiInputConfigEditor: React.FC<{
                                         updateItems(ni);
                                     }}
                                     placeholder="opt1, opt2, opt3"
-                                    className="h-8 text-[11px] bg-background border-border/50 focus:border-primary/50"
+                                    className="min-h-[40px] text-[11px] bg-background border-border/50 focus:border-primary/50 resize-y"
                                 />
                             </div>
                         )}
@@ -257,9 +257,20 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                                                         placeholder="Default text... supports multi-line"
                                                         className="min-h-[60px] text-[11px] border-border bg-background resize-y"
                                                     />
-                                                ) : (
+                                                ) : input.type === 'number' ? (
                                                     <Input
-                                                        type={input.type === 'number' ? 'number' : 'text'}
+                                                        type="number"
+                                                        value={input.default_value}
+                                                        onChange={(e) => {
+                                                            const ni = [...inputs];
+                                                            ni[idx].default_value = e.target.value;
+                                                            setInputs(ni);
+                                                        }}
+                                                        placeholder="0"
+                                                        className="h-8 text-[11px] border-border bg-background"
+                                                    />
+                                                ) : (
+                                                    <Textarea
                                                         value={input.default_value}
                                                         onChange={(e) => {
                                                             const ni = [...inputs];
@@ -267,11 +278,10 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                                                             setInputs(ni);
                                                         }}
                                                         placeholder={
-                                                            input.type === 'number' ? '0'
-                                                                : (input.type === 'select' || input.type === 'multi-select') ? 'option1, option2, option3'
-                                                                    : 'Default value...'
+                                                            (input.type === 'select' || input.type === 'multi-select') ? 'option1, option2, option3'
+                                                                : 'Default value...'
                                                         }
-                                                        className="h-8 text-[11px] border-border bg-background"
+                                                        className="min-h-[60px] text-[11px] border-border bg-background resize-y"
                                                     />
                                                 )}
                                             </div>
