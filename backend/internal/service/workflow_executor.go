@@ -35,6 +35,7 @@ type WorkflowExecutor struct {
 	serverService *ServerService
 	hub           *Hub
 	activeExecs   sync.Map // map[uuid.UUID]context.CancelFunc
+	execDoneChans sync.Map // map[uuid.UUID]chan struct{}
 }
 
 func NewWorkflowExecutor(
@@ -75,10 +76,19 @@ func NewWorkflowExecutor(
 		globalVarRepo: globalVarRepo,
 		serverService: serverService,
 		hub:           hub,
+		execDoneChans: sync.Map{},
 	}
 }
 
 func (e *WorkflowExecutor) Run(ctx context.Context, workflowID uuid.UUID, execID uuid.UUID, inputs map[string]string, scheduledID *uuid.UUID, pageID *uuid.UUID, triggerSource string, user *domain.User, startGroupID, startStepID, fromExecutionID *uuid.UUID) error {
+	// Create a signal channel to notify waiters that this execution is finished
+	done := make(chan struct{})
+	e.execDoneChans.Store(execID, done)
+	defer func() {
+		close(done)
+		e.execDoneChans.Delete(execID)
+	}()
+
 	// Create a cancellable context for this execution
 	execCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -87,6 +97,15 @@ func (e *WorkflowExecutor) Run(ctx context.Context, workflowID uuid.UUID, execID
 	defer e.activeExecs.Delete(execID)
 
 	return e.RunWithDepth(execCtx, workflowID, execID, inputs, scheduledID, pageID, triggerSource, 0, user, startGroupID, startStepID, fromExecutionID)
+}
+
+// GetWaitChan returns a channel that will be closed when the execution finishes.
+// If the execution is not currently active, it returns a nil channel.
+func (e *WorkflowExecutor) GetWaitChan(execID uuid.UUID) chan struct{} {
+	if val, ok := e.execDoneChans.Load(execID); ok {
+		return val.(chan struct{})
+	}
+	return nil
 }
 
 func (e *WorkflowExecutor) StopExecution(execID uuid.UUID) error {

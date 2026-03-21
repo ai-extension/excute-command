@@ -43,13 +43,13 @@ func (s *MCPService) GetServer() *server.MCPServer {
 func (s *MCPService) registerTools() {
 	// 1. list_workflows
 	listWorkflowsTool := mcp.NewTool("list_workflows",
-		mcp.WithDescription("Lấy danh sách các workflow có thể chạy. Trả về metadata và hướng dẫn AI (AIGuide) để biết workflow làm chức năng gì."),
+		mcp.WithDescription("Lấy danh sách các workflow có thể chạy. Trả về metadata và hướng dẫn AI (AIGuide). QUY TẮC: AI không được tự ý chạy lại hoặc tự động chọn workflow thay thế khi không có sự đồng ý từ User."),
 	)
 	s.server.AddTool(listWorkflowsTool, s.handleListWorkflows)
 
 	// 2. run_workflow
 	runWorkflowTool := mcp.NewTool("run_workflow",
-		mcp.WithDescription("Chạy một workflow dựa theo ID. Bạn PHẢI xem danh sách 'inputs' trong 'list_workflows' và truyền vào tham số 'inputs' dưới dạng JSON string."),
+		mcp.WithDescription("Chạy một workflow dựa theo ID. QUY TẮC: AI tuyệt đối không được tự ý chạy lại hoặc tự động chọn workflow thay thế khi chưa có sự đồng ý từ user."),
 		mcp.WithString("workflow_id", mcp.Required(), mcp.Description("UUID của workflow cần chạy")),
 		mcp.WithString("inputs", mcp.Description("Các biến đầu vào định dạng JSON string. Ví dụ: '{\"branch\": \"main\"}'")),
 	)
@@ -57,7 +57,7 @@ func (s *MCPService) registerTools() {
 
 	// 3. get_execution_log
 	getLogTool := mcp.NewTool("get_execution_log",
-		mcp.WithDescription("Xem trạng thái và log của một workflow execution. Nếu workflow đang chạy, bạn có thể chọn đợi cho đến khi hoàn thành."),
+		mcp.WithDescription("Xem trạng thái và log của execution. QUY TẮC: AI không được tự ý chạy lại hoặc tự động chọn workflow thay thế khi không có sự đồng ý từ User."),
 		mcp.WithString("execution_id", mcp.Required(), mcp.Description("UUID của execution")),
 		mcp.WithBoolean("wait", mcp.Description("Nếu true, tool sẽ đợi cho đến khi workflow kết thúc (tối đa 30 giây) trước khi trả về kết quả.")),
 	)
@@ -65,7 +65,7 @@ func (s *MCPService) registerTools() {
 
 	// 4. schedule_workflow
 	scheduleTool := mcp.NewTool("schedule_workflow",
-		mcp.WithDescription("Đặt lịch chạy cho một workflow (One-time hoặc Recurring). Bạn PHẢI xem danh sách 'inputs' trong 'list_workflows' và truyền vào tham số 'inputs' dưới dạng JSON string."),
+		mcp.WithDescription("Đặt lịch chạy cho workflow. QUY TẮC: AI không được tự ý chạy lại hoặc tự động chọn workflow thay thế khi không có sự đồng ý từ User."),
 		mcp.WithString("workflow_id", mcp.Required(), mcp.Description("UUID của workflow cần đặt lịch")),
 		mcp.WithString("name", mcp.Required(), mcp.Description("Tên của lịch trình (ví dụ: 'Daily Backup')")),
 		mcp.WithString("type", mcp.Required(), mcp.Description("Loại lịch: 'ONE_TIME' hoặc 'RECURRING'")),
@@ -218,26 +218,22 @@ func (s *MCPService) handleGetExecutionLog(ctx context.Context, request mcp.Call
 		return mcp.NewToolResultError("Không tìm thấy execution hoặc không có quyền"), nil
 	}
 
-	// Optional wait logic
+	// Optional wait logic: Instant signal instead of 2s polling
 	wait := request.GetBool("wait", false)
 	if wait && (exec.Status == domain.StatusPending || exec.Status == domain.StatusRunning) {
-		timeout := time.After(30 * time.Second)
-		ticker := time.NewTicker(2 * time.Second)
-		defer ticker.Stop()
-
-	waitLoop:
-		for {
+		waitChan := s.executor.GetWaitChan(execID)
+		if waitChan != nil {
+			// Wait for either the execution to finish, a 30s timeout, or client cancellation
 			select {
-			case <-timeout:
-				break waitLoop
-			case <-ticker.C:
-				exec, err = s.workflowService.GetExecution(execID, user)
-				if err != nil || (exec.Status != domain.StatusPending && exec.Status != domain.StatusRunning) {
-					break waitLoop
-				}
+			case <-waitChan:
+				// Execution finished! Re-fetch final state below
+			case <-time.After(30 * time.Second):
+				// Timeout reached
 			case <-ctx.Done():
-				break waitLoop
+				// Client disconnected
 			}
+			// Re-fetch to get final status and full logs
+			exec, _ = s.workflowService.GetExecution(execID, user)
 		}
 	}
 
