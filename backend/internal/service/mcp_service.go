@@ -57,8 +57,9 @@ func (s *MCPService) registerTools() {
 
 	// 3. get_execution_log
 	getLogTool := mcp.NewTool("get_execution_log",
-		mcp.WithDescription("Xem log của một workflow execution. Tool này sẽ theo dõi và stream log trong suốt quá trình chạy, chặn cho đến khi kết thúc."),
+		mcp.WithDescription("Xem trạng thái và log của một workflow execution. Nếu workflow đang chạy, bạn có thể chọn đợi cho đến khi hoàn thành."),
 		mcp.WithString("execution_id", mcp.Required(), mcp.Description("UUID của execution")),
+		mcp.WithBoolean("wait", mcp.Description("Nếu true, tool sẽ đợi cho đến khi workflow kết thúc (tối đa 30 giây) trước khi trả về kết quả.")),
 	)
 	s.server.AddTool(getLogTool, s.handleGetExecutionLog)
 
@@ -193,7 +194,7 @@ func (s *MCPService) handleRunWorkflow(ctx context.Context, request mcp.CallTool
 		_ = s.executor.Run(context.Background(), wf.ID, execID, inputs, nil, nil, "MCP", user, nil, nil, nil)
 	}()
 
-	return mcp.NewToolResultText(fmt.Sprintf("Workflow %s đang chạy. execution_id: %s", wf.Name, execID.String())), nil
+	return mcp.NewToolResultText(fmt.Sprintf("Workflow %s đang chạy. execution_id: %s. Hãy sử dụng tool 'get_execution_log' với execution_id này (có thể truyền thêm wait=true) để theo dõi tiến độ và xem kết quả cuối cùng.", wf.Name, execID.String())), nil
 }
 
 func (s *MCPService) handleGetExecutionLog(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -215,6 +216,29 @@ func (s *MCPService) handleGetExecutionLog(ctx context.Context, request mcp.Call
 	exec, err := s.workflowService.GetExecution(execID, user)
 	if err != nil {
 		return mcp.NewToolResultError("Không tìm thấy execution hoặc không có quyền"), nil
+	}
+
+	// Optional wait logic
+	wait := request.GetBool("wait", false)
+	if wait && (exec.Status == domain.StatusPending || exec.Status == domain.StatusRunning) {
+		timeout := time.After(30 * time.Second)
+		ticker := time.NewTicker(2 * time.Second)
+		defer ticker.Stop()
+
+	waitLoop:
+		for {
+			select {
+			case <-timeout:
+				break waitLoop
+			case <-ticker.C:
+				exec, err = s.workflowService.GetExecution(execID, user)
+				if err != nil || (exec.Status != domain.StatusPending && exec.Status != domain.StatusRunning) {
+					break waitLoop
+				}
+			case <-ctx.Done():
+				break waitLoop
+			}
+		}
 	}
 
 	// Structured Metadata Result
