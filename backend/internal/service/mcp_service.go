@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -122,12 +123,34 @@ func (s *MCPService) handleListWorkflows(ctx context.Context, request mcp.CallTo
 	for _, wf := range wfs {
 		inputs := []map[string]interface{}{}
 		for _, in := range wf.Inputs {
-			inputs = append(inputs, map[string]interface{}{
-				"key":      in.Key,
-				"label":    in.Label,
-				"type":     in.Type,
-				"required": in.Required,
-			})
+			inputMap := map[string]interface{}{
+				"key":           in.Key,
+				"label":         in.Label,
+				"type":          in.Type,
+				"required":      in.Required,
+				"default_value": in.DefaultValue,
+			}
+
+			// Add additional info based on type to help AI understand the input
+			if in.Type == "select" || in.Type == "multi-select" {
+				rawOptions := strings.Split(in.DefaultValue, ",")
+				options := []string{}
+				for _, opt := range rawOptions {
+					trimmed := strings.TrimSpace(opt)
+					if trimmed != "" {
+						options = append(options, trimmed)
+					}
+				}
+				inputMap["options"] = options
+			} else if in.Type == "multi-input" {
+				// Multi-input stores field definitions in DefaultValue as JSON
+				var fields []map[string]interface{}
+				if err := json.Unmarshal([]byte(in.DefaultValue), &fields); err == nil {
+					inputMap["multi_input_config"] = fields
+				}
+			}
+
+			inputs = append(inputs, inputMap)
 		}
 
 		result = append(result, map[string]interface{}{
@@ -166,6 +189,11 @@ func (s *MCPService) handleRunWorkflow(ctx context.Context, request mcp.CallTool
 	wf, err := s.workflowService.GetWorkflowWithAction(wfID, user, "EXECUTE")
 	if err != nil {
 		return mcp.NewToolResultError("Không tìm thấy workflow hoặc không có quyền EXECUTE"), nil
+	}
+
+	// Validate inputs before execution
+	if err := s.executor.validateInputs(wf, inputs); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Input validation failed: %v", err)), nil
 	}
 
 	execID := uuid.New()
