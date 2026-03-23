@@ -100,9 +100,6 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
             const updatedWF = await data.json();
             setWorkflow(prev => {
                 if (!prev) return updatedWF;
-                if (onStatusChange && updatedWF.status !== prev.status) {
-                    onStatusChange(updatedWF.status);
-                }
 
                 // Preserve execution_id if it's attached to the workflow object
                 const next = { ...updatedWF };
@@ -128,6 +125,14 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
     }, [isStatusWSReady, isTerminalReady, mode, onReady]);
 
     const { token } = useAuth();
+    const prevStatusRef = React.useRef<string | null>(workflow?.status || null);
+    useEffect(() => {
+        if (onStatusChange && workflow?.status && workflow.status !== prevStatusRef.current) {
+            onStatusChange(workflow.status);
+            prevStatusRef.current = workflow.status;
+        }
+    }, [workflow?.status, onStatusChange]);
+
     // Effect for WebSocket (Live Mode)
     useEffect(() => {
         if (mode !== 'LIVE' || !workflowID) return;
@@ -164,7 +169,6 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                 setWorkflow(prev => {
                     if (!prev) return prev;
                     if (targetID === prev.id) {
-                        if (onStatusChange && status !== prev.status) onStatusChange(status);
                         return { ...prev, status };
                     }
 
