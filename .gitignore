@@ -9,6 +9,7 @@ Thumbs.db
 
 # Backend (Golang)
 backend/bin/
+!backend/internal/assets/bin/httpget/*
 backend/*.exe
 backend/*.exe~
 backend/*.dll

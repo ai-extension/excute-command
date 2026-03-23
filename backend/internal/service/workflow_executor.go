@@ -1041,22 +1041,98 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 			body, _ := e.renderTemplate(step.HttpBody, pcontext)
 			headersStr, _ := e.renderTemplate(step.HttpHeaders, pcontext)
 
-			if method == "" {
-				method = "GET"
-			}
 			var headers map[string]string
 			if headersStr != "" {
 				json.Unmarshal([]byte(headersStr), &headers)
 			}
-			curlCmd := fmt.Sprintf("curl -s -X %s", strconv.Quote(method))
-			for k, v := range headers {
-				curlCmd += fmt.Sprintf(" -H %s", strconv.Quote(fmt.Sprintf("%s: %s", k, v)))
+
+			targetServerID := step.ServerID
+			if targetServerID == uuid.Nil {
+				targetServerID = defaultServerID
 			}
-			if body != "" {
-				curlCmd += fmt.Sprintf(" -d %s", strconv.Quote(body))
+
+			// Check for curl existence
+			checkCmd := "command -v curl >/dev/null 2>&1 && echo 'yes' || echo 'no'"
+			hasCurl := false
+			if targetServerID != uuid.Nil {
+				out, _ := e.serverService.ExecuteCommand(ctx, targetServerID, checkCmd, nil)
+				if strings.TrimSpace(out) == "yes" {
+					hasCurl = true
+				}
+			} else {
+				// Local check
+				_, err := exec.LookPath("curl")
+				hasCurl = (err == nil)
 			}
-			curlCmd += fmt.Sprintf(" %s", strconv.Quote(url))
-			step.CommandText = curlCmd
+
+			if hasCurl {
+				curlCmd := fmt.Sprintf("curl -s -X %s", strconv.Quote(method))
+				for k, v := range headers {
+					curlCmd += fmt.Sprintf(" -H %s", strconv.Quote(fmt.Sprintf("%s: %s", k, v)))
+				}
+				if body != "" {
+					curlCmd += fmt.Sprintf(" -d %s", strconv.Quote(body))
+				}
+				curlCmd += fmt.Sprintf(" %s", strconv.Quote(url))
+				step.CommandText = curlCmd
+			} else {
+				// Binary Injection (Trick #4)
+				msgLine := "\033[90m⚙ curl not found, using httpget injection...\033[0m\n"
+				fmt.Fprint(mainLogFile, msgLine)
+				fmt.Fprint(stepLogFile, msgLine)
+				e.hub.BroadcastLog(workflowID.String(), executionID.String(), msgLine)
+
+				unameOut := "linux x86_64"
+				if targetServerID != uuid.Nil {
+					out, _ := e.serverService.ExecuteCommand(ctx, targetServerID, "uname -s; uname -m", nil)
+					unameOut = strings.ToLower(strings.TrimSpace(out))
+				} else {
+					c := exec.CommandContext(ctx, "sh", "-c", "uname -s; uname -m")
+					b, _ := c.Output()
+					unameOut = strings.ToLower(strings.TrimSpace(string(b)))
+				}
+
+				osPrefix := "linux"
+				if strings.Contains(unameOut, "darwin") {
+					osPrefix = "darwin"
+				}
+
+				goArch := "amd64"
+				if strings.Contains(unameOut, "x86_64") || strings.Contains(unameOut, "amd64") {
+					goArch = "amd64"
+				} else if strings.Contains(unameOut, "aarch64") || strings.Contains(unameOut, "arm64") {
+					goArch = "arm64"
+				} else if strings.Contains(unameOut, "386") || strings.Contains(unameOut, "686") {
+					goArch = "386"
+				} else if strings.Contains(unameOut, "arm") {
+					goArch = "arm"
+				}
+
+				baseDir, _ := os.Getwd()
+				localBinary := filepath.Join(baseDir, "internal", "assets", "bin", "httpget", "httpget-"+osPrefix+"-"+goArch)
+				remoteBinary := "/tmp/httpget"
+
+				if targetServerID != uuid.Nil {
+					if _, err := os.Stat(localBinary); err == nil {
+						upErr := e.serverService.UploadFileToServers(ctx, []uuid.UUID{targetServerID}, localBinary, remoteBinary, nil)
+						if upErr != nil {
+							fmt.Fprintf(mainLogFile, "\033[1;33m⚠ Failed to inject httpget binary: %v\033[0m\n", upErr)
+						}
+					} else {
+						fmt.Fprintf(mainLogFile, "\033[1;33m⚠ httpget binary for %s not found in data/bin/\033[0m\n", goArch)
+					}
+				} else {
+					// For local fallback if curl is missing (unlikely but possible)
+					remoteBinary = localBinary
+				}
+
+				// Construct httpget command
+				step.CommandText = fmt.Sprintf("chmod +x %s 2>/dev/null; %s -u %s -X %s -H %s",
+					remoteBinary, remoteBinary, strconv.Quote(url), strconv.Quote(method), strconv.Quote(headersStr))
+				if body != "" {
+					step.CommandText += fmt.Sprintf(" -d %s", strconv.Quote(body))
+				}
+			}
 		}
 
 		// Default: COMMAND action type
