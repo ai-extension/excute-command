@@ -613,14 +613,14 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                                     {group.steps?.map((step) => {
                                         const status = getStepStatus(step.id);
                                         return (
-                                            <button
+                                            <div
                                                 key={step.id}
                                                 onClick={() => {
                                                     setActiveStepID(step.id);
                                                     setActiveGroupID(null);
                                                 }}
                                                 className={cn(
-                                                    "w-full flex items-center justify-between p-3 rounded-xl border transition-all text-left group",
+                                                    "w-full flex items-center justify-between p-3 rounded-xl border transition-all text-left group cursor-pointer",
                                                     activeStepID === step.id ? "bg-primary/10 border-primary/30" : "bg-muted/10 border-border hover:border-border/80",
                                                     status === 'RUNNING' && "border-primary/50 shadow-[0_0_15px_rgba(99,102,241,0.15)]"
                                                 )}
@@ -666,7 +666,7 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                                                     )}
                                                     <ChevronRight className="w-3 h-3 text-muted-foreground/40" />
                                                 </div>
-                                            </button>
+                                            </div>
                                         );
                                     })}
                                 </div>
