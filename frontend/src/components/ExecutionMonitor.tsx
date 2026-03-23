@@ -296,6 +296,7 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                     retry_enabled: false,
                     retry_limit: 0,
                     retry_delay: 0,
+                    mcp_report_log: false,
                     created_at: '',
                     updated_at: ''
                 });
@@ -319,7 +320,7 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                         order: (group.steps.length || 0) + 1,
                         created_at: execStep.started_at,
                         updated_at: execStep.finished_at || execStep.started_at
-                    } as any);
+                    });
                 }
             }
         });
