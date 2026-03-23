@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/user/csm-backend/internal/domain"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type PostgresWorkflowRepo struct {
@@ -593,11 +594,11 @@ func (r *PostgresWorkflowExecutionRepo) ListByScheduledID(scheduledID uuid.UUID,
 }
 
 func (r *PostgresWorkflowExecutionRepo) Update(exec *domain.WorkflowExecution) error {
-	return r.db.Save(exec).Error
+	return r.db.Omit(clause.Associations).Save(exec).Error
 }
 
 func (r *PostgresWorkflowExecutionRepo) CreateStepResult(stepExec *domain.WorkflowExecutionStep) error {
-	return r.db.Save(stepExec).Error // Use Save to handle both Create and Update
+	return r.db.Omit(clause.Associations).Save(stepExec).Error // Use Save to handle both Create and Update
 }
 
 func (r *PostgresWorkflowExecutionRepo) GetExecutionAnalytics(namespaceID uuid.UUID, days int, scope *domain.PermissionScope) ([]map[string]interface{}, error) {
