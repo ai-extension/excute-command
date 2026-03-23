@@ -18,6 +18,7 @@ import {
 } from "../ui/dropdown-menu";
 
 import { WorkflowGroup, WorkflowStep, Server as ServerType, Workflow } from '../../types';
+import { API_BASE_URL } from '../../lib/api';
 
 interface StepsBuilderTabProps {
     groups: Partial<WorkflowGroup>[];
@@ -535,6 +536,19 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                         }}
                                                                                         className="bg-muted/50 border-border h-8 text-[11px] font-medium rounded-md px-2"
                                                                                     />
+                                                                                    <div className="flex items-center gap-1 mt-1">
+                                                                                        <span className="text-[9px] font-mono text-muted-foreground/50">Key:</span>
+                                                                                        <Input
+                                                                                            value={step.action_key || ''}
+                                                                                            onChange={(e) => {
+                                                                                                const ng = [...groups];
+                                                                                                ng[gIdx]!.steps![sIdx].action_key = e.target.value.replace(/[^a-zA-Z0-9_]/g, '');
+                                                                                                setGroups(ng);
+                                                                                            }}
+                                                                                            className="h-5 text-[9px] px-1 font-mono bg-transparent border-transparent hover:border-border/50 focus:bg-background"
+                                                                                            placeholder="action_key"
+                                                                                        />
+                                                                                    </div>
                                                                                 </div>
                                                                                 <div className="col-span-2 space-y-1">
                                                                                     <label className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Type</label>
@@ -542,7 +556,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                         value={step.action_type || 'COMMAND'}
                                                                                         onChange={(e) => {
                                                                                             const ng = [...groups];
-                                                                                            ng[gIdx]!.steps![sIdx].action_type = e.target.value as 'COMMAND' | 'WORKFLOW';
+                                                                                            ng[gIdx]!.steps![sIdx].action_type = e.target.value as 'COMMAND' | 'WORKFLOW' | 'HTTP';
                                                                                             if (e.target.value === 'COMMAND') {
                                                                                                 ng[gIdx]!.steps![sIdx].target_workflow_id = undefined;
                                                                                                 ng[gIdx]!.steps![sIdx].target_workflow_inputs = undefined;
@@ -553,6 +567,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                     >
                                                                                         <option value="COMMAND">Command</option>
                                                                                         <option value="WORKFLOW">Workflow</option>
+                                                                                        <option value="HTTP">HTTP Request</option>
                                                                                     </select>
                                                                                 </div>
                                                                                 <div className="col-span-7 space-y-3">
@@ -569,6 +584,148 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                 className="bg-muted/50 border-border min-h-[40px] text-[11px] font-mono rounded-md px-2 py-2 resize-y"
                                                                                                 placeholder="Enter command sequence..."
                                                                                             />
+                                                                                        </div>
+                                                                                    ) : step.action_type === 'HTTP' ? (
+                                                                                        <div className="space-y-3 bg-muted/20 border border-border/50 rounded-lg p-3">
+                                                                                            <div className="flex items-center justify-between">
+                                                                                                <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-500">HTTP Configuration</label>
+                                                                                                <Button 
+                                                                                                    variant="outline" 
+                                                                                                    size="sm" 
+                                                                                                    className="h-6 text-[9px] px-2 py-0 border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10"
+                                                                                                    onClick={() => {
+                                                                                                        const text = prompt("Paste full cURL command here:");
+                                                                                                        if (!text) return;
+                                                                                                        let method = 'GET'; let url = ''; let headers: Record<string, string> = {}; let body = '';
+                                                                                                        try {
+                                                                                                            const tokens = text.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
+                                                                                                            for (let i = 0; i < tokens.length; i++) {
+                                                                                                                let token = tokens[i].replace(/^"|"$/g, '').replace(/^'|'$/g, '');
+                                                                                                                if (token === '-X' || token === '--request') { method = tokens[++i].replace(/^"|"$/g, '').replace(/^'|'$/g, '').toUpperCase(); }
+                                                                                                                else if (token === '-H' || token === '--header') {
+                                                                                                                    const h = tokens[++i].replace(/^"|"$/g, '').replace(/^'|'$/g, '');
+                                                                                                                    const pIdx = h.indexOf(':');
+                                                                                                                    if (pIdx > 0) headers[h.substring(0, pIdx).trim()] = h.substring(pIdx + 1).trim();
+                                                                                                                } else if (token === '-d' || token === '--data' || token === '--data-raw') {
+                                                                                                                    body = tokens[++i].replace(/^"|"$/g, '').replace(/^'|'$/g, '');
+                                                                                                                    if (method === 'GET') method = 'POST';
+                                                                                                                } else if (token.startsWith('http')) { url = token; }
+                                                                                                            }
+                                                                                                            const ng = [...groups];
+                                                                                                            ng[gIdx]!.steps![sIdx].http_method = method;
+                                                                                                            ng[gIdx]!.steps![sIdx].http_url = url;
+                                                                                                            ng[gIdx]!.steps![sIdx].http_headers = Object.keys(headers).length > 0 ? JSON.stringify(headers, null, 2) : '';
+                                                                                                            ng[gIdx]!.steps![sIdx].http_body = body;
+                                                                                                            setGroups(ng);
+                                                                                                        } catch(e) { alert("Failed to parse cURL"); }
+                                                                                                    }}
+                                                                                                >
+                                                                                                    Paste cURL
+                                                                                                </Button>
+                                                                                            </div>
+                                                                                            <div className="flex gap-2">
+                                                                                                <select
+                                                                                                    value={step.http_method || 'GET'}
+                                                                                                    onChange={(e) => {
+                                                                                                        const ng = [...groups];
+                                                                                                        ng[gIdx]!.steps![sIdx].http_method = e.target.value;
+                                                                                                        setGroups(ng);
+                                                                                                    }}
+                                                                                                    className="h-8 px-2 w-24 text-[10px] font-bold border border-border rounded-md bg-background text-foreground outline-none cursor-pointer"
+                                                                                                >
+                                                                                                    <option>GET</option>
+                                                                                                    <option>POST</option>
+                                                                                                    <option>PUT</option>
+                                                                                                    <option>PATCH</option>
+                                                                                                    <option>DELETE</option>
+                                                                                                </select>
+                                                                                                <Input 
+                                                                                                    value={step.http_url || ''}
+                                                                                                    onChange={(e) => {
+                                                                                                        const ng = [...groups];
+                                                                                                        ng[gIdx]!.steps![sIdx].http_url = e.target.value;
+                                                                                                        setGroups(ng);
+                                                                                                    }}
+                                                                                                    placeholder="https://api.example.com/..."
+                                                                                                    className="h-8 text-[11px] font-mono bg-background border-border flex-1"
+                                                                                                />
+                                                                                            </div>
+                                                                                            <div className="grid grid-cols-2 gap-3">
+                                                                                                <div className="space-y-1">
+                                                                                                    <label className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Headers (JSON)</label>
+                                                                                                    <Textarea 
+                                                                                                        value={step.http_headers || ''}
+                                                                                                        onChange={(e) => {
+                                                                                                            const ng = [...groups];
+                                                                                                            ng[gIdx]!.steps![sIdx].http_headers = e.target.value;
+                                                                                                            setGroups(ng);
+                                                                                                        }}
+                                                                                                        placeholder='{"Authorization": "Bearer token"}'
+                                                                                                        className="text-[10px] font-mono min-h-[60px] bg-background border-border"
+                                                                                                    />
+                                                                                                </div>
+                                                                                                <div className="space-y-1">
+                                                                                                    <label className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Body</label>
+                                                                                                    <Textarea 
+                                                                                                        value={step.http_body || ''}
+                                                                                                        onChange={(e) => {
+                                                                                                            const ng = [...groups];
+                                                                                                            ng[gIdx]!.steps![sIdx].http_body = e.target.value;
+                                                                                                            setGroups(ng);
+                                                                                                        }}
+                                                                                                        placeholder='{"key": "value"}'
+                                                                                                        className="text-[10px] font-mono min-h-[60px] bg-background border-border"
+                                                                                                    />
+                                                                                                </div>
+                                                                                            </div>
+                                                                                            <div className="flex items-center justify-between pt-2 border-t border-border/50">
+                                                                                                <div className="flex items-center gap-2">
+                                                                                                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Format:</span>
+                                                                                                    <select
+                                                                                                        value={step.output_format || 'json'}
+                                                                                                        onChange={(e) => {
+                                                                                                            const ng = [...groups];
+                                                                                                            ng[gIdx]!.steps![sIdx].output_format = e.target.value as 'json' | 'string';
+                                                                                                            setGroups(ng);
+                                                                                                        }}
+                                                                                                        className="h-6 px-1 text-[10px] font-mono border border-border rounded bg-background text-foreground outline-none cursor-pointer"
+                                                                                                    >
+                                                                                                        <option value="json">JSON</option>
+                                                                                                        <option value="string">String</option>
+                                                                                                    </select>
+                                                                                                </div>
+                                                                                                <Button 
+                                                                                                    size="sm" 
+                                                                                                    className="h-7 text-[10px] px-4 font-bold bg-emerald-500 text-white hover:bg-emerald-600"
+                                                                                                    onClick={async () => {
+                                                                                                        const group = groups[gIdx];
+                                                                                                        const serverId = step.server_id || group.default_server_id;
+                                                                                                        if (!serverId) { alert("Please assign a default Server to the Group or to this Step to test HTTP."); return; }
+                                                                                                        try {
+                                                                                                            let h = {};
+                                                                                                            if (step.http_headers) { try { h = JSON.parse(step.http_headers); } catch(e) { } }
+                                                                                                            const res = await fetch(`${API_BASE_URL}/servers/${serverId}/test-http`, {
+                                                                                                                method: 'POST',
+                                                                                                                headers: {
+                                                                                                                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                                                                                                                    'Content-Type': 'application/json'
+                                                                                                                },
+                                                                                                                body: JSON.stringify({
+                                                                                                                    http_url: step.http_url,
+                                                                                                                    http_method: step.http_method,
+                                                                                                                    http_headers: h,
+                                                                                                                    http_body: step.http_body
+                                                                                                                })
+                                                                                                            });
+                                                                                                            const data = await res.json();
+                                                                                                            if (!res.ok) throw new Error(data.error || 'Test failed');
+                                                                                                            alert("Status: " + res.status + "\n\nResponse:\n" + data.output);
+                                                                                                        } catch(err: any) { alert(err.message); }
+                                                                                                    }}
+                                                                                                >
+                                                                                                    Test HTTP
+                                                                                                </Button>
+                                                                                            </div>
                                                                                         </div>
                                                                                     ) : (
                                                                                         <div className="space-y-2">

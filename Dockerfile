@@ -19,10 +19,24 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o main cmd/server/
 
 # Final Stage
 FROM ubuntu:22.04
+# Install base packages
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    ca-certificates tzdata bash git curl \
+    ca-certificates tzdata bash git curl unzip \
     && rm -rf /var/lib/apt/lists/*
 
+# Install AWS CLI v2
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
+    && unzip awscliv2.zip \
+    && ./aws/install \
+    && rm -rf awscliv2.zip aws
+
+# Install Session Manager Plugin
+RUN curl "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" -o "session-manager-plugin.deb" \
+    && apt-get update \
+    && apt-get install -y ./session-manager-plugin.deb \
+    && rm -f session-manager-plugin.deb
+
+# Git config
 RUN git config --global user.name "CSM Administrator" && \
     git config --global user.email "admin@csm.local" && \
     git config --global init.defaultBranch main && \

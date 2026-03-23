@@ -287,14 +287,14 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 	}
 
 	// Initialize containers for interpolation
-	groupResults := make(map[string]string)
+	flowData := make(map[string]interface{})
 	var inputsMap map[string]string
 	if execution.Inputs != "" {
 		json.Unmarshal([]byte(execution.Inputs), &inputsMap)
 	}
 
 	// 0. Execute BEFORE hooks
-	if err := e.RunHooks(ctx, wf.Hooks, domain.HookTypeBefore, wf.NamespaceID, logFile, depth, execution.User, execution.ID, fromExecutionID, inputsMap, wf.Variables, groupResults); err != nil {
+	if err := e.RunHooks(ctx, wf.Hooks, domain.HookTypeBefore, wf.NamespaceID, logFile, depth, execution.User, execution.ID, fromExecutionID, inputsMap, wf.Variables, flowData); err != nil {
 		runErr = fmt.Errorf("before hook failed: %w", err)
 		e.hub.BroadcastLog(workflowID.String(), execution.ID.String(), fmt.Sprintf("Error: %v", runErr))
 		goto finalize
@@ -332,7 +332,7 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 				}
 
 				// 2. Render
-				pcontext := e.getInterpolationContext(inputsMap, wf.Variables, groupResults, wf.NamespaceID, execution.User)
+				pcontext := e.getInterpolationContext(inputsMap, wf.Variables, flowData, wf.NamespaceID, execution.User)
 				rendered, err := e.renderTemplate(string(content), pcontext)
 				if err != nil {
 					runErr = fmt.Errorf("failed to substitute variables in %s: %w", f.FileName, err)
@@ -463,8 +463,13 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 				groupStartStepID = startStepID
 			}
 
-			err := e.runGroup(ctx, &g, inputsMap, wf.Variables, groupResults, groupDefaultServerID, logFile, workflowID, execution.ID, wf.NamespaceID, execution.User, workingDirs, groupStartStepID, fromExecutionID, oldStepDirs)
-			groupResults[wf.Groups[i].Key] = string(wf.Groups[i].Status)
+			err := e.runGroup(ctx, &g, inputsMap, wf.Variables, flowData, groupDefaultServerID, logFile, workflowID, execution.ID, wf.NamespaceID, execution.User, workingDirs, groupStartStepID, fromExecutionID, oldStepDirs)
+			if _, ok := flowData[wf.Groups[i].Key]; !ok {
+				flowData[wf.Groups[i].Key] = make(map[string]interface{})
+			}
+			if gm, ok := flowData[wf.Groups[i].Key].(map[string]interface{}); ok {
+				gm["status"] = string(wf.Groups[i].Status)
+			}
 			if err != nil {
 				runErr = err
 				break
@@ -511,7 +516,7 @@ finalize:
 			e.hub.BroadcastLog(wf.ID.String(), execution.ID.String(), fmt.Sprintf("\n\033[1;31m✖ WORKFLOW TIMED OUT (Exceeded %d minutes)\033[0m", wf.TimeoutMinutes))
 
 			// Execute AFTER_FAILED hooks
-			e.RunHooks(context.Background(), wf.Hooks, domain.HookTypeAfterFailed, wf.NamespaceID, logFile, depth, execution.User, execution.ID, fromExecutionID, inputsMap, wf.Variables, groupResults)
+			e.RunHooks(context.Background(), wf.Hooks, domain.HookTypeAfterFailed, wf.NamespaceID, logFile, depth, execution.User, execution.ID, fromExecutionID, inputsMap, wf.Variables, flowData)
 		} else {
 			// Actual failure
 			wf.Status = domain.StatusFailed
@@ -520,7 +525,7 @@ finalize:
 			e.hub.BroadcastLog(wf.ID.String(), execution.ID.String(), fmt.Sprintf("\n\033[1;31m✖ WORKFLOW FAILED: %v\033[0m", runErr))
 
 			// Execute AFTER_FAILED hooks
-			e.RunHooks(ctx, wf.Hooks, domain.HookTypeAfterFailed, wf.NamespaceID, logFile, depth, execution.User, execution.ID, fromExecutionID, inputsMap, wf.Variables, groupResults)
+			e.RunHooks(ctx, wf.Hooks, domain.HookTypeAfterFailed, wf.NamespaceID, logFile, depth, execution.User, execution.ID, fromExecutionID, inputsMap, wf.Variables, flowData)
 		}
 	} else {
 		wf.Status = domain.StatusSuccess
@@ -529,7 +534,7 @@ finalize:
 		e.hub.BroadcastLog(wf.ID.String(), execution.ID.String(), "\n\033[1;32m✔ WORKFLOW SUCCESS\033[0m")
 
 		// Execute AFTER_SUCCESS hooks
-		e.RunHooks(ctx, wf.Hooks, domain.HookTypeAfterSuccess, wf.NamespaceID, logFile, depth, execution.User, execution.ID, fromExecutionID, inputsMap, wf.Variables, groupResults)
+		e.RunHooks(ctx, wf.Hooks, domain.HookTypeAfterSuccess, wf.NamespaceID, logFile, depth, execution.User, execution.ID, fromExecutionID, inputsMap, wf.Variables, flowData)
 	}
 
 	e.execRepo.Update(execution)
@@ -540,7 +545,7 @@ finalize:
 	return runErr
 }
 
-func (e *WorkflowExecutor) RunHooks(ctx context.Context, hooks []domain.WorkflowHook, hookType domain.HookType, namespaceID uuid.UUID, logFile *os.File, depth int, user *domain.User, executionID uuid.UUID, fromExecutionID *uuid.UUID, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string) error {
+func (e *WorkflowExecutor) RunHooks(ctx context.Context, hooks []domain.WorkflowHook, hookType domain.HookType, namespaceID uuid.UUID, logFile *os.File, depth int, user *domain.User, executionID uuid.UUID, fromExecutionID *uuid.UUID, inputs map[string]string, variables []domain.WorkflowVariable, flowData map[string]interface{}) error {
 	for _, hook := range hooks {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -562,7 +567,7 @@ func (e *WorkflowExecutor) RunHooks(ctx context.Context, hooks []domain.Workflow
 		}
 
 		// Substitute variables in hook inputs
-		pcontext := e.getInterpolationContext(inputs, variables, groupResults, namespaceID, user)
+		pcontext := e.getInterpolationContext(inputs, variables, flowData, namespaceID, user)
 
 		resolvedInputs := make(map[string]string)
 		for k, v := range hookInputs {
@@ -700,12 +705,12 @@ func (e *WorkflowExecutor) validateInputs(wf *domain.Workflow, provided map[stri
 	return nil
 }
 
-func (e *WorkflowExecutor) evaluateCondition(condition string, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, namespaceID uuid.UUID, user *domain.User) (bool, error) {
+func (e *WorkflowExecutor) evaluateCondition(condition string, inputs map[string]string, variables []domain.WorkflowVariable, flowData map[string]interface{}, namespaceID uuid.UUID, user *domain.User) (bool, error) {
 	if strings.TrimSpace(condition) == "" {
 		return true, nil // Empty condition = always run
 	}
 
-	pcontext := e.getInterpolationContext(inputs, variables, groupResults, namespaceID, user)
+	pcontext := e.getInterpolationContext(inputs, variables, flowData, namespaceID, user)
 
 	// Wrap the condition in an if block to evaluate it as a boolean expression
 	// We use a unique marker to detect if the block was executed and the result
@@ -719,9 +724,9 @@ func (e *WorkflowExecutor) evaluateCondition(condition string, inputs map[string
 	return strings.TrimSpace(rendered) == "TRUE", nil
 }
 
-func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowGroup, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, defaultServerID uuid.UUID, logFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, namespaceID uuid.UUID, user *domain.User, workingDirs *sync.Map, startStepID, fromExecutionID *uuid.UUID, oldStepDirs map[uuid.UUID]string) error {
+func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowGroup, inputs map[string]string, variables []domain.WorkflowVariable, flowData map[string]interface{}, defaultServerID uuid.UUID, logFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, namespaceID uuid.UUID, user *domain.User, workingDirs *sync.Map, startStepID, fromExecutionID *uuid.UUID, oldStepDirs map[uuid.UUID]string) error {
 	// Evaluate condition before running
-	if shouldRun, err := e.evaluateCondition(group.Condition, inputs, variables, groupResults, namespaceID, user); err != nil {
+	if shouldRun, err := e.evaluateCondition(group.Condition, inputs, variables, flowData, namespaceID, user); err != nil {
 		errStr := fmt.Sprintf("\n\033[1;31m✖ GROUP CONDITION ERROR: %s\033[0m\n\033[31mCondition: %s\nError: %v\033[0m\n", group.Name, group.Condition, err)
 		fmt.Fprint(logFile, errStr)
 		e.hub.BroadcastLog(workflowID.String(), executionID.String(), errStr)
@@ -781,7 +786,7 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 		e.groupRepo.UpdateStatus(group.ID, domain.StatusRunning)
 		e.hub.BroadcastStatus(group.ID.String(), executionID.String(), "group", string(domain.StatusRunning))
 
-		lastErr = e.runGroupAttempt(ctx, group, inputs, variables, groupResults, effectiveServerID, logFile, workflowID, executionID, namespaceID, user, workingDirs, startStepID, fromExecutionID, oldStepDirs)
+		lastErr = e.runGroupAttempt(ctx, group, inputs, variables, flowData, effectiveServerID, logFile, workflowID, executionID, namespaceID, user, workingDirs, startStepID, fromExecutionID, oldStepDirs)
 
 		if lastErr == nil {
 			group.Status = domain.StatusSuccess
@@ -821,7 +826,7 @@ func (e *WorkflowExecutor) runGroup(ctx context.Context, group *domain.WorkflowG
 	return nil
 }
 
-func (e *WorkflowExecutor) runGroupAttempt(ctx context.Context, group *domain.WorkflowGroup, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, effectiveServerID uuid.UUID, logFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, namespaceID uuid.UUID, user *domain.User, workingDirs *sync.Map, startStepID, fromExecutionID *uuid.UUID, oldStepDirs map[uuid.UUID]string) error {
+func (e *WorkflowExecutor) runGroupAttempt(ctx context.Context, group *domain.WorkflowGroup, inputs map[string]string, variables []domain.WorkflowVariable, flowData map[string]interface{}, effectiveServerID uuid.UUID, logFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, namespaceID uuid.UUID, user *domain.User, workingDirs *sync.Map, startStepID, fromExecutionID *uuid.UUID, oldStepDirs map[uuid.UUID]string) error {
 	if group.IsParallel {
 		// Parralel groups don't support partial reruns from steps as easily, usually it's better to rerun the whole group
 		// For simplicity, if a startStepID is provided in a parallel group, we just run all steps (or we could filter, but let's stick to simple logic)
@@ -832,7 +837,7 @@ func (e *WorkflowExecutor) runGroupAttempt(ctx context.Context, group *domain.Wo
 			wg.Add(1)
 			go func(step *domain.WorkflowStep) {
 				defer wg.Done()
-				if err := e.runStep(ctx, step, inputs, variables, groupResults, effectiveServerID, logFile, workflowID, executionID, namespaceID, user, workingDirs, fromExecutionID, group.ID, group.Name); err != nil {
+				if err := e.runStep(ctx, step, inputs, variables, flowData, effectiveServerID, logFile, workflowID, executionID, namespaceID, user, workingDirs, fromExecutionID, group.ID, group.Name, group.Key); err != nil {
 					errs <- err
 				}
 			}(&group.Steps[i])
@@ -882,7 +887,7 @@ func (e *WorkflowExecutor) runGroupAttempt(ctx context.Context, group *domain.Wo
 				continue
 			}
 
-			if err := e.runStep(ctx, step, inputs, variables, groupResults, effectiveServerID, logFile, workflowID, executionID, namespaceID, user, workingDirs, fromExecutionID, group.ID, group.Name); err != nil {
+			if err := e.runStep(ctx, step, inputs, variables, flowData, effectiveServerID, logFile, workflowID, executionID, namespaceID, user, workingDirs, fromExecutionID, group.ID, group.Name, group.Key); err != nil {
 				return err
 			}
 			// Sequential Step Delay: 200ms gap between steps to prevent race conditions
@@ -899,7 +904,7 @@ func (e *WorkflowExecutor) runGroupAttempt(ctx context.Context, group *domain.Wo
 		e.hub.BroadcastLog(workflowID.String(), executionID.String(), msg)
 
 		if group.CopySourcePath != "" && group.CopyTargetPath != "" {
-			if err := e.relayCopy(ctx, group, inputs, variables, groupResults, namespaceID, effectiveServerID, logFile, workflowID, executionID, user); err != nil {
+			if err := e.relayCopy(ctx, group, inputs, variables, flowData, namespaceID, effectiveServerID, logFile, workflowID, executionID, user); err != nil {
 				return fmt.Errorf("relay copy failed: %w", err)
 			}
 		} else {
@@ -916,13 +921,13 @@ func (e *WorkflowExecutor) runGroupAttempt(ctx context.Context, group *domain.Wo
 	return nil
 }
 
-func (e *WorkflowExecutor) relayCopy(ctx context.Context, group *domain.WorkflowGroup, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, namespaceID uuid.UUID, sourceServerID uuid.UUID, logFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, user *domain.User) error {
+func (e *WorkflowExecutor) relayCopy(ctx context.Context, group *domain.WorkflowGroup, inputs map[string]string, variables []domain.WorkflowVariable, flowData map[string]interface{}, namespaceID uuid.UUID, sourceServerID uuid.UUID, logFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, user *domain.User) error {
 	sourcePath := filepath.Clean(group.CopySourcePath)
 	targetPath := filepath.Clean(group.CopyTargetPath)
 
 	// Perform variable substitution
 	substitute := func(val string) (string, error) {
-		pcontext := e.getInterpolationContext(inputs, variables, groupResults, namespaceID, user)
+		pcontext := e.getInterpolationContext(inputs, variables, flowData, namespaceID, user)
 		return e.renderTemplate(val, pcontext)
 	}
 
@@ -990,7 +995,7 @@ func (e *WorkflowExecutor) relayCopy(ctx context.Context, group *domain.Workflow
 	return nil
 }
 
-func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowStep, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, defaultServerID uuid.UUID, mainLogFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, namespaceID uuid.UUID, user *domain.User, workingDirs *sync.Map, fromExecutionID *uuid.UUID, groupID uuid.UUID, groupName string) error {
+func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowStep, inputs map[string]string, variables []domain.WorkflowVariable, flowData map[string]interface{}, defaultServerID uuid.UUID, mainLogFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, namespaceID uuid.UUID, user *domain.User, workingDirs *sync.Map, fromExecutionID *uuid.UUID, groupID uuid.UUID, groupName string, groupKey string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -1027,8 +1032,33 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 
 	// Dispatch based on action type
 	if step.ActionType == "WORKFLOW" {
-		output, err = e.runWorkflowStep(ctx, step, inputs, variables, groupResults, namespaceID, mainLogFile, stepLogFile, workflowID, executionID, user, fromExecutionID)
+		output, err = e.runWorkflowStep(ctx, step, inputs, variables, flowData, namespaceID, mainLogFile, stepLogFile, workflowID, executionID, user, fromExecutionID)
 	} else {
+		if step.ActionType == "HTTP" {
+			pcontext := e.getInterpolationContext(inputs, variables, flowData, namespaceID, user)
+			url, _ := e.renderTemplate(step.HttpUrl, pcontext)
+			method, _ := e.renderTemplate(step.HttpMethod, pcontext)
+			body, _ := e.renderTemplate(step.HttpBody, pcontext)
+			headersStr, _ := e.renderTemplate(step.HttpHeaders, pcontext)
+
+			if method == "" {
+				method = "GET"
+			}
+			var headers map[string]string
+			if headersStr != "" {
+				json.Unmarshal([]byte(headersStr), &headers)
+			}
+			curlCmd := fmt.Sprintf("curl -s -X %s", strconv.Quote(method))
+			for k, v := range headers {
+				curlCmd += fmt.Sprintf(" -H %s", strconv.Quote(fmt.Sprintf("%s: %s", k, v)))
+			}
+			if body != "" {
+				curlCmd += fmt.Sprintf(" -d %s", strconv.Quote(body))
+			}
+			curlCmd += fmt.Sprintf(" %s", strconv.Quote(url))
+			step.CommandText = curlCmd
+		}
+
 		// Default: COMMAND action type
 		if step.CommandText == "" {
 			emptyMsg := "\033[90m(No command to execute)\033[0m\n"
@@ -1039,7 +1069,7 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 		}
 
 		// 1. Resolve variables using Pongo2
-		pcontext := e.getInterpolationContext(inputs, variables, groupResults, namespaceID, user)
+		pcontext := e.getInterpolationContext(inputs, variables, flowData, namespaceID, user)
 		command, renderErr := e.renderTemplate(step.CommandText, pcontext)
 		if renderErr != nil {
 			errMsg := fmt.Sprintf("\033[1;31m✖ Interpolation error: %v\033[0m\n", renderErr)
@@ -1098,6 +1128,28 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 		}
 	}
 
+	if err == nil && step.ActionKey != "" && groupKey != "" {
+		if _, ok := flowData[groupKey]; !ok {
+			flowData[groupKey] = make(map[string]interface{})
+		}
+		if gm, ok := flowData[groupKey].(map[string]interface{}); ok {
+			if _, ok := gm["step"]; !ok {
+				gm["step"] = make(map[string]interface{})
+			}
+			if sm, ok := gm["step"].(map[string]interface{}); ok {
+				var parsed interface{}
+				if step.OutputFormat == "json" {
+					if uerr := json.Unmarshal([]byte(output), &parsed); uerr != nil {
+						parsed = output
+					}
+				} else {
+					parsed = output
+				}
+				sm[step.ActionKey] = parsed
+			}
+		}
+	}
+
 	if err != nil {
 		if ctx.Err() != nil {
 			e.hub.BroadcastStatus(step.ID.String(), executionID.String(), "step", string(domain.StatusCancelled))
@@ -1133,7 +1185,7 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 
 // runWorkflowStep handles a step of action_type=WORKFLOW, running a target workflow either
 // synchronously (WaitToFinish=true) or asynchronously as a spawned goroutine.
-func (e *WorkflowExecutor) runWorkflowStep(ctx context.Context, step *domain.WorkflowStep, inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, namespaceID uuid.UUID, mainLogFile *os.File, stepLogFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, user *domain.User, fromExecutionID *uuid.UUID) (string, error) {
+func (e *WorkflowExecutor) runWorkflowStep(ctx context.Context, step *domain.WorkflowStep, inputs map[string]string, variables []domain.WorkflowVariable, flowData map[string]interface{}, namespaceID uuid.UUID, mainLogFile *os.File, stepLogFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, user *domain.User, fromExecutionID *uuid.UUID) (string, error) {
 	if step.TargetWorkflowID == nil {
 		return "", fmt.Errorf("step %q has action_type=WORKFLOW but no target_workflow_id set", step.Name)
 	}
@@ -1153,7 +1205,7 @@ func (e *WorkflowExecutor) runWorkflowStep(ctx context.Context, step *domain.Wor
 	}
 
 	// Interpolate each input value through the current workflow context
-	pcontext := e.getInterpolationContext(inputs, variables, groupResults, namespaceID, user)
+	pcontext := e.getInterpolationContext(inputs, variables, flowData, namespaceID, user)
 	resolvedInputs := make(map[string]string)
 
 	// 1. First, populate with target workflow default values
@@ -1489,7 +1541,7 @@ func (e *WorkflowExecutor) renderTemplate(templateStr string, ctx pongo2.Context
 	return tpl.Execute(ctx)
 }
 
-func (e *WorkflowExecutor) getInterpolationContext(inputs map[string]string, variables []domain.WorkflowVariable, groupResults map[string]string, namespaceID uuid.UUID, user *domain.User) pongo2.Context {
+func (e *WorkflowExecutor) getInterpolationContext(inputs map[string]string, variables []domain.WorkflowVariable, flowData map[string]interface{}, namespaceID uuid.UUID, user *domain.User) pongo2.Context {
 	ctx := make(pongo2.Context)
 
 	// 1. Global Variables: global.key
@@ -1540,14 +1592,8 @@ func (e *WorkflowExecutor) getInterpolationContext(inputs map[string]string, var
 	}
 	ctx["input"] = in
 
-	// 4. Step/Group Status: step.key.status
-	steps := make(map[string]interface{})
-	for k, v := range groupResults {
-		if v == "" || SecurityRegex.MatchString(v) {
-			steps[k] = map[string]string{"status": v}
-		}
-	}
-	ctx["step"] = steps
+	// 4. Step/Group Status: flow.group_key.status and flow.group_key.step.action_key
+	ctx["flow"] = flowData
 
 	return ctx
 }

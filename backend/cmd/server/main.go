@@ -236,6 +236,7 @@ func main() {
 			protected.PUT("/servers/:id", middleware.RBACMiddleware(db, userRepo, "servers", "WRITE"), serverHandler.UpdateServer)
 			protected.DELETE("/servers/:id", middleware.RBACMiddleware(db, userRepo, "servers", "DELETE"), serverHandler.DeleteServer)
 			protected.POST("/servers/:id/execute", middleware.RBACMiddleware(db, userRepo, "servers", "EXECUTE"), serverHandler.ExecuteCommand)
+			protected.POST("/servers/:id/test-http", middleware.RBACMiddleware(db, userRepo, "servers", "EXECUTE"), serverHandler.TestHttp)
 			protected.POST("/servers/:id/terminal", middleware.RBACMiddleware(db, userRepo, "servers", "EXECUTE"), serverHandler.StartTerminalSession)
 			protected.GET("/servers/:id/metrics", middleware.RBACMiddleware(db, userRepo, "servers", "READ"), serverHandler.GetServerMetrics)
 

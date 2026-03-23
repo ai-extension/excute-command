@@ -319,8 +319,14 @@ type WorkflowStep struct {
 	GroupID              uuid.UUID  `json:"group_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
 	ServerID             uuid.UUID  `json:"server_id,omitempty" gorm:"type:uuid;index"` // Optional: If empty, run locally
 	Name                 string     `json:"name" gorm:"not null"`
-	ActionType           string     `json:"action_type" gorm:"not null;default:'COMMAND'"` // COMMAND or WORKFLOW
+	ActionType           string     `json:"action_type" gorm:"not null;default:'COMMAND'"` // COMMAND, WORKFLOW, or HTTP
+	ActionKey            string     `json:"action_key" gorm:"default:''"`
 	CommandText          string     `json:"command_text"`
+	HttpUrl              string     `json:"http_url" gorm:"default:''"`
+	HttpMethod           string     `json:"http_method" gorm:"default:'GET'"`
+	HttpHeaders          string     `json:"http_headers" gorm:"default:'{}'"` // JSON string map[string]string
+	HttpBody             string     `json:"http_body" gorm:"default:''"`
+	OutputFormat         string     `json:"output_format" gorm:"default:'json'"` // json or string
 	TargetWorkflowID     *uuid.UUID `json:"target_workflow_id,omitempty" gorm:"type:uuid;index"`
 	TargetWorkflowInputs string     `json:"target_workflow_inputs,omitempty"` // JSON string of inputs for the target workflow
 	WaitToFinish         *bool      `json:"wait_to_finish" gorm:"default:true"`

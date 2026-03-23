@@ -45,8 +45,14 @@ export interface WorkflowStep {
     group_id: string;
     server_id?: string;
     name: string;
-    action_type: 'COMMAND' | 'WORKFLOW';
+    action_type: 'COMMAND' | 'WORKFLOW' | 'HTTP';
+    action_key?: string;
     command_text: string;
+    http_url?: string;
+    http_method?: string;
+    http_headers?: string;
+    http_body?: string;
+    output_format?: 'json' | 'string';
     target_workflow_id?: string;
     target_workflow_inputs?: string; // JSON string
     wait_to_finish: boolean;

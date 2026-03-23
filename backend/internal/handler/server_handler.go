@@ -202,6 +202,51 @@ func (h *ServerHandler) ExecuteCommand(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"output": output})
 }
 
+func (h *ServerHandler) TestHttp(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	var req struct {
+		HttpUrl     string            `json:"http_url"`
+		HttpMethod  string            `json:"http_method"`
+		HttpHeaders map[string]string `json:"http_headers"`
+		HttpBody    string            `json:"http_body"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	method := req.HttpMethod
+	if method == "" {
+		method = "GET"
+	}
+	curlCmd := "curl -s -X " + strconv.Quote(method)
+	for k, v := range req.HttpHeaders {
+		curlCmd += " -H " + strconv.Quote(k+": "+v)
+	}
+	if req.HttpBody != "" {
+		curlCmd += " -d " + strconv.Quote(req.HttpBody)
+	}
+	curlCmd += " " + strconv.Quote(req.HttpUrl)
+
+	user, _ := c.Get("user")
+	resID := id.String()
+	output, err := h.service.ExecuteCommand(c.Request.Context(), id, curlCmd, user.(*domain.User))
+	if err != nil {
+		h.auditLog.LogAction(c, "TEST_HTTP", "SERVER", resID, map[string]string{"url": req.HttpUrl, "error": err.Error()}, "FAILED")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "output": output})
+		return
+	}
+
+	h.auditLog.LogAction(c, "TEST_HTTP", "SERVER", resID, map[string]string{"url": req.HttpUrl}, "SUCCESS")
+	c.JSON(http.StatusOK, gin.H{"output": output})
+}
+
 func (h *ServerHandler) StartTerminalSession(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
