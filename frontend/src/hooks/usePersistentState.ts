@@ -14,7 +14,11 @@ export function usePersistentState<T>(key: string, initialValue: T) {
         }
         try {
             const item = window.localStorage.getItem(key);
-            return item ? JSON.parse(item) : initialValue;
+            // Check for null or the string "undefined" which causes JSON.parse to fail
+            if (item === null || item === "undefined") {
+                return initialValue;
+            }
+            return JSON.parse(item);
         } catch (error) {
             console.error(`Error reading localStorage key "${key}":`, error);
             return initialValue;
@@ -34,7 +38,11 @@ export function usePersistentState<T>(key: string, initialValue: T) {
 
             // Save to local storage
             if (typeof window !== "undefined") {
-                window.localStorage.setItem(key, JSON.stringify(valueToStore));
+                if (valueToStore === undefined) {
+                    window.localStorage.removeItem(key);
+                } else {
+                    window.localStorage.setItem(key, JSON.stringify(valueToStore));
+                }
             }
         } catch (error) {
             console.error(`Error setting localStorage key "${key}":`, error);

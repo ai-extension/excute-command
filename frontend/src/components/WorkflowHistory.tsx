@@ -20,7 +20,8 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import {
     Dialog,
-    DialogContent
+    DialogContent,
+    DialogTitle
 } from './ui/dialog';
 import { WorkflowExecution } from '../types';
 import { format } from 'date-fns';
@@ -442,6 +443,7 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
 
             <Dialog open={!!selectedExec} onOpenChange={(open: boolean) => !open && setSelectedExec(null)}>
                 <DialogContent hideClose className="max-w-5xl w-[90vw] h-[85vh] p-0 overflow-hidden bg-slate-950 border-white/10">
+                    <DialogTitle className="sr-only">Execution Detail</DialogTitle>
                     {loadingDetail ? (
                         <div className="h-full flex items-center justify-center">
                             <Loader2 className="w-8 h-8 animate-spin text-primary" />

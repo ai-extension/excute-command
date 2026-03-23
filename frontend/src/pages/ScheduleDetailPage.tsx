@@ -16,6 +16,7 @@ import { format } from 'date-fns';
 import {
     Dialog,
     DialogContent,
+    DialogTitle,
 } from '../components/ui/dialog';
 import ExecutionMonitor from '../components/ExecutionMonitor';
 import WorkflowRunner from '../components/WorkflowRunner';
@@ -314,6 +315,7 @@ const ScheduleDetailPage = () => {
 
                     <Dialog open={!!selectedExec} onOpenChange={(open) => !open && setSelectedExec(null)}>
                         <DialogContent className="max-w-5xl w-[90vw] h-[85vh] p-0 overflow-hidden bg-slate-950 border-white/10">
+                            <DialogTitle className="sr-only">Execution Detail</DialogTitle>
                             {loadingDetail ? (
                                 <div className="h-full flex items-center justify-center">
                                     <Loader2 className="w-8 h-8 animate-spin text-primary" />

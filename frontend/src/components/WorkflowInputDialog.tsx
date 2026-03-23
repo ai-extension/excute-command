@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { WorkflowInput, MultiInputItem } from '../types';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Dialog, DialogContent, DialogFooter } from './ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogTitle } from './ui/dialog';
 import { Zap, Plus, Trash2, Search } from 'lucide-react';
 
 interface WorkflowInputDialogProps {
@@ -160,6 +160,7 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent hideClose className="max-w-lg w-[95vw] bg-popover border-border border-2 rounded-2xl p-0 overflow-hidden shadow-2xl flex flex-col">
+                <DialogTitle className="sr-only">Workflow Input</DialogTitle>
                 <form onSubmit={handleSubmit} className="flex-1 p-6 space-y-5 overflow-y-auto max-h-[60vh] custom-scrollbar">
                     {inputs.map((input) => (
                         <div key={input.id} className="space-y-2 group">

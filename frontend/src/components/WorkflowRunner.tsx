@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../lib/api';
 import { Workflow, WorkflowInput } from '../types';
-import { Dialog, DialogContent } from "./ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
 import WorkflowMonitor from './WorkflowMonitor';
 import WorkflowInputDialog from './WorkflowInputDialog';
 
@@ -103,6 +103,7 @@ export const WorkflowRunner: React.FC<WorkflowRunnerProps> = ({ children, onRunC
             {/* Workflow Monitor Dialog */}
             <Dialog open={isMonitorOpen} onOpenChange={setIsMonitorOpen}>
                 <DialogContent hideClose className="max-w-5xl w-[90vw] h-[85vh] bg-[#0a0b0e] border-[#1a1c23] border-2 rounded-2xl p-0 overflow-hidden shadow-2xl flex flex-col focus:outline-none">
+                    <DialogTitle className="sr-only">Workflow Monitor</DialogTitle>
                     {runningWorkflow && (
                         <WorkflowMonitor
                             key={runKey}
