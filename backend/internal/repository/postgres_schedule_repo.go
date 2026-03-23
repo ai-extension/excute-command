@@ -4,6 +4,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/user/csm-backend/internal/domain"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type PostgresScheduleRepo struct {
@@ -145,7 +146,7 @@ func (r *PostgresScheduleRepo) Update(s *domain.Schedule) error {
 		// Sync ScheduledWorkflows
 		if s.ScheduledWorkflows != nil {
 			for i := range s.ScheduledWorkflows {
-				if err := tx.Save(&s.ScheduledWorkflows[i]).Error; err != nil {
+				if err := tx.Omit(clause.Associations).Save(&s.ScheduledWorkflows[i]).Error; err != nil {
 					return err
 				}
 			}
@@ -168,7 +169,7 @@ func (r *PostgresScheduleRepo) Update(s *domain.Schedule) error {
 			}
 		}
 
-		return tx.Omit("Tags", "ScheduledWorkflows", "Hooks").Save(s).Error
+		return tx.Omit(clause.Associations).Save(s).Error
 	})
 }
 

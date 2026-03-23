@@ -28,8 +28,15 @@ func (c *LocalConnection) Execute(ctx context.Context, command string, writers .
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	var stdout, stderr bytes.Buffer
-	stdoutWriters := append([]io.Writer{&stdout}, writers...)
-	stderrWriters := append([]io.Writer{&stderr}, writers...)
+	var filteredWriters []io.Writer
+	for _, w := range writers {
+		if w != nil {
+			filteredWriters = append(filteredWriters, w)
+		}
+	}
+
+	stdoutWriters := append([]io.Writer{&stdout}, filteredWriters...)
+	stderrWriters := append([]io.Writer{&stderr}, filteredWriters...)
 
 	cmd.Stdout = io.MultiWriter(stdoutWriters...)
 	cmd.Stderr = io.MultiWriter(stderrWriters...)

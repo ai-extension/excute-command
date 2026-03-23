@@ -207,7 +207,7 @@ func (r *PostgresWorkflowRepo) Update(wf *domain.Workflow) error {
 			// Step 1: Upsert each group first to ensure it exists in the DB before touching steps.
 			for i := range wf.Groups {
 				wf.Groups[i].WorkflowID = wf.ID
-				if err := tx.Omit("Steps").Save(&wf.Groups[i]).Error; err != nil {
+				if err := tx.Omit(clause.Associations).Save(&wf.Groups[i]).Error; err != nil {
 					return err
 				}
 			}
@@ -219,7 +219,7 @@ func (r *PostgresWorkflowRepo) Update(wf *domain.Workflow) error {
 						wf.Groups[i].Steps[j].ID = uuid.New()
 					}
 					wf.Groups[i].Steps[j].GroupID = wf.Groups[i].ID
-					if err := tx.Save(&wf.Groups[i].Steps[j]).Error; err != nil {
+					if err := tx.Omit(clause.Associations).Save(&wf.Groups[i].Steps[j]).Error; err != nil {
 						return err
 					}
 				}
@@ -242,7 +242,7 @@ func (r *PostgresWorkflowRepo) Update(wf *domain.Workflow) error {
 					wf.Hooks[i].ID = uuid.New()
 				}
 				wf.Hooks[i].WorkflowID = &wf.ID
-				if err := tx.Save(&wf.Hooks[i]).Error; err != nil {
+				if err := tx.Omit(clause.Associations).Save(&wf.Hooks[i]).Error; err != nil {
 					return err
 				}
 			}
@@ -265,7 +265,7 @@ func (r *PostgresWorkflowRepo) Update(wf *domain.Workflow) error {
 					wf.Files[i].ID = uuid.New()
 				}
 				wf.Files[i].WorkflowID = wf.ID
-				if err := tx.Save(&wf.Files[i]).Error; err != nil {
+				if err := tx.Omit(clause.Associations).Save(&wf.Files[i]).Error; err != nil {
 					return err
 				}
 			}
@@ -275,7 +275,7 @@ func (r *PostgresWorkflowRepo) Update(wf *domain.Workflow) error {
 		}
 
 		// Update top-level fields (omit associations to avoid double-processing)
-		return tx.Omit("Groups", "Inputs", "Variables", "Tags", "Hooks", "Files").Save(wf).Error
+		return tx.Omit(clause.Associations).Save(wf).Error
 	})
 }
 

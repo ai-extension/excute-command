@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/user/csm-backend/internal/domain"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type PostgresPageRepo struct {
@@ -137,7 +138,7 @@ func (r *PostgresPageRepo) Update(page *domain.Page) error {
 		// Sync Workflows
 		if page.Workflows != nil {
 			for i := range page.Workflows {
-				if err := tx.Save(&page.Workflows[i]).Error; err != nil {
+				if err := tx.Omit(clause.Associations).Save(&page.Workflows[i]).Error; err != nil {
 					return err
 				}
 			}
@@ -147,7 +148,7 @@ func (r *PostgresPageRepo) Update(page *domain.Page) error {
 		}
 
 		// Update top-level fields
-		return tx.Omit("Workflows", "Tags").Save(page).Error
+		return tx.Omit(clause.Associations).Save(page).Error
 	})
 }
 

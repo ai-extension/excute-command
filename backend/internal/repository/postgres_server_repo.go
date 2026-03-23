@@ -5,6 +5,7 @@ import (
 	"github.com/user/csm-backend/internal/domain"
 	"github.com/user/csm-backend/pkg/crypto"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type PostgresServerRepo struct {
@@ -133,7 +134,7 @@ func (r *PostgresServerRepo) Update(server *domain.Server) error {
 			server.PrivateKey = enc
 		}
 	}
-	return r.db.Save(server).Error
+	return r.db.Omit(clause.Associations).Save(server).Error
 }
 
 func (r *PostgresServerRepo) Delete(id uuid.UUID) error {

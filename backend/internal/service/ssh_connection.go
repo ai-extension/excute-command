@@ -36,8 +36,15 @@ func (c *SSHConnection) Execute(ctx context.Context, command string, writers ...
 	defer session.Close()
 
 	var stdout, stderr bytes.Buffer
-	stdoutWriters := append([]io.Writer{&stdout}, writers...)
-	stderrWriters := append([]io.Writer{&stderr}, writers...)
+	var filteredWriters []io.Writer
+	for _, w := range writers {
+		if w != nil {
+			filteredWriters = append(filteredWriters, w)
+		}
+	}
+
+	stdoutWriters := append([]io.Writer{&stdout}, filteredWriters...)
+	stderrWriters := append([]io.Writer{&stderr}, filteredWriters...)
 
 	session.Stdout = io.MultiWriter(stdoutWriters...)
 	session.Stderr = io.MultiWriter(stderrWriters...)
