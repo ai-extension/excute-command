@@ -150,7 +150,7 @@ func main() {
 	permHandler := handler.NewPermissionHandler(permRepo, workflowRepo, globalVarRepo, scheduleRepo, pageRepo, tagRepo, serverRepo, namespaceRepo, execRepo, userRepo, roleRepo, vpnRepo, auditLogService)
 	serverHandler := handler.NewServerHandler(serverService, terminalService, auditLogService)
 	wsHandler := handler.NewWSHandler(hub, terminalService, authService, pageService, workflowService)
-	workflowHandler := handler.NewWorkflowHandler(workflowService, workflowExecutor, auditLogService)
+	workflowHandler := handler.NewWorkflowHandler(workflowService, workflowExecutor, serverService, auditLogService)
 	globalVarHandler := handler.NewGlobalVariableHandler(globalVarService, auditLogService)
 	scheduleHandler := handler.NewScheduleHandler(scheduleService, auditLogService)
 	tagHandler := handler.NewTagHandler(tagService, auditLogService)
@@ -236,7 +236,8 @@ func main() {
 			protected.PUT("/servers/:id", middleware.RBACMiddleware(db, userRepo, "servers", "WRITE"), serverHandler.UpdateServer)
 			protected.DELETE("/servers/:id", middleware.RBACMiddleware(db, userRepo, "servers", "DELETE"), serverHandler.DeleteServer)
 			protected.POST("/servers/:id/execute", middleware.RBACMiddleware(db, userRepo, "servers", "EXECUTE"), serverHandler.ExecuteCommand)
-			protected.POST("/servers/:id/test-http", middleware.RBACMiddleware(db, userRepo, "servers", "EXECUTE"), serverHandler.TestHttp)
+			// Deprecated: use /api/workflows/:id/test-http
+			// protected.POST("/servers/:id/test-http", middleware.RBACMiddleware(db, userRepo, "servers", "EXECUTE"), serverHandler.TestHttp)
 			protected.POST("/servers/:id/terminal", middleware.RBACMiddleware(db, userRepo, "servers", "EXECUTE"), serverHandler.StartTerminalSession)
 			protected.GET("/servers/:id/metrics", middleware.RBACMiddleware(db, userRepo, "servers", "READ"), serverHandler.GetServerMetrics)
 
@@ -249,6 +250,7 @@ func main() {
 
 			protected.GET("/workflows/:id", middleware.RBACMiddleware(db, userRepo, "workflows", "READ"), workflowHandler.GetWorkflow)
 			protected.PUT("/workflows/:id", middleware.RBACMiddleware(db, userRepo, "workflows", "WRITE"), workflowHandler.UpdateWorkflow)
+			protected.POST("/workflows/:id/test-http", middleware.RBACMiddleware(db, userRepo, "workflows", "WRITE"), middleware.RBACMiddleware(db, userRepo, "workflows", "EXECUTE"), workflowHandler.TestHttp)
 			protected.POST("/workflows/:id/run", middleware.RBACMiddleware(db, userRepo, "workflows", "EXECUTE"), workflowHandler.RunWorkflow)
 			protected.POST("/workflows/:id/clone", middleware.RBACMiddleware(db, userRepo, "workflows", "WRITE"), workflowHandler.CloneWorkflow)
 			protected.DELETE("/workflows/:id", middleware.RBACMiddleware(db, userRepo, "workflows", "DELETE"), workflowHandler.DeleteWorkflow)

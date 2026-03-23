@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -225,18 +226,14 @@ func (h *ServerHandler) TestHttp(c *gin.Context) {
 	if method == "" {
 		method = "GET"
 	}
-	curlCmd := "curl -s -X " + strconv.Quote(method)
-	for k, v := range req.HttpHeaders {
-		curlCmd += " -H " + strconv.Quote(k+": "+v)
-	}
-	if req.HttpBody != "" {
-		curlCmd += " -d " + strconv.Quote(req.HttpBody)
-	}
-	curlCmd += " " + strconv.Quote(req.HttpUrl)
-
-	user, _ := c.Get("user")
+	userVal, _ := c.Get("user")
+	user := userVal.(*domain.User)
 	resID := id.String()
-	output, err := h.service.ExecuteCommand(c.Request.Context(), id, curlCmd, user.(*domain.User))
+
+	// Convert headers map to JSON string for ExecuteHttp
+	headersJSON, _ := json.Marshal(req.HttpHeaders)
+	
+	output, err := h.service.ExecuteHttp(c.Request.Context(), id, method, req.HttpUrl, req.HttpBody, string(headersJSON), user, nil)
 	if err != nil {
 		h.auditLog.LogAction(c, "TEST_HTTP", "SERVER", resID, map[string]string{"url": req.HttpUrl, "error": err.Error()}, "FAILED")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "output": output})

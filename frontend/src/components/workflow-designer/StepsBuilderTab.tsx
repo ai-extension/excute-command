@@ -19,6 +19,7 @@ import {
 
 import { WorkflowGroup, WorkflowStep, Server as ServerType, Workflow } from '../../types';
 import { API_BASE_URL } from '../../lib/api';
+import { useAuth } from '../../context/AuthContext';
 
 interface StepsBuilderTabProps {
     groups: Partial<WorkflowGroup>[];
@@ -41,6 +42,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
     id
 }) => {
     const [openSettingsGroupIdx, setOpenSettingsGroupIdx] = useState<number | null>(null);
+    const { apiFetch } = useAuth();
 
     const parentWf = allWorkflows.find(w => w.id === id);
     const parentInputs = parentWf?.inputs || [];
@@ -699,22 +701,18 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                     className="h-7 text-[10px] px-4 font-bold bg-emerald-500 text-white hover:bg-emerald-600"
                                                                                                     onClick={async () => {
                                                                                                         const group = groups[gIdx];
-                                                                                                        const serverId = step.server_id || group.default_server_id;
-                                                                                                        if (!serverId) { alert("Please assign a default Server to the Group or to this Step to test HTTP."); return; }
                                                                                                         try {
                                                                                                             let h = {};
                                                                                                             if (step.http_headers) { try { h = JSON.parse(step.http_headers); } catch(e) { } }
-                                                                                                            const res = await fetch(`${API_BASE_URL}/servers/${serverId}/test-http`, {
+                                                                                                            const res = await apiFetch(`${API_BASE_URL}/workflows/${id}/test-http`, {
                                                                                                                 method: 'POST',
-                                                                                                                headers: {
-                                                                                                                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                                                                                                                    'Content-Type': 'application/json'
-                                                                                                                },
                                                                                                                 body: JSON.stringify({
                                                                                                                     http_url: step.http_url,
                                                                                                                     http_method: step.http_method,
                                                                                                                     http_headers: h,
-                                                                                                                    http_body: step.http_body
+                                                                                                                    http_body: step.http_body,
+                                                                                                                    server_id: step.server_id,
+                                                                                                                    group_id: group.id
                                                                                                                 })
                                                                                                             });
                                                                                                             const data = await res.json();

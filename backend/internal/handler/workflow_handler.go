@@ -17,16 +17,18 @@ import (
 )
 
 type WorkflowHandler struct {
-	service  *service.WorkflowService
-	executor *service.WorkflowExecutor
-	auditLog *service.AuditLogService
+	service       *service.WorkflowService
+	executor      *service.WorkflowExecutor
+	serverService *service.ServerService
+	auditLog      *service.AuditLogService
 }
 
-func NewWorkflowHandler(s *service.WorkflowService, e *service.WorkflowExecutor, al *service.AuditLogService) *WorkflowHandler {
+func NewWorkflowHandler(s *service.WorkflowService, e *service.WorkflowExecutor, ss *service.ServerService, al *service.AuditLogService) *WorkflowHandler {
 	return &WorkflowHandler{
-		service:  s,
-		executor: e,
-		auditLog: al,
+		service:       s,
+		executor:      e,
+		serverService: ss,
+		auditLog:      al,
 	}
 }
 
@@ -661,4 +663,73 @@ func (h *WorkflowHandler) ImportWorkflow(c *gin.Context) {
 
 	h.auditLog.LogAction(c, "IMPORT", "WORKFLOW", wf.ID.String(), map[string]string{"name": wf.Name}, "SUCCESS")
 	c.JSON(http.StatusCreated, wf)
+}
+func (h *WorkflowHandler) TestHttp(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid workflow id"})
+		return
+	}
+
+	var req struct {
+		HttpUrl     string            `json:"http_url"`
+		HttpMethod  string            `json:"http_method"`
+		HttpHeaders map[string]string `json:"http_headers"`
+		HttpBody    string            `json:"http_body"`
+		ServerID    *uuid.UUID        `json:"server_id"`
+		GroupID     *uuid.UUID        `json:"group_id"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	userVal, _ := c.Get("user")
+	user := userVal.(*domain.User)
+
+	// Fetch workflow to look up default servers
+	wf, err := h.service.GetWorkflow(id, user)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "workflow not found"})
+		return
+	}
+
+	// Determine target server ID
+	targetServerID := uuid.Nil // Default to Local
+	if req.ServerID != nil && *req.ServerID != uuid.Nil {
+		targetServerID = *req.ServerID
+	} else if req.GroupID != nil && *req.GroupID != uuid.Nil {
+		// Find group in workflow
+		for _, g := range wf.Groups {
+			if g.ID == *req.GroupID {
+				if g.DefaultServerID != nil && *g.DefaultServerID != uuid.Nil {
+					targetServerID = *g.DefaultServerID
+				} else if wf.DefaultServerID != nil && *wf.DefaultServerID != uuid.Nil {
+					targetServerID = *wf.DefaultServerID
+				}
+				break
+			}
+		}
+	} else if wf.DefaultServerID != nil && *wf.DefaultServerID != uuid.Nil {
+		targetServerID = *wf.DefaultServerID
+	}
+
+	method := req.HttpMethod
+	if method == "" {
+		method = "GET"
+	}
+
+	// Convert headers map to JSON string for ExecuteHttp
+	headersJSON, _ := json.Marshal(req.HttpHeaders)
+
+	output, err := h.serverService.ExecuteHttp(c.Request.Context(), targetServerID, method, req.HttpUrl, req.HttpBody, string(headersJSON), user, nil)
+	if err != nil {
+		h.auditLog.LogAction(c, "TEST_HTTP", "WORKFLOW", id.String(), map[string]string{"url": req.HttpUrl, "error": err.Error(), "server_id": targetServerID.String()}, "FAILED")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "output": output})
+		return
+	}
+
+	h.auditLog.LogAction(c, "TEST_HTTP", "WORKFLOW", id.String(), map[string]string{"url": req.HttpUrl, "server_id": targetServerID.String()}, "SUCCESS")
+	c.JSON(http.StatusOK, gin.H{"output": output})
 }
