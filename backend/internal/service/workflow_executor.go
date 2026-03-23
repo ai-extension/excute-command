@@ -1051,79 +1051,84 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 				targetServerID = defaultServerID
 			}
 
-			output, err := e.serverService.ExecuteHttp(ctx, targetServerID, method, url, body, headersStr, user, stepLogFile)
+			output, err = e.serverService.ExecuteHttp(ctx, targetServerID, method, url, body, headersStr, user, stepLogFile)
+			if err == nil {
+				fmt.Fprint(mainLogFile, output)
+				e.hub.BroadcastLog(workflowID.String(), executionID.String(), output)
+			}
 			step.CommandText = "" // Command was already executed via ExecuteHttp
 			if err != nil {
 				return err
 			}
-			flowData[step.ID.String()] = output
 		}
 
-		// Default: COMMAND action type
-		if step.CommandText == "" {
-			emptyMsg := "\033[90m(No command to execute)\033[0m\n"
-			fmt.Fprint(mainLogFile, emptyMsg)
-			fmt.Fprint(stepLogFile, emptyMsg)
-			e.hub.BroadcastStatus(step.ID.String(), executionID.String(), "step", string(domain.StatusSuccess))
-			return nil
-		}
+		// 1. COMMAND action type - only execute if it's actually a COMMAND step
+		if step.ActionType == "COMMAND" {
+			if step.CommandText == "" {
+				emptyMsg := "\033[90m(No command to execute)\033[0m\n"
+				fmt.Fprint(mainLogFile, emptyMsg)
+				fmt.Fprint(stepLogFile, emptyMsg)
+				e.hub.BroadcastStatus(step.ID.String(), executionID.String(), "step", string(domain.StatusSuccess))
+				return nil
+			}
 
-		// 1. Resolve variables using Pongo2
-		pcontext := e.getInterpolationContext(inputs, variables, flowData, namespaceID, user)
-		command, renderErr := e.renderTemplate(step.CommandText, pcontext)
-		if renderErr != nil {
-			errMsg := fmt.Sprintf("\033[1;31m✖ Interpolation error: %v\033[0m\n", renderErr)
-			fmt.Fprint(mainLogFile, errMsg)
-			fmt.Fprint(stepLogFile, errMsg)
-			return fmt.Errorf("interpolation error: %w", renderErr)
-		}
+			// 1. Resolve variables using Pongo2
+			pcontext := e.getInterpolationContext(inputs, variables, flowData, namespaceID, user)
+			command, renderErr := e.renderTemplate(step.CommandText, pcontext)
+			if renderErr != nil {
+				errMsg := fmt.Sprintf("\033[1;31m✖ Interpolation error: %v\033[0m\n", renderErr)
+				fmt.Fprint(mainLogFile, errMsg)
+				fmt.Fprint(stepLogFile, errMsg)
+				return fmt.Errorf("interpolation error: %w", renderErr)
+			}
 
-		targetServerID := step.ServerID
-		if targetServerID == uuid.Nil {
-			targetServerID = defaultServerID
-		}
+			targetServerID := step.ServerID
+			if targetServerID == uuid.Nil {
+				targetServerID = defaultServerID
+			}
 
-		// Persist CWD: Prepend directory restoration and append directory capture
-		cwdMarker := "::CWD::"
-		var startingDir string // Track where this step started
-		if targetServerID != uuid.Nil {
-			if val, ok := workingDirs.Load(targetServerID); ok {
-				startingDir = val.(string)
-				if startingDir != "" {
-					command = fmt.Sprintf("cd %s && { %s; }", strconv.Quote(startingDir), command)
+			// Persist CWD: Prepend directory restoration and append directory capture
+			cwdMarker := "::CWD::"
+			var startingDir string // Track where this step started
+			if targetServerID != uuid.Nil {
+				if val, ok := workingDirs.Load(targetServerID); ok {
+					startingDir = val.(string)
+					if startingDir != "" {
+						command = fmt.Sprintf("cd %s && { %s; }", strconv.Quote(startingDir), command)
+					}
 				}
+				command = fmt.Sprintf("%s; printf '%s' && pwd -P", command, cwdMarker)
 			}
-			command = fmt.Sprintf("%s; printf '%s' && pwd -P", command, cwdMarker)
-		}
 
-		if targetServerID != uuid.Nil {
-			var out bytes.Buffer
-			outWriter := io.Writer(&out) // capture output without broadcasting
-			mw := io.MultiWriter(
-				&wsWriter{hub: e.hub, targetID: workflowID.String(), executionID: executionID.String(), buffer: mainLogFile},
-				&wsWriter{hub: e.hub, targetID: step.ID.String(), executionID: executionID.String(), buffer: nil}, // Broadcast to step trace
-				&fileWriter{file: stepLogFile},
-				outWriter,
-			)
-			filter := &cwdFilteredWriter{
-				underlying: mw,
-				marker:     cwdMarker,
-			}
-			_, err = e.serverService.ExecuteCommand(ctx, targetServerID, command, nil, filter)
-			filter.Finalize()
-			output = out.String()
-			if filter.found {
-				newDir := filepath.Clean(strings.TrimSpace(filter.cwdBuffer.String()))
-				if newDir != "" {
-					workingDirs.Store(targetServerID, newDir)
-					stepExec.WorkingDir = newDir // Persist for reruns
+			if targetServerID != uuid.Nil {
+				var out bytes.Buffer
+				outWriter := io.Writer(&out) // capture output without broadcasting
+				mw := io.MultiWriter(
+					&wsWriter{hub: e.hub, targetID: workflowID.String(), executionID: executionID.String(), buffer: mainLogFile},
+					&wsWriter{hub: e.hub, targetID: step.ID.String(), executionID: executionID.String(), buffer: nil}, // Broadcast to step trace
+					&fileWriter{file: stepLogFile},
+					outWriter,
+				)
+				filter := &cwdFilteredWriter{
+					underlying: mw,
+					marker:     cwdMarker,
 				}
-			}
-		} else {
-			var localNewDir string
-			output, localNewDir, err = e.runLocalStep(ctx, step, command, mainLogFile, stepLogFile, workflowID, executionID, workingDirs)
-			if localNewDir != "" {
-				stepExec.WorkingDir = localNewDir
+				_, err = e.serverService.ExecuteCommand(ctx, targetServerID, command, nil, filter)
+				filter.Finalize()
+				output = out.String()
+				if filter.found {
+					newDir := filepath.Clean(strings.TrimSpace(filter.cwdBuffer.String()))
+					if newDir != "" {
+						workingDirs.Store(targetServerID, newDir)
+						stepExec.WorkingDir = newDir // Persist for reruns
+					}
+				}
+			} else {
+				var localNewDir string
+				output, localNewDir, err = e.runLocalStep(ctx, step, command, mainLogFile, stepLogFile, workflowID, executionID, workingDirs)
+				if localNewDir != "" {
+					stepExec.WorkingDir = localNewDir
+				}
 			}
 		}
 	}
@@ -1139,7 +1144,9 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 			if sm, ok := gm["step"].(map[string]interface{}); ok {
 				var parsed interface{}
 				if step.OutputFormat == "json" {
-					if uerr := json.Unmarshal([]byte(output), &parsed); uerr != nil {
+					decoder := json.NewDecoder(strings.NewReader(output))
+					decoder.UseNumber()
+					if uerr := decoder.Decode(&parsed); uerr != nil {
 						parsed = output
 					}
 				} else {

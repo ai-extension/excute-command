@@ -250,7 +250,7 @@ func (s *ServerService) ExecuteHttp(ctx context.Context, serverID uuid.UUID, met
 		}
 		curlCmd += fmt.Sprintf(" %s", strconv.Quote(url))
 
-		return s.ExecuteCommand(ctx, serverID, curlCmd, user)
+		return s.ExecuteCommand(ctx, serverID, curlCmd, user, logWriter)
 	}
 
 	// 2. Binary Injection Fallback (Trick #4)
@@ -309,5 +309,5 @@ func (s *ServerService) ExecuteHttp(ctx context.Context, serverID uuid.UUID, met
 		httpgetCmd += fmt.Sprintf(" -d %s", strconv.Quote(body))
 	}
 
-	return s.ExecuteCommand(ctx, serverID, httpgetCmd, user)
+	return s.ExecuteCommand(ctx, serverID, httpgetCmd, user, logWriter)
 }
