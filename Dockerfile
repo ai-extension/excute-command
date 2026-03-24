@@ -11,10 +11,11 @@ FROM --platform=$BUILDPLATFORM golang:alpine AS backend-builder
 ARG TARGETOS
 ARG TARGETARCH
 WORKDIR /app/backend
-RUN apk add --no-cache gcc musl-dev
+RUN apk add --no-cache gcc musl-dev bash
 COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 COPY backend/ .
+RUN chmod +x scripts/compile_httpget.sh && bash scripts/compile_httpget.sh
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o main cmd/server/main.go
 
 # Final Stage
@@ -46,6 +47,9 @@ WORKDIR /app
 
 # Copy backend binary
 COPY --from=backend-builder /app/backend/main ./main
+
+# Copy httpget binaries
+COPY --from=backend-builder /app/backend/data/httpget ./data/httpget
 
 # Copy frontend build into the location the backend expects
 COPY --from=frontend-builder /app/frontend/dist ./frontend/public

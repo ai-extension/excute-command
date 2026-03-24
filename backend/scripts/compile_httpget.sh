@@ -4,7 +4,7 @@
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 PROJECT_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
 SOURCE_FILE="$PROJECT_ROOT/cmd/httpget/main.go"
-OUTPUT_DIR="$PROJECT_ROOT/internal/assets/bin/httpget"
+OUTPUT_DIR="$PROJECT_ROOT/data/httpget"
 
 # List of targets (OS/ARCH)
 TARGETS=(

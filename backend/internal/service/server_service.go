@@ -285,7 +285,7 @@ func (s *ServerService) ExecuteHttp(ctx context.Context, serverID uuid.UUID, met
 	}
 
 	baseDir, _ := os.Getwd()
-	localBinary := filepath.Join(baseDir, "internal", "assets", "bin", "httpget", "httpget-"+osPrefix+"-"+goArch)
+	localBinary := filepath.Join(baseDir, "data", "httpget", "httpget-"+osPrefix+"-"+goArch)
 	remoteBinary := "/tmp/httpget"
 
 	if serverID != uuid.Nil {
