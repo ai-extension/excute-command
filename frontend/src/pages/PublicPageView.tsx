@@ -1,0 +1,517 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useParams } from 'react-router-dom';
+import {
+    Zap, Loader2, Monitor, Terminal, Clock, Sun, Moon, Copy, Check
+} from 'lucide-react';
+import { cn, copyToClipboard as clipboardCopy } from '../lib/utils';
+import { Page, PageWidget, PageLayout, WorkflowInput } from '../types';
+import { Button } from '../components/ui/button';
+import WorkflowInputDialog from '../components/WorkflowInputDialog';
+import { API_BASE_URL } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
+
+// Extracted Components
+import PasswordProtection from '../components/PasswordProtection';
+import TerminalWidget from '../components/public/TerminalWidget';
+import EndpointWidget from '../components/public/EndpointWidget';
+import PageExecutionTerminal from '../components/public/PageExecutionTerminal';
+import LoginDialog from '../components/LoginDialog';
+
+const PublicPageView = () => {
+    const { slug } = useParams();
+    const [page, setPage] = useState<Page | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [password, setPassword] = useState('');
+    const [isAuthorized, setIsAuthorized] = useState(false);
+    const [isVerifying, setIsVerifying] = useState(false);
+    const [requiresPassword, setRequiresPassword] = useState(false);
+    const [widgets, setWidgets] = useState<PageWidget[]>([]);
+    const { showToast, apiFetch, isAuthenticated } = useAuth();
+    const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false);
+
+    // Token state
+    const [pageToken, setPageToken] = useState<string | null>(null);
+    const [tokenExpiresAt, setTokenExpiresAt] = useState<Date | null>(null);
+    const [tokenExpired, setTokenExpired] = useState(false);
+
+    // Execution State
+    const [runningWidgets, setRunningWidgets] = useState<Record<string, boolean>>({});
+    const [executionResults, setExecutionResults] = useState<Record<string, { success: boolean, message: string }>>({});
+
+    // Input Modal State
+    const [inputModal, setInputModal] = useState<{
+        isOpen: boolean;
+        widget: PageWidget | null;
+        workflowInputs: WorkflowInput[];
+    }>({
+        isOpen: false,
+        widget: null,
+        workflowInputs: []
+    });
+
+    const closeInputModal = () => {
+        setInputModal({ isOpen: false, widget: null, workflowInputs: [] });
+    };
+
+    // Log Streaming State
+    const [activeExecutionId, setActiveExecutionId] = useState<string | null>(null);
+    const [activeWidgetId, setActiveWidgetId] = useState<string | null>(null);
+    const [executionLogs, setExecutionLogs] = useState<string>('');
+    const [executionStatus, setExecutionStatus] = useState<string | null>(null);
+    const [isPollingLogs, setIsPollingLogs] = useState(false);
+    const [terminalState, setTerminalState] = useState<'normal' | 'minimized' | 'maximized'>('normal');
+
+    useEffect(() => {
+        if (executionStatus === 'SUCCESS' || executionStatus === 'FAILED' || executionStatus === 'CANCELLED') {
+            if (activeWidgetId) {
+                setRunningWidgets(prev => ({ ...prev, [activeWidgetId]: false }));
+                setTimeout(() => {
+                    setExecutionResults(prev => {
+                        const n = { ...prev };
+                        delete n[activeWidgetId];
+                        return n;
+                    });
+                }, 3000);
+            }
+        }
+    }, [executionStatus, activeWidgetId]);
+    const [publicTheme, setPublicTheme] = useState<'light' | 'dark'>(() => {
+        return (localStorage.getItem('public-theme') as 'light' | 'dark') || 'dark';
+    });
+    const [isCopied, setIsCopied] = useState(false);
+
+    useEffect(() => {
+        localStorage.setItem('public-theme', publicTheme);
+        // Direct manipulation of document element to override global ThemeProvider
+        if (publicTheme === 'dark') {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    }, [publicTheme]);
+
+    // Restore admin theme when leaving public page
+    useEffect(() => {
+        const originalTheme = localStorage.getItem('theme') || 'dark';
+        return () => {
+            if (originalTheme === 'dark') {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        };
+    }, []);
+
+    const togglePublicTheme = () => {
+        setPublicTheme(prev => prev === 'light' ? 'dark' : 'light');
+    };
+
+    const copyPublicUrl = async () => {
+        const success = await clipboardCopy(window.location.href);
+        if (success) {
+            setIsCopied(true);
+            setTimeout(() => setIsCopied(false), 2000);
+        }
+    };
+
+    const fetchPageContent = useCallback(async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            const url = `${API_BASE_URL}/public/pages/${slug}`;
+            const response = await apiFetch(url);
+            const data = await response.json();
+
+            if (response.status === 410) {
+                setError('This link has expired.');
+                setIsLoading(false);
+                return;
+            }
+
+            if (!response.ok && !data.is_public && !isAuthenticated) {
+                setIsLoginDialogOpen(true);
+            }
+
+            if (response.status === 401 || data.requires_password) {
+                setRequiresPassword(true);
+                setPage(data);
+            } else if (!response.ok) {
+                setError(data.error || 'Access Terminated');
+            } else {
+                setPage(data);
+                setIsAuthorized(true);
+                setRequiresPassword(false);
+                if (data.layout) {
+                    try {
+                        const layout: PageLayout = JSON.parse(data.layout);
+                        setWidgets(layout.widgets || []);
+                    } catch (_) {
+                        setWidgets([]);
+                    }
+                }
+            }
+        } catch (err) {
+            setError('Connection Failure');
+        } finally {
+            setIsLoading(false);
+        }
+    }, [slug, isAuthenticated, apiFetch]);
+
+    useEffect(() => {
+        fetchPageContent();
+    }, [fetchPageContent]);
+
+    const handlePasswordSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsVerifying(true);
+        try {
+            const response = await apiFetch(`${API_BASE_URL}/public/pages/${slug}/verify`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password })
+            });
+            const data = await response.json();
+            if (response.ok) {
+                const pageData = data.page || data;
+                setPage(pageData);
+                setIsAuthorized(true);
+                setRequiresPassword(false);
+                setTokenExpired(false);
+                setError(null);
+                if (data.token) {
+                    setPageToken(data.token);
+                    setTokenExpiresAt(data.expires_at ? new Date(data.expires_at) : null);
+                }
+                if (pageData.layout) {
+                    try {
+                        const layout: PageLayout = JSON.parse(pageData.layout);
+                        setWidgets(layout.widgets || []);
+                    } catch (_) { }
+                }
+            } else {
+                setError('Invalid password.');
+            }
+        } catch (err) {
+            setError('Verification failed.');
+        } finally {
+            setIsVerifying(false);
+        }
+    };
+
+    // Expiry watcher
+    useEffect(() => {
+        if (!tokenExpiresAt || !isAuthorized) return;
+        const check = setInterval(() => {
+            if (new Date() >= tokenExpiresAt) {
+                setTokenExpired(true);
+                setIsAuthorized(false);
+                setRequiresPassword(true);
+                setPageToken(null);
+                setTokenExpiresAt(null);
+                clearInterval(check);
+            }
+        }, 5000);
+        return () => clearInterval(check);
+    }, [tokenExpiresAt, isAuthorized]);
+
+    // Auto-close completion alert removed in favor of global toast
+
+    // Logs Polling replaced by WebSocket in PageExecutionTerminal
+
+    const runWidget = async (widget: PageWidget, inputs: Record<string, string> = {}) => {
+        if (widget.type !== 'ENDPOINT' || !widget.workflow_id) {
+            setExecutionResults(prev => ({ ...prev, [widget.id]: { success: false, message: 'INVALID CONFIG' } }));
+            return;
+        }
+
+        const pw = page?.workflows?.find(p => p.workflow_id === widget.workflow_id);
+        const workflowInputs = pw?.workflow?.inputs || [];
+
+        if (workflowInputs.length > 0 && Object.keys(inputs).length === 0) {
+            setInputModal({
+                isOpen: true,
+                widget,
+                workflowInputs
+            });
+            return;
+        }
+
+        setInputModal({ isOpen: false, widget: null, workflowInputs: [] });
+        setRunningWidgets(prev => ({ ...prev, [widget.id]: true }));
+        try {
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+            if (pageToken) headers['X-Page-Token'] = pageToken;
+
+            const response = await apiFetch(`${API_BASE_URL}/public/pages/${slug}/run/${widget.workflow_id}`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ inputs })
+            });
+
+            if (response.status === 401) {
+                setTokenExpired(true); setIsAuthorized(false);
+                return;
+            }
+
+            const data = await response.json();
+            if (response.ok) {
+                setExecutionResults(prev => ({ ...prev, [widget.id]: { success: true, message: 'SUCCESS' } }));
+
+                // Always track execution in background for status updates
+                setActiveExecutionId(data.execution_id);
+                setActiveWidgetId(widget.id);
+                setExecutionStatus('RUNNING');
+                setIsPollingLogs(true);
+
+                // Determine if logs should be shown (check widget config then fallback to page workflow config)
+                const showLog = widget.show_log ?? page?.workflows?.find(pw => pw.workflow_id === widget.workflow_id)?.show_log ?? false;
+
+                if (showLog) {
+                    setExecutionLogs('Initializing trace...');
+                    setTerminalState('normal');
+                } else {
+                    showToast('Workflow execution initiated.', 'success');
+                }
+            } else {
+                setExecutionResults(prev => ({ ...prev, [widget.id]: { success: false, message: data.error || 'FAILED' } }));
+                showToast(`Execution failed: ${data.error || 'Unknown error'}`, 'error');
+            }
+        } catch (err) {
+            setExecutionResults(prev => ({ ...prev, [widget.id]: { success: false, message: 'ERROR' } }));
+            showToast('Error connecting to server.', 'error');
+        } finally {
+            // No-op: We wait for WebSocket status broadcast to cleanup running state
+        }
+    };
+
+    const stopWidget = async (widget: PageWidget) => {
+        if (!activeExecutionId) return;
+
+        try {
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+            if (pageToken) headers['X-Page-Token'] = pageToken;
+
+            await apiFetch(`${API_BASE_URL}/public/pages/${slug}/executions/${activeExecutionId}/stop`, {
+                method: 'POST',
+                headers
+            });
+            // The WebSocket will broadcast CANCELLED status, triggering the cleanup automatically
+        } catch (err) {
+            console.error('Failed to stop execution:', err);
+        }
+    };
+
+    if (isLoading && !page) {
+        return (
+            <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
+                <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
+                <h1 className="text-xl font-bold uppercase tracking-tighter">Establishing Link</h1>
+            </div>
+        );
+    }
+
+    if (requiresPassword && !isAuthorized) {
+        return (
+            <>
+                <PasswordProtection
+                    pageTitle={page?.title || ''}
+                    password={password}
+                    setPassword={setPassword}
+                    onSubmit={handlePasswordSubmit}
+                    isVerifying={isVerifying}
+                    error={error}
+                    tokenExpired={tokenExpired}
+                    onAdminLogin={() => setIsLoginDialogOpen(true)}
+                />
+                <LoginDialog
+                    isOpen={isLoginDialogOpen}
+                    onOpenChange={setIsLoginDialogOpen}
+                />
+            </>
+        );
+    }
+
+    return (
+        <div className="min-h-screen transition-colors duration-300">
+            <div className="min-h-screen bg-background text-foreground selection:bg-primary/20 pb-20">
+                <header className="fixed top-0 left-0 right-0 h-1 bg-primary z-50 shadow-lg" />
+
+                {/* Floating Navigation / Auth / Theme Tools */}
+                <div className="fixed top-6 right-6 z-50 flex items-center gap-2">
+                    <Button
+                        variant="secondary"
+                        size="icon"
+                        className="h-10 w-10 rounded-xl glass shadow-premium border-white/10"
+                        onClick={copyPublicUrl}
+                        title="Copy Public Link"
+                    >
+                        {isCopied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                    </Button>
+                    <Button
+                        variant="secondary"
+                        size="icon"
+                        className="h-10 w-10 rounded-xl glass shadow-premium border-white/10"
+                        onClick={togglePublicTheme}
+                        title={`Switch to ${publicTheme === 'dark' ? 'light' : 'dark'} mode`}
+                    >
+                        {publicTheme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-400" />}
+                    </Button>
+                </div>
+
+                <main className="max-w-6xl mx-auto px-6 pt-24 pb-32">
+                    <div className="flex flex-col items-center text-center mb-16 space-y-4">
+                        <h1 className="text-5xl md:text-7xl font-black tracking-tighter">{page?.title}</h1>
+                        <p className="text-lg text-muted-foreground font-medium italic opacity-70">
+                            {page?.description || "Interactive control center."}
+                        </p>
+
+                        <div className="flex items-center gap-6 pt-2">
+                            <div className="flex items-center gap-2">
+                                <Zap className="w-4 h-4 text-primary" />
+                                <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
+                                    {widgets.filter(w => w.type === 'ENDPOINT').length} Endpoints
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Terminal className="w-4 h-4 text-emerald-500" />
+                                <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
+                                    {widgets.filter(w => w.type === 'TERMINAL').length} Terminals
+                                </span>
+                            </div>
+                        </div>
+
+                        {tokenExpiresAt && (
+                            <div className="flex items-center gap-2 pt-1 opacity-50">
+                                <Clock className="w-3 h-3 text-muted-foreground" />
+                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                                    Session expires at {tokenExpiresAt.toLocaleTimeString()}
+                                </span>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="flex flex-wrap gap-8">
+                        {widgets.map(widget => {
+                            if (widget.type === 'ENDPOINT') {
+                                return (
+                                    <EndpointWidget
+                                        key={widget.id}
+                                        widget={widget}
+                                        isRunning={runningWidgets[widget.id]}
+                                        result={executionResults[widget.id]}
+                                        onRun={runWidget}
+                                        onStop={stopWidget}
+                                    />
+                                );
+                            } else if (widget.type === 'TERMINAL') {
+                                return (
+                                    <TerminalWidget
+                                        key={widget.id}
+                                        widget={widget}
+                                        slug={slug || ''}
+                                        pageToken={pageToken}
+                                    />
+                                );
+                            }
+                            return null;
+                        })}
+                    </div>
+
+                    {widgets.length === 0 && (
+                        <div className="py-32 text-center opacity-30">
+                            <Monitor className="w-12 h-12 mx-auto mb-4" />
+                            <p className="text-sm font-bold uppercase tracking-widest">No nodes deployed</p>
+                        </div>
+                    )}
+                </main>
+
+                <WorkflowInputDialog
+                    isOpen={inputModal.isOpen}
+                    onOpenChange={(open) => !open && closeInputModal()}
+                    inputs={inputModal.workflowInputs}
+                    confirmLabel="Confirm & Launch"
+                    onConfirm={(values) => {
+                        if (inputModal.widget) {
+                            runWidget(inputModal.widget, values);
+                        }
+                    }}
+                    onCancel={closeInputModal}
+                />
+
+                {activeExecutionId && slug && (() => {
+                    const currentWidget = widgets.find(w => w.id === activeWidgetId);
+                    const currentShowLog = currentWidget?.show_log ?? page?.workflows?.find(pw => pw.workflow_id === currentWidget?.workflow_id)?.show_log ?? false;
+
+                    return (
+                        <PageExecutionTerminal
+                            activeExecutionId={activeExecutionId}
+                            slug={slug}
+                            pageToken={pageToken}
+                            terminalState={terminalState}
+                            setTerminalState={setTerminalState}
+                            onClose={() => {
+                                const widgetId = activeWidgetId;
+                                setActiveExecutionId(null);
+                                setActiveWidgetId(null);
+                                setExecutionStatus(null);
+                                setIsPollingLogs(false);
+                                // Cleanup runningWidgets and executionResults after a delay
+                                if (widgetId) {
+                                    setRunningWidgets(prev => ({ ...prev, [widgetId]: false }));
+                                    setTimeout(() => {
+                                        setExecutionResults(prev => {
+                                            const n = { ...prev };
+                                            delete n[widgetId];
+                                            return n;
+                                        });
+                                    }, 3000);
+                                }
+                            }}
+                            onStatusChange={(status: string) => {
+                                setExecutionStatus(status);
+                                if (status === 'SUCCESS' || status === 'FAILED' || status === 'CANCELLED') {
+                                    if (activeWidgetId) {
+                                        setExecutionResults(prev => ({
+                                            ...prev,
+                                            [activeWidgetId]: { success: status === 'SUCCESS', message: status }
+                                        }));
+
+                                        showToast(status === 'SUCCESS' ? 'Workflow executed successfully!' :
+                                            status === 'CANCELLED' ? 'Workflow cancelled.' : 'Workflow execution failed.',
+                                            status === 'SUCCESS' ? 'success' : 'error'
+                                        );
+
+                                        if (!currentShowLog) {
+                                            // Auto cleanup for hidden trackers
+                                            setTimeout(() => {
+                                                setRunningWidgets(prev => ({ ...prev, [activeWidgetId]: false }));
+                                                setTimeout(() => {
+                                                    setExecutionResults(prev => {
+                                                        const n = { ...prev };
+                                                        delete n[activeWidgetId];
+                                                        return n;
+                                                    });
+                                                    setActiveExecutionId(null);
+                                                    setActiveWidgetId(null);
+                                                }, 3000);
+                                            }, 1000);
+                                        }
+                                    }
+                                }
+                            }}
+                            isHidden={!currentShowLog}
+                        />
+                    );
+                })()}
+
+                <LoginDialog
+                    isOpen={isLoginDialogOpen}
+                    onOpenChange={setIsLoginDialogOpen}
+                />
+            </div>
+        </div>
+    );
+};
+
+export default PublicPageView;
