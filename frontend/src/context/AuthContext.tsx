@@ -58,8 +58,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return savedUser ? JSON.parse(savedUser) : null;
     });
     const [token, setToken] = useState<string | null>(() => {
-        // If we have an auth cookie, we treat it as logged in immediately
-        return getCookie('auth_token');
+        // Check cookie first (most up-to-date), then fallback to localStorage
+        return getCookie('auth_token') || localStorage.getItem('auth_token');
     });
     const [settings, setSettings] = useState<UserSettings>(() => {
         const savedSettings = localStorage.getItem('auth_settings');
@@ -104,15 +104,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setToken(null);
         setUser(null);
         localStorage.removeItem('auth_user');
+        localStorage.removeItem('auth_token');
         localStorage.removeItem('auth_settings');
     }, []);
 
     const login = useCallback((newToken: string, newUser: User) => {
         // newToken is the real JWT from the API response. Store it directly.
-        // getCookie is only a fallback in case the server returns an empty token.
-        setToken(newToken || getCookie('auth_token'));
+        const finalToken = newToken || getCookie('auth_token');
+        setToken(finalToken);
         setUser(newUser);
         localStorage.setItem('auth_user', JSON.stringify(newUser));
+        if (finalToken) {
+            localStorage.setItem('auth_token', finalToken);
+        }
     }, []);
 
     const updateUser = useCallback((newUser: User) => {
@@ -143,44 +147,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         let isMounted = true;
         const verifyAuth = async () => {
             const hasCookie = !!getCookie('auth_token');
-            const hasCachedUser = !!user;
+            const hasCachedToken = !!localStorage.getItem('auth_token');
+            const hasCachedUser = !!user || !!localStorage.getItem('auth_user');
 
-            if (hasCookie) {
-                // Skip call if we already have a cached user to avoid redundant network traffic on every load
-                if (!hasCachedUser) {
-                    try {
-                        const response = await fetch(`${API_BASE_URL}/me`, {
-                            headers: { 'Accept': 'application/json' },
-                            credentials: 'include'
-                        });
-                        if (response.ok) {
-                            const userData = await response.json();
-                            if (isMounted) {
-                                setUser(userData);
-                                setToken(getCookie('auth_token'));
-                                localStorage.setItem('auth_user', JSON.stringify(userData));
-                            }
-                        } else if (response.status === 401 && isMounted) {
-                            // Only log out if the token is explicitly rejected
-                            await logout();
-                        }
-                        // On other errors (503, 502, etc.) - keep the session alive
-                    } catch (err) {
-                        // Network error (backend offline/restarting) - keep session alive
-                        // The user will be able to continue when the backend comes back
-                        console.warn("Auth verification failed (network error), keeping session:", err);
+            // If we have either a cookie, a cached token, or a cached user, try to verify
+            if (hasCookie || hasCachedToken || hasCachedUser) {
+                // If we have a cached user but no cookie/token in state, we still try to fetch /me
+                // because the cookie might be HttpOnly (invisible to JS)
+                try {
+                    const response = await fetch(`${API_BASE_URL}/me`, {
+                        headers: { 'Accept': 'application/json' },
+                        credentials: 'include'
+                    });
+                    if (response.ok) {
+                        const userData = await response.json();
                         if (isMounted) {
-                            // Restore user from localStorage if available
-                            const savedUser = localStorage.getItem('auth_user');
-                            if (savedUser) setUser(JSON.parse(savedUser));
-                            setToken(getCookie('auth_token'));
+                            setUser(userData);
+                            const currentToken = getCookie('auth_token') || localStorage.getItem('auth_token');
+                            setToken(currentToken);
+                            localStorage.setItem('auth_user', JSON.stringify(userData));
                         }
+                    } else if (response.status === 401 && isMounted) {
+                        // Only log out if the token is explicitly rejected
+                        await logout();
+                    }
+                    // On other errors (503, 502, etc.) or if we already had a user, 
+                    // we keep the current session state to allow offline/reconnect usage
+                } catch (err) {
+                    // Network error (backend offline/restarting) - keep session alive
+                    console.warn("Auth verification failed (network error), keeping session:", err);
+                    if (isMounted && !user) {
+                        // If no user object in memory, restore from localStorage as fallback
+                        const savedUser = localStorage.getItem('auth_user');
+                        if (savedUser) setUser(JSON.parse(savedUser));
                     }
                 }
             } else if (isMounted) {
+                // No session indicators at all, ensure clean state
                 setUser(null);
                 setToken(null);
                 localStorage.removeItem('auth_user');
+                localStorage.removeItem('auth_token');
                 localStorage.removeItem('auth_settings');
             }
 
