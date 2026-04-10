@@ -1,4 +1,5 @@
 # Command Step Manager (CSM)
+![Dashboard](docs/assets/dashboard.png)
 
 CSM is a powerful, multi-step command execution and management platform designed to automate complex operations across multiple servers with ease and precision.
 
