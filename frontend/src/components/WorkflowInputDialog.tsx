@@ -15,6 +15,8 @@ interface WorkflowInputDialogProps {
     onCancel: () => void;
     isStarting?: boolean;
     confirmLabel?: string;
+    uploadUrl?: string;
+    headers?: Record<string, string>;
 }
 
 const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
@@ -24,7 +26,9 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
     onConfirm,
     onCancel,
     isStarting = false,
-    confirmLabel = "Initialize Pipeline"
+    confirmLabel = "Initialize Pipeline",
+    uploadUrl = '/api/workflows/upload-input',
+    headers = {}
 }) => {
     const [values, setValues] = useState<Record<string, string>>({});
     const [files, setFiles] = useState<Record<string, File>>({});
@@ -193,11 +197,14 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                         let token = localStorage.getItem('token');
                         if (!token) token = sessionStorage.getItem('token');
 
-                        const res = await fetch('/api/workflows/upload-input', {
+                        const finalHeaders = { ...headers };
+                        if (token && !finalHeaders['Authorization']) {
+                            finalHeaders['Authorization'] = `Bearer ${token}`;
+                        }
+
+                        const res = await fetch(uploadUrl, {
                             method: 'POST',
-                            headers: token ? {
-                                'Authorization': `Bearer ${token}`
-                            } : {},
+                            headers: finalHeaders,
                             body: formData
                         });
 
@@ -234,9 +241,14 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                                     let token = localStorage.getItem('token');
                                     if (!token) token = sessionStorage.getItem('token');
 
-                                    const res = await fetch('/api/workflows/upload-input', {
+                                    const finalHeaders = { ...headers };
+                                    if (token && !finalHeaders['Authorization']) {
+                                        finalHeaders['Authorization'] = `Bearer ${token}`;
+                                    }
+
+                                    const res = await fetch(uploadUrl, {
                                         method: 'POST',
-                                        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+                                        headers: finalHeaders,
                                         body: formData
                                     });
 

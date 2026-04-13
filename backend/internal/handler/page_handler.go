@@ -2,9 +2,13 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -447,6 +451,72 @@ func (h *PageHandler) StopPublicExecution(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Execution stop signal sent"})
+}
+
+func (h *PageHandler) UploadPublicInputFile(c *gin.Context) {
+	slug := c.Param("slug")
+	page, err := h.service.GetPageBySlug(slug)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "page not found"})
+		return
+	}
+
+	if !h.checkPublicAccess(c, page) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "page is not public"})
+		return
+	}
+
+	if page.ExpiresAt != nil && page.ExpiresAt.Before(time.Now()) {
+		c.JSON(http.StatusGone, gin.H{"error": "page has expired"})
+		return
+	}
+
+	if !h.verifyPageToken(c, page) {
+		return
+	}
+
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "file is required"})
+		return
+	}
+
+	inputSessionID := c.PostForm("session_id")
+	if inputSessionID == "" {
+		inputSessionID = uuid.New().String()
+	}
+
+	baseDir := filepath.Join("data", "uploads", "inputs", inputSessionID)
+	if err := os.MkdirAll(baseDir, 0755); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create directory"})
+		return
+	}
+
+	absBaseDir, err := filepath.Abs(baseDir)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get absolute path"})
+		return
+	}
+
+	ext := filepath.Ext(file.Filename)
+	nameOnly := strings.TrimSuffix(file.Filename, ext)
+	safeName := Slugify(nameOnly)
+	if safeName == "" {
+		safeName = "file"
+	}
+
+	finalFilename := fmt.Sprintf("%s_%d%s", safeName, time.Now().Unix(), ext)
+	localPath := filepath.Join(absBaseDir, finalFilename)
+
+	if err := c.SaveUploadedFile(file, localPath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save file"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"path":       localPath,
+		"session_id": inputSessionID,
+	})
 }
 
 func (h *PageHandler) sanitizePage(page *domain.Page) {

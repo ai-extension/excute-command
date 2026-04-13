@@ -431,6 +431,8 @@ const PublicPageView = () => {
                     onOpenChange={(open) => !open && closeInputModal()}
                     inputs={inputModal.workflowInputs}
                     confirmLabel="Confirm & Launch"
+                    uploadUrl={`${API_BASE_URL}/public/pages/${slug}/upload-input`}
+                    headers={pageToken ? { 'X-Page-Token': pageToken } : {}}
                     onConfirm={(values) => {
                         if (inputModal.widget) {
                             runWidget(inputModal.widget, values);

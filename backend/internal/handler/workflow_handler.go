@@ -763,7 +763,7 @@ func (h *WorkflowHandler) UploadInputFile(c *gin.Context) {
 	// Format: slugified-name_unix-time.ext
 	ext := filepath.Ext(file.Filename)
 	nameOnly := strings.TrimSuffix(file.Filename, ext)
-	safeName := slugify(nameOnly)
+	safeName := Slugify(nameOnly)
 	if safeName == "" {
 		safeName = "file"
 	}
@@ -782,8 +782,8 @@ func (h *WorkflowHandler) UploadInputFile(c *gin.Context) {
 	})
 }
 
-// slugify converts a string to a safe, URL-friendly format
-func slugify(s string) string {
+// Slugify converts a string to a safe, URL-friendly format
+func Slugify(s string) string {
 	s = strings.ToLower(s)
 	var res strings.Builder
 	for _, r := range s {

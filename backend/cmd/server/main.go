@@ -331,6 +331,7 @@ func main() {
 		api.POST("/public/pages/:slug/verify", middleware.LoginRateLimiter(), optionalAuth, pageHandler.VerifyPublicPage)
 		api.POST("/public/pages/:slug/run/:workflow_id", middleware.LoginRateLimiter(), optionalAuth, pageHandler.RunPublicWorkflow)
 		api.POST("/public/pages/:slug/executions/:exec_id/stop", middleware.LoginRateLimiter(), optionalAuth, pageHandler.StopPublicExecution)
+		api.POST("/public/pages/:slug/upload-input", middleware.LoginRateLimiter(), optionalAuth, pageHandler.UploadPublicInputFile)
 	}
 
 	// Serve static files from Vite build output
