@@ -500,7 +500,7 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 				defer os.Remove(tmpPath)
 			}
 
-			err := e.serverService.UploadFileToServers(ctx, transferServerIDs, sourcePath, targetPath, execution.User)
+			err := e.serverService.UploadFileToServers(ctx, transferServerIDs, sourcePath, targetPath, nil)
 			if err != nil {
 				runErr = fmt.Errorf("failed to transfer file %s: %w", f.FileName, err)
 				fmt.Fprintf(logFile, "\033[1;31m✖ FAILED\033[0m\n")
@@ -544,7 +544,7 @@ func (e *WorkflowExecutor) Execute(ctx context.Context, workflowID uuid.UUID, ex
 		// Baseline for remote servers
 		for id := range serverSet {
 			// Get initial physical directory (resolving symlinks) on remote server without logging it
-			out, err := e.serverService.ExecuteCommand(ctx, id, "pwd -P", execution.User)
+			out, err := e.serverService.ExecuteCommand(ctx, id, "pwd -P", nil)
 			if err == nil {
 				workingDirs.Store(id, filepath.Clean(strings.TrimSpace(out)))
 			}
@@ -1308,7 +1308,7 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 		// Check if target server is actually remote
 		isRemote := false
 		if targetServerID != uuid.Nil {
-			srv, _ := e.serverService.GetServer(targetServerID, user)
+			srv, _ := e.serverService.GetServer(targetServerID, nil)
 			if srv != nil && srv.ConnectionType == domain.ConnectionTypeSSH {
 				isRemote = true
 			}
@@ -1346,7 +1346,7 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 				targetServerID = defaultServerID
 			}
 
-			output, err = e.serverService.ExecuteHttp(ctx, targetServerID, method, url, body, headersStr, user, stepLogFile)
+			output, err = e.serverService.ExecuteHttp(ctx, targetServerID, method, url, body, headersStr, nil, stepLogFile)
 			if err == nil {
 				fmt.Fprint(mainLogFile, output)
 				e.hub.BroadcastLog(workflowID.String(), executionID.String(), output)
@@ -2136,7 +2136,7 @@ func (e *WorkflowExecutor) uploadSessionFilesIfNeeded(ctx context.Context, execI
 
 	for sid := range sessions {
 		// Only upload to remote servers (SSH)
-		srv, err := e.serverService.GetServer(serverID, user)
+		srv, err := e.serverService.GetServer(serverID, nil)
 		if err != nil || srv == nil {
 			fmt.Fprintf(mainLogFile, "\033[1;33m⚠ Warning: server not found or error: %v\033[0m\n", err)
 			continue
