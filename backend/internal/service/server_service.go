@@ -42,7 +42,12 @@ func (s *ServerService) CreateServer(server *domain.Server, user *domain.User) e
 }
 
 func (s *ServerService) GetServer(id uuid.UUID, user *domain.User) (*domain.Server, error) {
-	scope := domain.GetPermissionScope(user, "servers", "READ")
+	var scope domain.PermissionScope
+	if user == nil {
+		scope = domain.PermissionScope{IsGlobal: true}
+	} else {
+		scope = domain.GetPermissionScope(user, "servers", "READ")
+	}
 	return s.repo.GetByID(id, &scope)
 }
 
