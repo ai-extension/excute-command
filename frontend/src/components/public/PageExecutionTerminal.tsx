@@ -6,6 +6,7 @@ import { API_BASE_URL } from '../../lib/api';
 
 interface PageExecutionTerminalProps {
     activeExecutionId: string | null;
+    workflowId?: string;
     slug: string;
     pageToken: string | null;
     terminalState: 'normal' | 'minimized' | 'maximized';
@@ -17,6 +18,7 @@ interface PageExecutionTerminalProps {
 
 const PageExecutionTerminal: React.FC<PageExecutionTerminalProps> = ({
     activeExecutionId,
+    workflowId,
     slug,
     pageToken,
     terminalState,
@@ -52,7 +54,7 @@ const PageExecutionTerminal: React.FC<PageExecutionTerminalProps> = ({
             try {
                 const data = JSON.parse(event.data);
                 if (data.execution_id === activeExecutionId) {
-                    if (data.type === 'log' && data.content) {
+                    if (data.type === 'log' && data.content && (!workflowId || data.target_id === workflowId)) {
                         const newLines = data.content.split('\n').filter((l: string) => l.length > 0);
                         setLogs(prev => [...prev, ...newLines]);
                     } else if (data.type === 'status' && data.target_type === 'workflow') {

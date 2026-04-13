@@ -446,6 +446,7 @@ const PublicPageView = () => {
                     return (
                         <PageExecutionTerminal
                             activeExecutionId={activeExecutionId}
+                            workflowId={currentWidget?.workflow_id}
                             slug={slug}
                             pageToken={pageToken}
                             terminalState={terminalState}
