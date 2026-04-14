@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import {
-    Zap, Loader2, Monitor, Terminal, Clock, Sun, Moon, Copy, Check
+    Zap, Loader2, Monitor, Terminal, Clock, Sun, Moon, Copy, Check, Link2, Search
 } from 'lucide-react';
 import { cn, copyToClipboard as clipboardCopy } from '../lib/utils';
 import { Page, PageWidget, PageLayout, WorkflowInput } from '../types';
@@ -27,6 +27,7 @@ const PublicPageView = () => {
     const [isVerifying, setIsVerifying] = useState(false);
     const [requiresPassword, setRequiresPassword] = useState(false);
     const [widgets, setWidgets] = useState<PageWidget[]>([]);
+    const [searchQuery, setSearchQuery] = useState('');
     const { showToast, apiFetch, isAuthenticated } = useAuth();
     const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false);
 
@@ -391,12 +392,40 @@ const PublicPageView = () => {
                         )}
                     </div>
 
-                    <div className="flex flex-wrap gap-8">
+                    {widgets.length > 0 && (
+                        <div className="mb-10 max-w-xl mx-auto sticky top-6 z-40">
+                            <div className="relative">
+                                <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                                <input
+                                    type="text"
+                                    placeholder="Search widgets..."
+                                    value={searchQuery}
+                                    onChange={e => setSearchQuery(e.target.value)}
+                                    className="w-full h-12 pl-11 pr-4 bg-background/90 backdrop-blur border border-border rounded-full shadow-sm focus:ring-2 ring-primary/20 outline-none transition-all placeholder:text-muted-foreground/50 font-medium text-sm"
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="flex flex-wrap gap-x-[20px] gap-y-8 items-start">
                         {widgets.map(widget => {
+                            if (searchQuery) {
+                                const q = searchQuery.toLowerCase();
+                                const wTitle = (widget.title || '').toLowerCase();
+                                const wDesc = (widget.description || '').toLowerCase();
+                                if (widget.type === 'SECTION') {
+                                    if (!wTitle.includes(q) && !wDesc.includes(q)) return null;
+                                } else {
+                                    if (!wTitle.includes(q) && !wDesc.includes(q)) return null;
+                                }
+                            }
+
+                            const widthClass = widget.size === 'half' ? "w-[calc(50%-10px)]" : widget.size === 'third' ? "w-[calc(33.33%-14px)]" : "w-full";
+
+                            let content = null;
                             if (widget.type === 'ENDPOINT') {
-                                return (
+                                content = (
                                     <EndpointWidget
-                                        key={widget.id}
                                         widget={widget}
                                         isRunning={runningWidgets[widget.id]}
                                         result={executionResults[widget.id]}
@@ -405,16 +434,51 @@ const PublicPageView = () => {
                                     />
                                 );
                             } else if (widget.type === 'TERMINAL') {
-                                return (
+                                content = (
                                     <TerminalWidget
-                                        key={widget.id}
                                         widget={widget}
                                         slug={slug || ''}
                                         pageToken={pageToken}
                                     />
                                 );
+                            } else if (widget.type === 'LINK') {
+                                content = (
+                                    <div className="group bg-card border border-border rounded-[2rem] overflow-hidden hover:border-indigo-500/40 transition-all shadow-sm h-full flex flex-col">
+                                        <div className="flex items-center gap-3 px-5 py-4 border-b border-border bg-card">
+                                            <div className="flex flex-col min-w-0 flex-1">
+                                                <span className="text-[11px] font-black uppercase tracking-tight truncate">{widget.title || 'Link'}</span>
+                                            </div>
+                                            <div className="h-8 w-8 rounded-full bg-indigo-500/10 text-indigo-500 flex items-center justify-center shrink-0">
+                                                <Link2 className="w-4 h-4" />
+                                            </div>
+                                        </div>
+                                        <div className="p-6 flex-1 flex flex-col justify-center">
+                                            <a href={widget.url || '#'} target={widget.new_tab ? "_blank" : "_self"} rel="noreferrer"
+                                                className={cn("h-14 w-full rounded-2xl flex items-center justify-center text-white font-black tracking-[0.15em] text-[10px] shadow-sm cursor-pointer transition-all hover:scale-[1.02]", widget.style || 'bg-indigo-600')}>
+                                                <Link2 className="w-4 h-4 mr-2" />
+                                                {widget.label || 'OPEN LINK'}
+                                            </a>
+                                        </div>
+                                    </div>
+                                );
+                            } else if (widget.type === 'SECTION') {
+                                content = (
+                                    <div className="w-full pt-8 pb-2 border-b-2 border-border/50">
+                                        <h2 className="text-2xl font-black tracking-tight">{widget.title || 'Section Header'}</h2>
+                                        {widget.description && (
+                                            <p className="text-sm text-muted-foreground mt-1">{widget.description}</p>
+                                        )}
+                                    </div>
+                                );
                             }
-                            return null;
+
+                            if (!content) return null;
+
+                            return (
+                                <div key={widget.id} className={cn(widget.type === 'SECTION' ? 'w-full' : widthClass)}>
+                                    {content}
+                                </div>
+                            );
                         })}
                     </div>
 

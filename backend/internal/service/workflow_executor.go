@@ -1379,6 +1379,21 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 				return fmt.Errorf("interpolation error: %w", renderErr)
 			}
 
+			// Resolve AutoInputs variables for this step iteration
+			if len(execCfg.AutoInputs) > 0 {
+				var resolvedAutoInputs []AutoInputRule
+				for _, r := range execCfg.AutoInputs {
+					rp, _ := e.renderTemplate(r.Pattern, pcontext)
+					ri, _ := e.renderTemplate(r.Input, pcontext)
+					resolvedAutoInputs = append(resolvedAutoInputs, AutoInputRule{
+						Pattern: rp,
+						Input:   ri,
+						IsRegex: r.IsRegex,
+					})
+				}
+				execCfg.AutoInputs = resolvedAutoInputs
+			}
+
 			targetServerID := step.ServerID
 			if targetServerID == uuid.Nil {
 				targetServerID = defaultServerID

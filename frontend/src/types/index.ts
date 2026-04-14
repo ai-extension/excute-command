@@ -280,8 +280,8 @@ export interface PageWorkflow {
     workflow?: Workflow;
 }
 
-export type PageWidgetSize = 'full' | 'half';
-export type PageWidgetType = 'TERMINAL' | 'ENDPOINT';
+export type PageWidgetSize = 'full' | 'half' | 'third';
+export type PageWidgetType = 'TERMINAL' | 'ENDPOINT' | 'LINK' | 'SECTION';
 export type PageWidgetReload = 'realtime' | '5' | '10' | '30' | '60';
 
 export interface PageWidget {
@@ -302,6 +302,9 @@ export interface PageWidget {
     style?: string;
     show_log?: boolean;
     description?: string;
+    // LINK-specific
+    url?: string;
+    new_tab?: boolean;
 }
 
 export interface PageLayout {

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
     Save, ChevronLeft, Plus, Trash2, GripVertical,
     Settings as SettingsIcon, Globe, Lock, Copy,
-    Terminal, Zap, Monitor, RefreshCw, X, Palette, Clock, ServerIcon
+    Terminal, Zap, Monitor, RefreshCw, X, Palette, Clock, ServerIcon, Link2, Type
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -201,6 +201,29 @@ const PageDesignerPage = () => {
         setEditingWidgetId(w.id);
     };
 
+    const addLinkWidget = () => {
+        const w: PageWidget = {
+            id: generateId(), type: 'LINK',
+            title: 'External Link', size: 'third',
+            url: 'https://',
+            label: 'Open Link',
+            new_tab: true,
+            style: 'bg-indigo-600 shadow-[0_0_20px_rgba(79,70,229,0.3)]',
+        };
+        setWidgets(prev => [...prev, w]);
+        setEditingWidgetId(w.id);
+    };
+
+    const addSectionWidget = () => {
+        const w: PageWidget = {
+            id: generateId(), type: 'SECTION',
+            title: 'New Section', size: 'full',
+            description: 'Group your widgets here...',
+        };
+        setWidgets(prev => [...prev, w]);
+        setEditingWidgetId(w.id);
+    };
+
     const removeWidget = (wid: string) => {
         setWidgets(prev => prev.filter(w => w.id !== wid));
         if (editingWidgetId === wid) setEditingWidgetId(null);
@@ -291,6 +314,34 @@ const PageDesignerPage = () => {
                             </div>
                             <Plus className="w-4 h-4 text-muted-foreground" />
                         </button>
+
+                        <button onClick={addLinkWidget}
+                            className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-muted text-left transition-all border border-transparent hover:border-border group">
+                            <div className="flex items-center gap-3">
+                                <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-500 group-hover:bg-indigo-500/20 transition-colors">
+                                    <Link2 className="w-3.5 h-3.5" />
+                                </div>
+                                <div>
+                                    <span className="text-sm font-bold block">External Link</span>
+                                    <span className="text-[9px] text-muted-foreground uppercase font-medium">Quick link button</span>
+                                </div>
+                            </div>
+                            <Plus className="w-4 h-4 text-muted-foreground" />
+                        </button>
+
+                        <button onClick={addSectionWidget}
+                            className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-muted text-left transition-all border border-transparent hover:border-border group">
+                            <div className="flex items-center gap-3">
+                                <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-500 group-hover:bg-amber-500/20 transition-colors">
+                                    <Type className="w-3.5 h-3.5" />
+                                </div>
+                                <div>
+                                    <span className="text-sm font-bold block">Section Header</span>
+                                    <span className="text-[9px] text-muted-foreground uppercase font-medium">Title and description</span>
+                                </div>
+                            </div>
+                            <Plus className="w-4 h-4 text-muted-foreground" />
+                        </button>
                     </div>
                 </div>
 
@@ -322,7 +373,7 @@ const PageDesignerPage = () => {
                                                                     {...provided.draggableProps}
                                                                     className={cn(
                                                                         "transition-all duration-200",
-                                                                        widget.size === 'half' ? "w-[calc(50%-10px)]" : "w-full",
+                                                                        widget.size === 'half' ? "w-[calc(50%-10px)]" : widget.size === 'third' ? "w-[calc(33.33%-13px)]" : "w-full",
                                                                         snapshot.isDragging && "opacity-80 scale-[1.02] z-50"
                                                                     )}
                                                                 >
@@ -334,8 +385,22 @@ const PageDesignerPage = () => {
                                                                             onRemove={() => removeWidget(widget.id)}
                                                                             dragHandleProps={provided.dragHandleProps}
                                                                         />
-                                                                    ) : (
+                                                                    ) : widget.type === 'TERMINAL' ? (
                                                                         <TerminalWidgetCard
+                                                                            widget={widget}
+                                                                            onEdit={() => setEditingWidgetId(widget.id)}
+                                                                            onRemove={() => removeWidget(widget.id)}
+                                                                            dragHandleProps={provided.dragHandleProps}
+                                                                        />
+                                                                    ) : widget.type === 'LINK' ? (
+                                                                        <LinkWidgetCard
+                                                                            widget={widget}
+                                                                            onEdit={() => setEditingWidgetId(widget.id)}
+                                                                            onRemove={() => removeWidget(widget.id)}
+                                                                            dragHandleProps={provided.dragHandleProps}
+                                                                        />
+                                                                    ) : (
+                                                                        <SectionWidgetCard
                                                                             widget={widget}
                                                                             onEdit={() => setEditingWidgetId(widget.id)}
                                                                             onRemove={() => removeWidget(widget.id)}
@@ -489,11 +554,63 @@ const PageDesignerPage = () => {
                                     <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Width</label>
                                     <select value={activeWidget.size} onChange={e => updateWidget(activeWidget.id, { size: e.target.value as any })}
                                         className="w-full h-11 bg-muted/30 border border-border/50 rounded-2xl text-[11px] px-4 outline-none font-bold appearance-none cursor-pointer">
+                                        <option value="third" className="bg-popover text-foreground">1/3 Width</option>
                                         <option value="half" className="bg-popover text-foreground">Half Width</option>
                                         <option value="full" className="bg-popover text-foreground">Full Width</option>
                                     </select>
                                 </div>
                             </div>
+                            
+                            {activeWidget.type === 'SECTION' && (
+                                <div className="space-y-6">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Description / Subtitle</label>
+                                        <textarea
+                                            value={activeWidget.description || ''}
+                                            onChange={e => updateWidget(activeWidget.id, { description: e.target.value })}
+                                            className="w-full min-h-[80px] p-4 text-[11px] bg-muted/30 border border-border/50 rounded-2xl focus:ring-2 ring-primary/10 outline-none resize-none transition-all"
+                                            placeholder="Add context or instructions for this section..."
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeWidget.type === 'LINK' && (
+                                <div className="space-y-6">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1 flex items-center gap-2">
+                                            <Link2 className="w-3 h-3 text-indigo-500" /> Target URL
+                                        </label>
+                                        <Input value={activeWidget.url || ''} onChange={e => updateWidget(activeWidget.id, { url: e.target.value })} className="h-11 text-sm bg-muted/30 border border-border/50 rounded-2xl font-mono text-indigo-400" placeholder="https://" />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Button Label</label>
+                                            <Input value={activeWidget.label || ''} onChange={e => updateWidget(activeWidget.id, { label: e.target.value })} className="h-11 text-sm bg-muted/30 border border-border/50 rounded-2xl" placeholder="e.g. Open Link" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Style</label>
+                                            <SearchableSelect
+                                                options={BUTTON_STYLES}
+                                                value={activeWidget.style || ''}
+                                                onValueChange={(val) => updateWidget(activeWidget.id, { style: val })}
+                                                placeholder="Select style..."
+                                                triggerClassName="h-11 text-[11px] font-bold bg-muted/30 border border-border/50 rounded-2xl"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center justify-between p-5 bg-muted/20 rounded-[1.5rem] border border-border/40">
+                                        <div>
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-1">Open in new tab</p>
+                                            <p className="text-[11px] font-medium text-muted-foreground leading-none">Launch link in a separate window</p>
+                                        </div>
+                                        <button onClick={() => updateWidget(activeWidget.id, { new_tab: !activeWidget.new_tab })}
+                                            className={cn("w-12 h-6 rounded-full transition-all relative shrink-0 shadow-inner", activeWidget.new_tab ? "bg-primary" : "bg-muted-foreground/20")}>
+                                            <div className={cn("absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-200", activeWidget.new_tab ? "right-0.5" : "left-0.5")} />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
 
                             {activeWidget.type === 'ENDPOINT' && (
                                 <div className="space-y-6">
@@ -714,6 +831,72 @@ const TerminalWidgetCard: React.FC<TerminalWidgetCardProps> = ({ widget, onEdit,
             <span className="text-emerald-300">{widget.command || 'echo "Hello"'}</span>
             <span className="animate-pulse ml-1 text-emerald-400">▋</span>
         </div>
+    </div>
+);
+
+interface LinkWidgetCardProps {
+    widget: PageWidget;
+    onEdit: () => void;
+    onRemove: () => void;
+    dragHandleProps: any;
+}
+
+const LinkWidgetCard: React.FC<LinkWidgetCardProps> = ({ widget, onEdit, onRemove, dragHandleProps }) => (
+    <div className="group bg-card border border-border rounded-[2rem] overflow-hidden hover:border-indigo-500/40 transition-all shadow-sm">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-card">
+            <div className="flex items-center gap-3">
+                <div {...dragHandleProps} className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors">
+                    <GripVertical className="w-4 h-4" />
+                </div>
+                <div className="flex flex-col min-w-0">
+                    <span className="text-[11px] font-black uppercase tracking-tight truncate max-w-[120px]">{widget.title || 'Link'}</span>
+                    <span className="text-[9px] text-muted-foreground font-mono truncate max-w-[120px]">{widget.url || '---'}</span>
+                </div>
+            </div>
+            <div className="flex gap-2 shrink-0">
+                <button onClick={onEdit} className="h-7 w-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                    <SettingsIcon className="w-3 h-3" />
+                </button>
+                <button onClick={onRemove} className="h-7 w-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
+                    <Trash2 className="w-3 h-3" />
+                </button>
+            </div>
+        </div>
+        <div className="p-4">
+            <div className={cn("h-12 w-full rounded-[1rem] flex items-center justify-center text-white font-black tracking-[0.1em] text-[10px] shadow-sm cursor-pointer", widget.style || 'bg-indigo-600')}>
+                <Link2 className="w-3.5 h-3.5 mr-2" />
+                {widget.label || 'Open Link'}
+            </div>
+        </div>
+    </div>
+);
+
+interface SectionWidgetCardProps {
+    widget: PageWidget;
+    onEdit: () => void;
+    onRemove: () => void;
+    dragHandleProps: any;
+}
+
+const SectionWidgetCard: React.FC<SectionWidgetCardProps> = ({ widget, onEdit, onRemove, dragHandleProps }) => (
+    <div className="group border-b-2 border-border/50 pb-2 mb-2 pt-4 relative">
+        <div className="absolute right-0 top-0 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button onClick={onEdit} className="h-7 w-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                <SettingsIcon className="w-3 h-3" />
+            </button>
+            <button onClick={onRemove} className="h-7 w-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
+                <Trash2 className="w-3 h-3" />
+            </button>
+        </div>
+        <div className="flex items-center gap-2">
+            <div {...dragHandleProps} className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors mr-1">
+                <GripVertical className="w-4 h-4" />
+            </div>
+            <h3 className="text-lg font-black tracking-tight">{widget.title || 'Section Header'}</h3>
+        </div>
+        {widget.description && (
+            <p className="text-xs text-muted-foreground mt-1 ml-7">{widget.description}</p>
+        )}
     </div>
 );
 
