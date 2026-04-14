@@ -209,6 +209,7 @@ const PageDesignerPage = () => {
             label: 'Open Link',
             new_tab: true,
             style: 'bg-indigo-600 shadow-[0_0_20px_rgba(79,70,229,0.3)]',
+            description: '',
         };
         setWidgets(prev => [...prev, w]);
         setEditingWidgetId(w.id);
@@ -599,6 +600,15 @@ const PageDesignerPage = () => {
                                             />
                                         </div>
                                     </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Description</label>
+                                        <textarea
+                                            value={activeWidget.description || ''}
+                                            onChange={e => updateWidget(activeWidget.id, { description: e.target.value })}
+                                            className="w-full min-h-[80px] p-4 text-[11px] bg-muted/30 border border-border/50 rounded-2xl focus:ring-2 ring-primary/10 outline-none resize-none transition-all"
+                                            placeholder="Add a short description for this link..."
+                                        />
+                                    </div>
                                     <div className="flex items-center justify-between p-5 bg-muted/20 rounded-[1.5rem] border border-border/40">
                                         <div>
                                             <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-1">Open in new tab</p>
@@ -863,6 +873,9 @@ const LinkWidgetCard: React.FC<LinkWidgetCardProps> = ({ widget, onEdit, onRemov
             </div>
         </div>
         <div className="p-4">
+            {widget.description && (
+                <p className="text-[10px] text-muted-foreground mb-3 px-2 line-clamp-2">{widget.description}</p>
+            )}
             <div className={cn("h-12 w-full rounded-[1rem] flex items-center justify-center text-white font-black tracking-[0.1em] text-[10px] shadow-sm cursor-pointer", widget.style || 'bg-indigo-600')}>
                 <Link2 className="w-3.5 h-3.5 mr-2" />
                 {widget.label || 'Open Link'}

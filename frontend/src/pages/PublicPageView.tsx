@@ -420,7 +420,7 @@ const PublicPageView = () => {
                                 }
                             }
 
-                            const widthClass = widget.size === 'half' ? "w-[calc(50%-10px)]" : widget.size === 'third' ? "w-[calc(33.33%-14px)]" : "w-full";
+                            const widthClass = widget.size === 'half' ? "w-full md:w-[calc(50%-10px)]" : widget.size === 'third' ? "w-full md:w-[calc((100%-40px)/3)]" : "w-full";
 
                             let content = null;
                             if (widget.type === 'ENDPOINT') {
@@ -444,15 +444,18 @@ const PublicPageView = () => {
                             } else if (widget.type === 'LINK') {
                                 content = (
                                     <div className="group bg-card border border-border rounded-[2rem] overflow-hidden hover:border-indigo-500/40 transition-all shadow-sm h-full flex flex-col">
-                                        <div className="flex items-center gap-3 px-5 py-4 border-b border-border bg-card">
-                                            <div className="flex flex-col min-w-0 flex-1">
-                                                <span className="text-[11px] font-black uppercase tracking-tight truncate">{widget.title || 'Link'}</span>
-                                            </div>
-                                            <div className="h-8 w-8 rounded-full bg-indigo-500/10 text-indigo-500 flex items-center justify-center shrink-0">
+                                        <div className="flex items-center gap-4 px-8 py-4 border-b border-border bg-card">
+                                            <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500 ring-1 ring-indigo-500/20">
                                                 <Link2 className="w-4 h-4" />
                                             </div>
+                                            <div className="flex flex-col min-w-0 flex-1">
+                                                <span className="text-[13px] font-black uppercase tracking-[0.2em] truncate">{widget.title || 'Link'}</span>
+                                            </div>
                                         </div>
-                                        <div className="p-6 flex-1 flex flex-col justify-center">
+                                        <div className="p-8 flex-1 flex flex-col justify-center">
+                                            {widget.description && (
+                                                <p className="text-sm text-muted-foreground mb-4 px-1 line-clamp-3">{widget.description}</p>
+                                            )}
                                             <a href={widget.url || '#'} target={widget.new_tab ? "_blank" : "_self"} rel="noreferrer"
                                                 className={cn("h-14 w-full rounded-2xl flex items-center justify-center text-white font-black tracking-[0.15em] text-[10px] shadow-sm cursor-pointer transition-all hover:scale-[1.02]", widget.style || 'bg-indigo-600')}>
                                                 <Link2 className="w-4 h-4 mr-2" />

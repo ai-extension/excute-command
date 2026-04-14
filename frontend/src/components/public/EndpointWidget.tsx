@@ -22,18 +22,17 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
 }) => {
     return (
         <div className={cn(
-            "p-10 bg-card border border-border rounded-[3rem] shadow-xl flex flex-col justify-between min-h-[260px] transition-all hover:border-primary/50 group",
-            widget.size === 'full' ? "w-full" : "w-full md:w-[calc(50%-16px)]"
+            "p-8 bg-card border border-border rounded-[2rem] shadow-xl flex flex-col justify-between min-h-[260px] transition-all hover:border-primary/50 group w-full"
         )}>
             <div>
                 <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-5">
-                        <div className="p-4 rounded-[1.5rem] bg-primary/10 text-primary ring-1 ring-primary/20 group-hover:bg-primary group-hover:text-white transition-all duration-300">
-                            <Zap className="w-7 h-7" />
+                    <div className="flex items-center gap-4">
+                        <div className="p-2.5 rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20 group-hover:bg-primary group-hover:text-white transition-all duration-300">
+                            <Zap className="w-4 h-4" />
                         </div>
                         <div>
-                            <h3 className="text-2xl font-black tracking-tight uppercase leading-tight">{widget.title}</h3>
-                            <Badge variant="outline" className="text-[8px] font-black uppercase tracking-[0.25em] px-2 h-5 mt-1.5 border-primary/30 text-primary/70">Terminal Access Port</Badge>
+                            <h3 className="text-[13px] font-black tracking-[0.2em] uppercase leading-tight">{widget.title}</h3>
+                            <Badge variant="outline" className="text-[7px] font-black uppercase tracking-[0.25em] px-1.5 h-4 mt-1 border-primary/30 text-primary/70">Terminal Access Port</Badge>
                         </div>
                     </div>
                 </div>

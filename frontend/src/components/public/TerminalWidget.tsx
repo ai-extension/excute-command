@@ -84,9 +84,8 @@ const TerminalWidget: React.FC<TerminalWidgetProps> = ({ widget, slug, pageToken
 
     return (
         <div className={cn(
-            "bg-[#0a0b0e] border border-white/10 rounded-[3rem] overflow-hidden shadow-2xl transition-all duration-300 group hover:border-emerald-500/30",
-            widgetState === 'maximized' ? "fixed inset-8 z-[120] w-auto h-auto" :
-                widget.size === 'full' ? "w-full" : "w-full md:w-[calc(50%-16px)]",
+            "bg-[#0a0b0e] border border-white/10 rounded-[2rem] overflow-hidden shadow-2xl transition-all duration-300 group hover:border-emerald-500/30",
+            widgetState === 'maximized' ? "fixed inset-8 z-[120] w-auto h-auto" : "w-full",
             widgetState === 'minimized' ? "h-[54px]" : ""
         )}>
             <div className="flex items-center justify-between px-4 py-2.5 bg-white/5 border-b border-white/5">
@@ -112,13 +111,13 @@ const TerminalWidget: React.FC<TerminalWidgetProps> = ({ widget, slug, pageToken
                         </button>
                     </div>
                     <Terminal className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="text-[11px] font-mono font-black text-zinc-100 uppercase tracking-[0.2em]">{widget.title}</span>
+                    <span className="text-[13px] font-mono font-black text-zinc-100 uppercase tracking-[0.2em]">{widget.title}</span>
                 </div>
             </div>
             {widgetState !== 'minimized' && (
                 <>
                     <div ref={scrollRef} className={cn(
-                        "p-10 font-mono text-[14px] leading-relaxed text-slate-200 overflow-y-auto overflow-x-auto whitespace-pre scrollbar-thin selection:bg-emerald-500/40 selection:text-white",
+                        "p-8 font-mono text-[14px] leading-relaxed text-slate-200 overflow-y-auto overflow-x-auto whitespace-pre scrollbar-thin selection:bg-emerald-500/40 selection:text-white",
                         widgetState === 'maximized' ? "h-[calc(100vh-250px)]" : "min-h-[250px] max-h-[500px]"
                     )}>
                         {lines.map((l: string, i: number) => (
@@ -127,7 +126,7 @@ const TerminalWidget: React.FC<TerminalWidgetProps> = ({ widget, slug, pageToken
                             </div>
                         ))}
                     </div>
-                    <div className="px-10 py-5 bg-black/40 border-t border-white/5 text-[11px] font-mono text-zinc-400 truncate opacity-60 group-hover:opacity-100 transition-opacity uppercase tracking-[0.1em]">
+                    <div className="px-8 py-4 bg-black/40 border-t border-white/5 text-[11px] font-mono text-zinc-400 truncate opacity-60 group-hover:opacity-100 transition-opacity uppercase tracking-[0.1em]">
                         <span className="text-emerald-500 font-bold mr-2">$ exec</span> {widget.command}
                     </div>
                 </>

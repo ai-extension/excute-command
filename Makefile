@@ -39,7 +39,7 @@ db-init2: ## Re-initialize database (clear all data)
 
 
 run-be: ## Run backend server
-	@PID=$$(lsof -t -i:8080); if [ -n "$$PID" ]; then kill -9 $$PID; fi
+# 	@PID=$$(lsof -t -i:8080); if [ -n "$$PID" ]; then kill -9 $$PID; fi
 	cd backend && go run cmd/server/main.go
 
 run-fe: ## Run frontend development server
