@@ -31,8 +31,8 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
                             <Zap className="w-4 h-4" />
                         </div>
                         <div>
-                            <h3 className="text-[13px] font-black tracking-[0.2em] uppercase leading-tight">{widget.title}</h3>
-                            <Badge variant="outline" className="text-[7px] font-black uppercase tracking-[0.25em] px-1.5 h-4 mt-1 border-primary/30 text-primary/70">Terminal Access Port</Badge>
+                            <h3 className="text-[13px] font-black leading-tight">{widget.title}</h3>
+                            <Badge variant="outline" className="text-[7px] font-black px-1.5 h-4 mt-1 border-primary/30 text-primary/70">Terminal Access Port</Badge>
                         </div>
                     </div>
                 </div>
@@ -47,7 +47,7 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
                         <Button
                             disabled
                             className={cn(
-                                "flex-1 h-16 rounded-[1.5rem] font-black tracking-[0.3em] text-[11px] shadow-premium transition-all",
+                                "flex-1 h-16 rounded-[1.5rem] font-black text-[11px] shadow-premium transition-all",
                                 widget.style || "premium-gradient"
                             )}
                         >
@@ -68,7 +68,7 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
                         onClick={() => onRun(widget)}
                         disabled={isRunning}
                         className={cn(
-                            "w-full h-16 rounded-[1.5rem] font-black tracking-[0.3em] text-[11px] shadow-premium transition-all active:scale-[0.98]",
+                            "w-full h-16 rounded-[1.5rem] font-black text-[11px] shadow-premium transition-all active:scale-[0.98]",
                             result ? (result.success ? "bg-emerald-500 hover:bg-emerald-600 text-white" : "bg-rose-500 hover:bg-rose-600 text-white") : (widget.style || "premium-gradient")
                         )}
                     >
