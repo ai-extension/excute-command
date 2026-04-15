@@ -307,7 +307,7 @@ const PublicPageView = () => {
         return (
             <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
                 <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
-                <h1 className="text-xl font-bold uppercase tracking-tighter">Establishing Link</h1>
+                <h1 className="text-xl font-bold uppercase ">Establishing Link</h1>
             </div>
         );
     }
@@ -362,7 +362,7 @@ const PublicPageView = () => {
 
                 <main className="max-w-6xl mx-auto px-6 pt-24 pb-32">
                     <div className="flex flex-col items-center text-center mb-16 space-y-4">
-                        <h1 className="text-5xl md:text-7xl font-black tracking-tighter">{page?.title}</h1>
+                        <h1 className="text-5xl md:text-7xl font-black ">{page?.title}</h1>
                         <p className="text-lg text-muted-foreground font-medium italic opacity-70">
                             {page?.description || "Interactive control center."}
                         </p>
@@ -370,13 +370,13 @@ const PublicPageView = () => {
                         <div className="flex items-center gap-6 pt-2">
                             <div className="flex items-center gap-2">
                                 <Zap className="w-4 h-4 text-primary" />
-                                <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
+                                <span className="text-[11px] font-black uppercase  text-muted-foreground">
                                     {widgets.filter(w => w.type === 'ENDPOINT').length} Endpoints
                                 </span>
                             </div>
                             <div className="flex items-center gap-2">
                                 <Terminal className="w-4 h-4 text-emerald-500" />
-                                <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
+                                <span className="text-[11px] font-black uppercase  text-muted-foreground">
                                     {widgets.filter(w => w.type === 'TERMINAL').length} Terminals
                                 </span>
                             </div>
@@ -385,7 +385,7 @@ const PublicPageView = () => {
                         {tokenExpiresAt && (
                             <div className="flex items-center gap-2 pt-1 opacity-50">
                                 <Clock className="w-3 h-3 text-muted-foreground" />
-                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                                <span className="text-[10px] font-bold text-muted-foreground uppercase ">
                                     Session expires at {tokenExpiresAt.toLocaleTimeString()}
                                 </span>
                             </div>
@@ -449,7 +449,7 @@ const PublicPageView = () => {
                                                 <Link2 className="w-4 h-4" />
                                             </div>
                                             <div className="flex flex-col min-w-0 flex-1">
-                                                <span className="text-[13px] font-black uppercase tracking-[0.2em] truncate">{widget.title || 'Link'}</span>
+                                                <span className="text-[13px] font-black truncate">{widget.title || 'Link'}</span>
                                             </div>
                                         </div>
                                         <div className="p-8 flex-1 flex flex-col justify-center">
@@ -457,7 +457,7 @@ const PublicPageView = () => {
                                                 <p className="text-sm text-muted-foreground mb-4 px-1 line-clamp-3">{widget.description}</p>
                                             )}
                                             <a href={widget.url || '#'} target={widget.new_tab ? "_blank" : "_self"} rel="noreferrer"
-                                                className={cn("h-14 w-full rounded-2xl flex items-center justify-center text-white font-black tracking-[0.15em] text-[10px] shadow-sm cursor-pointer transition-all hover:scale-[1.02]", widget.style || 'bg-indigo-600')}>
+                                                className={cn("h-14 w-full rounded-2xl flex items-center justify-center text-white font-black text-[10px] shadow-sm cursor-pointer transition-all hover:scale-[1.02]", widget.style || 'bg-indigo-600')}>
                                                 <Link2 className="w-4 h-4 mr-2" />
                                                 {widget.label || 'OPEN LINK'}
                                             </a>
@@ -467,7 +467,7 @@ const PublicPageView = () => {
                             } else if (widget.type === 'SECTION') {
                                 content = (
                                     <div className="w-full pt-8 pb-2 border-b-2 border-border/50">
-                                        <h2 className="text-2xl font-black tracking-tight">{widget.title || 'Section Header'}</h2>
+                                        <h2 className="text-2xl font-black ">{widget.title || 'Section Header'}</h2>
                                         {widget.description && (
                                             <p className="text-sm text-muted-foreground mt-1">{widget.description}</p>
                                         )}
@@ -488,7 +488,7 @@ const PublicPageView = () => {
                     {widgets.length === 0 && (
                         <div className="py-32 text-center opacity-30">
                             <Monitor className="w-12 h-12 mx-auto mb-4" />
-                            <p className="text-sm font-bold uppercase tracking-widest">No nodes deployed</p>
+                            <p className="text-sm font-bold uppercase">No nodes deployed</p>
                         </div>
                     )}
                 </main>
