@@ -9,6 +9,16 @@ import { Button } from '../components/ui/button';
 import WorkflowInputDialog from '../components/WorkflowInputDialog';
 import { API_BASE_URL } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import {
+    HistoryMap,
+    ExecutionHistoryEntry,
+    loadHistory,
+    saveHistory,
+    appendEntry,
+    updateEntryStatus,
+} from '../lib/executionHistory';
+import { resolveButtonStyle } from '../components/ButtonStylePicker';
 
 // Extracted Components
 import PasswordProtection from '../components/PasswordProtection';
@@ -55,6 +65,15 @@ const PublicPageView = () => {
         setInputModal({ isOpen: false, widget: null, workflowInputs: [] });
     };
 
+    // Execution history (persisted per slug in localStorage)
+    const [historyMap, setHistoryMap] = useState<HistoryMap>({});
+    useEffect(() => {
+        if (slug) setHistoryMap(loadHistory(slug));
+    }, [slug]);
+    useEffect(() => {
+        if (slug) saveHistory(slug, historyMap);
+    }, [slug, historyMap]);
+
     // Log Streaming State
     const [activeExecutionId, setActiveExecutionId] = useState<string | null>(null);
     const [activeWidgetId, setActiveWidgetId] = useState<string | null>(null);
@@ -77,25 +96,28 @@ const PublicPageView = () => {
             }
         }
     }, [executionStatus, activeWidgetId]);
+    const { setTheme: setGlobalTheme } = useTheme();
     const [publicTheme, setPublicTheme] = useState<'light' | 'dark'>(() => {
-        return (localStorage.getItem('public-theme') as 'light' | 'dark') || 'dark';
+        return (localStorage.getItem('public-theme') as 'light' | 'dark') || 'light';
     });
     const [isCopied, setIsCopied] = useState(false);
 
+    // Persist public-theme separately and drive global ThemeProvider so it doesn't override us
     useEffect(() => {
         localStorage.setItem('public-theme', publicTheme);
-        // Direct manipulation of document element to override global ThemeProvider
-        if (publicTheme === 'dark') {
-            document.documentElement.classList.add('dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-        }
-    }, [publicTheme]);
+        setGlobalTheme(publicTheme);
+    }, [publicTheme, setGlobalTheme]);
 
-    // Restore admin theme when leaving public page
+    // Restore admin theme (both localStorage + class) on unmount
     useEffect(() => {
-        const originalTheme = localStorage.getItem('theme') || 'dark';
+        const originalTheme = (localStorage.getItem('admin-theme') as 'light' | 'dark')
+            || (localStorage.getItem('theme') as 'light' | 'dark')
+            || 'dark';
+        // Snapshot admin theme so we can restore on unmount even after we overwrite "theme"
+        localStorage.setItem('admin-theme', originalTheme);
         return () => {
+            localStorage.setItem('theme', originalTheme);
+            localStorage.removeItem('admin-theme');
             if (originalTheme === 'dark') {
                 document.documentElement.classList.add('dark');
             } else {
@@ -265,6 +287,19 @@ const PublicPageView = () => {
                 setExecutionStatus('RUNNING');
                 setIsPollingLogs(true);
 
+                // Persist history entry for this run
+                if (data.execution_id) {
+                    const entry: ExecutionHistoryEntry = {
+                        executionId: data.execution_id,
+                        widgetId: widget.id,
+                        workflowId: widget.workflow_id,
+                        inputs,
+                        status: 'RUNNING',
+                        timestamp: Date.now(),
+                    };
+                    setHistoryMap(prev => appendEntry(prev, entry));
+                }
+
                 // Determine if logs should be shown (check widget config then fallback to page workflow config)
                 const showLog = widget.show_log ?? page?.workflows?.find(pw => pw.workflow_id === widget.workflow_id)?.show_log ?? false;
 
@@ -393,7 +428,7 @@ const PublicPageView = () => {
                     </div>
 
                     {widgets.length > 0 && (
-                        <div className="mb-10 max-w-xl mx-auto sticky top-6 z-40">
+                        <div className="mb-10 max-w-xl mx-auto">
                             <div className="relative">
                                 <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
                                 <input
@@ -408,81 +443,116 @@ const PublicPageView = () => {
                     )}
 
                     <div className="flex flex-wrap gap-x-[20px] gap-y-8 items-start">
-                        {widgets.map(widget => {
-                            if (searchQuery) {
+                        {(() => {
+                            const matchesSearch = (widget: PageWidget) => {
+                                if (!searchQuery) return true;
                                 const q = searchQuery.toLowerCase();
                                 const wTitle = (widget.title || '').toLowerCase();
                                 const wDesc = (widget.description || '').toLowerCase();
-                                if (widget.type === 'SECTION') {
-                                    if (!wTitle.includes(q) && !wDesc.includes(q)) return null;
-                                } else {
-                                    if (!wTitle.includes(q) && !wDesc.includes(q)) return null;
+                                return wTitle.includes(q) || wDesc.includes(q);
+                            };
+
+                            const renderWidgetBody = (widget: PageWidget): React.ReactNode => {
+                                if (widget.type === 'ENDPOINT') {
+                                    return (
+                                        <EndpointWidget
+                                            widget={widget}
+                                            isRunning={runningWidgets[widget.id]}
+                                            result={executionResults[widget.id]}
+                                            onRun={runWidget}
+                                            onStop={stopWidget}
+                                            history={historyMap[widget.id] || []}
+                                            slug={slug}
+                                            pageToken={pageToken}
+                                        />
+                                    );
                                 }
-                            }
-
-                            const widthClass = widget.size === 'half' ? "w-full md:w-[calc(50%-10px)]" : widget.size === 'third' ? "w-full md:w-[calc((100%-40px)/3)]" : "w-full";
-
-                            let content = null;
-                            if (widget.type === 'ENDPOINT') {
-                                content = (
-                                    <EndpointWidget
-                                        widget={widget}
-                                        isRunning={runningWidgets[widget.id]}
-                                        result={executionResults[widget.id]}
-                                        onRun={runWidget}
-                                        onStop={stopWidget}
-                                    />
-                                );
-                            } else if (widget.type === 'TERMINAL') {
-                                content = (
-                                    <TerminalWidget
-                                        widget={widget}
-                                        slug={slug || ''}
-                                        pageToken={pageToken}
-                                    />
-                                );
-                            } else if (widget.type === 'LINK') {
-                                content = (
-                                    <div className="group bg-card border border-border rounded-[2rem] overflow-hidden hover:border-indigo-500/40 transition-all shadow-sm h-full flex flex-col">
-                                        <div className="flex items-center gap-4 px-8 py-4 border-b border-border bg-card">
-                                            <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500 ring-1 ring-indigo-500/20">
-                                                <Link2 className="w-4 h-4" />
+                                if (widget.type === 'TERMINAL') {
+                                    return (
+                                        <TerminalWidget
+                                            widget={widget}
+                                            slug={slug || ''}
+                                            pageToken={pageToken}
+                                        />
+                                    );
+                                }
+                                if (widget.type === 'LINK') {
+                                    return (
+                                        <div className="group bg-card border border-border rounded-[2rem] overflow-hidden hover:border-indigo-500/40 transition-all shadow-sm h-full flex flex-col">
+                                            <div className="flex items-center gap-4 px-8 py-4 border-b border-border bg-card">
+                                                <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500 ring-1 ring-indigo-500/20">
+                                                    <Link2 className="w-4 h-4" />
+                                                </div>
+                                                <div className="flex flex-col min-w-0 flex-1">
+                                                    <span className="text-[13px] font-black truncate">{widget.title || 'Link'}</span>
+                                                </div>
                                             </div>
-                                            <div className="flex flex-col min-w-0 flex-1">
-                                                <span className="text-[13px] font-black truncate">{widget.title || 'Link'}</span>
+                                            <div className="p-8 flex-1 flex flex-col justify-center">
+                                                {widget.description && (
+                                                    <p className="text-sm text-muted-foreground mb-4 px-1 line-clamp-3">{widget.description}</p>
+                                                )}
+                                                {(() => {
+                                                    const r = resolveButtonStyle(widget.style, 'bg-indigo-600');
+                                                    return (
+                                                        <a href={widget.url || '#'} target={widget.new_tab ? "_blank" : "_self"} rel="noreferrer"
+                                                            style={r.style}
+                                                            className={cn("h-14 w-full rounded-2xl flex items-center justify-center text-white font-black text-[10px] shadow-sm cursor-pointer transition-all hover:scale-[1.02]", r.className)}>
+                                                            <Link2 className="w-4 h-4 mr-2" />
+                                                            {widget.label || 'OPEN LINK'}
+                                                        </a>
+                                                    );
+                                                })()}
                                             </div>
                                         </div>
-                                        <div className="p-8 flex-1 flex flex-col justify-center">
-                                            {widget.description && (
-                                                <p className="text-sm text-muted-foreground mb-4 px-1 line-clamp-3">{widget.description}</p>
+                                    );
+                                }
+                                return null;
+                            };
+
+                            const widthFor = (widget: PageWidget) =>
+                                widget.size === 'half' ? "w-full md:w-[calc(50%-10px)]" : widget.size === 'third' ? "w-full md:w-[calc((100%-40px)/3)]" : "w-full";
+
+                            const topLevel = widgets.filter(w => !w.parent_id);
+
+                            return topLevel.map(widget => {
+                                if (widget.type === 'SECTION') {
+                                    const children = widgets.filter(w => w.parent_id === widget.id);
+                                    const visibleChildren = children.filter(matchesSearch);
+                                    if (!matchesSearch(widget) && visibleChildren.length === 0) return null;
+                                    return (
+                                        <div key={widget.id} className="w-full">
+                                            <div className="pt-4 pb-3 border-b-2 border-border/50 mb-6">
+                                                <h2 className="text-2xl font-black">{widget.title || 'Section Header'}</h2>
+                                                {widget.description && (
+                                                    <p className="text-sm text-muted-foreground mt-1">{widget.description}</p>
+                                                )}
+                                            </div>
+                                            {visibleChildren.length > 0 && (
+                                                <div className="flex flex-wrap gap-x-[20px] gap-y-8 items-start">
+                                                    {visibleChildren.map(child => {
+                                                        const body = renderWidgetBody(child);
+                                                        if (!body) return null;
+                                                        return (
+                                                            <div key={child.id} className={widthFor(child)}>
+                                                                {body}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
                                             )}
-                                            <a href={widget.url || '#'} target={widget.new_tab ? "_blank" : "_self"} rel="noreferrer"
-                                                className={cn("h-14 w-full rounded-2xl flex items-center justify-center text-white font-black text-[10px] shadow-sm cursor-pointer transition-all hover:scale-[1.02]", widget.style || 'bg-indigo-600')}>
-                                                <Link2 className="w-4 h-4 mr-2" />
-                                                {widget.label || 'OPEN LINK'}
-                                            </a>
                                         </div>
+                                    );
+                                }
+                                if (!matchesSearch(widget)) return null;
+                                const body = renderWidgetBody(widget);
+                                if (!body) return null;
+                                return (
+                                    <div key={widget.id} className={widthFor(widget)}>
+                                        {body}
                                     </div>
                                 );
-                            } else if (widget.type === 'SECTION') {
-                                content = (
-                                    <div className="w-full pt-8 pb-2 border-b-2 border-border/50">
-                                        <h2 className="text-2xl font-black ">{widget.title || 'Section Header'}</h2>
-                                        {widget.description && (
-                                            <p className="text-sm text-muted-foreground mt-1">{widget.description}</p>
-                                        )}
-                                    </div>
-                                );
-                            }
-
-                            if (!content) return null;
-
-                            return (
-                                <div key={widget.id} className={cn(widget.type === 'SECTION' ? 'w-full' : widthClass)}>
-                                    {content}
-                                </div>
-                            );
-                        })}
+                            });
+                        })()}
                     </div>
 
                     {widgets.length === 0 && (
@@ -540,6 +610,9 @@ const PublicPageView = () => {
                             }}
                             onStatusChange={(status: string) => {
                                 setExecutionStatus(status);
+                                if (activeWidgetId && activeExecutionId) {
+                                    setHistoryMap(prev => updateEntryStatus(prev, activeWidgetId, activeExecutionId, status));
+                                }
                                 if (status === 'SUCCESS' || status === 'FAILED' || status === 'CANCELLED') {
                                     if (activeWidgetId) {
                                         setExecutionResults(prev => ({

@@ -305,6 +305,8 @@ export interface PageWidget {
     // LINK-specific
     url?: string;
     new_tab?: boolean;
+    // SECTION nesting — id of parent SECTION widget (top-level when undefined)
+    parent_id?: string;
 }
 
 export interface PageLayout {

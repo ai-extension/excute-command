@@ -302,7 +302,20 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                                                             {/* Right side: Type & Default Value */}
                                                             <div className="col-span-6">
                                                                 <div className="space-y-1.5">
-                                                                    <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Type</label>
+                                                                    <div className="flex items-center justify-between">
+                                                                        <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Type</label>
+                                                                        <div className="flex items-center gap-2">
+                                                                            <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Required</label>
+                                                                            <Switch
+                                                                                checked={input.required ?? true}
+                                                                                onCheckedChange={(val) => {
+                                                                                    const ni = [...inputs];
+                                                                                    ni[idx].required = val;
+                                                                                    setInputs(ni);
+                                                                                }}
+                                                                            />
+                                                                        </div>
+                                                                    </div>
                                                                     <select
                                                                         value={input.type || 'input'}
                                                                         onChange={(e) => { const ni = [...inputs]; ni[idx].type = e.target.value as WorkflowInput['type']; setInputs(ni); }}

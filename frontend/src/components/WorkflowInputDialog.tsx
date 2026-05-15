@@ -126,8 +126,10 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
             if (input.type === 'select') {
                 const options = (input.default_value || '').split(',').map(o => o.trim()).filter(Boolean);
                 if (isValueEmpty) {
-                    newErrors[input.key] = 'Please select an option';
-                } else if (!isValueEmpty && !options.includes(val)) {
+                    if (input.required) {
+                        newErrors[input.key] = 'Please select an option';
+                    }
+                } else if (!options.includes(val)) {
                     newErrors[input.key] = 'Invalid option';
                 }
             } else if (input.type === 'multi-select') {
@@ -144,6 +146,11 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                 }
                 if (!Array.isArray(rows)) {
                     newErrors[input.key] = 'Must be an array';
+                    return;
+                }
+                const hasData = rows.some(r => r && Object.values(r).some(v => String(v ?? '').trim() !== ''));
+                if (input.required && !hasData) {
+                    newErrors[input.key] = 'Please add at least one row';
                     return;
                 }
                 for (const row of rows) {

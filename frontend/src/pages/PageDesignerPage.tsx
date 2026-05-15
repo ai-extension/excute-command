@@ -16,6 +16,7 @@ import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../lib/api';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { TagSelector } from '../components/TagSelector';
+import { ButtonStylePicker, resolveButtonStyle } from '../components/ButtonStylePicker';
 
 
 const generateId = () => Math.random().toString(36).slice(2, 10);
@@ -235,10 +236,77 @@ const PageDesignerPage = () => {
 
     const handleDragEnd = (result: DropResult) => {
         if (!result.destination) return;
-        const items = [...widgets];
-        const [moved] = items.splice(result.source.index, 1);
-        items.splice(result.destination.index, 0, moved);
-        setWidgets(items);
+        const srcId = result.source.droppableId;
+        const dstId = result.destination.droppableId;
+        const srcIdx = result.source.index;
+        const dstIdx = result.destination.index;
+
+        const isSectionDroppable = (id: string) => id.startsWith('section-');
+        const getParentIdFromDroppable = (id: string) => isSectionDroppable(id) ? id.slice('section-'.length) : null;
+
+        const srcParent = getParentIdFromDroppable(srcId);
+        const dstParent = getParentIdFromDroppable(dstId);
+
+        const sourceList = widgets.filter(w => (w.parent_id || null) === srcParent);
+        const moved = sourceList[srcIdx];
+        if (!moved) return;
+
+        // Disallow section inside section
+        if (moved.type === 'SECTION' && dstParent) return;
+
+        const sameList = srcParent === dstParent;
+
+        // Build new flat array
+        const updated = widgets.map(w => w.id === moved.id ? { ...w, parent_id: dstParent || undefined } : w);
+
+        // Compute final orders per parent
+        const buildOrdered = () => {
+            const topLevel = updated.filter(w => !w.parent_id);
+            const childrenByParent: Record<string, typeof updated> = {};
+            updated.forEach(w => {
+                if (w.parent_id) {
+                    if (!childrenByParent[w.parent_id]) childrenByParent[w.parent_id] = [];
+                    childrenByParent[w.parent_id].push(w);
+                }
+            });
+
+            // Apply DnD reordering to the affected lists
+            const reorder = (list: typeof updated, parent: string | null) => {
+                const filtered = list.filter(w => w.id !== moved.id);
+                if (sameList) {
+                    if ((parent || null) === srcParent) {
+                        filtered.splice(dstIdx, 0, updated.find(w => w.id === moved.id)!);
+                    }
+                } else {
+                    if ((parent || null) === dstParent) {
+                        filtered.splice(dstIdx, 0, updated.find(w => w.id === moved.id)!);
+                    }
+                }
+                return filtered;
+            };
+
+            const finalTop = reorder(topLevel, null);
+            const finalChildren: Record<string, typeof updated> = {};
+            Object.keys(childrenByParent).forEach(pid => {
+                finalChildren[pid] = reorder(childrenByParent[pid], pid);
+            });
+            // Ensure dst section list exists when moving into empty section
+            if (dstParent && !finalChildren[dstParent]) {
+                finalChildren[dstParent] = reorder([], dstParent);
+            }
+
+            // Flatten: each top-level, followed by its children if section
+            const flat: typeof updated = [];
+            finalTop.forEach(w => {
+                flat.push(w);
+                if (w.type === 'SECTION' && finalChildren[w.id]) {
+                    flat.push(...finalChildren[w.id]);
+                }
+            });
+            return flat;
+        };
+
+        setWidgets(buildOrdered());
     };
 
 
@@ -366,7 +434,7 @@ const PageDesignerPage = () => {
                                         <Droppable droppableId="canvas">
                                             {(provided) => (
                                                 <div {...provided.droppableProps} ref={provided.innerRef} className="flex flex-wrap gap-5 items-start">
-                                                    {widgets.map((widget, idx) => (
+                                                    {widgets.filter(w => !w.parent_id).map((widget, idx) => (
                                                         <Draggable key={widget.id} draggableId={widget.id} index={idx}>
                                                             {(provided, snapshot) => (
                                                                 <div
@@ -374,7 +442,8 @@ const PageDesignerPage = () => {
                                                                     {...provided.draggableProps}
                                                                     className={cn(
                                                                         "transition-all duration-200",
-                                                                        widget.size === 'half' ? "w-[calc(50%-10px)]" : widget.size === 'third' ? "w-[calc(33.33%-13px)]" : "w-full",
+                                                                        widget.type === 'SECTION' ? "w-full" :
+                                                                            widget.size === 'half' ? "w-[calc(50%-10px)]" : widget.size === 'third' ? "w-[calc((100%-40px)/3)]" : "w-full",
                                                                         snapshot.isDragging && "opacity-80 scale-[1.02] z-50"
                                                                     )}
                                                                 >
@@ -406,7 +475,66 @@ const PageDesignerPage = () => {
                                                                             onEdit={() => setEditingWidgetId(widget.id)}
                                                                             onRemove={() => removeWidget(widget.id)}
                                                                             dragHandleProps={provided.dragHandleProps}
-                                                                        />
+                                                                        >
+                                                                            <Droppable droppableId={`section-${widget.id}`} type="DEFAULT">
+                                                                                {(innerProvided, innerSnapshot) => (
+                                                                                    <div
+                                                                                        ref={innerProvided.innerRef}
+                                                                                        {...innerProvided.droppableProps}
+                                                                                        className={cn(
+                                                                                            "flex flex-wrap gap-5 items-start min-h-[80px] p-4 rounded-2xl border-2 border-dashed transition-colors",
+                                                                                            innerSnapshot.isDraggingOver ? "border-primary/50 bg-primary/5" : "border-border/40 bg-muted/10"
+                                                                                        )}
+                                                                                    >
+                                                                                        {widgets.filter(w => w.parent_id === widget.id).map((child, cIdx) => (
+                                                                                            <Draggable key={child.id} draggableId={child.id} index={cIdx}>
+                                                                                                {(childProvided, childSnapshot) => (
+                                                                                                    <div
+                                                                                                        ref={childProvided.innerRef}
+                                                                                                        {...childProvided.draggableProps}
+                                                                                                        className={cn(
+                                                                                                            "transition-all duration-200",
+                                                                                                            child.size === 'half' ? "w-[calc(50%-10px)]" : child.size === 'third' ? "w-[calc((100%-40px)/3)]" : "w-full",
+                                                                                                            childSnapshot.isDragging && "opacity-80 scale-[1.02] z-50"
+                                                                                                        )}
+                                                                                                    >
+                                                                                                        {child.type === 'ENDPOINT' ? (
+                                                                                                            <EndpointWidgetCard
+                                                                                                                widget={child}
+                                                                                                                workflows={availableWorkflows}
+                                                                                                                onEdit={() => setEditingWidgetId(child.id)}
+                                                                                                                onRemove={() => removeWidget(child.id)}
+                                                                                                                dragHandleProps={childProvided.dragHandleProps}
+                                                                                                            />
+                                                                                                        ) : child.type === 'TERMINAL' ? (
+                                                                                                            <TerminalWidgetCard
+                                                                                                                widget={child}
+                                                                                                                onEdit={() => setEditingWidgetId(child.id)}
+                                                                                                                onRemove={() => removeWidget(child.id)}
+                                                                                                                dragHandleProps={childProvided.dragHandleProps}
+                                                                                                            />
+                                                                                                        ) : child.type === 'LINK' ? (
+                                                                                                            <LinkWidgetCard
+                                                                                                                widget={child}
+                                                                                                                onEdit={() => setEditingWidgetId(child.id)}
+                                                                                                                onRemove={() => removeWidget(child.id)}
+                                                                                                                dragHandleProps={childProvided.dragHandleProps}
+                                                                                                            />
+                                                                                                        ) : null}
+                                                                                                    </div>
+                                                                                                )}
+                                                                                            </Draggable>
+                                                                                        ))}
+                                                                                        {innerProvided.placeholder}
+                                                                                        {widgets.filter(w => w.parent_id === widget.id).length === 0 && (
+                                                                                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 w-full text-center py-4">
+                                                                                                Drop widgets here
+                                                                                            </p>
+                                                                                        )}
+                                                                                    </div>
+                                                                                )}
+                                                                            </Droppable>
+                                                                        </SectionWidgetCard>
                                                                     )}
                                                                 </div>
                                                             )}
@@ -591,12 +719,10 @@ const PageDesignerPage = () => {
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Style</label>
-                                            <SearchableSelect
-                                                options={BUTTON_STYLES}
+                                            <ButtonStylePicker
+                                                presets={BUTTON_STYLES}
                                                 value={activeWidget.style || ''}
-                                                onValueChange={(val) => updateWidget(activeWidget.id, { style: val })}
-                                                placeholder="Select style..."
-                                                triggerClassName="h-11 text-[11px] font-bold bg-muted/30 border border-border/50 rounded-2xl"
+                                                onChange={(val) => updateWidget(activeWidget.id, { style: val })}
                                             />
                                         </div>
                                     </div>
@@ -657,12 +783,10 @@ const PageDesignerPage = () => {
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Style</label>
-                                            <SearchableSelect
-                                                options={BUTTON_STYLES}
+                                            <ButtonStylePicker
+                                                presets={BUTTON_STYLES}
                                                 value={activeWidget.style || 'premium-gradient'}
-                                                onValueChange={(val) => updateWidget(activeWidget.id, { style: val })}
-                                                placeholder="Select style..."
-                                                triggerClassName="h-11 text-[11px] font-bold bg-muted/30 border border-border/50 rounded-2xl"
+                                                onChange={(val) => updateWidget(activeWidget.id, { style: val })}
                                             />
                                         </div>
                                     </div>
@@ -796,10 +920,18 @@ const EndpointWidgetCard: React.FC<EndpointWidgetCardProps> = ({ widget, workflo
                 </button>
             </div>
             <div className="p-6">
-                <div className={cn("h-14 w-full rounded-2xl flex items-center justify-center text-white font-black tracking-[0.15em] text-[10px] shadow-sm", widget.style || 'premium-gradient')}>
-                    <Zap className="w-4 h-4 mr-2" />
-                    {widget.label || 'Execute'}
-                </div>
+                {(() => {
+                    const r = resolveButtonStyle(widget.style, 'premium-gradient');
+                    return (
+                        <div
+                            className={cn("h-14 w-full rounded-2xl flex items-center justify-center text-white font-black tracking-[0.15em] text-[10px] shadow-sm", r.className)}
+                            style={r.style}
+                        >
+                            <Zap className="w-4 h-4 mr-2" />
+                            {widget.label || 'Execute'}
+                        </div>
+                    );
+                })()}
             </div>
         </div>
     );
@@ -876,10 +1008,18 @@ const LinkWidgetCard: React.FC<LinkWidgetCardProps> = ({ widget, onEdit, onRemov
             {widget.description && (
                 <p className="text-[10px] text-muted-foreground mb-3 px-2 line-clamp-2">{widget.description}</p>
             )}
-            <div className={cn("h-12 w-full rounded-[1rem] flex items-center justify-center text-white font-black tracking-[0.1em] text-[10px] shadow-sm cursor-pointer", widget.style || 'bg-indigo-600')}>
-                <Link2 className="w-3.5 h-3.5 mr-2" />
-                {widget.label || 'Open Link'}
-            </div>
+            {(() => {
+                const r = resolveButtonStyle(widget.style, 'bg-indigo-600');
+                return (
+                    <div
+                        className={cn("h-12 w-full rounded-[1rem] flex items-center justify-center text-white font-black tracking-[0.1em] text-[10px] shadow-sm cursor-pointer", r.className)}
+                        style={r.style}
+                    >
+                        <Link2 className="w-3.5 h-3.5 mr-2" />
+                        {widget.label || 'Open Link'}
+                    </div>
+                );
+            })()}
         </div>
     </div>
 );
@@ -889,11 +1029,12 @@ interface SectionWidgetCardProps {
     onEdit: () => void;
     onRemove: () => void;
     dragHandleProps: any;
+    children?: React.ReactNode;
 }
 
-const SectionWidgetCard: React.FC<SectionWidgetCardProps> = ({ widget, onEdit, onRemove, dragHandleProps }) => (
-    <div className="group border-b-2 border-border/50 pb-2 mb-2 pt-4 relative">
-        <div className="absolute right-0 top-0 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+const SectionWidgetCard: React.FC<SectionWidgetCardProps> = ({ widget, onEdit, onRemove, dragHandleProps, children }) => (
+    <div className="group border border-border/40 rounded-3xl p-4 bg-card/30 relative">
+        <div className="absolute right-3 top-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
             <button onClick={onEdit} className="h-7 w-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
                 <SettingsIcon className="w-3 h-3" />
             </button>
@@ -901,15 +1042,16 @@ const SectionWidgetCard: React.FC<SectionWidgetCardProps> = ({ widget, onEdit, o
                 <Trash2 className="w-3 h-3" />
             </button>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 mb-3 pb-3 border-b-2 border-border/40">
             <div {...dragHandleProps} className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors mr-1">
                 <GripVertical className="w-4 h-4" />
             </div>
             <h3 className="text-lg font-black tracking-tight">{widget.title || 'Section Header'}</h3>
         </div>
         {widget.description && (
-            <p className="text-xs text-muted-foreground mt-1 ml-7">{widget.description}</p>
+            <p className="text-xs text-muted-foreground mb-3 ml-7">{widget.description}</p>
         )}
+        {children}
     </div>
 );
 

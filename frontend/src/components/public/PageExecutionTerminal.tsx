@@ -30,8 +30,80 @@ const PageExecutionTerminal: React.FC<PageExecutionTerminalProps> = ({
     const [logs, setLogs] = useState<string[]>([]);
     const [status, setStatus] = useState<string | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
     const onStatusChangeRef = useRef(onStatusChange);
     useEffect(() => { onStatusChangeRef.current = onStatusChange; });
+
+    const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
+    const [size, setSize] = useState<{ width: number; height: number } | null>(null);
+    const dragState = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
+    const resizeState = useRef<{ startX: number; startY: number; originW: number; originH: number } | null>(null);
+
+    const onHeaderMouseDown = (e: React.MouseEvent) => {
+        if (terminalState === 'maximized') return;
+        const target = e.target as HTMLElement;
+        if (target.closest('button')) return;
+        const rect = containerRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        dragState.current = {
+            startX: e.clientX,
+            startY: e.clientY,
+            originX: rect.left,
+            originY: rect.top,
+        };
+        e.preventDefault();
+    };
+
+    useEffect(() => {
+        const onMove = (e: MouseEvent) => {
+            if (dragState.current) {
+                const dx = e.clientX - dragState.current.startX;
+                const dy = e.clientY - dragState.current.startY;
+                const rect = containerRef.current?.getBoundingClientRect();
+                const w = rect?.width ?? 0;
+                const h = rect?.height ?? 0;
+                const nx = Math.min(Math.max(0, dragState.current.originX + dx), window.innerWidth - w);
+                const ny = Math.min(Math.max(0, dragState.current.originY + dy), window.innerHeight - h);
+                setPosition({ x: nx, y: ny });
+            } else if (resizeState.current) {
+                const dx = e.clientX - resizeState.current.startX;
+                const dy = e.clientY - resizeState.current.startY;
+                const nw = Math.min(Math.max(280, resizeState.current.originW + dx), window.innerWidth - 16);
+                const nh = Math.min(Math.max(160, resizeState.current.originH + dy), window.innerHeight - 16);
+                setSize({ width: nw, height: nh });
+            }
+        };
+        const onUp = () => { dragState.current = null; resizeState.current = null; };
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+        return () => {
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+        };
+    }, []);
+
+    useEffect(() => {
+        if (terminalState === 'maximized') { setPosition(null); setSize(null); }
+    }, [terminalState]);
+
+    const onResizeMouseDown = (e: React.MouseEvent) => {
+        if (terminalState !== 'normal') return;
+        const rect = containerRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        if (!position) setPosition({ x: rect.left, y: rect.top });
+        resizeState.current = {
+            startX: e.clientX,
+            startY: e.clientY,
+            originW: rect.width,
+            originH: rect.height,
+        };
+        e.preventDefault();
+        e.stopPropagation();
+    };
+
+    const toggleMinimize = () => {
+        setTerminalState(terminalState === 'minimized' ? 'normal' : 'minimized');
+    };
 
     useEffect(() => {
         if (!activeExecutionId) return;
@@ -92,15 +164,34 @@ const PageExecutionTerminal: React.FC<PageExecutionTerminalProps> = ({
     }
 
     return (
-        <div className={cn(
-            "fixed z-[110] transition-all duration-500 ease-in-out",
-            terminalState === 'minimized' ? "bottom-8 right-8 w-[300px] h-[64px]" :
-                terminalState === 'maximized' ? "inset-8 w-auto h-auto" :
-                    "bottom-8 right-8 w-full max-w-2xl h-[450px]"
-        )}>
+        <div
+            ref={containerRef}
+            style={(() => {
+                if (terminalState === 'maximized') return undefined;
+                const s: React.CSSProperties = {};
+                if (position) { s.left = position.x; s.top = position.y; s.right = 'auto'; s.bottom = 'auto'; }
+                if (size && terminalState === 'normal') { s.width = size.width; s.height = size.height; s.maxWidth = 'none'; }
+                return s;
+            })()}
+            className={cn(
+                "fixed z-[110]",
+                !dragState.current && !resizeState.current && "transition-all duration-500 ease-in-out",
+                position && terminalState !== 'maximized' ? "" :
+                    terminalState === 'minimized' ? "bottom-8 right-8" :
+                        terminalState === 'maximized' ? "inset-8" :
+                            "bottom-8 right-8",
+                terminalState === 'minimized' ? "w-[300px] h-[64px]" :
+                    terminalState === 'maximized' ? "w-auto h-auto" :
+                        (!size ? "w-full max-w-2xl h-[450px]" : "")
+            )}>
             <div className="w-full h-full bg-[#0a0a0c] border border-white/10 rounded-[2rem] shadow-[0_24px_80px_rgba(0,0,0,0.8),0_0_20px_rgba(var(--primary-rgb),0.1)] overflow-hidden flex flex-col animate-in slide-in-from-right-16 duration-500">
                 {/* Terminal Header */}
-                <div className="bg-white/5 px-4 py-2.5 border-b border-white/5 flex items-center justify-between">
+                <div
+                    onMouseDown={onHeaderMouseDown}
+                    className={cn(
+                        "bg-white/5 px-4 py-2.5 border-b border-white/5 flex items-center justify-between select-none",
+                        terminalState !== 'maximized' ? "cursor-grab active:cursor-grabbing" : ""
+                    )}>
                     <div className="flex items-center gap-3">
                         {/* Traffic Light Controls */}
                         <div className="flex gap-1 mr-2">
@@ -111,10 +202,13 @@ const PageExecutionTerminal: React.FC<PageExecutionTerminalProps> = ({
                                 <X className="w-1.5 h-1.5 text-black opacity-0 group-hover/btn:opacity-100" />
                             </button>
                             <button
-                                onClick={() => setTerminalState('minimized')}
+                                onClick={toggleMinimize}
+                                title={terminalState === 'minimized' ? 'Restore' : 'Minimize'}
                                 className="w-2.5 h-2.5 rounded-full bg-[#ffbd2e] border border-[#dea123] hover:bg-[#ffbd2e]/80 transition-all flex items-center justify-center group/btn"
                             >
-                                <ChevronDown className="w-1.5 h-1.5 text-black opacity-0 group-hover/btn:opacity-100" />
+                                {terminalState === 'minimized'
+                                    ? <ChevronUp className="w-1.5 h-1.5 text-black opacity-0 group-hover/btn:opacity-100" />
+                                    : <ChevronDown className="w-1.5 h-1.5 text-black opacity-0 group-hover/btn:opacity-100" />}
                             </button>
                             <button
                                 onClick={() => setTerminalState(terminalState === 'maximized' ? 'normal' : 'maximized')}
@@ -152,6 +246,16 @@ const PageExecutionTerminal: React.FC<PageExecutionTerminalProps> = ({
                     </div>
                 )}
             </div>
+            {terminalState === 'normal' && (
+                <div
+                    onMouseDown={onResizeMouseDown}
+                    title="Resize"
+                    className="absolute bottom-1 right-1 w-4 h-4 cursor-nwse-resize text-zinc-400 hover:text-zinc-200 z-20"
+                    style={{
+                        backgroundImage: 'linear-gradient(135deg, transparent 55%, currentColor 55%, currentColor 65%, transparent 65%, transparent 75%, currentColor 75%, currentColor 85%, transparent 85%)',
+                    }}
+                />
+            )}
         </div>
     );
 };
