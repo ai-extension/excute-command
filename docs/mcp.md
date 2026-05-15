@@ -47,15 +47,113 @@ The **API Keys** screen shows a pre-generated config snippet — paste it into t
 
 ## 🛠️ Available tools
 
-| Tool | What the AI does with it |
-| :--- | :--- |
-| **`list_workflows`** | Discovers what's available, filterable by tag or namespace. |
-| **`run_workflow`** | Triggers a specific workflow with structured inputs. Returns an `execution_id`. |
-| **`get_execution_log`** | Reads logs for an `execution_id`; supports `wait=true` to poll until finished. |
-| **`schedule_workflow`** | Creates a cron schedule for a workflow. |
-| **`get_tags`** | Lists available tags so the AI can narrow `list_workflows`. |
+The MCP server exposes 5 tools. Each tool's call is authenticated by the API key and authorized by the key's role assignments — the AI cannot exceed the human operator's permissions.
 
-Every tool call is authenticated by the API key and authorized by the key's role assignments — the AI cannot exceed the human operator's permissions.
+### 1. `list_workflows`
+Discover what is available.
+
+| Param | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `tags` | string | no | Comma-separated **tag IDs** (not names) to filter by. Get IDs from `get_tags`. |
+
+Returns metadata for each workflow: `id`, `name`, `description`, `ai_guide`, `inputs[]` (key/type/required/default/options), `tags[]`. Only workflows the API key has `workflow:execute` on are returned.
+
+### 2. `run_workflow`
+Trigger an execution.
+
+| Param | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `workflow_id` | UUID | **yes** | Workflow to run. |
+| `inputs` | JSON string | no | Input values, e.g., `{"branch":"main","dry_run":"yes"}`. Validated by each input's regex. |
+
+Returns the new `execution_id` immediately. Status is `RUNNING`; use `get_execution_log` to follow up.
+
+### 3. `get_execution_log`
+Read status + logs for a specific run.
+
+| Param | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `execution_id` | UUID | **yes** | Returned by `run_workflow`. |
+| `wait` | bool | no | If `true`, the call blocks for up to **30 seconds** waiting for terminal status — saves the AI from polling. |
+
+Returns step-level status (RUNNING / SUCCESS / FAILED / CANCELLED), durations, stdout/stderr per step, and the workflow-level outcome.
+
+### 4. `schedule_workflow`
+Create a recurring or one-time schedule.
+
+| Param | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `workflow_id` | UUID | **yes** | Workflow to schedule. |
+| `name` | string | **yes** | Schedule label (e.g., `nightly-backup`). |
+| `type` | string | **yes** | `RECURRING` or `ONE_TIME`. |
+| `cron_expression` | string | for RECURRING | 6-field cron (see [Schedules](schedules.md#-cron-syntax-6-fields-with-seconds)). |
+| `next_run_at` | RFC3339 | for ONE_TIME | Absolute time to fire once. |
+| `inputs` | JSON string | no | Preset inputs handed to every triggered run. |
+
+### 5. `get_tags`
+List all tags with their IDs. Always call this first if you plan to filter `list_workflows` by tag.
+
+---
+
+## 🔗 What you can build with these tools
+
+The 5 tools are intentionally small — the power is in **chaining** them. Below are concrete flow patterns the AI can execute on your behalf.
+
+### Pattern 1 — Conversational ops ("run X")
+> *"Restart the staging app."*
+
+1. `list_workflows` → find `restart-staging`.
+2. Ask the user to confirm inputs (per the workflow's AI Guide).
+3. `run_workflow(workflow_id, inputs)` → get `execution_id`.
+4. `get_execution_log(execution_id, wait=true)` → report success/failure with the relevant log tail.
+
+### Pattern 2 — Diagnose then act
+> *"The website feels slow — check it and fix if simple."*
+
+1. `get_tags` → grab the `diagnostic` tag id.
+2. `list_workflows(tags=<diag_id>)` → list diagnostic flows.
+3. `run_workflow(health-check)` → `get_execution_log(wait=true)`.
+4. Parse output. If "disk full" detected, run `cleanup-logs`. If unsure, stop and report to the user — the AI Guide should forbid auto-mitigation without consent.
+
+### Pattern 3 — Fan-out / batch
+> *"Deploy to every server in the prod fleet."*
+
+1. `list_workflows` → find `deploy-one-host`.
+2. Loop: for each host, `run_workflow(workflow_id, inputs={"host":H})` → collect `execution_id`s.
+3. `get_execution_log(wait=true)` per id, or poll a few in parallel.
+4. Summarize successes / failures for the user.
+
+Alternative: build a single workflow with **Nested Workflow / Dynamic Foreach** step (see [Workflows — Step specializations](workflows.md#workflow-nested)) so the AI only makes one call.
+
+### Pattern 4 — Schedule via chat
+> *"Run the nightly backup at 2am Tokyo time."*
+
+1. `list_workflows` → find `nightly-backup`.
+2. `schedule_workflow(workflow_id, name="nightly-backup-tokyo", type="RECURRING", cron_expression="0 0 2 * * *", inputs="{...}")`.
+3. Confirm the schedule was created; report `next_run_at` to the user.
+
+### Pattern 5 — Post-run investigation
+> *"Why did execution `abcd-1234` fail?"*
+
+1. `get_execution_log(execution_id="abcd-1234")` → read stderr + failed step.
+2. Cross-reference with `list_workflows` to inspect the failing step's purpose.
+3. Suggest a fix or re-run with corrected inputs — but **only after** the user explicitly approves the re-run.
+
+### Pattern 6 — Self-service onboarding
+> *"What can I do here?"*
+
+1. `get_tags` + `list_workflows` → produce a categorized catalog.
+2. For each workflow, surface its `description` and `ai_guide` so the AI can speak about it accurately.
+3. Stop. Let the user pick.
+
+---
+
+## 🚧 Guardrails baked into the tools
+
+- Every tool description includes the rule: **AI must not re-run or substitute a workflow without explicit user consent.** Honor it in your client prompt.
+- `run_workflow` requires inputs that pass each workflow's `SecurityRegex`; malformed values are rejected before any command runs.
+- Permission check is enforced on every call — the AI cannot enumerate or run anything the API key wasn't granted.
+- All five tools record entries in [Audit Logs](audit_logs.md) with `trigger_source = MCP` and the calling API key's id.
 
 ---
 
