@@ -1,56 +1,108 @@
-# 📅 Schedules: Automated Execution
+# 📅 Schedules: Time-Triggered Automation
 
-Schedules allow you to automate the running of workflows at specific times or intervals using standard Cron syntax. This ensures your recurring tasks—like backups, reports, or health checks—run perfectly without manual intervention.
+Schedules run workflows automatically on a cron expression — daily backups, hourly health checks, weekly reports — without any manual click.
 
 ![Schedules List](assets/schedules.png)
 *Managing automated tasks in the Schedules overview.*
 
 ---
 
-## 🏗️ Overview
+## 🌟 Overview
 
-A **Schedule** creates a persistent link between a **Workflow** and a **Time Trigger**. When the trigger condition is met, CSM automatically starts a new execution of the linked workflow.
+A **Schedule** binds three things:
 
-### Key Features
-- **Preset Inputs**: Define specific input variables for each schedule independently.
-- **Toggle Control**: Instantly enable or disable a trigger without deleting the configuration.
-- **Manual Trigger**: Use the "Run Now" feature to test a scheduled task at any time.
+```
+Workflow  +  Cron expression  +  Preset inputs   =  Schedule
+```
+
+When the cron condition fires, CSM starts a new execution of the workflow using the preset inputs. The schedule can be toggled on/off without losing its configuration.
+
+### When to use a Schedule
+- **Recurring jobs** — backups, sync, cleanups, log rotation.
+- **Off-hours runs** — heavy maintenance at 02:00.
+- **Polling / health checks** — every N minutes.
+- **One-off future runs** — fire once at a specific date/time.
+
+For ad-hoc runs, use **Run Now** from the workflow list instead.
 
 ---
 
-## ⚙️ Configuration (Cron Deep-Dive)
+## ⚙️ Cron syntax (6 fields, with seconds)
 
-CSM uses the standard **6-field Cron syntax** (including seconds support) for precision timing.
+```
+┌───────── seconds (0-59)
+│ ┌─────── minutes (0-59)
+│ │ ┌───── hours   (0-23)
+│ │ │ ┌─── day of month (1-31)
+│ │ │ │ ┌─ month (1-12)
+│ │ │ │ │ ┌ day of week (0-6, Sun-Sat)
+│ │ │ │ │ │
+*  *  *  *  *  *
+```
 
-| Field | Allowed Values |
+### Useful examples
+| Expression | Meaning |
 | :--- | :--- |
-| **Seconds** | 0-59 |
-| **Minutes** | 0-59 |
-| **Hours** | 0-23 |
-| **Day of Month** | 1-31 |
-| **Month** | 1-12 |
-| **Day of Week** | 0-6 (Sunday to Saturday) |
+| `0 */5 * * * *` | Every 5 minutes (at second 0) |
+| `0 0 * * * *` | Every hour |
+| `0 0 2 * * *` | Daily at 02:00 |
+| `0 30 9 * * 1-5` | 09:30 every weekday |
+| `0 0 0 1 * *` | First of every month at midnight |
+| `0 0 12 * * 1` | Every Monday at noon |
 
-### Functional Nuances
-- **`RECURRING` vs `ONE_TIME`**: Most schedules are recurring, but you can define a one-time execution for a specific date/time.
-- **The `CatchUp` Mechanism**: If enabled, and the CSM service was offline during a scheduled trigger, the system will automatically "Catch Up" and run the missed job immediately upon service restoration.
-- **"Run Now" Interaction**: Manually clicking "Run Now" triggers the workflow immediately using the schedule's preset inputs. It does **not** interfere with or delay the next automatic cron execution.
+The UI shows a live **Next run** preview so you can confirm the expression before saving.
 
 ---
 
-## 🚀 Usage & Monitoring
+## 🛠️ Configuration
 
-### Managing Your Automation
-- **Next Run Detection**: The UI automatically calculates and displays the next execution time based on your expression, helping you verify your cron logic immediately.
-- **Active Execution**: If a scheduled task is still running when the next trigger occurs, CSM will spawn a concurrent execution unless specifically restricted in the workflow settings.
-
-### Best Practices
-- **Staggering**: Avoid scheduling many heavy workflows (like full backups) at the exact same second to prevent CPU spikes on the orchestrator.
-- **Cleanup**: Set the **Cleanup Files** flag in your workflow if the scheduled task generates temporary artifacts that shouldn't persist.
+| Field | What it controls |
+| :--- | :--- |
+| **Workflow** | The pipeline to fire. |
+| **Type** | `RECURRING` (default) or `ONE_TIME`. |
+| **Cron** | The trigger expression. |
+| **Timezone** | Interprets the cron in that TZ; defaults to server TZ. |
+| **Inputs** | Preset values handed to the workflow on every run. |
+| **CatchUp** | If on, missed runs (while CSM was offline) execute on restart. |
+| **Enabled** | Master switch — turn off without deleting. |
 
 ---
 
-## 🧠 Technical Reference
-Schedules are managed by the `ScheduleService` in the backend. 
-- **Persistence**: Schedules are stored in the database and re-loaded into the active cron runner upon service restart or modification.
-- **Error Handling**: If a scheduled workflow fails, an event is logged in the **Audit Logs**, and `AFTER_FAILED` hooks are triggered as usual.
+## 🚀 Lifecycle & behavior
+
+- **Run Now** triggers immediately using the preset inputs and does **not** shift the next scheduled tick.
+- **Concurrent runs** are allowed by default. If the previous execution is still running, a new one starts in parallel. To enforce serial execution, use the workflow's concurrency settings.
+- **Failures** are logged in the [Audit Log](audit_logs.md) and `AFTER_FAILED` hooks fire as usual (see [Workflows — Hooks](workflows.md#-lifecycle-hooks)).
+- **Persistence** — schedules live in the database and are reloaded into the cron runner whenever the service restarts or a schedule is modified.
+
+---
+
+## ✅ Best practices
+
+- **Stagger heavy jobs** — don't run all nightly backups at `0 0 0 * * *` exactly; spread them across minutes to avoid CPU spikes.
+- **Set Cleanup Files** on the workflow if the scheduled task generates temporary artifacts.
+- **Use namespace-scoped variables** so the same workflow can run in staging vs. production by attaching different schedules.
+- **Monitor with Audit Logs** — every scheduled trigger is recorded with `TriggerSource = Schedule`.
+
+---
+
+## 🛠️ Step-by-step: create a schedule
+
+1. **Navigate** to Schedules → **+ New Schedule**.
+2. **Pick a workflow** (must exist already; see [Workflows](workflows.md)).
+3. **Enter the cron** expression; confirm the "Next run" preview.
+4. **Fill preset inputs** for the workflow.
+5. (Optional) Toggle **CatchUp** if you want missed runs to fire after downtime.
+6. **Save** — the schedule is live immediately. Toggle off if you need a pause.
+7. (Optional) Click **Run Now** to test without waiting for the next tick.
+
+---
+
+## 🔧 Troubleshooting
+
+| Symptom | Likely cause | Fix |
+| :--- | :--- | :--- |
+| Schedule never fires | Wrong timezone; enabled toggle off | Check the TZ field; verify "Next run" preview matches expectation. |
+| Two runs at the same minute | Multiple overlapping cron expressions or concurrent triggers | Consolidate schedules or enforce concurrency limits in the workflow. |
+| Missed runs after restart | CatchUp disabled | Enable **CatchUp** if you need backfill behavior. |
+| Inputs differ between manual and scheduled runs | Manual run dialog overrides preset inputs | Re-save the schedule with the desired preset values. |

@@ -1,58 +1,99 @@
-# 🔑 Global Variables: Centralized Config
+# 🔑 Global Variables: Shared Config & Secrets
 
-Global Variables provide a way to store and manage configuration data that is shared across multiple workflows and environments. This enables "Define Once, Use Everywhere" behavior, simplifying mass updates across your entire automation infrastructure.
+Global Variables centralize values that many workflows need — API endpoints, install paths, credentials, environment flags — so you can change them in one place.
 
 ![Global Variables](assets/variables.png)
-*Centralized management for all your environment constants.*
+*Centralized management for environment constants and secrets.*
 
 ---
 
-## 🏗️ Overview
+## 🌟 Overview
 
-Instead of hardcoding values like API endpoints, installation paths, or environment flags within each workflow, you can define them as **Global Variables**. 
+Instead of hard-coding things like `DB_HOST=prod.db.internal` inside every workflow, define them as **Global Variables**. Workflows reference them with `{{ global.KEY }}` and CSM resolves the value at run time.
 
-### Reference Syntax
-Variables are accessed in any workflow field (Command, URL, Headers) using the double-curly-brace syntax:
-- `{{ global.VAR_NAME }}`
+### When to use a Global Variable
+- A value is shared by **two or more workflows**.
+- A value **changes per environment** (staging vs. production) — define one in each namespace.
+- A value is a **secret** (API key, password, token) — let CSM mask it automatically.
 
----
-
-## ⚙️ Configuration
-
-Every variable in CSM has a **Key** and a **Value**, but you can further specialize them:
-
-### Functional Nuances
-- **Namespace Isolation**: Global variables are strictly scoped to their **Namespace**. A variable created in "Development" is invisible to workflows in "Production," ensuring environment safety.
-- **Resolution Priority (The Ladder)**:
-    1. **Workflow Inputs** (Manual override - Highest)
-    2. **Workflow Internal Variables** (Set in designer)
-    3. **Global Variables** (Namespace fallback - Lowest)
-- **Automatic Masking**: The backend execution engine performs a string-search on the command buffer. If any text matches a **Secret** variable's value, it is replaced with `[MASKED]` before being saved to the database logs.
+For values used only inside a single workflow, prefer **Workflow Variables** (declared in the workflow designer); they don't pollute the global namespace.
 
 ---
 
-## 🚀 Usage & Best Practices
+## ⚙️ Anatomy of a variable
 
-### The Power of Secret Masking
-When a variable is marked as **Secret**, CSM ensures it is never leaked:
-- **UI Masking**: The value appears as `••••••••` in the dashboard.
-- **Log Stripping**: The backend execution engine automatically scrubs secret values from terminal output before saving it to the audit logs.
-
-### Best Practices
-- **Naming Conventions**: Use uppercase with underscores (e.g., `PROD_DB_URL`) to distinguish globals from local workflow inputs.
-- **Environment Parity**: Create variables for environment-specific paths (e.g., `APP_ROOT`) so the same workflow can run on both staging and production servers without modification.
+| Field | Purpose |
+| :--- | :--- |
+| **Key** | Identifier used in templates: `{{ global.KEY }}`. Convention: `UPPER_SNAKE_CASE`. |
+| **Value** | The actual string. |
+| **Secret** | When on, the value is hidden in the UI and masked in logs. |
+| **Description** | Optional human note (shown in the variable list). |
+| **Namespace** | Hard isolation — `dev` vs. `prod` never bleed. |
 
 ---
 
-## 🧠 Technical Reference
+## 🪜 Resolution priority
 
-### Priority & Overriding
-In the execution context, variables are resolved in the following order of priority:
-1. **Local Workflow Inputs** (highest priority)
-2. **Workflow Internal Variables**
-3. **Global Variables** (lowest priority)
+When a template `{{ global.KEY }}` resolves at runtime, CSM walks this ladder (highest wins):
 
-If a Global Variable and a Workflow Input share the same name, the **Input** value will take precedence during that specific execution.
+1. **Workflow Inputs** — overrides everything for that run.
+2. **Workflow Variables** — declared on the workflow.
+3. **Global Variables** — namespace fallback.
 
-### Security Implementation
-Secrets are stored in the database. While masked in the UI, they are decrypted by the `WorkflowExecutor` only at the moment of command execution.
+If `Workflow Input.KEY` exists, it wins even if a global with the same key is defined. This makes it easy to override a default per run.
+
+---
+
+## 🔒 Secret masking
+
+When a variable is marked **Secret**:
+
+- **UI** — value displays as `••••••••`.
+- **Command preview** — the rendered command shown to the user before run hides the secret.
+- **Logs** — the executor performs a final string-replace pass on stdout/stderr; any substring matching a secret value becomes `[MASKED]` before the line is persisted.
+- **Audit log** — secret-valued payload fields are scrubbed before write.
+
+> [!IMPORTANT]
+> Masking is **value-based**. If your secret is `hunter2` and a command's natural output happens to print `hunter2`, that string is masked too. Don't pick generic words as secret values (e.g., avoid `admin`).
+
+---
+
+## ✅ Best practices
+
+- **Naming** — `UPPER_SNAKE_CASE` distinguishes globals from workflow-local inputs at a glance.
+- **One value per environment** — keep a `PROD` namespace and a `STAGING` namespace with the same keys but different values; the same workflow runs everywhere unchanged.
+- **Mark secrets early** — toggling Secret after the value is already in logs does not retroactively scrub them.
+- **Avoid generic words** as secret values (see warning above).
+- **Don't store huge blobs** — for large files, use [Workflow Files](workflows.md#-workflow-files) instead.
+
+---
+
+## 🛠️ Step-by-step: define a variable
+
+1. **Navigate** to Global Variables → **+ New**.
+2. **Key** — e.g., `DEPLOY_HOST`.
+3. **Value** — e.g., `app.prod.internal`.
+4. **Secret** — toggle on if the value is sensitive.
+5. **Description** — short note for teammates.
+6. **Save**. The variable is immediately available to all workflows in this namespace via `{{ global.DEPLOY_HOST }}`.
+
+To **override per run**, declare an input with the same key on a workflow; the input value wins for that execution.
+
+---
+
+## 🧠 Reference
+
+- **Storage** — variables live in the database, encrypted at rest if your deployment configures encryption.
+- **Decryption** — secrets are decrypted by the `WorkflowExecutor` at the exact moment of command execution; the plaintext never leaves the executor's memory.
+- **Namespace lookup** — every fetch is scoped by the running execution's namespace; a leak across namespaces is impossible by construction.
+
+---
+
+## 🔧 Troubleshooting
+
+| Symptom | Likely cause | Fix |
+| :--- | :--- | :--- |
+| `{{ global.KEY }}` renders as empty | Wrong namespace, or key typo | Confirm the variable exists in the workflow's namespace; check casing. |
+| Secret value appears in old logs | Variable was not marked Secret at the time of that run | Toggling Secret only affects future runs; rotate the secret if leaked. |
+| Workflow input doesn't override the global | Input is `Required` but skipped, or has a different key | Confirm the input key matches exactly; check the run dialog. |
+| Mask shows random unrelated text | A short / generic secret value matched substring elsewhere | Choose a longer, unique secret value. |

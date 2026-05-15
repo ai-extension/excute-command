@@ -22,10 +22,12 @@ CSM is a powerful, multi-step command execution and management platform designed
 ## Project Structure
 - **/backend**: Golang REST API providing command orchestration.
 - **/frontend**: React + Vite + Tailwind CSS admin dashboard.
-- **/docs**: Comprehensive documentation, including:
-  - **[📘 User Manual](docs/user_manual.md)**: Conceptual overview for non-technical users.
-  - **[🚀 Getting Started Guide](docs/getting_started.md)**: A 5-minute visual introduction.
-  - **[🛠️ Workflow Reference](docs/workflows.md)**: Deep technical details for power users.
+- **/docs**: Comprehensive documentation. Start here: **[📖 Documentation Center](docs/README.md)**.
+  - **[📘 User Manual](docs/user_manual.md)** — plain-English concepts for non-technical users.
+  - **[🚀 Getting Started](docs/getting_started.md)** — 5-minute hands-on tour.
+  - **[📱 Pages](docs/pages.md)** — page designer, widgets, public UI, history, log viewer.
+  - **[⚙️ Workflows](docs/workflows.md)** — full orchestration reference.
+  - **[📅 Schedules](docs/schedules.md)**, **[🔑 Variables](docs/variables.md)**, **[🔐 Roles](docs/roles.md)**, **[📜 Audit Logs](docs/audit_logs.md)**, **[🤖 MCP](docs/mcp.md)**.
 
 ## Quick Start
 

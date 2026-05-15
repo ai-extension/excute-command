@@ -52,9 +52,17 @@ Now, let's see it in action!
 Don't want your team to deal with complex commands? Create a **Page**.
 
 1. Go to **Pages** and click **+ New Page**.
-2. Select your "Server Health Check" workflow.
-3. Use the **Page Designer** to add a button labeled "Check Server Status".
-4. Save and share the Page URL!
+2. Give it a title and a unique **slug** (the URL path, e.g. `health-check`).
+3. In the **Page Designer**, drag an **Endpoint** widget onto the canvas.
+4. Set its **Target Workflow** to "Server Health Check".
+5. (Optional) Use the **Style** picker — choose a preset color or open the palette to pick a custom hex.
+6. (Optional) Drop a **Section** widget and drag the Endpoint inside to group related buttons.
+7. Save.
+
+Share the URL `/public/pages/health-check`. On the public page your team can:
+- Click the button to run the workflow.
+- Watch live logs in the floating terminal (drag to move, drag the corner to resize, yellow button to minimize/restore).
+- Open **History** on the widget to see the last 10 runs, re-run with the same inputs, or open **View Log** to inspect any previous run.
 
 ![Page Designer](assets/page_design.png)
 *Turn any complex script into a simple, beautiful button.*

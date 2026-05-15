@@ -1,59 +1,144 @@
 # 📱 Pages: Custom User Interfaces
 
-Pages allow you to create simplified, user-facing interfaces for triggering workflows. This is ideal for enabling non-technical users to execute complex tasks safely without needing to understand the underlying command logic.
+Pages turn complex workflows into simple, shareable web UIs. They let non-technical users run automations safely without touching shell or SSH.
 
 ![Pages List](assets/pages_list.png)
-*Manage and deploy your custom interfaces from the Pages overview.*
+*Manage and deploy custom interfaces from the Pages overview.*
 
 ---
 
 ## 🏗️ Overview
 
-A **Page** acts as a simplified frontend for a background **Workflow**. It maps visual **Widgets** directly to the workflow's **Inputs**. When a user fills out the form and clicks "Execute", the workflow is triggered with those specific parameters.
+A **Page** is a public or private web view assembled from **Widgets**. Each widget either:
 
-### Why Use Pages?
-- **Safety**: Restrict users to only specific parameters, preventing accidental system damage.
-- **Simplicity**: No need for users to log into servers or know shell commands.
-- **Portability**: Share unique URLs with teammates for specific tools (e.g., "Account Unlocker").
+- triggers a **Workflow** (Endpoint widget), or
+- streams a live command output (Terminal widget), or
+- opens an external URL (Link widget), or
+- groups other widgets visually (Section widget).
+
+Pages have a unique **slug** in the URL (`/public/pages/{slug}`) and an optional access mode (public, private, password-protected).
+
+### Why use Pages?
+- **Safety** — operators only see the inputs you allow; no shell access required.
+- **Simplicity** — one click instead of a multi-step command pipeline.
+- **Reusability** — multiple Pages can wrap the same Workflow with different defaults.
+- **Branding** — custom title, description, colors per Page.
 
 ---
 
-## ⚙️ Configuration & Design
+## 🧱 Widget catalog
 
-The Page Designer features a visual drag-and-drop interface for building your form.
+| Widget | Purpose | Notes |
+| :--- | :--- | :--- |
+| **Endpoint** | Run a Workflow | Maps to a workflow + its `inputs`. Shows status, history, and re-run buttons. |
+| **Terminal** | Live command output | Streams a recurring shell command from a chosen server. Supports reload intervals. |
+| **Link** | External hyperlink | Plain anchor, optional "open in new tab". |
+| **Section** | Container / grouping | Acts as a drop zone — drag any non-section widget *into* a Section to nest it. Moving the Section moves all its children together. |
+
+### Widget sizes
+Every widget can be sized as **full**, **half** (1/2), or **third** (1/3) width. On the public page, three `third`-sized widgets fit on one row; mobile collapses to full width.
+
+---
+
+## ⚙️ Page Designer
+
+The designer (`/pages/{id}/edit`) is a drag-and-drop canvas.
 
 ![Page Designer](assets/page_designer.png)
-*Mapping visual Widgets to Workflow Inputs in the Page Designer.*
 
-### Widgets Reference
-| Widget | Use Case | Implementation Hint |
-| :--- | :--- | :--- |
-| **Input** | Standard text or numbers. | Best for names, IDs, or counts. |
-| **Select** | Dropdown choices. | Maps to `select` workflow inputs. |
-| **Switch** | Yes/No toggles. | Ideal for boolean flags (e.g., `Force Restart`). |
-| **Checkbox** | Confirmation flags. | Use for explicit user consent. |
-| **Label** | Instruction text. | Purely visual; does not send data. |
+### Layout & nesting
+- **Drag** any widget by its handle to reorder on the canvas.
+- **Sections** render as bordered containers with their own drop zone.
+  - Drop other widgets *inside* a section to nest them.
+  - Drop them back on the outer canvas to detach.
+  - Moving a section in the outer list keeps every nested child attached.
+- Sections cannot be nested inside other sections.
+
+### Button style picker
+For **Endpoint** and **Link** widgets, the "Style" field exposes:
+- **Presets** — Premium Blue, Neon Emerald, Cyber Rose, Deep Indigo, Atomic Amber. Click a chip to apply.
+- **Custom color** — click the palette icon to open a color picker. Hex input + live preview included. The selected color is rendered with a matching glow shadow on the public page.
+
+### Per-widget configuration (Endpoint)
+| Field | What it does |
+| :--- | :--- |
+| **Target Workflow** | Workflow that runs when the button is clicked. |
+| **Button Label** | Visible button text. Defaults to workflow name. |
+| **Style** | Preset or custom color (see picker above). |
+| **Description** | Subtitle shown on the public widget card. |
+| **Show Log** | If on, opens the live terminal automatically while running. Otherwise the run is silent (toast only). |
+| **Size** | full / half / third. |
 
 ---
 
-## 🔒 Security & Protection
+## 🌐 Public page experience
 
-Pages can be configured with different visibility and security layers:
+The public view at `/public/pages/{slug}` is the screen you share with your team.
 
-### Functional Nuances
-- **Privacy Modes**: 
-  - **Public**: Accessible via slug (e.g., `/p/restarter`).
-  - **Private**: Requires a valid CSM login session and the `page:read` permission.
-- **`TokenTTL` & Expiration**: When a public page is accessed, the backend can issue a temporary session token with a specific **Time-To-Live (TTL)**. By default, this is set to **15 minutes**.
-- **Endpoint Protection**: If **Unlock Password** is active, the workflow trigger API is blocked until the user provides the correct password hash, which is verified server-side.
+### Header
+- **Title + description** from the Page meta.
+- **Endpoint / Terminal counters** above the grid.
+- **Copy URL** and **light/dark theme toggle** in the top-right. Default theme is **light**; user choice persists in `localStorage`.
+
+### Search
+A search bar above the grid filters widgets by title or description. Searching inside a section keeps the section header visible.
+
+### Execution history (per Endpoint widget)
+Each Endpoint widget remembers the **last 10 runs** locally (`localStorage` keyed by page slug + widget id):
+
+- **History button** — clock icon with a count badge; opens a list of past runs.
+- **Each history row shows** status (running/success/failed/cancelled), short execution ID, inputs used, and timestamp.
+- **Re-run** — runs the workflow again with the saved inputs, skipping the input prompt.
+- **View Log** — fetches the archived `workflow.log` from the backend and renders it with ANSI colors in a dialog. Works for past runs even if you closed the live terminal.
+- **Quick-rerun shortcut** — a small button next to the main "Initiate" button re-runs the most recent execution with its inputs.
+
+### Live execution terminal
+While a workflow is running (and "Show Log" is on for that widget), a floating terminal panel streams logs in real time:
+
+- **Yellow button** toggles **minimize ↔ restore**.
+- **Green button** toggles **maximize ↔ normal**.
+- **Red button** closes the terminal.
+- **Drag** by the header to move the panel anywhere on screen.
+- **Resize** by dragging the bottom-right corner (similar to a `<textarea>`).
+- Position and size persist across status updates until you maximize or close.
 
 ---
 
-## 🚀 Usage & Deployment
+## 🔒 Access control
 
-1. **Build**: Connect your Page widgets to a Workflow.
-2. **Assign Slug**: Give it a unique name (e.g., `app-restarter`).
-3. **Share**: Distribute the URL `/p/app-restarter` to your intended users.
+Pages support three visibility modes:
+
+| Mode | Behavior |
+| :--- | :--- |
+| **Public** | Anyone with the slug URL can use the page. |
+| **Public + password** | Visitor must enter the unlock password; backend issues a short-lived **page token** (default TTL: 15 min). The token is required by every workflow trigger. |
+| **Private** | Requires a logged-in CSM user with `page:read` permission on the namespace. |
+
+When a token expires, the visitor is prompted to re-enter the password without losing form state.
+
+---
+
+## 🛠️ Build & deploy checklist
+
+1. **Choose a workflow** — make sure it accepts the inputs you want exposed.
+2. **Create the Page** — set title, description, slug.
+3. **Drop widgets** — start with one Endpoint widget per action.
+4. **Group with Sections** — drag related widgets into a Section for visual grouping.
+5. **Pick colors** — use a preset or custom hex to match team branding.
+6. **Choose access** — public / public+password / private.
+7. **Test** — open `/public/pages/{slug}` in an incognito window.
+8. **Share** — distribute the URL.
 
 > [!TIP]
-> You can create multiple different Pages for the same Workflow to provide different "views" to different team members.
+> You can create multiple Pages pointing at the same Workflow to provide different views (e.g., a "staging" page and a "production" page with different default inputs and stricter passwords).
+
+---
+
+## 🔧 Troubleshooting
+
+| Symptom | Likely cause | Fix |
+| :--- | :--- | :--- |
+| "View Log" returns *log file not found* | Backend cleaned up logs, or execution was very recent and `workflow.log` not yet flushed | Wait a few seconds and retry; older runs may have been pruned. |
+| Theme reverts on reload | Old admin theme overrode public theme | Already handled — the public page now drives the global theme provider directly. |
+| Custom button color doesn't appear | Browser blocked third-party storage / value was hand-edited | Re-pick the color from the palette to refresh the saved `custom:#hex` token. |
+| Token expired mid-run | TTL elapsed during a long workflow | Increase TTL on the Page settings or extend session by re-entering the password. |

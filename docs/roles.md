@@ -1,66 +1,111 @@
-# 🔐 Roles & Permissions: RBAC System
+# 🔐 Roles & Permissions: RBAC
 
-The Command Step Manager uses a granular Role-Based Access Control (RBAC) system to ensure system security and data integrity. This allows administrators to define exactly what each user can see and do within the platform.
+CSM uses fine-grained Role-Based Access Control so each user sees only what they need. Permissions are namespace-scoped — a `prod` admin has no power in `staging` unless explicitly granted.
 
 ![Roles List](assets/roles.png)
-*Defining granular access levels in the Roles overview.*
+*Defining access levels in the Roles overview.*
 
 ---
 
-## 🏗️ Overview
+## 🌟 Overview
 
-Access is managed through **Roles**, which are collections of specific **Permissions**. 
+```
+Permission  →  smallest "can-do" unit (workflow:execute, server:write, audit:read, …)
+Role        →  named bundle of permissions (Deployer, Auditor, Operator, …)
+User        →  has one or more Roles; effective rights = union of all their roles
+Namespace   →  tenancy boundary; a Role applies inside its namespace only
+```
 
-### The RBAC Model
-1. **Permissions**: The individual "can-do" actions (e.g., `Update Workflow`).
-2. **Roles**: A named bucket of permissions (e.g., `Deployer`, `Auditor`).
-3. **Users**: Individuals who are assigned one or more roles. Their effective permission set is the **union** of all permissions from their assigned roles.
+A user attempting an action is allowed iff at least one of their roles in the action's namespace grants the required permission.
 
----
-
-## ⚙️ Permission Scopes & Matrix
-
-CSM uses a structured permission matrix mapping **Actions** to **Resource Types**.
-
-### 1. Functional Actions
-Every permission is composed of an **Action Type**:
-- **`READ`**: Viewing resource lists and details.
-- **`WRITE`**: Creating new resources or modifying existing ones.
-- **`EXECUTE`**: High-impact actions like running a Workflow or triggering a Schedule.
-
-### 2. Resource & Functional Scopes
-Permissions are categorized into two logical types:
-- **`FUNCTION`**: System-level capabilities (e.g., `audit:read`, `system:settings`).
-- **`RESOURCE`**: Object-level capabilities (e.g., `workflow:execute`, `server:write`).
-
-### 3. Granular Scoping (Item-Level Access)
-A role can be Restricted or Global:
-- **Global**: The user can perform the action on *any* resource in the namespace.
-- **Item-Scoped**: Using the `AllowedItemIDs` field, you can restrict a user to only see or execute specific Workflows while hiding others in the same namespace.
+### When to design a new Role
+- A team member needs **just enough** rights for one workflow (don't grant Super Admin).
+- A new persona joins (auditor, operator, ops engineer).
+- You want to **restrict by item** — e.g., one user can run only `deploy-staging`, not `deploy-prod`.
 
 ---
 
-## 🚀 Usage & Best Practices
+## ⚙️ Permission model
 
-### Assignment Strategy
-1. **Identify Personas**: Define roles based on job functions (e.g., "Junior Developer", "Senior DevOps").
-2. **Grant Permissions**: Assign only the scopes necessary for those personas.
-3. **Assign Users**: Link team members to the appropriate roles.
+### Action types
+| Action | Means |
+| :--- | :--- |
+| **`READ`** | View lists and details. |
+| **`WRITE`** | Create or modify resources. |
+| **`EXECUTE`** | High-impact action — run a workflow, fire a schedule. |
 
-### Best Practices
-- **Principle of Least Privilege**: Never give a user "System Admin" if they only need to run a specific deployment workflow.
-- **Audit Regularly**: Check the **Audit Logs** to ensure users are only performing the actions they were intended to perform.
-- **Use Namespace Segregation**: Separate Production and Staging environments into different namespaces to prevent accidental cross-env configuration.
+### Permission scopes
+- **`FUNCTION`** — system-level capabilities (`audit:read`, `system:settings`).
+- **`RESOURCE`** — object-level capabilities (`workflow:execute`, `server:write`, `page:read`).
+
+### Item-level restriction
+A role can be **Global** (all items of a resource type) or **Item-scoped** via `AllowedItemIDs`. Item-scoping is great for limiting a deploy operator to specific workflows while hiding others in the same namespace.
 
 ---
 
-## 🧠 Technical Reference
+## 🧑‍💼 Common persona templates
 
-### Permission Resolution
-When a user attempts an action (e.g., clicking "Run" on a workflow), the backend performs a check:
-1. It fetches all roles assigned to the user.
-2. It checks if any of those roles contain the `workflow:execute` bit for the current namespace.
-3. If not found, the API returns a `403 Forbidden` response.
+| Persona | Permissions (suggested) |
+| :--- | :--- |
+| **Super Admin** | All `FUNCTION` + all `RESOURCE` permissions across all namespaces. |
+| **Workflow Author** | `workflow:read,write` ; `server:read` ; `variable:read,write` ; `page:read,write`. |
+| **Deploy Operator** | `workflow:execute` (item-scoped to release workflows) ; `page:read`. |
+| **Auditor** | `audit:read` ; `workflow:read` ; `server:read` ; `schedule:read`. |
+| **AI Integrator** | API keys with `mcp:enable` ; per-namespace `workflow:read,execute`. |
 
-### Default Roles
-Upon installation, CSM includes a **Super Admin** role which has all permission bits enabled across all namespaces. This role should be reserved for initial setup and emergency operations.
+---
+
+## 🔒 Resolution flow
+
+When a user clicks **Run** on a workflow:
+
+1. Backend reads all roles attached to the user.
+2. Filters to roles within the workflow's namespace.
+3. Checks if any role grants `workflow:execute`.
+4. If the role is item-scoped, checks `AllowedItemIDs` contains the workflow's id.
+5. Allowed → executes; not allowed → `403 Forbidden` (and an entry in the [Audit Log](audit_logs.md)).
+
+---
+
+## ✅ Best practices
+
+- **Principle of least privilege** — start with no permissions and add only what's blocked.
+- **Audit assignments quarterly** — review the role-user matrix in [Audit Logs](audit_logs.md).
+- **Separate `prod` and `staging`** into different namespaces; copy roles but not assignments.
+- **Reserve Super Admin** for emergency operations and the initial bootstrap user.
+- **Use item scoping** for deploy / production workflows — far safer than namespace-wide `workflow:execute`.
+
+---
+
+## 🛠️ Step-by-step: create a role
+
+1. **Navigate** to Roles → **+ New Role**.
+2. **Name** — descriptive, matches the persona (e.g., `Deploy Operator`).
+3. **Namespace** — pick the scope (or leave global if applicable).
+4. **Add permissions** — tick the action × resource cells in the matrix.
+5. (Optional) **Item-scope** — for any `workflow:execute` or similar, pick the specific item IDs.
+6. **Save**. The role appears in the user assignment dialog immediately.
+
+### Assigning a role to a user
+- Users → pick a user → **Roles** tab → add the role.
+- Changes take effect on the user's next API call (no logout required).
+
+---
+
+## 🧠 Reference
+
+- **Default Super Admin** — created at install; has all bits enabled across all namespaces. Treat like a `root` account.
+- **Permission storage** — roles are stored as a permission bitmap per resource type, plus an optional `AllowedItemIDs` array.
+- **API keys** can have their own permission subset (a sub-role) — useful for limited automation tokens (see [MCP](mcp.md)).
+- **Cross-namespace actions** are always denied unless an explicit role grants permission in *each* namespace separately.
+
+---
+
+## 🔧 Troubleshooting
+
+| Symptom | Likely cause | Fix |
+| :--- | :--- | :--- |
+| User gets `403` on a workflow they should run | Role is item-scoped and workflow id not in `AllowedItemIDs` | Add the id, or grant the role globally. |
+| New role doesn't apply | Role assigned but cached session | Refresh the page; for API keys, regenerate or wait for cache TTL. |
+| Auditor can't see audit logs | Missing `audit:read` permission | Add the `FUNCTION` permission `audit:read` to the auditor role. |
+| Permission bleeds across environments | Same role assigned in multiple namespaces | Split into per-namespace roles; review the namespace column in the assignment table. |

@@ -28,6 +28,7 @@ A **Workflow** is a list of instructions for the server.
 ### 3. Pages (The "Friendly Face")
 A **Page** is what your staff actually sees. It hides all the technical "code" and just shows a form and a button.
 - **Analogy**: It's like the interface of a microwave. You don't need to know how the electricity works; you just press the "Popcorn" button.
+- **Extras on each Page**: live log viewer (draggable, resizable), per-button **history** of the last 10 runs with re-run and "view log", section grouping, light/dark theme, and custom button colors. See [Pages](pages.md) for the full tour.
 
 ---
 

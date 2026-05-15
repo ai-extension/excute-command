@@ -1,98 +1,195 @@
-# 🧠 Workflows: Technical Reference
+# ⚙️ Workflows: Orchestration Reference
 
-Workflows are high-performance automation pipelines. This guide provides an exhaustive reference for inputs, file handling, orchestration, and internal system behaviors.
+Workflows are the core of CSM — multi-step command pipelines that you design once and run anywhere. This guide covers the full mental model, every input/output type, lifecycle hooks, the templating engine, advanced patterns, and security.
 
 ![Workflows List](assets/workflows_list.png)
 
 ---
 
-## 📥 Workflow Inputs
-Inputs allow users to provide parameters at runtime. Every input is validated via a `SecurityRegex` to prevent shell injection.
+## 🌟 Overview
 
-### Input Types & Behavior
-| Type | UI Component | Data Structure |
-| :--- | :--- | :--- |
-| **`input`** | Text Box | A single string. |
-| **`number`** | Numeric Box | An integer or float. |
-| **`select`** | Dropdown | A single string from a list. |
-| **`multi-select`** | Tag Input | An array of strings. |
-| **`multi-input`** | Dynamic List | A list of string values. |
-| **`file`** | File Picker | A local path string (automatically managed). |
+A **Workflow** is a tree:
+
+```
+Workflow
+├── Inputs            (user parameters declared at design time)
+├── Files             (scripts/configs uploaded with the run)
+├── Variables         (workflow-internal constants)
+├── Group 1           (executes in order)
+│   ├── Step 1.1      (a command, HTTP call, sub-workflow, TTY, …)
+│   ├── Step 1.2
+│   └── …
+├── Group 2           (executes after Group 1 — or in parallel if configured)
+└── Hooks             (BEFORE / AFTER_SUCCESS / AFTER_FAILED)
+```
+
+Each **Step** runs a command on a **Server** (or locally), and its output can feed into later steps via templating. The **Execution** record captures every step's stdout/stderr, status, duration, and final result.
+
+### When to use a workflow
+- A task takes **more than one command** or involves multiple servers.
+- You want to **reuse** the same logic with different parameters.
+- You need **traceability** (who ran what, when, with which inputs).
+- You want to expose the task to **non-technical users** (via Pages) or to **AI agents** (via MCP).
+
+---
+
+## 📥 Workflow inputs
+
+Inputs collect parameters from the user before a workflow starts. Every input is validated by a `SecurityRegex` to prevent shell injection.
+
+### Input types
+| Type | UI component | Returns | Typical use |
+| :--- | :--- | :--- | :--- |
+| **`input`** | Text box | string | Names, IDs, free text |
+| **`number`** | Numeric box | int / float | Counts, ports |
+| **`select`** | Dropdown | string | Pre-defined choices |
+| **`multi-select`** | Tag input | string[] | Multi-pick options |
+| **`multi-input`** | Dynamic list | string[] | Variable-length lists |
+| **`file`** | File picker | local path string | Scripts, configs, binaries |
+
+### Input metadata
+- **Required** — block the run if empty.
+- **Default value** — pre-fills the form.
+- **Pattern** — extra regex on top of the global security regex.
+- **CollapseInitially** — hides inputs under a "Show more" group for cleaner UIs.
+- **Group** — visually clusters related inputs in the run dialog.
 
 > [!TIP]
-> **Collapsible Groups**: You can set `CollapseInitially` on inputs to keep the run-dialog clean for complex workflows.
+> Use descriptive input keys (`git_branch`, `target_env`) — they appear in MCP tool schemas and AI agents use them to decide how to fill the form.
 
 ---
 
-## 📁 Workflow Files & Transfers
-Workflows can manage persistent scripts, configuration files, or binaries that need to be deployed before execution.
+## 📁 Workflow files
 
-### The File Lifecycle
-1. **Validation**: CSM checks the file existence and size.
-2. **Preprocessing**: If **Variable Substitution** is enabled, CSM renders the file content using Pongo2 (injecting inputs, variables, and globals) into a temporary buffer.
-3. **Transfer**: Files are uploaded to the **Workflow Default Server**.
-4. **Deployment Path**: 
-   - If `Target Folder` is set, files go to `TargetFolder/FileName`.
-   - Otherwise, the individual `Target Path` is used.
-5. **Cleanup**: If `Cleanup Files` is enabled, all transferred files are deleted after the workflow finishes (regardless of success or failure).
+Workflows can ship persistent assets (scripts, configs, binaries) that travel with each run.
 
-### 🔄 Implicit Remote Path Rewriting
-When a workflow runs on a **remote server (SSH)**, CSM performs "Path Magic":
-- If a variable or input points to a local CSM upload (e.g., `data/uploads/inputs/job_123/script.sh`), the engine automatically rewrites it to the temporary remote path:
-  - `/tmp/csm_inputs/job_123/script.sh`
-- This ensures your commands (e.g., `bash {{input.my_file}}`) work perfectly on both local and remote servers without manual path management.
+### Lifecycle
+1. **Validate** — existence + size limit.
+2. **Preprocess** — if **Variable Substitution** is enabled, the file content is rendered through Pongo2 (inputs, variables, globals).
+3. **Transfer** — uploaded to the **Workflow Default Server** (or each step's server, depending on settings).
+4. **Deploy path** — `TargetFolder/FileName` if `Target Folder` is set; otherwise the file's explicit `Target Path`.
+5. **Cleanup** — if **Cleanup Files** is on, transferred files are deleted after the run completes (success or failure).
+
+### Implicit remote path rewriting
+When a workflow runs on a **remote SSH server**, CSM rewrites any reference to a local upload path:
+
+- Local: `data/uploads/inputs/job_123/script.sh`
+- Remote: `/tmp/csm_inputs/job_123/script.sh`
+
+You can use `bash {{ input.my_file }}` and the same template works locally and over SSH.
 
 ---
 
-## 🏗️ Lifecycle Hooks
-Hooks allow you to trigger decoupled logic at specific stages. 
+## 🏗️ Lifecycle hooks
 
-| Hook Type | Trigger Event |
+Hooks attach side-effects to workflow phases.
+
+| Hook | Fires when |
 | :--- | :--- |
-| **BEFORE** | Executes after input validation but before file transfers. |
-| **AFTER_SUCCESS** | Executes only if all groups and steps finish with `SUCCESS`. |
-| **AFTER_FAILED** | Executes if any critical group/step fails or if a timeout occurs. |
+| **BEFORE** | After input validation, before file transfers |
+| **AFTER_SUCCESS** | All groups/steps finished with `SUCCESS` |
+| **AFTER_FAILED** | Any critical group/step failed or workflow timed out |
 
-> [!IMPORTANT]
-> To prevent infinite loops, CSM enforces a maximum recursion depth of **3 levels** for hooks.
-
----
-
-## 🧠 Dynamic Templating (Pongo2)
-CSM uses **Pongo2** for all substitution. Every command, URL, and header field is a template.
-
-### Variable Scopes
-- `{{ input.key }}`: User-provided parameters.
-- `{{ variable.key }}`: Internal workflow constants.
-- `{{ global.key }}`: System-wide configuration.
-- `{{ flow.group_key.step.action_key }}`: Output of a previous step.
-- `{{ item }}` / `{{ index }}`: Current element and position in a Loop.
+Hooks are themselves workflows. To prevent loops, CSM enforces a maximum **recursion depth of 3 levels**.
 
 ---
 
-## 🧩 Advanced Orchestration
+## 🧠 Templating (Pongo2)
 
-### 📂 Context & State Persistence
-- **Working Directory Tracking**: CSM executes `pwd -P` after every step and automatically restores that directory for subsequent steps on the same server.
-- **Group Loops**: Iterate over JSON arrays or comma-separated strings. Results are indexed (e.g., `step_key_0`).
-- **Relay**: Transfer artifacts between two remote servers via the CSM backend proxy using streaming tarballs.
+Every command, URL, header, and file body is a Pongo2 template. Available scopes:
+
+| Scope | Reference | Notes |
+| :--- | :--- | :--- |
+| Inputs | `{{ input.key }}` | User-provided at runtime |
+| Variables | `{{ variable.key }}` | Workflow-internal constants |
+| Globals | `{{ global.key }}` | System-wide, namespace-scoped |
+| Step outputs | `{{ flow.group_key.step.action_key }}` | Output from a previous step's `action_key` |
+| Loop item | `{{ item }}` / `{{ index }}` | Current value and 0-based position |
+
+### Common patterns
+- Conditional command: `{% if input.dry_run == "yes" %}--dry-run{% endif %}`
+- JSON access: `{{ flow.fetch.json.result.0.host }}`
+- Pre-formatted block: `{% raw %}{ "k": "v" }{% endraw %}` to skip parsing.
 
 ---
 
-## ⚡ Step Specializations
+## 🧩 Advanced orchestration
 
-### Nested Workflows (WORKFLOW)
-Trigger sub-pipelines with full argument mapping.
-- **Sync/Async**: Use `WaitToFinish: false` to spawn a sub-workflow as a background process ("Fire and Forget").
-- **Dynamic Foreach**: Pass a JSON structure to spawn $N$ sub-workflows based on a list.
+### Working directory tracking
+After every step, CSM runs `pwd -P` and remembers the cwd. The next step on the same server resumes from there — so a `cd` in one step persists into the next.
 
-### Terminal Automation (TTY)
-For interactive prompts (e.g., `sudo`, `ssh-keygen`).
-- **Auto-Input Rules**: Define Regex patterns to watch and the keystrokes to send automatically.
+### Group loops
+Set `Loop` on a group with a JSON array or comma-separated string. The group runs once per element; outputs are indexed as `step_key_0`, `step_key_1`, …
+
+### Parallel groups
+Groups marked **parallel** start simultaneously; the workflow waits for all of them before proceeding to the next sequential group.
+
+### Relay (cross-server transfer)
+Stream artifacts from one remote server to another via the CSM backend as a tarball — no scp gymnastics needed.
+
+---
+
+## ⚡ Step specializations
+
+### COMMAND
+Plain shell command. Captures stdout/stderr, exit code.
+
+### HTTP
+Send REST requests. Headers, body, and query are templated. Response body parsed as JSON into `flow.*` for later steps.
+
+### WORKFLOW (nested)
+Run another workflow as a step.
+- **Sync** — wait for completion (default).
+- **Async** (`WaitToFinish: false`) — spawn and continue ("fire and forget").
+- **Dynamic foreach** — pass a JSON array to spawn N sub-workflows.
+
+### TTY
+For interactive prompts (`sudo`, `ssh-keygen`, vault unlocks). Define regex/keystroke pairs; CSM watches output and types responses automatically.
+
+---
+
+## 🚨 Failure handling
+
+- Each step has a **timeout** (default workflow-level, overridable per-step).
+- **Critical** flag: if a critical step fails, the whole workflow fails immediately and `AFTER_FAILED` runs.
+- Non-critical failures are logged but the workflow continues.
+- A step can be retried with `MaxRetries`/`RetryDelaySeconds`.
 
 ---
 
 ## 🔒 Security
-All inputs must match:
-`^[\pL0-9_\-\.\ \/\\:\[\]{}"',@#%!+=?;&|\(\)\$\n\r]*$`
-This prevents shell injection while supporting complex JSON and command structures.
+
+All input values must match the global allow-list regex:
+
+```
+^[\pL0-9_\-\.\ \/\\:\[\]{}"',@#%!+=?;&|\(\)\$\n\r]*$
+```
+
+This permits Unicode letters, JSON, and shell-safe punctuation while blocking metacharacters that would enable injection (backticks, `>`, etc.).
+
+Secrets from **Global Variables** are masked in logs (see [Variables](variables.md) — Secret Masking).
+
+---
+
+## 🛠️ Step-by-step: build a workflow
+
+1. **Create** — Workflows → **+ New**.
+2. **Meta** — name, description, AI guide (used by [MCP](mcp.md)).
+3. **Inputs** — declare parameters; pick types and defaults.
+4. **Variables / Files** — add internal constants and uploaded assets.
+5. **Groups & steps** — drag steps in; set command, server, timeout, critical flag.
+6. **Hooks** — wire up `BEFORE` / `AFTER_*` if needed.
+7. **Test** — **Run Now** with sample inputs; watch the [Execution Log](audit_logs.md).
+8. **Expose** — wrap in a [Page](pages.md), attach a [Schedule](schedules.md), or expose via [MCP](mcp.md).
+
+---
+
+## 🔧 Troubleshooting
+
+| Symptom | Likely cause | Fix |
+| :--- | :--- | :--- |
+| Command works on terminal but fails in CSM | Working directory or env differ | Add `cd /path && …` or set an explicit working dir; check the SSH user's shell init files. |
+| `{{ flow.X.Y }}` is empty | Previous step's `action_key` not set or step skipped | Confirm the producing step ran and the `action_key` matches exactly. |
+| File upload referenced as local path on remote | Variable substitution off | Enable **Variable Substitution** for that file, or use the explicit `/tmp/csm_inputs/...` path. |
+| Secret leaked in logs | Value not registered as a Global Secret | Move the value into a Global Variable marked **Secret**. |
+| Workflow hangs on TTY prompt | No matching auto-input rule | Add a TTY rule with the correct regex; pre-test on a non-prod server. |
