@@ -40,8 +40,9 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	h.auditLog.LogAction(c, "LOGIN", "AUTH", "", nil, "SUCCESS")
 
-	// MaxAge is in seconds (24h = 86400s). SameSite Mode Strict is safer.
-	c.SetCookie("auth_token", token, 86400, "/", "", false, false) // Secure: false for local dev, HttpOnly: false to let JS read it
+	// MaxAge in seconds, mirrors JWT exp from token_expiration setting (hours).
+	maxAge := h.authService.GetTokenExpirationHours() * 3600
+	c.SetCookie("auth_token", token, maxAge, "/", "", false, false) // Secure: false for local dev, HttpOnly: false to let JS read it
 
 	c.JSON(http.StatusOK, gin.H{
 		"token": token,
@@ -96,7 +97,8 @@ func (h *AuthHandler) SocialLogin(c *gin.Context) {
 		return
 	}
 
-	c.SetCookie("auth_token", token, 86400, "/", "", false, false)
+	maxAgeSocial := h.authService.GetTokenExpirationHours() * 3600
+	c.SetCookie("auth_token", token, maxAgeSocial, "/", "", false, false)
 
 	c.JSON(http.StatusOK, gin.H{
 		"token": token,

@@ -69,6 +69,16 @@ func (s *AuthService) Register(username, password, email string) (*domain.User, 
 	return user, nil
 }
 
+func (s *AuthService) GetTokenExpirationHours() int {
+	expirationHours := 24
+	if setting, err := s.settingsRepo.GetByKey("token_expiration"); err == nil {
+		if val, err := strconv.Atoi(setting.Value); err == nil && val > 0 {
+			expirationHours = val
+		}
+	}
+	return expirationHours
+}
+
 func (s *AuthService) Login(username, password string) (string, *domain.User, error) {
 	user, err := s.userRepo.GetByUsername(username)
 	if err != nil {
@@ -79,12 +89,7 @@ func (s *AuthService) Login(username, password string) (string, *domain.User, er
 		return "", nil, errors.New("invalid credentials")
 	}
 
-	expirationHours := 24
-	if setting, err := s.settingsRepo.GetByKey("token_expiration"); err == nil {
-		if val, err := strconv.Atoi(setting.Value); err == nil && val > 0 {
-			expirationHours = val
-		}
-	}
+	expirationHours := s.GetTokenExpirationHours()
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id":  user.ID,
@@ -147,12 +152,7 @@ func (s *AuthService) SocialLogin(provider, socialID, email, fullName, avatarURL
 	}
 
 	// Generate token
-	expirationHours := 24
-	if setting, err := s.settingsRepo.GetByKey("token_expiration"); err == nil {
-		if val, err := strconv.Atoi(setting.Value); err == nil && val > 0 {
-			expirationHours = val
-		}
-	}
+	expirationHours := s.GetTokenExpirationHours()
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id":  user.ID,
