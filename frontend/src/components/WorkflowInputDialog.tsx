@@ -17,7 +17,44 @@ interface WorkflowInputDialogProps {
     confirmLabel?: string;
     uploadUrl?: string;
     headers?: Record<string, string>;
+    storageKey?: string;
 }
+
+const DRAFT_PREFIX = 'wf_input_draft:';
+
+const loadDraft = (key: string | undefined, inputs: WorkflowInput[]): Record<string, string> | null => {
+    if (!key) return null;
+    try {
+        const raw = localStorage.getItem(DRAFT_PREFIX + key);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') return null;
+        const allowedKeys = new Set(inputs.filter(i => i.type !== 'file').map(i => i.key));
+        const cleaned: Record<string, string> = {};
+        for (const k of Object.keys(parsed)) {
+            if (allowedKeys.has(k) && typeof parsed[k] === 'string') {
+                cleaned[k] = parsed[k];
+            }
+        }
+        return cleaned;
+    } catch {
+        return null;
+    }
+};
+
+const saveDraft = (key: string | undefined, values: Record<string, string>, inputs: WorkflowInput[]) => {
+    if (!key) return;
+    try {
+        const fileKeys = new Set(inputs.filter(i => i.type === 'file').map(i => i.key));
+        const toSave: Record<string, string> = {};
+        for (const k of Object.keys(values)) {
+            if (!fileKeys.has(k)) toSave[k] = values[k];
+        }
+        localStorage.setItem(DRAFT_PREFIX + key, JSON.stringify(toSave));
+    } catch {
+        // ignore quota/serialize errors
+    }
+};
 
 const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
     isOpen,
@@ -28,7 +65,8 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
     isStarting = false,
     confirmLabel = "Initialize Pipeline",
     uploadUrl = '/api/workflows/upload-input',
-    headers = {}
+    headers = {},
+    storageKey,
 }) => {
     const [values, setValues] = useState<Record<string, string>>({});
     const [files, setFiles] = useState<Record<string, File>>({});
@@ -107,12 +145,26 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                     initialValues[input.key] = ''; // Select/File starts empty
                 }
             });
+
+            const draft = loadDraft(storageKey, inputs);
+            if (draft) {
+                for (const k of Object.keys(draft)) {
+                    initialValues[k] = draft[k];
+                }
+            }
+
             setValues(initialValues);
             setFiles({});
             setMultiInputFiles({});
             setErrors({});
         }
-    }, [isOpen, inputs]);
+    }, [isOpen, inputs, storageKey]);
+
+    useEffect(() => {
+        if (isOpen && storageKey && inputs.length > 0) {
+            saveDraft(storageKey, values, inputs);
+        }
+    }, [values, isOpen, storageKey, inputs]);
 
     const validate = () => {
         const newErrors: Record<string, string> = {};

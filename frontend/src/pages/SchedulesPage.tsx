@@ -324,6 +324,7 @@ const SchedulesPage = () => {
                     setIsInputDialogOpen(false);
                     setPendingWorkflow(null);
                 }}
+                storageKey={pendingWorkflow ? `schedule:workflow:${pendingWorkflow.id}` : undefined}
             />
 
             <ConfirmDialog

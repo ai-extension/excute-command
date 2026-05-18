@@ -576,6 +576,7 @@ const PublicPageView = () => {
                         }
                     }}
                     onCancel={closeInputModal}
+                    storageKey={inputModal.widget ? `public:${slug}:widget:${inputModal.widget.id}` : undefined}
                 />
 
                 {activeExecutionId && slug && (() => {
