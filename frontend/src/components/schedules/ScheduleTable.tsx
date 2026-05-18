@@ -79,7 +79,7 @@ export const ScheduleTable: React.FC<ScheduleTableProps> = ({
                                     <div>
                                         <div className="flex items-center gap-2">
                                             <p
-                                                className="text-sm font-black tracking-tight text-white uppercase cursor-pointer hover:text-primary transition-colors"
+                                                className="text-sm font-black tracking-tight text-foreground uppercase cursor-pointer hover:text-primary transition-colors"
                                                 onClick={() => navigate(`/schedules/${s.id}`)}
                                             >
                                                 {s.name}
@@ -119,7 +119,7 @@ export const ScheduleTable: React.FC<ScheduleTableProps> = ({
                                 <div className="flex flex-col gap-1">
                                     <div className="flex items-center gap-2">
                                         <Calendar className="w-3.5 h-3.5 text-muted-foreground/40" />
-                                        <span className="text-[11px] font-black text-slate-300">
+                                        <span className="text-[11px] font-black text-foreground">
                                             {formatDisplayDate(s.next_run_at)}
                                         </span>
                                     </div>
