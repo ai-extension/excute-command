@@ -262,6 +262,10 @@ func (s *ServerService) ExecuteHttp(ctx context.Context, serverID uuid.UUID, met
 		hasCurl = (err == nil)
 	}
 
+	if strings.TrimSpace(method) == "" {
+		method = "GET"
+	}
+
 	if hasCurl {
 		curlCmd := fmt.Sprintf("curl -s -X %s", shellQuote(method))
 		for k, v := range headers {

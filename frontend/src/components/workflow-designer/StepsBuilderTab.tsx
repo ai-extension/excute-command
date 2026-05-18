@@ -884,6 +884,9 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                     ng[gIdx]!.steps![sIdx].target_workflow_id = undefined;
                                                                                                     ng[gIdx]!.steps![sIdx].target_workflow_inputs = undefined;
                                                                                                 }
+                                                                                                if (newType === 'HTTP' && !ng[gIdx]!.steps![sIdx].http_method) {
+                                                                                                    ng[gIdx]!.steps![sIdx].http_method = 'GET';
+                                                                                                }
                                                                                                 setGroups(ng);
                                                                                             }}
                                                                                             className="h-8 px-2 w-full text-[11px] font-semibold border border-border rounded-md bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 cursor-pointer"
