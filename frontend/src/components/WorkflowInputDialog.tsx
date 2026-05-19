@@ -226,8 +226,8 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
 
     const validate = () => {
         const newErrors: Record<string, string> = {};
-        const safeRegex = /^[\p{L}0-9_\-\. \/\\:\[\]{}"',@#%!+=?;&|\(\)\$\n\r]*$/u;
-        const allowedCharsDesc = 'Letters, 0-9, _, -, ., /, \\, :, [, ], {, }, ", \', @, #, %, !, +, =, ?, ;, &, |, (, ), $, Newline and Space';
+        const safeRegex = /^[\p{L}0-9_\-\. \/\\:\[\]{}"',@#%!+=?;&|\(\)\$\n\r\*]*$/u;
+        const allowedCharsDesc = 'Letters, 0-9, _, -, ., /, \\, :, [, ], {, }, ", \', @, #, %, !, +, =, ?, ;, &, |, (, ), $, *, Newline and Space';
 
         inputs.forEach(input => {
             const val = values[input.key];

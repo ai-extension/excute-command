@@ -21,7 +21,7 @@ import (
 
 var (
 	// We allow backslash (\) to support literal \n and other escaped characters.
-	SecurityRegex = regexp.MustCompile(`(?s)^[\pL0-9_\-\.\ \/\\:\[\]{}"',@#%!+=?;&|\(\)\$\n\r]*$`)
+	SecurityRegex = regexp.MustCompile(`(?s)^[\pL0-9_\-\.\ \/\\:\[\]{}"',@#%!+=?;&|\(\)\$\n\r\*]*$`)
 )
 
 type WorkflowExecutor struct {
