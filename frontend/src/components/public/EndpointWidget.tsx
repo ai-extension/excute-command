@@ -121,7 +121,7 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
                         </button>
                     )}
                 </div>
-                <p className="text-[13px] font-medium text-muted-foreground mt-6 opacity-60 leading-relaxed max-w-[90%]">
+                <p className="text-[13px] font-medium text-muted-foreground mt-6 opacity-60 leading-relaxed whitespace-pre-wrap">
                     {widget.description || "Launch automated system orchestration pipeline with real-time feedback loop."}
                 </p>
             </div>

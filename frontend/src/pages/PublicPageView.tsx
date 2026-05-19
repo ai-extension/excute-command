@@ -490,7 +490,7 @@ const PublicPageView = () => {
                                             </div>
                                             <div className="p-8 flex-1 flex flex-col justify-center">
                                                 {widget.description && (
-                                                    <p className="text-sm text-muted-foreground mb-4 px-1 line-clamp-3">{widget.description}</p>
+                                                    <p className="text-sm text-muted-foreground mb-4 px-1 whitespace-pre-wrap">{widget.description}</p>
                                                 )}
                                                 {(() => {
                                                     const r = resolveButtonStyle(widget.style, 'bg-indigo-600');
@@ -612,7 +612,7 @@ const PublicPageView = () => {
                                                         {(widget.table_rows || []).map((row, ri) => (
                                                             <tr key={ri} className="border-b border-border/30 hover:bg-muted/30 transition-colors">
                                                                 {row.map((cell, ci) => (
-                                                                    <td key={ci} className="px-4 py-2.5 text-foreground/80">{cell}</td>
+                                                                    <td key={ci} className="px-4 py-2.5 text-foreground/80 whitespace-pre-wrap">{cell}</td>
                                                                 ))}
                                                             </tr>
                                                         ))}
@@ -643,7 +643,7 @@ const PublicPageView = () => {
                                             <div className="pt-4 pb-3 border-b-2 border-border/50 mb-6">
                                                 <h2 className="text-2xl font-black">{widget.title || 'Section Header'}</h2>
                                                 {widget.description && (
-                                                    <p className="text-sm text-muted-foreground mt-1">{widget.description}</p>
+                                                    <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{widget.description}</p>
                                                 )}
                                             </div>
                                             {visibleChildren.length > 0 && (
