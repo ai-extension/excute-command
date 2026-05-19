@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
     Save, ChevronLeft, Plus, Trash2, GripVertical,
     Settings as SettingsIcon, Globe, Lock, Copy,
-    Terminal, Zap, Monitor, RefreshCw, X, Palette, Clock, ServerIcon, Link2, Type
+    Terminal, Zap, Monitor, RefreshCw, X, Palette, Clock, ServerIcon, Link2, Type,
+    FileText, ImageIcon, Frame, Activity, Table2
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -41,7 +42,7 @@ const PageDesignerPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const { activeNamespace } = useNamespace();
-    const { apiFetch } = useAuth();
+    const { apiFetch, hasPermission } = useAuth();
 
     // Page meta
     const [title, setTitle] = useState('');
@@ -226,6 +227,59 @@ const PageDesignerPage = () => {
         setEditingWidgetId(w.id);
     };
 
+    const addTextWidget = () => {
+        const w: PageWidget = {
+            id: generateId(), type: 'TEXT',
+            title: 'Text Block', size: 'full',
+            content: 'Enter your text here...',
+        };
+        setWidgets(prev => [...prev, w]);
+        setEditingWidgetId(w.id);
+    };
+
+    const addImageWidget = () => {
+        const w: PageWidget = {
+            id: generateId(), type: 'IMAGE',
+            title: 'Image', size: 'half',
+            image_url: '', alt_text: '',
+        };
+        setWidgets(prev => [...prev, w]);
+        setEditingWidgetId(w.id);
+    };
+
+    const addIframeWidget = () => {
+        const w: PageWidget = {
+            id: generateId(), type: 'IFRAME',
+            title: 'Embedded Content', size: 'full',
+            iframe_url: '', iframe_height: 400,
+        };
+        setWidgets(prev => [...prev, w]);
+        setEditingWidgetId(w.id);
+    };
+
+    const addStatusWidget = () => {
+        const w: PageWidget = {
+            id: generateId(), type: 'STATUS',
+            title: 'Status', size: 'third',
+            status_label: 'Service', status_value: 'ok',
+        };
+        setWidgets(prev => [...prev, w]);
+        setEditingWidgetId(w.id);
+    };
+
+    const addTableWidget = () => {
+        const w: PageWidget = {
+            id: generateId(), type: 'TABLE',
+            title: 'Data Table', size: 'full',
+            table_headers: ['Column 1', 'Column 2', 'Column 3'],
+            table_rows: [['Row 1', 'Data', 'Data'], ['Row 2', 'Data', 'Data']],
+        };
+        setWidgets(prev => [...prev, w]);
+        setEditingWidgetId(w.id);
+    };
+
+    const canUseTerminal = hasPermission('servers', 'READ');
+
     const removeWidget = (wid: string) => {
         setWidgets(prev => prev.filter(w => w.id !== wid));
         if (editingWidgetId === wid) setEditingWidgetId(null);
@@ -370,6 +424,7 @@ const PageDesignerPage = () => {
                             <Plus className="w-4 h-4 text-muted-foreground" />
                         </button>
 
+                        {canUseTerminal && (
                         <button onClick={addTerminalWidget}
                             className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-muted text-left transition-all border border-transparent hover:border-border group">
                             <div className="flex items-center gap-3">
@@ -383,6 +438,7 @@ const PageDesignerPage = () => {
                             </div>
                             <Plus className="w-4 h-4 text-muted-foreground" />
                         </button>
+                        )}
 
                         <button onClick={addLinkWidget}
                             className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-muted text-left transition-all border border-transparent hover:border-border group">
@@ -407,6 +463,80 @@ const PageDesignerPage = () => {
                                 <div>
                                     <span className="text-sm font-bold block">Section Header</span>
                                     <span className="text-[9px] text-muted-foreground uppercase font-medium">Title and description</span>
+                                </div>
+                            </div>
+                            <Plus className="w-4 h-4 text-muted-foreground" />
+                        </button>
+
+                        <div className="pt-3 mt-1 border-t border-border/50">
+                            <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/50 mb-2 px-3">Content Widgets</p>
+                        </div>
+
+                        <button onClick={addTextWidget}
+                            className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-muted text-left transition-all border border-transparent hover:border-border group">
+                            <div className="flex items-center gap-3">
+                                <div className="p-1.5 rounded-lg bg-sky-500/10 text-sky-500 group-hover:bg-sky-500/20 transition-colors">
+                                    <FileText className="w-3.5 h-3.5" />
+                                </div>
+                                <div>
+                                    <span className="text-sm font-bold block">Text Block</span>
+                                    <span className="text-[9px] text-muted-foreground uppercase font-medium">Rich text content</span>
+                                </div>
+                            </div>
+                            <Plus className="w-4 h-4 text-muted-foreground" />
+                        </button>
+
+                        <button onClick={addImageWidget}
+                            className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-muted text-left transition-all border border-transparent hover:border-border group">
+                            <div className="flex items-center gap-3">
+                                <div className="p-1.5 rounded-lg bg-pink-500/10 text-pink-500 group-hover:bg-pink-500/20 transition-colors">
+                                    <ImageIcon className="w-3.5 h-3.5" />
+                                </div>
+                                <div>
+                                    <span className="text-sm font-bold block">Image</span>
+                                    <span className="text-[9px] text-muted-foreground uppercase font-medium">Display an image</span>
+                                </div>
+                            </div>
+                            <Plus className="w-4 h-4 text-muted-foreground" />
+                        </button>
+
+                        <button onClick={addIframeWidget}
+                            className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-muted text-left transition-all border border-transparent hover:border-border group">
+                            <div className="flex items-center gap-3">
+                                <div className="p-1.5 rounded-lg bg-violet-500/10 text-violet-500 group-hover:bg-violet-500/20 transition-colors">
+                                    <Frame className="w-3.5 h-3.5" />
+                                </div>
+                                <div>
+                                    <span className="text-sm font-bold block">Iframe Embed</span>
+                                    <span className="text-[9px] text-muted-foreground uppercase font-medium">Embed external content</span>
+                                </div>
+                            </div>
+                            <Plus className="w-4 h-4 text-muted-foreground" />
+                        </button>
+
+                        <button onClick={addStatusWidget}
+                            className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-muted text-left transition-all border border-transparent hover:border-border group">
+                            <div className="flex items-center gap-3">
+                                <div className="p-1.5 rounded-lg bg-teal-500/10 text-teal-500 group-hover:bg-teal-500/20 transition-colors">
+                                    <Activity className="w-3.5 h-3.5" />
+                                </div>
+                                <div>
+                                    <span className="text-sm font-bold block">Status Indicator</span>
+                                    <span className="text-[9px] text-muted-foreground uppercase font-medium">Show service status</span>
+                                </div>
+                            </div>
+                            <Plus className="w-4 h-4 text-muted-foreground" />
+                        </button>
+
+                        <button onClick={addTableWidget}
+                            className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-muted text-left transition-all border border-transparent hover:border-border group">
+                            <div className="flex items-center gap-3">
+                                <div className="p-1.5 rounded-lg bg-orange-500/10 text-orange-500 group-hover:bg-orange-500/20 transition-colors">
+                                    <Table2 className="w-3.5 h-3.5" />
+                                </div>
+                                <div>
+                                    <span className="text-sm font-bold block">Data Table</span>
+                                    <span className="text-[9px] text-muted-foreground uppercase font-medium">Display tabular data</span>
                                 </div>
                             </div>
                             <Plus className="w-4 h-4 text-muted-foreground" />
@@ -469,6 +599,13 @@ const PageDesignerPage = () => {
                                                                             onRemove={() => removeWidget(widget.id)}
                                                                             dragHandleProps={provided.dragHandleProps}
                                                                         />
+                                                                    ) : widget.type === 'TEXT' || widget.type === 'IMAGE' || widget.type === 'IFRAME' || widget.type === 'STATUS' || widget.type === 'TABLE' ? (
+                                                                        <ContentWidgetCard
+                                                                            widget={widget}
+                                                                            onEdit={() => setEditingWidgetId(widget.id)}
+                                                                            onRemove={() => removeWidget(widget.id)}
+                                                                            dragHandleProps={provided.dragHandleProps}
+                                                                        />
                                                                     ) : (
                                                                         <SectionWidgetCard
                                                                             widget={widget}
@@ -515,6 +652,13 @@ const PageDesignerPage = () => {
                                                                                                             />
                                                                                                         ) : child.type === 'LINK' ? (
                                                                                                             <LinkWidgetCard
+                                                                                                                widget={child}
+                                                                                                                onEdit={() => setEditingWidgetId(child.id)}
+                                                                                                                onRemove={() => removeWidget(child.id)}
+                                                                                                                dragHandleProps={childProvided.dragHandleProps}
+                                                                                                            />
+                                                                                                        ) : child.type === 'TEXT' || child.type === 'IMAGE' || child.type === 'IFRAME' || child.type === 'STATUS' || child.type === 'TABLE' ? (
+                                                                                                            <ContentWidgetCard
                                                                                                                 widget={child}
                                                                                                                 onEdit={() => setEditingWidgetId(child.id)}
                                                                                                                 onRemove={() => removeWidget(child.id)}
@@ -878,6 +1022,113 @@ const PageDesignerPage = () => {
                                     </div>
                                 </div>
                             )}
+
+                            {activeWidget.type === 'TEXT' && (
+                                <div className="space-y-6">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1 flex items-center gap-2">
+                                            <FileText className="w-3 h-3 text-sky-500" /> Content
+                                        </label>
+                                        <textarea
+                                            value={activeWidget.content || ''}
+                                            onChange={e => updateWidget(activeWidget.id, { content: e.target.value })}
+                                            className="w-full min-h-[160px] p-4 text-[11px] bg-muted/30 border border-border/50 rounded-2xl focus:ring-2 ring-primary/10 outline-none resize-y transition-all font-mono"
+                                            placeholder="Enter text or markdown content..."
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeWidget.type === 'IMAGE' && (
+                                <div className="space-y-6">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1 flex items-center gap-2">
+                                            <ImageIcon className="w-3 h-3 text-pink-500" /> Image URL
+                                        </label>
+                                        <Input value={activeWidget.image_url || ''} onChange={e => updateWidget(activeWidget.id, { image_url: e.target.value })} className="h-11 text-sm bg-muted/30 border border-border/50 rounded-2xl font-mono text-pink-400" placeholder="https://example.com/image.png" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Alt Text</label>
+                                        <Input value={activeWidget.alt_text || ''} onChange={e => updateWidget(activeWidget.id, { alt_text: e.target.value })} className="h-11 text-sm bg-muted/30 border border-border/50 rounded-2xl" placeholder="Describe the image..." />
+                                    </div>
+                                    {activeWidget.image_url && (
+                                        <div className="rounded-2xl overflow-hidden border border-border/50 bg-muted/20">
+                                            <img src={activeWidget.image_url} alt={activeWidget.alt_text || ''} className="w-full h-auto max-h-48 object-contain" onError={e => (e.currentTarget.style.display = 'none')} />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {activeWidget.type === 'IFRAME' && (
+                                <div className="space-y-6">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1 flex items-center gap-2">
+                                            <Frame className="w-3 h-3 text-violet-500" /> Embed URL
+                                        </label>
+                                        <Input value={activeWidget.iframe_url || ''} onChange={e => updateWidget(activeWidget.id, { iframe_url: e.target.value })} className="h-11 text-sm bg-muted/30 border border-border/50 rounded-2xl font-mono text-violet-400" placeholder="https://grafana.example.com/d/..." />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Height (px)</label>
+                                        <Input type="number" value={activeWidget.iframe_height || 400} onChange={e => updateWidget(activeWidget.id, { iframe_height: parseInt(e.target.value) || 400 })} className="h-11 text-sm bg-muted/30 border border-border/50 rounded-2xl" min={100} max={2000} />
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeWidget.type === 'STATUS' && (
+                                <div className="space-y-6">
+                                    <div className="grid grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1 flex items-center gap-2">
+                                                <Activity className="w-3 h-3 text-teal-500" /> Label
+                                            </label>
+                                            <Input value={activeWidget.status_label || ''} onChange={e => updateWidget(activeWidget.id, { status_label: e.target.value })} className="h-11 text-sm bg-muted/30 border border-border/50 rounded-2xl" placeholder="e.g. API Server" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Status</label>
+                                            <select value={activeWidget.status_value || 'ok'} onChange={e => updateWidget(activeWidget.id, { status_value: e.target.value as any })}
+                                                className="w-full h-11 bg-muted/30 border border-border/50 rounded-2xl text-[11px] px-4 outline-none font-bold appearance-none cursor-pointer">
+                                                <option value="ok" className="bg-popover text-foreground">OK</option>
+                                                <option value="warning" className="bg-popover text-foreground">Warning</option>
+                                                <option value="error" className="bg-popover text-foreground">Error</option>
+                                                <option value="info" className="bg-popover text-foreground">Info</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Description</label>
+                                        <Input value={activeWidget.description || ''} onChange={e => updateWidget(activeWidget.id, { description: e.target.value })} className="h-11 text-sm bg-muted/30 border border-border/50 rounded-2xl" placeholder="Optional status description..." />
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeWidget.type === 'TABLE' && (
+                                <div className="space-y-6">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1 flex items-center gap-2">
+                                            <Table2 className="w-3 h-3 text-orange-500" /> Column Headers
+                                        </label>
+                                        <Input
+                                            value={(activeWidget.table_headers || []).join(', ')}
+                                            onChange={e => updateWidget(activeWidget.id, { table_headers: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
+                                            className="h-11 text-sm bg-muted/30 border border-border/50 rounded-2xl"
+                                            placeholder="Column 1, Column 2, Column 3"
+                                        />
+                                        <p className="text-[9px] text-muted-foreground px-1">Separate column names with commas</p>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Data Rows</label>
+                                        <textarea
+                                            value={(activeWidget.table_rows || []).map(row => row.join(', ')).join('\n')}
+                                            onChange={e => updateWidget(activeWidget.id, {
+                                                table_rows: e.target.value.split('\n').map(line => line.split(',').map(s => s.trim())).filter(row => row.some(cell => cell))
+                                            })}
+                                            className="w-full min-h-[120px] p-4 text-[11px] bg-muted/30 border border-border/50 rounded-2xl focus:ring-2 ring-primary/10 outline-none resize-y transition-all font-mono"
+                                            placeholder="Row 1 Col 1, Row 1 Col 2, Row 1 Col 3&#10;Row 2 Col 1, Row 2 Col 2, Row 2 Col 3"
+                                        />
+                                        <p className="text-[9px] text-muted-foreground px-1">One row per line, separate cells with commas</p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                         <div className="px-8 py-6 bg-muted/10 border-t border-border/40 flex flex-col gap-3">
                             <Button onClick={() => setEditingWidgetId(null)} className="premium-gradient text-white text-[10px] font-black uppercase tracking-[0.2em] h-12 rounded-2xl shadow-premium">
@@ -1054,5 +1305,109 @@ const SectionWidgetCard: React.FC<SectionWidgetCardProps> = ({ widget, onEdit, o
         {children}
     </div>
 );
+
+const STATUS_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
+    ok: { bg: 'bg-emerald-500/10', text: 'text-emerald-500', dot: 'bg-emerald-500' },
+    warning: { bg: 'bg-amber-500/10', text: 'text-amber-500', dot: 'bg-amber-500' },
+    error: { bg: 'bg-rose-500/10', text: 'text-rose-500', dot: 'bg-rose-500' },
+    info: { bg: 'bg-sky-500/10', text: 'text-sky-500', dot: 'bg-sky-500' },
+};
+
+const WIDGET_META: Record<string, { icon: React.ReactNode; color: string; label: string }> = {
+    TEXT: { icon: <FileText className="w-3.5 h-3.5" />, color: 'sky', label: 'Text Block' },
+    IMAGE: { icon: <ImageIcon className="w-3.5 h-3.5" />, color: 'pink', label: 'Image' },
+    IFRAME: { icon: <Frame className="w-3.5 h-3.5" />, color: 'violet', label: 'Iframe' },
+    STATUS: { icon: <Activity className="w-3.5 h-3.5" />, color: 'teal', label: 'Status' },
+    TABLE: { icon: <Table2 className="w-3.5 h-3.5" />, color: 'orange', label: 'Table' },
+};
+
+interface ContentWidgetCardProps {
+    widget: PageWidget;
+    onEdit: () => void;
+    onRemove: () => void;
+    dragHandleProps: any;
+}
+
+const ContentWidgetCard: React.FC<ContentWidgetCardProps> = ({ widget, onEdit, onRemove, dragHandleProps }) => {
+    const meta = WIDGET_META[widget.type] || WIDGET_META.TEXT;
+    const colorClasses = `bg-${meta.color}-500/10 text-${meta.color}-500 group-hover:bg-${meta.color}-500/20`;
+
+    return (
+        <div className="group bg-card border border-border rounded-[2rem] overflow-hidden hover:border-primary/40 transition-all shadow-sm">
+            <div className="flex items-center gap-2 px-5 py-3.5 border-b border-border bg-card">
+                <div {...dragHandleProps} className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors">
+                    <GripVertical className="w-4 h-4" />
+                </div>
+                <div className={cn("p-1.5 rounded-lg transition-colors", colorClasses)}>
+                    {meta.icon}
+                </div>
+                <div className="flex-1 min-w-0">
+                    <p className="text-[11px] font-black uppercase tracking-tight truncate">{widget.title || meta.label}</p>
+                    <p className="text-[9px] text-muted-foreground font-medium uppercase tracking-widest">{meta.label}</p>
+                </div>
+                <button onClick={onEdit} className="h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors border border-transparent hover:border-border">
+                    <SettingsIcon className="w-3.5 h-3.5" />
+                </button>
+                <button onClick={onRemove} className="h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors border border-transparent hover:border-border">
+                    <Trash2 className="w-3.5 h-3.5" />
+                </button>
+            </div>
+            <div className="p-5">
+                {widget.type === 'TEXT' && (
+                    <p className="text-xs text-muted-foreground line-clamp-3 whitespace-pre-wrap">{widget.content || 'No content yet...'}</p>
+                )}
+                {widget.type === 'IMAGE' && (
+                    widget.image_url ? (
+                        <img src={widget.image_url} alt={widget.alt_text || ''} className="w-full h-32 object-contain rounded-xl bg-muted/20" onError={e => { e.currentTarget.src = ''; e.currentTarget.alt = 'Image failed to load'; }} />
+                    ) : (
+                        <div className="h-24 flex items-center justify-center rounded-xl bg-muted/20 text-muted-foreground">
+                            <ImageIcon className="w-8 h-8 opacity-30" />
+                        </div>
+                    )
+                )}
+                {widget.type === 'IFRAME' && (
+                    <div className="h-20 flex items-center justify-center rounded-xl bg-violet-500/5 border border-violet-500/20 text-violet-400">
+                        <Frame className="w-5 h-5 mr-2 opacity-50" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest opacity-70">{widget.iframe_url ? 'Embedded Content' : 'No URL set'}</span>
+                    </div>
+                )}
+                {widget.type === 'STATUS' && (() => {
+                    const sc = STATUS_COLORS[widget.status_value || 'ok'];
+                    return (
+                        <div className={cn("flex items-center gap-3 p-4 rounded-xl", sc.bg)}>
+                            <div className={cn("w-3 h-3 rounded-full animate-pulse", sc.dot)} />
+                            <span className={cn("text-sm font-black uppercase", sc.text)}>{widget.status_label || 'Status'}</span>
+                        </div>
+                    );
+                })()}
+                {widget.type === 'TABLE' && (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-[10px]">
+                            <thead>
+                                <tr className="border-b border-border">
+                                    {(widget.table_headers || []).map((h, i) => (
+                                        <th key={i} className="px-3 py-2 text-left font-black uppercase tracking-widest text-muted-foreground">{h}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {(widget.table_rows || []).slice(0, 2).map((row, ri) => (
+                                    <tr key={ri} className="border-b border-border/30">
+                                        {row.map((cell, ci) => (
+                                            <td key={ci} className="px-3 py-1.5 text-muted-foreground">{cell}</td>
+                                        ))}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        {(widget.table_rows || []).length > 2 && (
+                            <p className="text-[9px] text-muted-foreground/50 mt-1 px-3">+{(widget.table_rows || []).length - 2} more rows</p>
+                        )}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
 
 export default PageDesignerPage;
