@@ -64,7 +64,7 @@ export const ResourceFilters: React.FC<ResourceFiltersProps> = ({
     };
 
     return (
-        <div className="flex flex-col gap-3 bg-card/60 backdrop-blur-md px-3 py-3 rounded-2xl border border-border shadow-premium group/filter transition-all duration-300 hover:border-primary/30">
+        <div className="flex flex-col gap-3 bg-card/60 backdrop-blur-md px-3 py-3 rounded-md border border-border shadow-premium group/filter transition-all duration-300 hover:border-primary/30">
             <div className="flex flex-wrap items-center gap-2">
                 <div className="relative flex-1 max-w-[340px] group">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/60 transition-all group-focus-within:text-primary" />
@@ -73,7 +73,7 @@ export const ResourceFilters: React.FC<ResourceFiltersProps> = ({
                         value={localSearch}
                         onChange={(e) => setLocalSearch(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleApply()}
-                        className="pl-9 h-8 bg-background border-border text-foreground rounded-lg focus-visible:ring-primary/30 placeholder:text-muted-foreground/50 font-medium text-[11px] transition-all focus:border-primary/40 shadow-sm"
+                        className="pl-9 h-8 bg-background border-border text-foreground rounded-md focus-visible:ring-primary/30 placeholder:text-muted-foreground/50 font-medium text-xs transition-all focus:border-primary/40 shadow-sm"
                     />
                 </div>
 
@@ -89,7 +89,7 @@ export const ResourceFilters: React.FC<ResourceFiltersProps> = ({
                         type={config.type}
                         width={config.width || "w-48"}
                         triggerClassName={cn(
-                            "h-8 flex items-center gap-2 px-3 rounded-lg border font-black uppercase tracking-wider text-[9px] transition-all shrink-0",
+                            "h-8 flex items-center gap-2 px-3 rounded-md border font-black uppercase tracking-wider text-[10px] transition-all shrink-0",
                             isFiltered(config)
                                 ? "bg-primary/10 border-primary/40 text-primary hover:bg-primary/20"
                                 : "bg-background border-border text-muted-foreground hover:text-foreground hover:border-primary/40 hover:bg-background"
@@ -112,7 +112,7 @@ export const ResourceFilters: React.FC<ResourceFiltersProps> = ({
                             type={config.type}
                             width={config.width || "w-full"}
                             triggerClassName={cn(
-                                "h-9 flex items-center gap-2 px-3 rounded-lg border font-black uppercase tracking-wider text-[10px] transition-all shrink-0",
+                                "h-9 flex items-center gap-2 px-3 rounded-md border font-black uppercase tracking-wider text-[10px] transition-all shrink-0",
                                 isFiltered(config)
                                     ? "bg-primary/10 border-primary/40 text-primary hover:bg-primary/20"
                                     : "bg-background border-border text-muted-foreground hover:text-foreground hover:border-primary/40 hover:bg-background"
@@ -125,7 +125,7 @@ export const ResourceFilters: React.FC<ResourceFiltersProps> = ({
                 <Button
                     onClick={handleApply}
                     disabled={isLoading}
-                    className="h-8 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-[9px] shadow-sm transition-all active:scale-95 gap-1.5 shrink-0"
+                    className="h-8 px-4 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-[10px] shadow-sm transition-all active:scale-95 gap-1.5 shrink-0"
                 >
                     <Filter className="w-3 h-3" />
                     {isLoading ? "Syncing..." : "Apply"}
@@ -140,7 +140,7 @@ export const ResourceFilters: React.FC<ResourceFiltersProps> = ({
                             onReset();
                         }}
                         disabled={isLoading}
-                        className="h-8 px-4 rounded-lg border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground font-black uppercase tracking-widest text-[9px] transition-all active:scale-95 shrink-0"
+                        className="h-8 px-4 rounded-md border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground font-black uppercase tracking-widest text-[10px] transition-all active:scale-95 shrink-0"
                     >
                         Reset
                     </Button>

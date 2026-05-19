@@ -268,8 +268,8 @@ const ServerPage = () => {
             />
 
             {error ? (
-                <div className="bg-destructive/10 border border-destructive/20 rounded-2xl p-8 text-center animate-in fade-in zoom-in-95 duration-300">
-                    <div className="inline-flex p-4 rounded-2xl bg-destructive/10 text-destructive mb-4">
+                <div className="bg-destructive/10 border border-destructive/20 rounded-md p-8 text-center animate-in fade-in zoom-in-95 duration-300">
+                    <div className="inline-flex p-4 rounded-md bg-destructive/10 text-destructive mb-4">
                         <XCircle className="w-8 h-8" />
                     </div>
                     <h3 className="text-lg font-black uppercase tracking-tight text-destructive mb-2">Fleet Synchronization Failed</h3>
@@ -278,7 +278,7 @@ const ServerPage = () => {
                     <Button
                         onClick={() => fetchServers()}
                         variant="outline"
-                        className="px-8 rounded-xl border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive font-bold uppercase tracking-widest text-[10px]"
+                        className="px-8 rounded-md border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive font-bold uppercase tracking-widest text-[10px]"
                     >
                         Retry Uplink
                     </Button>
@@ -330,7 +330,7 @@ const ServerPage = () => {
 
             {/* Footer Status */}
             <div className="flex justify-center pt-8 border-t border-border mt-auto">
-                <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.4em] opacity-40">
+                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.4em] opacity-40">
                     Fleet Management {APP_VERSION} • CSM APP ENGINE
                 </p>
             </div>

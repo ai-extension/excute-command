@@ -58,7 +58,7 @@ export const ScheduleFormDialog: React.FC<ScheduleFormDialogProps> = ({
                     <DialogTitle className="text-2xl font-black tracking-tight">
                         {isEditing ? 'Edit Automation' : 'Create Automation'}
                     </DialogTitle>
-                    <div className="flex p-0.5 bg-muted/50 rounded-lg border border-border mt-4">
+                    <div className="flex p-0.5 bg-muted/50 rounded-md border border-border mt-4">
                         <button
                             type="button"
                             onClick={() => setActiveDialogTab('config')}
@@ -90,7 +90,7 @@ export const ScheduleFormDialog: React.FC<ScheduleFormDialogProps> = ({
                                     <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Plan Name</Label>
                                     <Input
                                         placeholder="e.g. Daily Database Backup"
-                                        className="h-10 bg-muted/30 border-border rounded-xl font-bold tracking-tight focus:bg-background transition-all"
+                                        className="h-9 bg-muted/30 border-border rounded-md font-bold tracking-tight focus:bg-background transition-all"
                                         value={formData.name}
                                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                         required
@@ -101,7 +101,7 @@ export const ScheduleFormDialog: React.FC<ScheduleFormDialogProps> = ({
                                     <div className="space-y-2">
                                         <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Type</Label>
                                         <select
-                                            className="w-full h-10 bg-muted/30 border border-border rounded-xl font-bold px-3 text-xs outline-none focus:bg-background transition-all"
+                                            className="w-full h-9 bg-muted/30 border border-border rounded-md font-bold px-3 text-xs outline-none focus:bg-background transition-all"
                                             value={formData.type}
                                             onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                                         >
@@ -115,7 +115,7 @@ export const ScheduleFormDialog: React.FC<ScheduleFormDialogProps> = ({
                                                 <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Cron Expression</Label>
                                                 <Input
                                                     placeholder="* * * * * *"
-                                                    className="h-10 bg-muted/30 border-border rounded-xl font-bold font-mono text-xs"
+                                                    className="h-9 bg-muted/30 border-border rounded-md font-bold font-mono text-xs"
                                                     value={formData.cron_expression}
                                                     onChange={(e) => setFormData({ ...formData, cron_expression: e.target.value })}
                                                     required
@@ -141,7 +141,7 @@ export const ScheduleFormDialog: React.FC<ScheduleFormDialogProps> = ({
                                                     `}} />
                                                     <Input
                                                         type="datetime-local"
-                                                        className="h-12 bg-muted/30 border-border rounded-xl font-bold text-sm pl-10 pr-4 transition-all focus:bg-background cursor-pointer [color-scheme:dark]"
+                                                        className="h-9 bg-muted/30 border-border rounded-md font-bold text-sm pl-10 pr-4 transition-all focus:bg-background cursor-pointer [color-scheme:dark]"
                                                         value={formData.next_run_at}
                                                         onChange={(e) => setFormData({ ...formData, next_run_at: e.target.value })}
                                                         required
@@ -162,7 +162,7 @@ export const ScheduleFormDialog: React.FC<ScheduleFormDialogProps> = ({
                                             type="number"
                                             min="0"
                                             max="5"
-                                            className="h-10 bg-muted/30 border-border rounded-xl font-bold text-xs transition-all"
+                                            className="h-9 bg-muted/30 border-border rounded-md font-bold text-xs transition-all"
                                             value={formData.retries}
                                             onChange={(e) => setFormData({ ...formData, retries: parseInt(e.target.value) || 0 })}
                                         />
@@ -170,7 +170,7 @@ export const ScheduleFormDialog: React.FC<ScheduleFormDialogProps> = ({
                                     <div className="space-y-2">
                                         <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Initial Status</Label>
                                         <select
-                                            className="w-full h-10 bg-muted/30 border border-border rounded-xl font-bold px-3 text-xs outline-none focus:bg-background transition-all"
+                                            className="w-full h-9 bg-muted/30 border border-border rounded-md font-bold px-3 text-xs outline-none focus:bg-background transition-all"
                                             value={formData.status}
                                             onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                                         >
@@ -180,10 +180,10 @@ export const ScheduleFormDialog: React.FC<ScheduleFormDialogProps> = ({
                                     </div>
                                 </div>
 
-                                <div className="flex items-center justify-between p-3 bg-muted/30 border border-border rounded-xl">
+                                <div className="flex items-center justify-between p-3 bg-muted/30 border border-border rounded-md">
                                     <div className="space-y-0.5">
                                         <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Catch-up</Label>
-                                        <p className="text-[9px] text-muted-foreground font-medium ml-1">Run missed jobs if server was offline.</p>
+                                        <p className="text-[10px] text-muted-foreground font-medium ml-1">Run missed jobs if server was offline.</p>
                                     </div>
                                     <Switch
                                         checked={formData.catch_up}
@@ -197,7 +197,7 @@ export const ScheduleFormDialog: React.FC<ScheduleFormDialogProps> = ({
                                         onChange={(tags) => setFormData({ ...formData, tags })}
                                     />
                                 </div>
-                                <p className="text-[9px] text-muted-foreground font-medium px-1 italic">Retries occur every 10 seconds upon workflow failure.</p>
+                                <p className="text-[10px] text-muted-foreground font-medium px-1 italic">Retries occur every 10 seconds upon workflow failure.</p>
 
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between">
@@ -207,7 +207,7 @@ export const ScheduleFormDialog: React.FC<ScheduleFormDialogProps> = ({
                                             variant="outline"
                                             size="sm"
                                             onClick={() => setIsPickerOpen(true)}
-                                            className="h-8 text-[9px] font-black uppercase tracking-widest rounded-lg border-primary/20 bg-primary/5 text-primary"
+                                            className="h-8 text-[10px] font-black uppercase tracking-widest rounded-md border-primary/20 bg-primary/5 text-primary"
                                         >
                                             <Plus className="w-3 h-3 mr-1" /> Add Workflow
                                         </Button>
@@ -215,21 +215,21 @@ export const ScheduleFormDialog: React.FC<ScheduleFormDialogProps> = ({
 
                                     <div className="space-y-2">
                                         {formData.workflows.length === 0 ? (
-                                            <div className="flex flex-col items-center justify-center py-8 bg-muted/20 border border-dashed border-border rounded-xl">
+                                            <div className="flex flex-col items-center justify-center py-8 bg-muted/20 border border-dashed border-border rounded-md">
                                                 <AlertCircle className="w-6 h-6 text-muted-foreground/20 mb-2" />
-                                                <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">No workflows selected</p>
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">No workflows selected</p>
                                             </div>
                                         ) : (
                                             <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1 text-slate-200">
                                                 {formData.workflows.map((wf: any, idx: number) => (
-                                                    <div key={idx} className="flex items-center justify-between p-3 bg-muted/30 border border-border rounded-xl group transition-all">
+                                                    <div key={idx} className="flex items-center justify-between p-3 bg-muted/30 border border-border rounded-md group transition-all">
                                                         <div className="flex flex-col gap-1">
                                                             <div className="flex items-center gap-2">
                                                                 <Zap className="w-3 h-3 text-primary" />
-                                                                <span className="text-[11px] font-black uppercase tracking-tight">{wf.name}</span>
+                                                                <span className="text-xs font-black uppercase tracking-tight">{wf.name}</span>
                                                             </div>
                                                             {wf.inputs !== "{}" && (
-                                                                <p className="text-[9px] font-medium text-muted-foreground truncate max-w-[200px]">
+                                                                <p className="text-[10px] font-medium text-muted-foreground truncate max-w-[200px]">
                                                                     Inputs: {wf.inputs}
                                                                 </p>
                                                             )}
@@ -238,7 +238,7 @@ export const ScheduleFormDialog: React.FC<ScheduleFormDialogProps> = ({
                                                             variant="ghost"
                                                             size="icon"
                                                             type="button"
-                                                            className="h-8 w-8 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                                            className="h-8 w-8 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                                                             onClick={() => removeWorkflowFromForm(idx)}
                                                         >
                                                             <Trash2 className="w-3.5 h-3.5" />
@@ -277,7 +277,7 @@ export const ScheduleFormDialog: React.FC<ScheduleFormDialogProps> = ({
                         <Button
                             type="submit"
                             disabled={isSubmitting || formData.workflows.length === 0}
-                            className="premium-gradient font-black uppercase tracking-widest text-[10px] w-full shadow-premium rounded-xl"
+                            className="premium-gradient font-black uppercase tracking-widest text-[10px] w-full shadow-premium rounded-md"
                         >
                             {isSubmitting ? "Syncing..." : isEditing ? "Save Changes" : "Schedule Automation"}
                         </Button>

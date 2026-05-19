@@ -29,7 +29,7 @@ export const ServerTerminalDialog: React.FC<ServerTerminalDialogProps> = ({
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className={cn(
-                "bg-[#0a0b0e] border-[#1a1c23] border-2 rounded-2xl p-0 overflow-hidden shadow-2xl transition-all duration-300 [&>button]:hidden",
+                "bg-[#0a0b0e] border-[#1a1c23] border-2 rounded-md p-0 overflow-hidden shadow-2xl transition-all duration-300 [&>button]:hidden",
                 isMaximized
                     ? "fixed inset-0 w-screen h-screen max-w-none rounded-none !m-0 border-0 translate-x-0 translate-y-0 left-0 top-0"
                     : "max-w-3xl h-[600px]"
@@ -53,7 +53,7 @@ export const ServerTerminalDialog: React.FC<ServerTerminalDialogProps> = ({
                                 title="Toggle Fullscreen"
                             />
                         </div>
-                        <div className="flex items-center gap-3 py-1 px-3 bg-black/30 rounded-full border border-white/5">
+                        <div className="flex items-center gap-3 py-1 px-3 bg-black/30 rounded-md border border-white/5">
                             <Terminal className="w-3.5 h-3.5 text-primary" />
                             <span className="text-[10px] font-black tracking-[0.2em] text-zinc-400 uppercase">
                                 {server?.name} <span className="text-zinc-600 mx-1">•</span> {server?.host}
@@ -67,12 +67,12 @@ export const ServerTerminalDialog: React.FC<ServerTerminalDialogProps> = ({
                                 "w-2 h-2 rounded-full",
                                 sessionID ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] animate-pulse" : "bg-zinc-700"
                             )} />
-                            <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">
                                 {sessionID ? 'Session Active' : 'Connecting...'}
                             </span>
                         </div>
 
-                        <Badge variant="outline" className="text-[8px] font-black tracking-[0.2em] border-primary/20 bg-primary/5 text-primary py-0.5 px-2">
+                        <Badge variant="outline" className="text-[10px] font-black tracking-[0.2em] border-primary/20 bg-primary/5 text-primary py-0.5 px-2">
                             SSH PTY v1.0
                         </Badge>
                     </div>
@@ -95,7 +95,7 @@ export const ServerTerminalDialog: React.FC<ServerTerminalDialogProps> = ({
                                 <Terminal className="w-10 h-10 text-primary relative animate-bounce" />
                             </div>
                             <div className="flex flex-col items-center gap-1">
-                                <p className="text-[11px] font-black uppercase tracking-[0.4em] text-zinc-600">
+                                <p className="text-xs font-black uppercase tracking-[0.4em] text-zinc-600">
                                     Handshaking Interface...
                                 </p>
                                 <div className="w-32 h-0.5 bg-zinc-900 rounded-full overflow-hidden">

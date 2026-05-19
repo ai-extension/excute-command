@@ -379,7 +379,7 @@ const PublicPageView = () => {
                     <Button
                         variant="secondary"
                         size="icon"
-                        className="h-10 w-10 rounded-xl glass shadow-premium border-white/10"
+                        className="h-10 w-10 rounded-md glass shadow-premium border-white/10"
                         onClick={copyPublicUrl}
                         title="Copy Public Link"
                     >
@@ -388,7 +388,7 @@ const PublicPageView = () => {
                     <Button
                         variant="secondary"
                         size="icon"
-                        className="h-10 w-10 rounded-xl glass shadow-premium border-white/10"
+                        className="h-10 w-10 rounded-md glass shadow-premium border-white/10"
                         onClick={togglePublicTheme}
                         title={`Switch to ${publicTheme === 'dark' ? 'light' : 'dark'} mode`}
                     >
@@ -406,13 +406,13 @@ const PublicPageView = () => {
                         <div className="flex items-center gap-6 pt-2">
                             <div className="flex items-center gap-2">
                                 <Zap className="w-4 h-4 text-primary" />
-                                <span className="text-[11px] font-black uppercase  text-muted-foreground">
+                                <span className="text-xs font-black uppercase  text-muted-foreground">
                                     {widgets.filter(w => w.type === 'ENDPOINT').length} Endpoints
                                 </span>
                             </div>
                             <div className="flex items-center gap-2">
                                 <Terminal className="w-4 h-4 text-emerald-500" />
-                                <span className="text-[11px] font-black uppercase  text-muted-foreground">
+                                <span className="text-xs font-black uppercase  text-muted-foreground">
                                     {widgets.filter(w => w.type === 'TERMINAL').length} Terminals
                                 </span>
                             </div>
@@ -437,7 +437,7 @@ const PublicPageView = () => {
                                     placeholder="Search widgets..."
                                     value={searchQuery}
                                     onChange={e => setSearchQuery(e.target.value)}
-                                    className="w-full h-12 pl-11 pr-4 bg-background/90 backdrop-blur border border-border rounded-full shadow-sm focus:ring-2 ring-primary/20 outline-none transition-all placeholder:text-muted-foreground/50 font-medium text-sm"
+                                    className="w-full h-12 pl-11 pr-4 bg-card border border-border rounded-md shadow-sm focus:ring-2 ring-primary/20 focus:border-primary/40 outline-none transition-all placeholder:text-muted-foreground/50 font-medium text-sm"
                                 />
                             </div>
                         </div>
@@ -479,13 +479,13 @@ const PublicPageView = () => {
                                 }
                                 if (widget.type === 'LINK') {
                                     return (
-                                        <div className="group bg-card border border-border rounded-[2rem] overflow-hidden hover:border-indigo-500/40 transition-all shadow-sm h-full flex flex-col">
+                                        <div className="group bg-card border border-border rounded-md overflow-hidden hover:border-indigo-500/40 transition-all shadow-sm h-full flex flex-col">
                                             <div className="flex items-center gap-4 px-8 py-4 border-b border-border bg-card">
-                                                <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500 ring-1 ring-indigo-500/20">
+                                                <div className="p-2.5 rounded-md bg-indigo-500/10 text-indigo-500 ring-1 ring-indigo-500/20">
                                                     <Link2 className="w-4 h-4" />
                                                 </div>
                                                 <div className="flex flex-col min-w-0 flex-1">
-                                                    <span className="text-[13px] font-black truncate">{widget.title || 'Link'}</span>
+                                                    <span className="text-sm font-black truncate">{widget.title || 'Link'}</span>
                                                 </div>
                                             </div>
                                             <div className="p-8 flex-1 flex flex-col justify-center">
@@ -497,7 +497,7 @@ const PublicPageView = () => {
                                                     return (
                                                         <a href={widget.url || '#'} target={widget.new_tab ? "_blank" : "_self"} rel="noreferrer"
                                                             style={r.style}
-                                                            className={cn("h-14 w-full rounded-2xl flex items-center justify-center text-white font-black text-[10px] shadow-sm cursor-pointer transition-all hover:scale-[1.02]", r.className)}>
+                                                            className={cn("h-14 w-full rounded-md flex items-center justify-center text-white font-black text-[10px] shadow-sm cursor-pointer transition-all hover:scale-[1.02]", r.className)}>
                                                             <Link2 className="w-4 h-4 mr-2" />
                                                             {widget.label || 'OPEN LINK'}
                                                         </a>
@@ -509,12 +509,12 @@ const PublicPageView = () => {
                                 }
                                 if (widget.type === 'TEXT') {
                                     return (
-                                        <div className="bg-card border border-border rounded-[2rem] overflow-hidden shadow-sm h-full flex flex-col">
+                                        <div className="bg-card border border-border rounded-md overflow-hidden shadow-sm h-full flex flex-col">
                                             <div className="flex items-center gap-4 px-8 py-4 border-b border-border bg-card">
-                                                <div className="p-2.5 rounded-xl bg-sky-500/10 text-sky-500 ring-1 ring-sky-500/20">
+                                                <div className="p-2.5 rounded-md bg-sky-500/10 text-sky-500 ring-1 ring-sky-500/20">
                                                     <FileText className="w-4 h-4" />
                                                 </div>
-                                                <span className="text-[13px] font-black truncate">{widget.title || 'Text'}</span>
+                                                <span className="text-sm font-black truncate">{widget.title || 'Text'}</span>
                                             </div>
                                             <div className="p-8 flex-1">
                                                 <div className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">{widget.content || ''}</div>
@@ -524,18 +524,18 @@ const PublicPageView = () => {
                                 }
                                 if (widget.type === 'IMAGE') {
                                     return (
-                                        <div className="bg-card border border-border rounded-[2rem] overflow-hidden shadow-sm h-full flex flex-col">
+                                        <div className="bg-card border border-border rounded-md overflow-hidden shadow-sm h-full flex flex-col">
                                             <div className="flex items-center gap-4 px-8 py-4 border-b border-border bg-card">
-                                                <div className="p-2.5 rounded-xl bg-pink-500/10 text-pink-500 ring-1 ring-pink-500/20">
+                                                <div className="p-2.5 rounded-md bg-pink-500/10 text-pink-500 ring-1 ring-pink-500/20">
                                                     <ImageIcon className="w-4 h-4" />
                                                 </div>
-                                                <span className="text-[13px] font-black truncate">{widget.title || 'Image'}</span>
+                                                <span className="text-sm font-black truncate">{widget.title || 'Image'}</span>
                                             </div>
                                             <div className="p-6 flex-1 flex items-center justify-center">
                                                 {widget.image_url ? (
-                                                    <img src={widget.image_url} alt={widget.alt_text || ''} className="w-full h-auto max-h-[500px] object-contain rounded-xl" />
+                                                    <img src={widget.image_url} alt={widget.alt_text || ''} className="w-full h-auto max-h-[500px] object-contain rounded-md" />
                                                 ) : (
-                                                    <div className="h-48 w-full flex items-center justify-center rounded-xl bg-muted/20 text-muted-foreground">
+                                                    <div className="h-48 w-full flex items-center justify-center rounded-md bg-muted/20 text-muted-foreground">
                                                         <ImageIcon className="w-12 h-12 opacity-20" />
                                                     </div>
                                                 )}
@@ -545,24 +545,24 @@ const PublicPageView = () => {
                                 }
                                 if (widget.type === 'IFRAME') {
                                     return (
-                                        <div className="bg-card border border-border rounded-[2rem] overflow-hidden shadow-sm h-full flex flex-col">
+                                        <div className="bg-card border border-border rounded-md overflow-hidden shadow-sm h-full flex flex-col">
                                             <div className="flex items-center gap-4 px-8 py-4 border-b border-border bg-card">
-                                                <div className="p-2.5 rounded-xl bg-violet-500/10 text-violet-500 ring-1 ring-violet-500/20">
+                                                <div className="p-2.5 rounded-md bg-violet-500/10 text-violet-500 ring-1 ring-violet-500/20">
                                                     <Frame className="w-4 h-4" />
                                                 </div>
-                                                <span className="text-[13px] font-black truncate">{widget.title || 'Embedded Content'}</span>
+                                                <span className="text-sm font-black truncate">{widget.title || 'Embedded Content'}</span>
                                             </div>
                                             <div className="p-4 flex-1">
                                                 {widget.iframe_url ? (
                                                     <iframe
                                                         src={widget.iframe_url}
-                                                        className="w-full rounded-xl border border-border/50"
+                                                        className="w-full rounded-md border border-border/50"
                                                         style={{ height: widget.iframe_height || 400 }}
                                                         sandbox="allow-scripts allow-same-origin allow-popups"
                                                         title={widget.title || 'Embedded content'}
                                                     />
                                                 ) : (
-                                                    <div className="h-48 flex items-center justify-center rounded-xl bg-violet-500/5 border border-violet-500/20 text-violet-400">
+                                                    <div className="h-48 flex items-center justify-center rounded-md bg-violet-500/5 border border-violet-500/20 text-violet-400">
                                                         <Frame className="w-8 h-8 opacity-30" />
                                                     </div>
                                                 )}
@@ -579,7 +579,7 @@ const PublicPageView = () => {
                                     };
                                     const sc = statusColors[widget.status_value || 'ok'];
                                     return (
-                                        <div className={cn("border rounded-[2rem] overflow-hidden shadow-sm h-full flex flex-col", sc.bg, `border-${(widget.status_value || 'ok') === 'ok' ? 'emerald' : (widget.status_value || 'ok') === 'warning' ? 'amber' : (widget.status_value || 'ok') === 'error' ? 'rose' : 'sky'}-500/20`)}>
+                                        <div className={cn("border rounded-md overflow-hidden shadow-sm h-full flex flex-col", sc.bg, `border-${(widget.status_value || 'ok') === 'ok' ? 'emerald' : (widget.status_value || 'ok') === 'warning' ? 'amber' : (widget.status_value || 'ok') === 'error' ? 'rose' : 'sky'}-500/20`)}>
                                             <div className="p-8 flex flex-col items-center justify-center gap-3 flex-1">
                                                 <div className={cn("w-4 h-4 rounded-full animate-pulse shadow-lg", sc.dot)} />
                                                 <span className={cn("text-lg font-black uppercase tracking-tight", sc.text)}>{widget.status_label || 'Status'}</span>
@@ -592,12 +592,12 @@ const PublicPageView = () => {
                                 }
                                 if (widget.type === 'TABLE') {
                                     return (
-                                        <div className="bg-card border border-border rounded-[2rem] overflow-hidden shadow-sm h-full flex flex-col">
+                                        <div className="bg-card border border-border rounded-md overflow-hidden shadow-sm h-full flex flex-col">
                                             <div className="flex items-center gap-4 px-8 py-4 border-b border-border bg-card">
-                                                <div className="p-2.5 rounded-xl bg-orange-500/10 text-orange-500 ring-1 ring-orange-500/20">
+                                                <div className="p-2.5 rounded-md bg-orange-500/10 text-orange-500 ring-1 ring-orange-500/20">
                                                     <Table2 className="w-4 h-4" />
                                                 </div>
-                                                <span className="text-[13px] font-black truncate">{widget.title || 'Data Table'}</span>
+                                                <span className="text-sm font-black truncate">{widget.title || 'Data Table'}</span>
                                             </div>
                                             <div className="p-6 flex-1 overflow-x-auto">
                                                 <table className="w-full text-sm">

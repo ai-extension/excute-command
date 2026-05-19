@@ -72,7 +72,7 @@ export const ButtonStylePicker: React.FC<ButtonStylePickerProps> = ({ presets, v
                             onClick={() => { setCustomMode(false); onChange(preset.value); }}
                             title={preset.label}
                             className={cn(
-                                "relative h-9 w-9 rounded-xl border transition-all flex items-center justify-center",
+                                "relative h-9 w-9 rounded-md border transition-all flex items-center justify-center",
                                 preset.value,
                                 selected ? "ring-2 ring-primary ring-offset-2 ring-offset-background border-transparent" : "border-border/40 hover:scale-105"
                             )}
@@ -93,7 +93,7 @@ export const ButtonStylePicker: React.FC<ButtonStylePickerProps> = ({ presets, v
                     }}
                     title="Custom color"
                     className={cn(
-                        "h-9 w-9 rounded-xl border flex items-center justify-center transition-all",
+                        "h-9 w-9 rounded-md border flex items-center justify-center transition-all",
                         customMode
                             ? "ring-2 ring-primary ring-offset-2 ring-offset-background border-transparent text-white"
                             : "border-border/40 bg-muted/30 text-muted-foreground hover:text-foreground"
@@ -105,7 +105,7 @@ export const ButtonStylePicker: React.FC<ButtonStylePickerProps> = ({ presets, v
             </div>
 
             {customMode && (
-                <div className="flex items-center gap-2 p-2 rounded-2xl bg-muted/30 border border-border/40">
+                <div className="flex items-center gap-2 p-2 rounded-md bg-muted/30 border border-border/40">
                     <input
                         type="color"
                         value={hex}
@@ -124,10 +124,10 @@ export const ButtonStylePicker: React.FC<ButtonStylePickerProps> = ({ presets, v
                             }
                         }}
                         placeholder="#6366f1"
-                        className="flex-1 h-8 px-3 text-[11px] font-mono bg-background/60 border border-border/40 rounded-lg outline-none focus:ring-2 ring-primary/20"
+                        className="flex-1 h-8 px-3 text-xs font-mono bg-background/60 border border-border/40 rounded-md outline-none focus:ring-2 ring-primary/20"
                     />
                     <div
-                        className="h-8 flex-1 rounded-lg flex items-center justify-center text-[10px] font-black text-white tracking-wider"
+                        className="h-8 flex-1 rounded-md flex items-center justify-center text-[10px] font-black text-white tracking-wider"
                         style={previewStyle.style}
                     >
                         PREVIEW

@@ -35,10 +35,10 @@ export const ServerFormDialog: React.FC<ServerFormDialogProps> = ({
 }) => {
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[425px] bg-card border-border rounded-2xl shadow-premium">
+            <DialogContent className="sm:max-w-[425px] bg-card border-border rounded-md shadow-premium">
                 <DialogHeader>
                     <DialogTitle className="text-sm font-black uppercase tracking-widest">{editingServer ? 'Edit Host Configuration' : 'Register New Host'}</DialogTitle>
-                    <DialogDescription className="text-[11px] font-medium opacity-60 uppercase tracking-tighter">
+                    <DialogDescription className="text-xs font-medium opacity-60 uppercase tracking-tighter">
                         Configure SSH connectivity for direct command execution.
                     </DialogDescription>
                 </DialogHeader>

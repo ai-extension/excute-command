@@ -34,8 +34,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
             <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#050505] relative overflow-hidden">
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-primary/20 blur-[120px] rounded-full animate-pulse" />
                 <div className="relative z-10 flex flex-col items-center gap-6">
-                    <div className="h-16 w-16 rounded-2xl premium-gradient p-[1px] animate-bounce duration-1000 shadow-[0_0_40px_rgba(99,102,241,0.4)]">
-                        <div className="w-full h-full rounded-2xl bg-[#050505] flex items-center justify-center">
+                    <div className="h-16 w-16 rounded-md premium-gradient p-[1px] animate-bounce duration-1000 shadow-[0_0_40px_rgba(99,102,241,0.4)]">
+                        <div className="w-full h-full rounded-md bg-[#050505] flex items-center justify-center">
                             <div className="w-8 h-8 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
                         </div>
                     </div>

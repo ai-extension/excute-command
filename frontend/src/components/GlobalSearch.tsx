@@ -90,7 +90,7 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean, onOpenChan
             open={open}
             onOpenChange={onOpenChange}
             label="Global Search"
-            className="fixed left-[50%] top-[40%] sm:top-[30%] z-50 w-full max-w-[600px] translate-x-[-50%] translate-y-[-50%] bg-card rounded-2xl shadow-premium border border-border/50 overflow-hidden outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
+            className="fixed left-[50%] top-[40%] sm:top-[30%] z-50 w-full max-w-[600px] translate-x-[-50%] translate-y-[-50%] bg-card rounded-md shadow-premium border border-border/50 overflow-hidden outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
             overlayClassName="fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 backdrop-blur-sm"
         >
             <div className="flex flex-col w-full text-foreground h-full max-h-[70vh]">
@@ -116,9 +116,9 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean, onOpenChan
                                 <Command.Item
                                     key={`wf-${wf.id}`}
                                     onSelect={() => runCommand(() => navigate(`/workflows/${wf.id}/edit`))}
-                                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-default aria-selected:bg-muted aria-selected:text-primary transition-colors mt-1 hover:bg-muted/50 data-[selected=true]:bg-muted data-[selected=true]:text-primary outline-none"
+                                    className="flex items-center gap-3 px-3 py-2.5 rounded-md cursor-default aria-selected:bg-muted aria-selected:text-primary transition-colors mt-1 hover:bg-muted/50 data-[selected=true]:bg-muted data-[selected=true]:text-primary outline-none"
                                 >
-                                    <div className="h-8 w-8 rounded-lg bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20 shrink-0">
+                                    <div className="h-8 w-8 rounded-md bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20 shrink-0">
                                         <Zap className="w-4 h-4 text-indigo-500" />
                                     </div>
                                     <div className="flex flex-col flex-1 min-w-0">
@@ -138,14 +138,14 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean, onOpenChan
                                 <Command.Item
                                     key={`sch-${schedule.id}`}
                                     onSelect={() => runCommand(() => navigate(`/schedules/${schedule.id}`))}
-                                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-default aria-selected:bg-muted aria-selected:text-primary transition-colors mt-1 hover:bg-muted/50 data-[selected=true]:bg-muted data-[selected=true]:text-primary outline-none"
+                                    className="flex items-center gap-3 px-3 py-2.5 rounded-md cursor-default aria-selected:bg-muted aria-selected:text-primary transition-colors mt-1 hover:bg-muted/50 data-[selected=true]:bg-muted data-[selected=true]:text-primary outline-none"
                                 >
-                                    <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center border border-amber-500/20 shrink-0">
+                                    <div className="h-8 w-8 rounded-md bg-amber-500/10 flex items-center justify-center border border-amber-500/20 shrink-0">
                                         <Calendar className="w-4 h-4 text-amber-500" />
                                     </div>
                                     <div className="flex flex-col flex-1 min-w-0">
                                         <span className="text-sm font-semibold truncate">{schedule.name}</span>
-                                        <span className="text-[11px] text-muted-foreground tracking-tight opacity-80 flex gap-2">
+                                        <span className="text-xs text-muted-foreground tracking-tight opacity-80 flex gap-2">
                                             <span className="px-1.5 py-0.5 bg-muted rounded font-bold uppercase">{schedule.type}</span>
                                             <span className="truncate">{schedule.cron_expression || 'One-time execution'}</span>
                                         </span>

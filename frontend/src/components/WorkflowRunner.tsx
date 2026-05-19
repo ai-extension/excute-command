@@ -105,7 +105,7 @@ export const WorkflowRunner: React.FC<WorkflowRunnerProps> = ({ children, onRunC
             {/* Workflow Monitor Dialog */}
             <Dialog open={isMonitorOpen} onOpenChange={setIsMonitorOpen}>
                 <DialogContent hideClose className={cn(
-                    "bg-[#0a0b0e] border-[#1a1c23] border-2 rounded-2xl p-0 overflow-hidden shadow-2xl flex flex-col focus:outline-none transition-all duration-300",
+                    "bg-[#0a0b0e] border-[#1a1c23] border-2 rounded-md p-0 overflow-hidden shadow-2xl flex flex-col focus:outline-none transition-all duration-300",
                     isMonitorMaximized
                         ? "fixed inset-0 w-screen h-screen max-w-none rounded-none !m-0 border-0 translate-x-0 translate-y-0 left-0 top-0"
                         : "max-w-5xl w-[90vw] h-[85vh]"

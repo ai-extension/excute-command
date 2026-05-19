@@ -441,30 +441,30 @@ const WorkflowDesignerPage = () => {
     return (
         <WorkflowRunner>
             {(runWorkflow) => (
-                <div className="flex flex-col h-[calc(100vh-2rem)] bg-background rounded-xl border border-border overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-500">
+                <div className="flex flex-col h-[calc(100vh-2rem)] bg-background rounded-md border border-border overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-500">
                     {/* Loading/Error States */}
                     {isLoading ? (
                         <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-background">
-                            <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center animate-pulse">
+                            <div className="w-12 h-12 rounded-md bg-primary/10 border border-primary/20 flex items-center justify-center animate-pulse">
                                 <Zap className="w-6 h-6 text-primary" />
                             </div>
                             <p className="text-[10px] font-black uppercase tracking-[0.4em] text-muted-foreground animate-pulse">Syncing Blueprint Architect...</p>
                         </div>
                     ) : error ? (
                         <div className="flex-1 flex flex-col items-center justify-center gap-6 bg-background p-8 text-center">
-                            <div className="w-16 h-16 rounded-3xl bg-destructive/10 border border-destructive/20 flex items-center justify-center">
+                            <div className="w-16 h-16 rounded-md bg-destructive/10 border border-destructive/20 flex items-center justify-center">
                                 <File className="w-8 h-8 text-destructive" />
                             </div>
                             <div className="space-y-2">
                                 <h3 className="text-sm font-black uppercase tracking-widest text-destructive">Blueprint Access Denied</h3>
-                                <p className="text-[11px] font-medium text-muted-foreground max-w-sm mx-auto uppercase tracking-tighter opacity-70">
+                                <p className="text-xs font-medium text-muted-foreground max-w-sm mx-auto uppercase tracking-tighter opacity-70">
                                     {error}
                                 </p>
                             </div>
                             <Button
                                 onClick={() => window.location.reload()}
                                 variant="outline"
-                                className="px-8 rounded-xl border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive font-black uppercase tracking-widest text-[9px]"
+                                className="px-8 rounded-md border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive font-black uppercase tracking-widest text-[10px]"
                             >
                                 Retry Handshake
                             </Button>
@@ -480,7 +480,7 @@ const WorkflowDesignerPage = () => {
                                             variant="ghost"
                                             size="icon"
                                             onClick={() => navigate('/workflows')}
-                                            className="h-8 w-8 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground"
+                                            className="h-8 w-8 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
                                         >
                                             <ChevronLeft className="w-4 h-4" />
                                         </Button>
@@ -489,7 +489,7 @@ const WorkflowDesignerPage = () => {
                                                 <h1 className="text-sm font-bold tracking-tight text-foreground uppercase">
                                                     {id ? 'Modify Automation' : 'New Orchestration'}
                                                 </h1>
-                                                <Badge variant="outline" className="text-[9px] font-bold px-1.5 h-4 bg-primary/10 border-primary/20 text-primary">
+                                                <Badge variant="outline" className="text-[10px] font-bold px-1.5 h-4 bg-primary/10 border-primary/20 text-primary">
                                                     {id ? 'v4' : 'New'}
                                                 </Badge>
                                             </div>
@@ -500,7 +500,7 @@ const WorkflowDesignerPage = () => {
                                     </div>
 
                                     <div className="flex items-center gap-2">
-                                        <div className="flex items-center gap-2 px-2.5 py-1 bg-muted/40 rounded-lg border border-border/50 group/status transition-all hover:border-indigo-500/20 mr-1">
+                                        <div className="flex items-center gap-2 px-2.5 py-1 bg-muted/40 rounded-md border border-border/50 group/status transition-all hover:border-indigo-500/20 mr-1">
                                             <div className="flex flex-col items-start">
                                                 <div className="flex items-center gap-2 mt-0.5">
                                                     <Switch
@@ -511,7 +511,7 @@ const WorkflowDesignerPage = () => {
                                                         )}
                                                     />
                                                     <span className={cn(
-                                                        "text-[9px] font-bold uppercase tracking-wider leading-none transition-colors",
+                                                        "text-[10px] font-bold uppercase tracking-wider leading-none transition-colors",
                                                         isPublic ? "text-indigo-500" : "text-amber-500"
                                                     )}>
                                                         {isPublic ? 'Public' : 'Draft'}
@@ -522,7 +522,7 @@ const WorkflowDesignerPage = () => {
                                         <Button
                                             onClick={handleExport}
                                             variant="outline"
-                                            className="h-8 px-3 rounded-lg border-indigo-500/30 text-indigo-500 hover:bg-indigo-500/10 hover:text-indigo-400 text-[9px] font-bold uppercase tracking-widest transition-all"
+                                            className="h-8 px-3 rounded-md border-indigo-500/30 text-indigo-500 hover:bg-indigo-500/10 hover:text-indigo-400 text-[10px] font-bold uppercase tracking-widest transition-all"
                                         >
                                             <Download className="w-3 h-3 mr-1.5" />
                                             Export
@@ -531,7 +531,7 @@ const WorkflowDesignerPage = () => {
                                             <Button
                                                 onClick={() => runWorkflow({ id: id as string, name, description, inputs: inputs as any, groups: groups as any })}
                                                 variant="outline"
-                                                className="h-8 px-3 rounded-lg border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-400 text-[9px] font-bold uppercase tracking-widest transition-all"
+                                                className="h-8 px-3 rounded-md border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-400 text-[10px] font-bold uppercase tracking-widest transition-all"
                                             >
                                                 <Play className="w-3 h-3 mr-1.5" />
                                                 Run
@@ -541,7 +541,7 @@ const WorkflowDesignerPage = () => {
                                         <Button
                                             onClick={handleSave}
                                             disabled={isSaving}
-                                            className="premium-gradient text-white text-[9px] font-bold uppercase tracking-widest h-8 px-4 rounded-lg shadow-premium"
+                                            className="premium-gradient text-white text-[10px] font-bold uppercase tracking-widest h-8 px-4 rounded-md shadow-premium"
                                         >
                                             <Save className="w-3 h-3 mr-1.5" />
                                             {isSaving ? 'Saving...' : 'Save Pipeline'}
@@ -551,7 +551,7 @@ const WorkflowDesignerPage = () => {
 
                                 {/* Row 2: Navigation Tabs */}
                                 <div className="flex items-center justify-center px-4 py-1.5 bg-muted/10">
-                                    <div className="flex p-0.5 bg-muted/50 rounded-lg border border-border">
+                                    <div className="flex p-0.5 bg-muted/50 rounded-md border border-border">
                                         <button
                                             onClick={() => setActiveTab('general')}
                                             className={cn(
@@ -686,7 +686,7 @@ const WorkflowDesignerPage = () => {
                                             <div className="max-w-4xl mx-auto space-y-12 pb-20">
                                                 <div className="flex flex-col gap-2 border-b border-border/50 pb-6">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
+                                                        <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center border border-primary/20">
                                                             <Zap className="w-5 h-5 text-primary" />
                                                         </div>
                                                         <h2 className="text-2xl font-black tracking-tight text-foreground uppercase italic">Execution Hooks</h2>
@@ -739,10 +739,10 @@ const WorkflowDesignerPage = () => {
                                 <div className="flex items-center gap-4">
                                     <div className="flex items-center gap-2">
                                         <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-                                        <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Draft Phase: Local Persistence Active</span>
+                                        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Draft Phase: Local Persistence Active</span>
                                     </div>
                                 </div>
-                                <p className="text-[9px] font-bold text-muted-foreground/50 uppercase tracking-[0.2em]">
+                                <p className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-[0.2em]">
                                     CSM APP DESIGNER {APP_VERSION.split('-')[0]}
                                 </p>
                             </div>

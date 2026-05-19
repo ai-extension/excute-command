@@ -217,31 +217,31 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
         switch (exec.trigger_source) {
             case 'SCHEDULE':
                 return (
-                    <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 font-black text-[8px] uppercase tracking-widest px-2 py-0.5">
+                    <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 font-black text-[10px] uppercase tracking-widest px-2 py-0.5">
                         <Calendar className="w-3 h-3 mr-1" /> Scheduled
                     </Badge>
                 );
             case 'PAGE':
                 return (
-                    <Badge variant="outline" className="bg-purple-500/10 text-purple-500 border-purple-500/20 font-black text-[8px] uppercase tracking-widest px-2 py-0.5">
+                    <Badge variant="outline" className="bg-purple-500/10 text-purple-500 border-purple-500/20 font-black text-[10px] uppercase tracking-widest px-2 py-0.5">
                         <FileText className="w-3 h-3 mr-1" /> Page: {exec.page?.title || 'Public'}
                     </Badge>
                 );
             case 'HOOK':
                 return (
-                    <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/20 font-black text-[8px] uppercase tracking-widest px-2 py-0.5">
+                    <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/20 font-black text-[10px] uppercase tracking-widest px-2 py-0.5">
                         <Zap className="w-3 h-3 mr-1" /> Hook
                     </Badge>
                 );
             case 'STEP':
                 return (
-                    <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 font-black text-[8px] uppercase tracking-widest px-2 py-0.5">
+                    <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 font-black text-[10px] uppercase tracking-widest px-2 py-0.5">
                         <Zap className="w-3 h-3 mr-1" /> Step Action
                     </Badge>
                 );
             default:
                 return (
-                    <Badge variant="outline" className="bg-slate-500/10 text-slate-400 border-slate-500/20 font-black text-[8px] uppercase tracking-widest px-2 py-0.5">
+                    <Badge variant="outline" className="bg-slate-500/10 text-slate-400 border-slate-500/20 font-black text-[10px] uppercase tracking-widest px-2 py-0.5">
                         <Plus className="w-3 h-3 mr-1" /> Manual
                     </Badge>
                 );
@@ -312,7 +312,7 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
                         <CardContent className="p-3 flex items-center justify-between gap-4">
                             <div className="flex items-center gap-3 overflow-hidden">
                                 <div className={cn(
-                                    "w-1 h-10 rounded-full shrink-0",
+                                    "w-1 h-9 rounded-full shrink-0",
                                     exec.status === 'SUCCESS' ? 'bg-green-500' :
                                         exec.status === 'FAILED' ? 'bg-red-500' :
                                             exec.status === 'CANCELLED' ? 'bg-yellow-500' : 'bg-blue-500'
@@ -342,7 +342,7 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
                                                 {exec.workflow.tags.map(tag => (
                                                     <span
                                                         key={tag.id}
-                                                        className="px-1 py-0 rounded text-[7px] font-bold border"
+                                                        className="px-1 py-0 rounded text-[10px] font-bold border"
                                                         style={{ backgroundColor: `${tag.color}20`, color: tag.color, borderColor: `${tag.color}40` }}
                                                     >
                                                         {tag.name}
@@ -396,7 +396,7 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
                     <History className="w-4 h-4 text-emerald-500" />
                     <h3 className="font-semibold text-sm">Execution History</h3>
                     {total > 0 && (
-                        <Badge variant="outline" className="text-[9px] font-black px-1.5 py-0">
+                        <Badge variant="outline" className="text-[10px] font-black px-1.5 py-0">
                             {total} runs
                         </Badge>
                     )}
@@ -407,7 +407,7 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
             </div>
 
             {executions.length === 0 ? (
-                <div className="text-center py-12 bg-white/5 border border-dashed rounded-lg">
+                <div className="text-center py-12 bg-white/5 border border-dashed rounded-md">
                     <History className="w-8 h-8 mx-auto text-muted-foreground animate-pulse mb-2" />
                     <p className="text-sm text-muted-foreground">No execution history found.</p>
                 </div>
@@ -447,7 +447,7 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
                     "p-0 overflow-hidden bg-slate-950 border-white/10 shadow-2xl flex flex-col focus:outline-none transition-all duration-300",
                     isMonitorMaximized
                         ? "fixed inset-0 w-screen h-screen max-w-none rounded-none !m-0 border-0 translate-x-0 translate-y-0 left-0 top-0"
-                        : "max-w-5xl w-[90vw] h-[85vh] rounded-2xl border-2"
+                        : "max-w-5xl w-[90vw] h-[85vh] rounded-md border-2"
                 )}>
                     <DialogTitle className="sr-only">Execution Detail</DialogTitle>
                     {loadingDetail ? (

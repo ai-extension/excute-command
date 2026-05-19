@@ -179,7 +179,7 @@ const PagesListPage = () => {
                 </div>
                 <Button
                     onClick={handleCreatePage}
-                    className="h-8 px-4 rounded-xl premium-gradient font-black uppercase tracking-widest text-[9px] shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
+                    className="h-8 px-4 rounded-md premium-gradient font-black uppercase tracking-widest text-[10px] shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
                 >
                     <Plus className="w-3.5 h-3.5" />
                     New Page
@@ -242,8 +242,8 @@ const PagesListPage = () => {
                     Loading your interfaces...
                 </div>
             ) : error ? (
-                <div className="flex-1 flex flex-col items-center justify-center gap-6 p-12 border-2 border-dashed border-destructive/20 rounded-3xl bg-destructive/5 animate-in fade-in zoom-in-95 duration-500">
-                    <div className="p-4 rounded-2xl bg-destructive/10 text-destructive">
+                <div className="flex-1 flex flex-col items-center justify-center gap-6 p-12 border-2 border-dashed border-destructive/20 rounded-md bg-destructive/5 animate-in fade-in zoom-in-95 duration-500">
+                    <div className="p-4 rounded-md bg-destructive/10 text-destructive">
                         <AlertTriangle className="w-10 h-10" />
                     </div>
                     <div className="text-center space-y-2">
@@ -255,22 +255,22 @@ const PagesListPage = () => {
                     <Button
                         onClick={() => fetchPages()}
                         variant="outline"
-                        className="rounded-xl px-8 h-12 font-bold uppercase tracking-widest text-[11px] border-destructive/20 hover:bg-destructive/10"
+                        className="rounded-md px-8 h-9 font-bold uppercase tracking-widest text-xs border-destructive/20 hover:bg-destructive/10"
                     >
                         Retry Connection
                     </Button>
                 </div>
             ) : pages.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center gap-4 opacity-50 border-2 border-dashed border-border rounded-2xl bg-card">
+                <div className="flex-1 flex flex-col items-center justify-center gap-4 opacity-50 border-2 border-dashed border-border rounded-md bg-card">
                     <Layout className="w-12 h-12 text-muted-foreground" />
                     <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground">No pages found</p>
-                    <Button onClick={handleCreatePage} variant="outline" className="rounded-full px-6">Create your first page</Button>
+                    <Button onClick={handleCreatePage} variant="outline" className="rounded-md px-6">Create your first page</Button>
                 </div>
             ) : (
                 <div className="space-y-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {pages.map(page => (
-                            <div key={page.id} className="group bg-card border border-border rounded-2xl p-5 hover:border-primary/50 transition-all duration-300 shadow-sm hover:shadow-xl hover:shadow-primary/5 relative overflow-hidden flex flex-col min-h-[220px]">
+                            <div key={page.id} className="group bg-card border border-border rounded-md p-5 hover:border-primary/50 transition-all duration-300 shadow-sm hover:shadow-xl hover:shadow-primary/5 relative overflow-hidden flex flex-col min-h-[220px]">
                                 <div className="flex items-start justify-between mb-4">
                                     <div className="flex flex-col gap-1">
                                         <h3 className="text-lg font-bold group-hover:text-primary transition-colors line-clamp-1">{page.title}</h3>
@@ -279,11 +279,11 @@ const PagesListPage = () => {
                                                 /{page.slug}
                                             </Badge>
                                             {page.is_public ? (
-                                                <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 text-[9px] font-bold uppercase py-0 h-5">
+                                                <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 text-[10px] font-bold uppercase py-0 h-5">
                                                     <Globe className="w-3 h-3 mr-1" /> Public
                                                 </Badge>
                                             ) : (
-                                                <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 text-[9px] font-bold uppercase py-0 h-5">
+                                                <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 text-[10px] font-bold uppercase py-0 h-5">
                                                     <Lock className="w-3 h-3 mr-1" /> Private
                                                 </Badge>
                                             )}
@@ -293,7 +293,7 @@ const PagesListPage = () => {
                                                 {page.tags.map(tag => (
                                                     <span
                                                         key={tag.id}
-                                                        className="px-1.5 py-0.5 rounded text-[8px] font-bold border"
+                                                        className="px-1.5 py-0.5 rounded text-[10px] font-bold border"
                                                         style={{ backgroundColor: `${tag.color}20`, color: tag.color, borderColor: `${tag.color}40` }}
                                                     >
                                                         {tag.name}
@@ -303,10 +303,10 @@ const PagesListPage = () => {
                                         )}
                                     </div>
                                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => navigate(`/pages/${page.id}/edit`)}>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md" onClick={() => navigate(`/pages/${page.id}/edit`)}>
                                             <Edit2 className="w-4 h-4 text-muted-foreground" />
                                         </Button>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:text-destructive" onClick={() => handleDeletePage(page)}>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md hover:text-destructive" onClick={() => handleDeletePage(page)}>
                                             <Trash2 className="w-4 h-4" />
                                         </Button>
                                     </div>
@@ -323,10 +323,10 @@ const PagesListPage = () => {
                                         </span>
                                         {page.created_by_username && (
                                             <div className="flex items-center gap-1.5 grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100 transition-all">
-                                                <div className="h-4 w-4 rounded-full bg-primary/20 flex items-center justify-center text-[7px] font-black text-primary uppercase">
+                                                <div className="h-4 w-4 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-black text-primary uppercase">
                                                     {page.created_by_username[0]}
                                                 </div>
-                                                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">{page.created_by_username}</span>
+                                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter">{page.created_by_username}</span>
                                             </div>
                                         )}
                                     </div>
@@ -334,13 +334,13 @@ const PagesListPage = () => {
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            className="h-8 px-3 text-[10px] font-bold uppercase tracking-widest rounded-lg"
+                                            className="h-8 px-3 text-[10px] font-bold uppercase tracking-widest rounded-md"
                                             onClick={() => window.open(`/public/pages/${page.slug}`, '_blank')}
                                         >
                                             <ExternalLink className="w-3 h-3" />
                                         </Button>
                                         <Button
-                                            className="px-4 h-8 text-[10px] font-bold uppercase tracking-widest rounded-lg premium-gradient text-white"
+                                            className="px-4 h-8 text-[10px] font-bold uppercase tracking-widest rounded-md premium-gradient text-white"
                                             onClick={() => navigate(`/pages/${page.id}/edit`)}
                                         >
                                             Design <ChevronRight className="w-3 h-3 ml-1" />

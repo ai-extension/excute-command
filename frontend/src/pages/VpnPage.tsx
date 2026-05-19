@@ -204,7 +204,7 @@ const VpnPage = () => {
                 </div>
                 <Button
                     onClick={() => handleOpenForm()}
-                    className="px-4 rounded-xl premium-gradient font-black uppercase tracking-widest text-[10px] shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
+                    className="px-4 rounded-md premium-gradient font-black uppercase tracking-widest text-[10px] shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
                 >
                     <Plus className="w-3.5 h-3.5" />
                     Add VPN
@@ -265,8 +265,8 @@ const VpnPage = () => {
 
             {/* Error State */}
             {error && (
-                <div className="bg-destructive/10 border border-destructive/20 rounded-2xl p-8 text-center animate-in fade-in zoom-in-95 duration-300">
-                    <div className="inline-flex p-4 rounded-2xl bg-destructive/10 text-destructive mb-4">
+                <div className="bg-destructive/10 border border-destructive/20 rounded-md p-8 text-center animate-in fade-in zoom-in-95 duration-300">
+                    <div className="inline-flex p-4 rounded-md bg-destructive/10 text-destructive mb-4">
                         <XCircle className="w-8 h-8" />
                     </div>
                     <h3 className="text-lg font-black uppercase tracking-tight text-destructive mb-2">VPN Synchronization Failed</h3>
@@ -276,7 +276,7 @@ const VpnPage = () => {
                     <Button
                         onClick={() => fetchVpns()}
                         variant="outline"
-                        className="px-8 rounded-xl border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive font-bold uppercase tracking-widest text-[10px]"
+                        className="px-8 rounded-md border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive font-bold uppercase tracking-widest text-[10px]"
                     >
                         Retry Uplink
                     </Button>
@@ -284,16 +284,16 @@ const VpnPage = () => {
             )}
 
             {/* Table */}
-            <div className="rounded-2xl border border-border bg-card shadow-card overflow-hidden">
+            <div className="rounded-md border border-border bg-card shadow-card overflow-hidden">
                 <Table>
                     <TableHeader>
                         <TableRow className="bg-muted hover:bg-muted/80 border-border">
-                            <TableHead className="px-6 h-12 font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">VPN Configuration</TableHead>
-                            <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Protocol</TableHead>
-                            <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Authentication / Config</TableHead>
-                            <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Endpoint</TableHead>
-                            <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground">Created By</TableHead>
-                            <TableHead className="font-black uppercase tracking-[0.15em] text-[9px] text-muted-foreground text-right px-6">Operations</TableHead>
+                            <TableHead className="px-6 h-9 font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">VPN Configuration</TableHead>
+                            <TableHead className="font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">Protocol</TableHead>
+                            <TableHead className="font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">Authentication / Config</TableHead>
+                            <TableHead className="font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">Endpoint</TableHead>
+                            <TableHead className="font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">Created By</TableHead>
+                            <TableHead className="font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground text-right px-6">Operations</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -301,20 +301,20 @@ const VpnPage = () => {
                             <TableRow key={vpn.id} className="group border-border hover:bg-muted/40 transition-colors">
                                 <TableCell className="px-6 py-4">
                                     <div className="flex items-center gap-3">
-                                        <div className="h-10 w-10 rounded-xl bg-muted/80 flex items-center justify-center border border-border group-hover:border-primary/20 group-hover:scale-110 transition-all shadow-sm">
+                                        <div className="h-10 w-10 rounded-md bg-muted/80 flex items-center justify-center border border-border group-hover:border-primary/20 group-hover:scale-110 transition-all shadow-sm">
                                             <Network className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
                                         </div>
                                         <div>
-                                            <p className="text-[13px] font-black tracking-tight">{vpn.name}</p>
-                                            <p className="text-[9px] text-muted-foreground font-black uppercase tracking-tighter opacity-70">
+                                            <p className="text-sm font-black tracking-tight">{vpn.name}</p>
+                                            <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter opacity-70">
                                                 {vpn.description || 'No description provided'}
                                             </p>
                                         </div>
                                     </div>
                                 </TableCell>
                                 <TableCell>
-                                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 border border-primary/20 w-fit">
-                                        <span className="text-[9px] font-black tracking-widest text-primary uppercase">{vpn.vpn_type}</span>
+                                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary/10 border border-primary/20 w-fit">
+                                        <span className="text-[10px] font-black tracking-widest text-primary uppercase">{vpn.vpn_type}</span>
                                     </div>
                                 </TableCell>
                                 <TableCell>
@@ -325,26 +325,26 @@ const VpnPage = () => {
                                             ) : (
                                                 <Key className="w-3.5 h-3.5 text-indigo-500" />
                                             )}
-                                            <span className="text-[11px] font-bold uppercase tracking-widest">
+                                            <span className="text-xs font-bold uppercase tracking-widest">
                                                 {vpn.auth_type} ({vpn.user})
                                             </span>
                                         </div>
                                     ) : (
                                         <div className="flex items-center gap-2">
                                             <Shield className="w-3.5 h-3.5 text-emerald-500" />
-                                            <span className="text-[11px] font-bold uppercase tracking-widest">
+                                            <span className="text-xs font-bold uppercase tracking-widest">
                                                 {vpn.vpn_type === 'WIREGUARD' ? 'WG Config' : 'OVPN Config'} Ready
                                             </span>
                                         </div>
                                     )}
                                 </TableCell>
-                                <TableCell className="font-mono text-[11px] text-muted-foreground tracking-tight">
+                                <TableCell className="font-mono text-xs text-muted-foreground tracking-tight">
                                     {vpn.host}:{vpn.port}
                                 </TableCell>
                                 <TableCell>
                                     {vpn.created_by_username ? (
                                         <div className="flex items-center gap-1.5">
-                                            <div className="h-5 w-5 rounded-full bg-primary/20 flex items-center justify-center text-[8px] font-black text-primary uppercase shrink-0">
+                                            <div className="h-5 w-5 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-black text-primary uppercase shrink-0">
                                                 {vpn.created_by_username[0]}
                                             </div>
                                             <span className="text-[10px] font-semibold text-muted-foreground">{vpn.created_by_username}</span>
@@ -359,7 +359,7 @@ const VpnPage = () => {
                                             variant="ghost"
                                             size="icon"
                                             onClick={() => handleOpenForm(vpn)}
-                                            className="h-8 w-8 rounded-lg hover:bg-muted"
+                                            className="h-8 w-8 rounded-md hover:bg-muted"
                                         >
                                             <Edit2 className="w-3.5 h-3.5" />
                                         </Button>
@@ -367,7 +367,7 @@ const VpnPage = () => {
                                             variant="ghost"
                                             size="icon"
                                             onClick={() => handleDeleteVpn(vpn)}
-                                            className="h-8 w-8 rounded-lg hover:bg-destructive/10 hover:text-destructive"
+                                            className="h-8 w-8 rounded-md hover:bg-destructive/10 hover:text-destructive"
                                         >
                                             <Trash2 className="w-3.5 h-3.5" />
                                         </Button>
@@ -395,10 +395,10 @@ const VpnPage = () => {
 
             {/* Add/Edit Dialog */}
             <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-                <DialogContent className="sm:max-w-[425px] bg-card border-border rounded-2xl shadow-premium">
+                <DialogContent className="sm:max-w-[425px] bg-card border-border rounded-md shadow-premium">
                     <DialogHeader>
                         <DialogTitle className="text-sm font-black uppercase tracking-widest">{editingVpn ? 'Edit VPN Config' : 'Add New VPN Config'}</DialogTitle>
-                        <DialogDescription className="text-[11px] font-medium opacity-60 uppercase tracking-tighter">
+                        <DialogDescription className="text-xs font-medium opacity-60 uppercase tracking-tighter">
                             Configure SSH proxy connection details.
                         </DialogDescription>
                     </DialogHeader>

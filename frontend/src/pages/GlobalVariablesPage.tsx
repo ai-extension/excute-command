@@ -195,14 +195,14 @@ const GlobalVariablesPage = () => {
                     if (!open) setFormData({ key: '', value: '', description: '' });
                 }}>
                     <DialogTrigger asChild>
-                        <Button className="h-8 premium-gradient font-black uppercase tracking-widest text-[9px] px-4 shadow-premium rounded-xl gap-2">
+                        <Button className="h-8 premium-gradient font-black uppercase tracking-widest text-[10px] px-4 shadow-premium rounded-md gap-2">
                             <Plus className="w-3.5 h-3.5" /> Add Global Variable
                         </Button>
                     </DialogTrigger>
                     <DialogContent className="sm:max-w-[425px]">
                         <DialogHeader>
                             <DialogTitle className="text-2xl font-black tracking-tight">Create Variable</DialogTitle>
-                            <DialogDescription className="text-[11px] font-medium text-muted-foreground">
+                            <DialogDescription className="text-xs font-medium text-muted-foreground">
                                 Define a new key-value pair for this namespace.
                             </DialogDescription>
                         </DialogHeader>
@@ -211,7 +211,7 @@ const GlobalVariablesPage = () => {
                                 <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Key Name</Label>
                                 <Input
                                     placeholder="e.g. API_ENDPOINT"
-                                    className="h-12 bg-muted/30 border-border rounded-xl font-bold uppercase tracking-tight focus:bg-background transition-all"
+                                    className="h-9 bg-muted/30 border-border rounded-md font-bold uppercase tracking-tight focus:bg-background transition-all"
                                     value={formData.key}
                                     onChange={(e) => setFormData({ ...formData, key: e.target.value })}
                                     required
@@ -221,7 +221,7 @@ const GlobalVariablesPage = () => {
                                 <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Value</Label>
                                 <Textarea
                                     placeholder="Enter variable value... supports multi-line"
-                                    className="min-h-[100px] bg-muted/30 border-border rounded-xl font-medium resize-y"
+                                    className="min-h-[100px] bg-muted/30 border-border rounded-md font-medium resize-y"
                                     value={formData.value}
                                     onChange={(e) => setFormData({ ...formData, value: e.target.value })}
                                     required
@@ -231,7 +231,7 @@ const GlobalVariablesPage = () => {
                                 <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Description</Label>
                                 <Textarea
                                     placeholder="What is this variable used for?"
-                                    className="min-h-[100px] bg-muted/30 border-border rounded-xl font-medium resize-none"
+                                    className="min-h-[100px] bg-muted/30 border-border rounded-md font-medium resize-none"
                                     value={formData.description}
                                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                                 />
@@ -240,7 +240,7 @@ const GlobalVariablesPage = () => {
                                 <Button
                                     type="submit"
                                     disabled={isSubmitting}
-                                    className="premium-gradient font-black uppercase tracking-widest text-[10px] h-12 w-full shadow-premium rounded-xl"
+                                    className="premium-gradient font-black uppercase tracking-widest text-[10px] h-9 w-full shadow-premium rounded-md"
                                 >
                                     {isSubmitting ? "Creating..." : "Save Variable"}
                                 </Button>
@@ -278,15 +278,15 @@ const GlobalVariablesPage = () => {
                 primaryAction={null}
             />
 
-            <Card className="border-border bg-card shadow-premium overflow-hidden rounded-2xl">
+            <Card className="border-border bg-card shadow-premium overflow-hidden rounded-md">
                 <Table>
                     <TableHeader>
                         <TableRow className="bg-muted/50 border-border hover:bg-muted/50">
-                            <TableHead className="w-[300px] h-14 font-black uppercase tracking-widest text-[9px] px-8">Variable Key</TableHead>
-                            <TableHead className="font-black uppercase tracking-widest text-[9px]">Resolved Value</TableHead>
-                            <TableHead className="font-black uppercase tracking-widest text-[9px]">Reference Code</TableHead>
-                            <TableHead className="font-black uppercase tracking-widest text-[9px]">Created By</TableHead>
-                            <TableHead className="text-right h-14 px-8 font-black uppercase tracking-widest text-[9px]">Actions</TableHead>
+                            <TableHead className="w-[300px] h-14 font-black uppercase tracking-widest text-[10px] px-8">Variable Key</TableHead>
+                            <TableHead className="font-black uppercase tracking-widest text-[10px]">Resolved Value</TableHead>
+                            <TableHead className="font-black uppercase tracking-widest text-[10px]">Reference Code</TableHead>
+                            <TableHead className="font-black uppercase tracking-widest text-[10px]">Created By</TableHead>
+                            <TableHead className="text-right h-14 px-8 font-black uppercase tracking-widest text-[10px]">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -303,12 +303,12 @@ const GlobalVariablesPage = () => {
                             <TableRow key={v.id} className="group border-border hover:bg-muted/30 transition-all duration-200">
                                 <TableCell className="px-8 py-5">
                                     <div className="flex items-center gap-4">
-                                        <div className="h-10 w-10 rounded-xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20 shadow-sm shrink-0">
+                                        <div className="h-10 w-10 rounded-md bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20 shadow-sm shrink-0">
                                             <Globe className="w-5 h-5 text-indigo-500" />
                                         </div>
                                         <div>
                                             <p className="text-sm font-black tracking-tight text-primary uppercase">{v.key}</p>
-                                            <p className="text-[11px] text-muted-foreground font-medium line-clamp-1 opacity-70 mt-0.5">
+                                            <p className="text-xs text-muted-foreground font-medium line-clamp-1 opacity-70 mt-0.5">
                                                 {v.description || 'No description provided'}
                                             </p>
                                         </div>
@@ -316,7 +316,7 @@ const GlobalVariablesPage = () => {
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex items-center gap-2 max-w-[300px]">
-                                        <code className="px-3 py-1.5 rounded-lg bg-muted text-[11px] font-bold text-slate-300 border border-border/50 truncate">
+                                        <code className="px-3 py-1.5 rounded-md bg-muted text-xs font-bold text-slate-300 border border-border/50 truncate">
                                             {v.value}
                                         </code>
                                     </div>
@@ -347,7 +347,7 @@ const GlobalVariablesPage = () => {
                                 <TableCell>
                                     {v.created_by_username ? (
                                         <div className="flex items-center gap-1.5">
-                                            <div className="h-5 w-5 rounded-full bg-primary/20 flex items-center justify-center text-[8px] font-black text-primary uppercase shrink-0">
+                                            <div className="h-5 w-5 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-black text-primary uppercase shrink-0">
                                                 {v.created_by_username[0]}
                                             </div>
                                             <span className="text-[10px] font-semibold text-muted-foreground">{v.created_by_username}</span>
@@ -361,7 +361,7 @@ const GlobalVariablesPage = () => {
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            className="rounded-xl hover:bg-indigo-500/10 hover:text-indigo-500 transition-colors"
+                                            className="rounded-md hover:bg-indigo-500/10 hover:text-indigo-500 transition-colors"
                                             onClick={() => openEditDialog(v)}
                                         >
                                             <Edit3 className="w-4 h-4" />
@@ -369,7 +369,7 @@ const GlobalVariablesPage = () => {
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            className="rounded-xl hover:bg-destructive/10 hover:text-destructive transition-colors"
+                                            className="rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors"
                                             onClick={() => handleDelete(v)}
                                         >
                                             <Trash2 className="w-4 h-4" />
@@ -383,8 +383,8 @@ const GlobalVariablesPage = () => {
                                     <div className="flex flex-col items-center justify-center gap-4 opacity-40">
                                         <Database className="w-10 h-10" />
                                         <div className="space-y-1">
-                                            <p className="text-[11px] font-black uppercase tracking-[0.2em]">No global variables found</p>
-                                            <p className="text-[9px] font-bold opacity-60">Create namespace-wide variables to use across flows.</p>
+                                            <p className="text-xs font-black uppercase tracking-[0.2em]">No global variables found</p>
+                                            <p className="text-[10px] font-bold opacity-60">Create namespace-wide variables to use across flows.</p>
                                         </div>
                                         <Button
                                             variant="outline"
@@ -415,7 +415,7 @@ const GlobalVariablesPage = () => {
                 <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
                         <DialogTitle className="text-2xl font-black tracking-tight">Edit Variable</DialogTitle>
-                        <DialogDescription className="text-[11px] font-medium text-muted-foreground">
+                        <DialogDescription className="text-xs font-medium text-muted-foreground">
                             Update the global configuration for <span className="text-primary font-bold uppercase">{selectedVar?.key}</span>
                         </DialogDescription>
                     </DialogHeader>
@@ -423,17 +423,17 @@ const GlobalVariablesPage = () => {
                         <div className="space-y-2">
                             <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Key Name</Label>
                             <Input
-                                className="h-12 bg-muted/10 border-border rounded-xl font-bold uppercase tracking-tight opacity-60"
+                                className="h-9 bg-muted/10 border-border rounded-md font-bold uppercase tracking-tight opacity-60"
                                 value={formData.key}
                                 disabled
                             />
-                            <p className="text-[8px] font-bold text-amber-500/80 px-1 italic">* Variable keys cannot be modified after creation to prevent flow breakage.</p>
+                            <p className="text-[10px] font-bold text-amber-500/80 px-1 italic">* Variable keys cannot be modified after creation to prevent flow breakage.</p>
                         </div>
                         <div className="space-y-2">
                             <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">New Value</Label>
                             <Textarea
                                 placeholder="Value..."
-                                className="min-h-[100px] bg-muted/30 border-border rounded-xl font-medium resize-y"
+                                className="min-h-[100px] bg-muted/30 border-border rounded-md font-medium resize-y"
                                 value={formData.value}
                                 onChange={(e) => setFormData({ ...formData, value: e.target.value })}
                                 required
@@ -443,7 +443,7 @@ const GlobalVariablesPage = () => {
                             <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Description</Label>
                             <Textarea
                                 placeholder="Description..."
-                                className="min-h-[100px] bg-muted/30 border-border rounded-xl font-medium resize-none"
+                                className="min-h-[100px] bg-muted/30 border-border rounded-md font-medium resize-none"
                                 value={formData.description}
                                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                             />
@@ -452,7 +452,7 @@ const GlobalVariablesPage = () => {
                             <Button
                                 type="submit"
                                 disabled={isSubmitting}
-                                className="premium-gradient font-black uppercase tracking-widest text-[10px] h-12 w-full shadow-premium rounded-xl"
+                                className="premium-gradient font-black uppercase tracking-widest text-[10px] h-9 w-full shadow-premium rounded-md"
                             >
                                 {isSubmitting ? "Updating..." : "Update variable"}
                             </Button>

@@ -117,7 +117,7 @@ const ScheduleDetailPage = () => {
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => navigate('/schedules')}
-                                className="h-10 w-10 rounded-xl bg-card border border-border hover:bg-muted"
+                                className="h-10 w-10 rounded-md bg-card border border-border hover:bg-muted"
                             >
                                 <ArrowLeft className="w-5 h-5" />
                             </Button>
@@ -155,7 +155,7 @@ const ScheduleDetailPage = () => {
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         {/* Config Sidebar */}
                         <div className="lg:col-span-1 space-y-6">
-                            <Card className="bg-card border-border shadow-premium overflow-hidden rounded-2xl">
+                            <Card className="bg-card border-border shadow-premium overflow-hidden rounded-md">
                                 <div className="p-5 border-b border-border bg-muted/30">
                                     <div className="flex items-center gap-2">
                                         <Settings className="w-4 h-4 text-primary" />
@@ -165,33 +165,33 @@ const ScheduleDetailPage = () => {
                                 <CardContent className="p-6 space-y-6">
                                     <div className="space-y-4">
                                         <div className="flex justify-between items-center">
-                                            <span className="text-[11px] font-bold text-muted-foreground uppercase">Type</span>
+                                            <span className="text-xs font-bold text-muted-foreground uppercase">Type</span>
                                             <Badge variant="outline" className="font-black text-[10px]">{schedule.type}</Badge>
                                         </div>
                                         {schedule.type === 'RECURRING' && (
                                             <div className="flex justify-between items-center">
-                                                <span className="text-[11px] font-bold text-muted-foreground uppercase">Cron</span>
+                                                <span className="text-xs font-bold text-muted-foreground uppercase">Cron</span>
                                                 <code className="text-[10px] font-mono font-bold text-indigo-400">{schedule.cron_expression}</code>
                                             </div>
                                         )}
                                         <div className="flex justify-between items-center">
-                                            <span className="text-[11px] font-bold text-muted-foreground uppercase">Max Retries</span>
+                                            <span className="text-xs font-bold text-muted-foreground uppercase">Max Retries</span>
                                             <span className="text-xs font-black text-amber-500">{schedule.retries}x</span>
                                         </div>
                                         <div className="flex justify-between items-center">
-                                            <span className="text-[11px] font-bold text-muted-foreground uppercase">Next Run</span>
-                                            <span className="text-[11px] font-black text-white">
+                                            <span className="text-xs font-bold text-muted-foreground uppercase">Next Run</span>
+                                            <span className="text-xs font-black text-white">
                                                 {schedule.next_run_at ? format(new Date(schedule.next_run_at), 'MMM d, HH:mm:ss') : 'N/A'}
                                             </span>
                                         </div>
                                         <div className="h-px bg-white/5 my-2" />
                                         <div className="flex justify-between items-center">
-                                            <span className="text-[11px] font-bold text-muted-foreground uppercase">
+                                            <span className="text-xs font-bold text-muted-foreground uppercase">
                                                 {schedule.type === 'ONE_TIME' ? 'Execution Status' : 'Total Runs'}
                                             </span>
                                             {schedule.type === 'ONE_TIME' ? (
                                                 <Badge variant="outline" className={cn(
-                                                    "font-black text-[9px] uppercase tracking-widest px-2 py-0.5",
+                                                    "font-black text-[10px] uppercase tracking-widest px-2 py-0.5",
                                                     schedule.total_runs > 0 ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/20" : "bg-zinc-800 text-zinc-500 border-white/5"
                                                 )}>
                                                     {schedule.total_runs > 0 ? 'EXECUTED' : 'PENDING'}
@@ -201,10 +201,10 @@ const ScheduleDetailPage = () => {
                                             )}
                                         </div>
                                         <div className="flex justify-between items-center">
-                                            <span className="text-[11px] font-bold text-muted-foreground uppercase">Last Result</span>
+                                            <span className="text-xs font-bold text-muted-foreground uppercase">Last Result</span>
                                             {schedule.last_run_status ? (
                                                 <Badge className={cn(
-                                                    "font-black text-[9px] uppercase tracking-widest px-2 py-0.5 rounded-md",
+                                                    "font-black text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-md",
                                                     schedule.last_run_status === 'SUCCESS' ? "bg-green-500/10 text-green-500 border-green-500/20" :
                                                         schedule.last_run_status === 'FAILED' ? "bg-red-500/10 text-red-500 border-red-500/20" :
                                                             "bg-blue-500/10 text-blue-400 border-blue-500/20"
@@ -219,7 +219,7 @@ const ScheduleDetailPage = () => {
                                 </CardContent>
                             </Card>
 
-                            <Card className="bg-card border-border shadow-premium overflow-hidden rounded-2xl">
+                            <Card className="bg-card border-border shadow-premium overflow-hidden rounded-md">
                                 <div className="p-5 border-b border-border bg-muted/30">
                                     <div className="flex items-center gap-2">
                                         <Box className="w-4 h-4 text-primary" />
@@ -229,17 +229,17 @@ const ScheduleDetailPage = () => {
                                 <CardContent className="p-4 space-y-3">
                                     {(schedule.scheduled_workflows && schedule.scheduled_workflows.length > 0) ? (
                                         schedule.scheduled_workflows.map(sw => (
-                                            <div key={sw.id} className="flex flex-col gap-2 p-3 rounded-xl bg-muted/20 border border-white/5 hover:bg-muted/30 transition-all group">
+                                            <div key={sw.id} className="flex flex-col gap-2 p-3 rounded-md bg-muted/20 border border-white/5 hover:bg-muted/30 transition-all group">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                                                    <div className="w-8 h-8 rounded-md bg-primary/10 border border-primary/20 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
                                                         <Zap className="w-4 h-4" />
                                                     </div>
                                                     <span className="text-xs font-black text-zinc-300 uppercase tracking-tight">{sw.workflow?.name || 'Unknown Workflow'}</span>
                                                 </div>
                                                 {sw.inputs && sw.inputs !== "{}" && (
                                                     <div className="pl-11 pr-2 pb-1">
-                                                        <p className="text-[9px] font-medium text-muted-foreground break-all bg-black/20 p-2 rounded-lg border border-white/5">
-                                                            <span className="text-[8px] font-black uppercase opacity-40 block mb-1">Configured Inputs</span>
+                                                        <p className="text-[10px] font-medium text-muted-foreground break-all bg-black/20 p-2 rounded-md border border-white/5">
+                                                            <span className="text-[10px] font-black uppercase opacity-40 block mb-1">Configured Inputs</span>
                                                             {sw.inputs}
                                                         </p>
                                                     </div>
@@ -247,7 +247,7 @@ const ScheduleDetailPage = () => {
                                             </div>
                                         ))
                                     ) : (
-                                        <div className="p-8 text-center bg-muted/10 rounded-xl border border-dashed border-white/5">
+                                        <div className="p-8 text-center bg-muted/10 rounded-md border border-dashed border-white/5">
                                             <p className="text-[10px] font-bold text-muted-foreground uppercase opacity-40">No workflows configured</p>
                                         </div>
                                     )}
@@ -269,9 +269,9 @@ const ScheduleDetailPage = () => {
 
                             <div className="space-y-3">
                                 {executions.length === 0 ? (
-                                    <div className="py-20 flex flex-col items-center justify-center bg-card/50 rounded-3xl border border-dashed border-border border-white/5">
+                                    <div className="py-20 flex flex-col items-center justify-center bg-card/50 rounded-md border border-dashed border-border border-white/5">
                                         <History className="w-12 h-12 text-muted-foreground/20 mb-4" />
-                                        <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">No historical traces detected</p>
+                                        <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">No historical traces detected</p>
                                     </div>
                                 ) : executions.map((exec) => (
                                     <Card
@@ -282,7 +282,7 @@ const ScheduleDetailPage = () => {
                                         <CardContent className="p-4 flex items-center justify-between">
                                             <div className="flex items-center gap-4">
                                                 <div className={cn(
-                                                    "w-10 h-10 rounded-xl flex items-center justify-center border",
+                                                    "w-10 h-10 rounded-md flex items-center justify-center border",
                                                     exec.status === 'SUCCESS' ? 'bg-green-500/10 border-green-500/20 text-green-500' :
                                                         exec.status === 'FAILED' ? 'bg-red-500/10 border-red-500/20 text-red-500' :
                                                             'bg-blue-500/10 border-blue-500/20 text-blue-500'
@@ -295,10 +295,10 @@ const ScheduleDetailPage = () => {
                                                         {getStatusBadge(exec.status)}
                                                     </div>
                                                     <div className="flex gap-4 mt-1 opacity-60">
-                                                        <span className="text-[9px] font-bold uppercase flex items-center gap-1.5 font-mono">
+                                                        <span className="text-[10px] font-bold uppercase flex items-center gap-1.5 font-mono">
                                                             #{exec.id.slice(0, 8)}
                                                         </span>
-                                                        <span className="text-[9px] font-bold uppercase flex items-center gap-1.5">
+                                                        <span className="text-[10px] font-bold uppercase flex items-center gap-1.5">
                                                             <Calendar className="w-2.5 h-2.5" />
                                                             {format(new Date(exec.started_at), 'MMM d, HH:mm:ss')}
                                                         </span>

@@ -185,12 +185,12 @@ export default function RolePermissionsPage() {
 
     return (
         <div className="space-y-6 max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex items-center justify-between bg-card p-6 rounded-3xl border border-border shadow-soft">
+            <div className="flex items-center justify-between bg-card p-6 rounded-md border border-border shadow-soft">
                 <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="icon" onClick={() => navigate('/roles')} className="rounded-xl mr-2">
+                    <Button variant="ghost" size="icon" onClick={() => navigate('/roles')} className="rounded-md mr-2">
                         <ArrowLeft className="w-5 h-5" />
                     </Button>
-                    <div className="p-3 bg-primary/10 rounded-2xl">
+                    <div className="p-3 bg-primary/10 rounded-md">
                         <Shield className="w-6 h-6 text-primary" />
                     </div>
                     <div>
@@ -198,7 +198,7 @@ export default function RolePermissionsPage() {
                         <p className="text-muted-foreground text-sm font-medium mt-1">Define access rules for resources.</p>
                     </div>
                 </div>
-                <Button onClick={handleSave} disabled={isSaving} className="premium-gradient font-black uppercase tracking-widest text-[10px] h-12 px-8 shadow-premium rounded-xl gap-2">
+                <Button onClick={handleSave} disabled={isSaving} className="premium-gradient font-black uppercase tracking-widest text-[10px] h-9 px-8 shadow-premium rounded-md gap-2">
                     {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     Save Changes
                 </Button>
@@ -208,7 +208,7 @@ export default function RolePermissionsPage() {
                 {CATEGORIES.map((cat) => (
                     <div key={cat.id} className="space-y-4">
                         <div className="flex items-center gap-3 px-2">
-                            <div className="p-2 bg-primary/5 rounded-lg border border-primary/10">
+                            <div className="p-2 bg-primary/5 rounded-md border border-primary/10">
                                 <cat.icon className="w-4 h-4 text-primary" />
                             </div>
                             <h2 className="text-sm font-black uppercase tracking-[0.2em] text-foreground/70">{cat.label} Resources</h2>
@@ -352,7 +352,7 @@ function ResourceCategoryRow({ category, activeNamespaceId, isPermEnabled, toggl
         <Card className="border-border shadow-sm overflow-hidden transition-all duration-300">
             <CardHeader className="p-5 flex flex-row items-center justify-between bg-muted/20">
                 <div className="flex items-center gap-4">
-                    <div className="p-2.5 bg-background rounded-xl border border-border shadow-sm">
+                    <div className="p-2.5 bg-background rounded-md border border-border shadow-sm">
                         <category.icon className="w-5 h-5 text-primary" />
                     </div>
                     <div>
@@ -364,8 +364,8 @@ function ResourceCategoryRow({ category, activeNamespaceId, isPermEnabled, toggl
                     {category.id === 'namespaces' || category.id === 'tags' ? (
                         <>
                             <div className="flex flex-col gap-1">
-                                <span className="text-[9px] font-black uppercase text-muted-foreground ml-1">Metadata Defaults:</span>
-                                <div className="flex items-center gap-3 bg-background px-3 py-1.5 rounded-xl border border-border/50 shadow-xs">
+                                <span className="text-[10px] font-black uppercase text-muted-foreground ml-1">Metadata Defaults:</span>
+                                <div className="flex items-center gap-3 bg-background px-3 py-1.5 rounded-md border border-border/50 shadow-xs">
                                     {ACTIONS.map(action => {
                                         const perm = getPermByAction(action);
                                         if (!perm) return null;
@@ -376,15 +376,15 @@ function ResourceCategoryRow({ category, activeNamespaceId, isPermEnabled, toggl
                                                     checked={isPermEnabled(perm.id, null)}
                                                     onClick={() => togglePermission(perm.id, null, !isPermEnabled(perm.id, null))}
                                                 />
-                                                <Label htmlFor={`all-${category.id}-${action}`} className="text-[9px] font-bold cursor-pointer">{action}</Label>
+                                                <Label htmlFor={`all-${category.id}-${action}`} className="text-[10px] font-bold cursor-pointer">{action}</Label>
                                             </div>
                                         );
                                     })}
                                 </div>
                             </div>
                             <div className="flex flex-col gap-1">
-                                <span className="text-[9px] font-black uppercase text-primary ml-1">Inherited Access Defaults:</span>
-                                <div className="flex items-center gap-3 bg-primary/5 px-3 py-1.5 rounded-xl border border-primary/20 shadow-xs">
+                                <span className="text-[10px] font-black uppercase text-primary ml-1">Inherited Access Defaults:</span>
+                                <div className="flex items-center gap-3 bg-primary/5 px-3 py-1.5 rounded-md border border-primary/20 shadow-xs">
                                     {HIERARCHY_ACTIONS.map(action => {
                                         const perm = getPermByAction(action);
                                         if (!perm) return null;
@@ -395,7 +395,7 @@ function ResourceCategoryRow({ category, activeNamespaceId, isPermEnabled, toggl
                                                     checked={isPermEnabled(perm.id, null)}
                                                     onClick={() => togglePermission(perm.id, null, !isPermEnabled(perm.id, null))}
                                                 />
-                                                <Label htmlFor={`all-${category.id}-${action}`} className="text-[9px] font-bold text-primary cursor-pointer">{action.replace('RESOURCE_', 'RES ')}</Label>
+                                                <Label htmlFor={`all-${category.id}-${action}`} className="text-[10px] font-bold text-primary cursor-pointer">{action.replace('RESOURCE_', 'RES ')}</Label>
                                             </div>
                                         );
                                     })}
@@ -403,7 +403,7 @@ function ResourceCategoryRow({ category, activeNamespaceId, isPermEnabled, toggl
                             </div>
                         </>
                     ) : (
-                        <div className="flex items-center gap-4 bg-background px-4 py-2 rounded-xl border border-border shadow-xs">
+                        <div className="flex items-center gap-4 bg-background px-4 py-2 rounded-md border border-border shadow-xs">
                             <span className="text-[10px] font-black uppercase tracking-tighter text-muted-foreground mr-1">All {category.label}:</span>
                             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 max-w-[400px]">
                                 {ACTIONS.map(action => {
@@ -429,7 +429,7 @@ function ResourceCategoryRow({ category, activeNamespaceId, isPermEnabled, toggl
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                className="text-xs font-bold gap-2 rounded-lg hover:bg-primary/10 hover:text-primary transition-colors"
+                                className="text-xs font-bold gap-2 rounded-md hover:bg-primary/10 hover:text-primary transition-colors"
                             >
                                 Add Specific Rules
                                 {isLoadingItems && <Loader2 className="w-3 h-3 animate-spin" />}
@@ -445,7 +445,7 @@ function ResourceCategoryRow({ category, activeNamespaceId, isPermEnabled, toggl
                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                                     <Input
                                         placeholder="Search items..."
-                                        className="pl-10 rounded-xl"
+                                        className="pl-10 rounded-md"
                                         value={searchTerm}
                                         onChange={(e) => setSearchTerm(e.target.value)}
                                     />
@@ -460,7 +460,7 @@ function ResourceCategoryRow({ category, activeNamespaceId, isPermEnabled, toggl
                                         availableItems.map((item: any) => (
                                             <div
                                                 key={item.id}
-                                                className="flex items-center justify-between p-2.5 rounded-xl hover:bg-muted/50 border border-transparent hover:border-border transition-all group"
+                                                className="flex items-center justify-between p-2.5 rounded-md hover:bg-muted/50 border border-transparent hover:border-border transition-all group"
                                             >
                                                 <div className="flex flex-col">
                                                     <span className="text-sm font-bold">{item.name || item.title || item.username || item.id}</span>
@@ -469,7 +469,7 @@ function ResourceCategoryRow({ category, activeNamespaceId, isPermEnabled, toggl
                                                 <Button
                                                     size="sm"
                                                     variant="default"
-                                                    className="h-8 rounded-lg"
+                                                    className="h-8 rounded-md"
                                                     onClick={() => {
                                                         setExplicitlyAddedIds(prev => [...prev, item.id]);
                                                         setIsDialogOpen(false);
@@ -494,7 +494,7 @@ function ResourceCategoryRow({ category, activeNamespaceId, isPermEnabled, toggl
             {isExpanded && (
                 <CardContent className="p-0 border-t border-border animate-in slide-in-from-top-2">
                     <div className="p-5">
-                        <div className="border border-border rounded-2xl overflow-hidden shadow-xs">
+                        <div className="border border-border rounded-md overflow-hidden shadow-xs">
                             <table className="w-full text-sm border-collapse">
                                 <thead className="bg-muted/50 text-muted-foreground text-[10px] font-black uppercase tracking-widest">
                                     {category.id === 'namespaces' || category.id === 'tags' ? (
@@ -556,7 +556,7 @@ function ResourceCategoryRow({ category, activeNamespaceId, isPermEnabled, toggl
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
-                                                        className="w-7 h-7 text-destructive hover:bg-destructive/10 rounded-lg"
+                                                        className="w-7 h-7 text-destructive hover:bg-destructive/10 rounded-md"
                                                         onClick={() => {
                                                             setExplicitlyAddedIds(prev => prev.filter(id => id !== itemId));
                                                             category.permissions.forEach((p: any) => togglePermission(p.id, itemId, false));

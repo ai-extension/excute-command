@@ -53,7 +53,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
             title={isCollapsed ? item.name : ""}
             className={({ isActive }) =>
                 cn(
-                    "flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-300 group relative overflow-hidden",
+                    "flex items-center gap-2.5 px-3 py-2 rounded-md transition-all duration-300 group relative overflow-hidden",
                     isActive
                         ? "bg-primary text-white shadow-premium scale-[1.02]"
                         : "text-muted-foreground hover:bg-muted hover:text-foreground hover:translate-x-1",
@@ -64,7 +64,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
         >
             <item.icon className={cn("w-4 h-4 transition-transform duration-300 group-hover:scale-110 shrink-0")} />
             {!isCollapsed && (
-                <span className="text-[13px] font-semibold tracking-tight animate-in fade-in slide-in-from-left-1 duration-300">{item.name}</span>
+                <span className="text-sm font-semibold tracking-tight animate-in fade-in slide-in-from-left-1 duration-300">{item.name}</span>
             )}
             {!isCollapsed && (
                 <div className="absolute right-3 opacity-20 group-hover:opacity-100 transition-opacity">
@@ -82,7 +82,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
             )}
         >
             <div className={cn("flex items-center gap-2.5 px-1 relative w-full mb-2", isCollapsed && "justify-center px-0")}>
-                <div className="premium-gradient p-2 rounded-lg shadow-premium rotate-2 hover:rotate-0 transition-all duration-300 shrink-0 flex items-center justify-center min-w-[36px] min-h-[36px]">
+                <div className="premium-gradient p-2 rounded-md shadow-premium rotate-2 hover:rotate-0 transition-all duration-300 shrink-0 flex items-center justify-center min-w-[36px] min-h-[36px]">
                     {siteLogo ? (
                         <img src={siteLogo} alt="Logo" className="w-5 h-5 object-contain" />
                     ) : (
@@ -92,7 +92,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
                 {!isCollapsed && (
                     <div className="flex flex-col animate-in fade-in slide-in-from-left-2 duration-500">
                         <span className="text-lg font-black tracking-tighter leading-none truncate max-w-[180px]">{siteTitle}</span>
-                        <span className="text-[9px] font-bold text-primary tracking-[0.2em] uppercase mt-0.5 opacity-80">Execution Engine</span>
+                        <span className="text-[10px] font-bold text-primary tracking-[0.2em] uppercase mt-0.5 opacity-80">Execution Engine</span>
                     </div>
                 )}
             </div>
@@ -107,7 +107,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
                         {!isCollapsed && (
                             <div className="flex items-center gap-1.5 px-4 mb-2 mt-1">
                                 <div className="h-px flex-1 bg-border/50" />
-                                <span className="text-[8px] font-black uppercase tracking-[0.2em] text-primary/50">Operational</span>
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/50">Operational</span>
                                 <div className="h-px flex-1 bg-border/50" />
                             </div>
                         )}
@@ -123,7 +123,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
                         {!isCollapsed && (
                             <div className="flex items-center gap-1.5 px-4 mb-2">
                                 <div className="h-px flex-1 bg-border/50" />
-                                <span className="text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">Global</span>
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">Global</span>
                                 <div className="h-px flex-1 bg-border/50" />
                             </div>
                         )}
@@ -139,7 +139,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
                         {!isCollapsed && (
                             <div className="flex items-center gap-1.5 px-4 mb-2">
                                 <div className="h-px flex-1 bg-border/50" />
-                                <span className="text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">Identity</span>
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">Identity</span>
                                 <div className="h-px flex-1 bg-border/50" />
                             </div>
                         )}
@@ -155,7 +155,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
                         {!isCollapsed && (
                             <div className="flex items-center gap-1.5 px-4 mb-2">
                                 <div className="h-px flex-1 bg-border/50" />
-                                <span className="text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">System</span>
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">System</span>
                                 <div className="h-px flex-1 bg-border/50" />
                             </div>
                         )}
@@ -172,8 +172,8 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
                     size="icon"
                     onClick={() => setIsCollapsed(!isCollapsed)}
                     className={cn(
-                        "h-10 w-10 rounded-xl hover:bg-muted text-muted-foreground hover:text-primary transition-all duration-300 mx-auto",
-                        !isCollapsed && "w-full gap-2 px-4 justify-start h-10"
+                        "h-10 w-10 rounded-md hover:bg-muted text-muted-foreground hover:text-primary transition-all duration-300 mx-auto",
+                        !isCollapsed && "w-full gap-2 px-4 justify-start h-9"
                     )}
                 >
                     {isCollapsed ? (
@@ -181,7 +181,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
                     ) : (
                         <>
                             <ChevronsLeft className="w-5 h-5" />
-                            <span className="text-[11px] font-black uppercase tracking-widest">Collapse Sidebar</span>
+                            <span className="text-xs font-black uppercase tracking-widest">Collapse Sidebar</span>
                         </>
                     )}
                 </Button>

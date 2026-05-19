@@ -44,16 +44,16 @@ export const ScheduleTable: React.FC<ScheduleTableProps> = ({
     const navigate = useNavigate();
 
     return (
-        <Card className="border-border bg-card shadow-premium overflow-hidden rounded-2xl">
+        <Card className="border-border bg-card shadow-premium overflow-hidden rounded-md">
             <Table>
                 <TableHeader>
                     <TableRow className="bg-muted/50 border-border hover:bg-muted/50">
-                        <TableHead className="w-[300px] h-14 font-black uppercase tracking-widest text-[9px] px-8">Schedule</TableHead>
-                        <TableHead className="font-black uppercase tracking-widest text-[9px]">Timing & Pattern</TableHead>
-                        <TableHead className="font-black uppercase tracking-widest text-[9px]">Performance</TableHead>
-                        <TableHead className="font-black uppercase tracking-widest text-[9px]">Workflows</TableHead>
-                        <TableHead className="font-black uppercase tracking-widest text-[9px]">Created By</TableHead>
-                        <TableHead className="text-right h-14 px-8 font-black uppercase tracking-widest text-[9px]">Actions</TableHead>
+                        <TableHead className="w-[300px] h-14 font-black uppercase tracking-widest text-[10px] px-8">Schedule</TableHead>
+                        <TableHead className="font-black uppercase tracking-widest text-[10px]">Timing & Pattern</TableHead>
+                        <TableHead className="font-black uppercase tracking-widest text-[10px]">Performance</TableHead>
+                        <TableHead className="font-black uppercase tracking-widest text-[10px]">Workflows</TableHead>
+                        <TableHead className="font-black uppercase tracking-widest text-[10px]">Created By</TableHead>
+                        <TableHead className="text-right h-14 px-8 font-black uppercase tracking-widest text-[10px]">Actions</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -71,7 +71,7 @@ export const ScheduleTable: React.FC<ScheduleTableProps> = ({
                             <TableCell className="px-8 py-5">
                                 <div className="flex items-center gap-4">
                                     <div className={cn(
-                                        "h-10 w-10 rounded-xl flex items-center justify-center border shadow-sm shrink-0 transition-colors",
+                                        "h-10 w-10 rounded-md flex items-center justify-center border shadow-sm shrink-0 transition-colors",
                                         s.status === 'ACTIVE' ? "bg-emerald-500/10 border-emerald-500/20" : "bg-slate-500/10 border-slate-500/20"
                                     )}>
                                         <Clock className={cn("w-5 h-5", s.status === 'ACTIVE' ? "text-emerald-500" : "text-slate-500")} />
@@ -85,14 +85,14 @@ export const ScheduleTable: React.FC<ScheduleTableProps> = ({
                                                 {s.name}
                                             </p>
                                             <Badge className={cn(
-                                                "font-black text-[8px] uppercase tracking-widest px-1.5 py-0 rounded",
+                                                "font-black text-[10px] uppercase tracking-widest px-1.5 py-0 rounded",
                                                 s.status === 'ACTIVE' ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-slate-500/10 text-slate-500 border-slate-500/10"
                                             )}>
                                                 {s.status}
                                             </Badge>
                                         </div>
                                         <div className="flex items-center gap-2 mt-0.5">
-                                            <Badge variant="outline" className="text-[8px] font-black tracking-widest bg-muted/20 px-1.5 py-0 border-white/5">
+                                            <Badge variant="outline" className="text-[10px] font-black tracking-widest bg-muted/20 px-1.5 py-0 border-white/5">
                                                 {s.type}
                                             </Badge>
                                             <span className="text-[10px] text-muted-foreground font-bold opacity-40">
@@ -104,7 +104,7 @@ export const ScheduleTable: React.FC<ScheduleTableProps> = ({
                                                 {s.tags.map(tag => (
                                                     <span
                                                         key={tag.id}
-                                                        className="px-1.5 py-0.5 rounded text-[8px] font-bold border"
+                                                        className="px-1.5 py-0.5 rounded text-[10px] font-bold border"
                                                         style={{ backgroundColor: `${tag.color}20`, color: tag.color, borderColor: `${tag.color}40` }}
                                                     >
                                                         {tag.name}
@@ -119,12 +119,12 @@ export const ScheduleTable: React.FC<ScheduleTableProps> = ({
                                 <div className="flex flex-col gap-1">
                                     <div className="flex items-center gap-2">
                                         <Calendar className="w-3.5 h-3.5 text-muted-foreground/40" />
-                                        <span className="text-[11px] font-black text-foreground">
+                                        <span className="text-xs font-black text-foreground">
                                             {formatDisplayDate(s.next_run_at)}
                                         </span>
                                     </div>
                                     {s.type === 'RECURRING' && (
-                                        <code className="text-[9px] font-bold text-indigo-400 font-mono opacity-80">
+                                        <code className="text-[10px] font-bold text-indigo-400 font-mono opacity-80">
                                             {s.cron_expression}
                                         </code>
                                     )}
@@ -135,7 +135,7 @@ export const ScheduleTable: React.FC<ScheduleTableProps> = ({
                                     <div className="flex items-center gap-2">
                                         {s.type === 'ONE_TIME' ? (
                                             <span className={cn(
-                                                "text-[9px] font-black tracking-widest px-1.5 py-0.5 rounded",
+                                                "text-[10px] font-black tracking-widest px-1.5 py-0.5 rounded",
                                                 s.total_runs > 0 ? "bg-indigo-500/10 text-indigo-400" : "bg-muted text-muted-foreground opacity-40"
                                             )}>
                                                 {s.total_runs > 0 ? 'EXECUTED' : 'PENDING'}
@@ -148,7 +148,7 @@ export const ScheduleTable: React.FC<ScheduleTableProps> = ({
 
                                         {s.last_run_status && (
                                             <Badge className={cn(
-                                                "font-black text-[8px] uppercase tracking-widest px-1.5 py-0 rounded",
+                                                "font-black text-[10px] uppercase tracking-widest px-1.5 py-0 rounded",
                                                 s.last_run_status === 'SUCCESS' ? "bg-green-500/10 text-green-500 border-green-500/20" :
                                                     s.last_run_status === 'FAILED' ? "bg-red-500/10 text-red-500 border-red-500/20" :
                                                         "bg-blue-500/10 text-blue-400 border-blue-500/20"
@@ -158,7 +158,7 @@ export const ScheduleTable: React.FC<ScheduleTableProps> = ({
                                         )}
                                     </div>
                                     {s.retries > 0 && (
-                                        <span className="text-[9px] font-bold text-amber-500/60 uppercase">
+                                        <span className="text-[10px] font-bold text-amber-500/60 uppercase">
                                             Retries: {s.retries}x
                                         </span>
                                     )}
@@ -167,7 +167,7 @@ export const ScheduleTable: React.FC<ScheduleTableProps> = ({
                             <TableCell>
                                 <div className="flex flex-wrap gap-1 max-w-[200px]">
                                     {s.scheduled_workflows?.map(sw => (
-                                        <Badge key={sw.id} variant="secondary" className="bg-primary/5 text-primary border-primary/10 font-black text-[8px] px-1.5 py-0.5 rounded-md">
+                                        <Badge key={sw.id} variant="secondary" className="bg-primary/5 text-primary border-primary/10 font-black text-[10px] px-1.5 py-0.5 rounded-md">
                                             {sw.workflow?.name?.split(' ')[0] || 'Unknown'}
                                         </Badge>
                                     ))}
@@ -176,7 +176,7 @@ export const ScheduleTable: React.FC<ScheduleTableProps> = ({
                             <TableCell>
                                 {s.created_by_username ? (
                                     <div className="flex items-center gap-1.5">
-                                        <div className="h-5 w-5 rounded-full bg-primary/20 flex items-center justify-center text-[8px] font-black text-primary uppercase shrink-0">
+                                        <div className="h-5 w-5 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-black text-primary uppercase shrink-0">
                                             {s.created_by_username[0]}
                                         </div>
                                         <span className="text-[10px] font-semibold text-muted-foreground">{s.created_by_username}</span>
@@ -190,7 +190,7 @@ export const ScheduleTable: React.FC<ScheduleTableProps> = ({
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        className="rounded-xl hover:bg-muted transition-colors text-zinc-400 hover:text-white"
+                                        className="rounded-md hover:bg-muted transition-colors text-zinc-400 hover:text-white"
                                         onClick={() => onToggleStatus(s.id)}
                                         title={s.status === 'ACTIVE' ? "Pause" : "Activate"}
                                     >
@@ -199,7 +199,7 @@ export const ScheduleTable: React.FC<ScheduleTableProps> = ({
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        className="rounded-xl hover:bg-muted transition-colors text-zinc-400 hover:text-white"
+                                        className="rounded-md hover:bg-muted transition-colors text-zinc-400 hover:text-white"
                                         onClick={() => onEdit(s)}
                                     >
                                         <Edit3 className="w-4 h-4" />
@@ -207,7 +207,7 @@ export const ScheduleTable: React.FC<ScheduleTableProps> = ({
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        className="rounded-xl hover:bg-muted transition-colors text-zinc-400 hover:text-destructive"
+                                        className="rounded-md hover:bg-muted transition-colors text-zinc-400 hover:text-destructive"
                                         onClick={() => onDelete(s)}
                                     >
                                         <Trash2 className="w-4 h-4" />

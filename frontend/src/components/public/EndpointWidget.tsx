@@ -94,17 +94,17 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
 
     return (
         <div className={cn(
-            "p-8 bg-card border border-border rounded-[2rem] shadow-xl flex flex-col justify-between min-h-[260px] transition-all hover:border-primary/50 group w-full"
+            "p-8 bg-card border border-border rounded-md shadow-xl flex flex-col justify-between min-h-[260px] transition-all hover:border-primary/50 group w-full"
         )}>
             <div>
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-4">
-                        <div className="p-2.5 rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20 group-hover:bg-primary group-hover:text-white transition-all duration-300">
+                        <div className="p-2.5 rounded-md bg-primary/10 text-primary ring-1 ring-primary/20 group-hover:bg-primary group-hover:text-white transition-all duration-300">
                             <Zap className="w-4 h-4" />
                         </div>
                         <div>
-                            <h3 className="text-[13px] font-black leading-tight">{widget.title}</h3>
-                            <Badge variant="outline" className="text-[7px] font-black px-1.5 h-4 mt-1 border-primary/30 text-primary/70">Terminal Access Port</Badge>
+                            <h3 className="text-sm font-black leading-tight">{widget.title}</h3>
+                            <Badge variant="outline" className="text-[10px] font-black px-1.5 h-4 mt-1 border-primary/30 text-primary/70">Terminal Access Port</Badge>
                         </div>
                     </div>
                     {hasHistory && (
@@ -115,13 +115,13 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
                             className="relative h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors border border-transparent hover:border-border"
                         >
                             <History className="w-4 h-4" />
-                            <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-primary text-primary-foreground text-[9px] font-black flex items-center justify-center">
+                            <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-black flex items-center justify-center">
                                 {history.length}
                             </span>
                         </button>
                     )}
                 </div>
-                <p className="text-[13px] font-medium text-muted-foreground mt-6 opacity-60 leading-relaxed max-w-[90%]">
+                <p className="text-sm font-medium text-muted-foreground mt-6 opacity-60 leading-relaxed max-w-[90%]">
                     {widget.description || "Launch automated system orchestration pipeline with real-time feedback loop."}
                 </p>
             </div>
@@ -133,7 +133,7 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
                             disabled
                             style={styleResolved.style}
                             className={cn(
-                                "flex-1 h-16 rounded-[1.5rem] font-black text-[11px] shadow-premium transition-all",
+                                "flex-1 h-16 rounded-md font-black text-xs shadow-premium transition-all",
                                 styleResolved.className
                             )}
                         >
@@ -144,7 +144,7 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
                         </Button>
                         <Button
                             onClick={() => onStop && onStop(widget)}
-                            className="h-16 w-16 shrink-0 rounded-[1.5rem] bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/50 shadow-premium transition-all active:scale-[0.98] flex items-center justify-center group/stop"
+                            className="h-16 w-16 shrink-0 rounded-md bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/50 shadow-premium transition-all active:scale-[0.98] flex items-center justify-center group/stop"
                         >
                             <Square className="w-5 h-5 fill-current opacity-70 group-hover/stop:opacity-100 transition-opacity" />
                         </Button>
@@ -156,7 +156,7 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
                             disabled={isRunning}
                             style={result ? undefined : styleResolved.style}
                             className={cn(
-                                "flex-1 h-16 rounded-[1.5rem] font-black text-[11px] shadow-premium transition-all active:scale-[0.98]",
+                                "flex-1 h-16 rounded-md font-black text-xs shadow-premium transition-all active:scale-[0.98]",
                                 result ? (result.success ? "bg-emerald-500 hover:bg-emerald-600 text-white" : "bg-rose-500 hover:bg-rose-600 text-white") : styleResolved.className
                             )}
                         >
@@ -177,7 +177,7 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
                                 type="button"
                                 onClick={() => triggerRerun(lastEntry.inputs)}
                                 title={`Re-run last (${formatTime(lastEntry.timestamp)})`}
-                                className="h-16 w-16 shrink-0 rounded-[1.5rem] bg-primary/10 hover:bg-primary/20 text-primary border border-primary/40 shadow-premium transition-all active:scale-[0.98] flex items-center justify-center"
+                                className="h-16 w-16 shrink-0 rounded-md bg-primary/10 hover:bg-primary/20 text-primary border border-primary/40 shadow-premium transition-all active:scale-[0.98] flex items-center justify-center"
                             >
                                 <RotateCcw className="w-5 h-5" />
                             </button>
@@ -202,9 +202,9 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
                             const { cls, Icon } = statusStyle(entry.status);
                             const isFinal = entry.status !== 'RUNNING';
                             return (
-                                <div key={entry.executionId} className="border border-border rounded-2xl p-4 bg-card/50 flex flex-col gap-2">
+                                <div key={entry.executionId} className="border border-border rounded-md p-4 bg-card/50 flex flex-col gap-2">
                                     <div className="flex items-center justify-between gap-3">
-                                        <div className={cn("flex items-center gap-2 px-2 py-1 rounded-full ring-1", cls)}>
+                                        <div className={cn("flex items-center gap-2 px-2 py-1 rounded-md ring-1", cls)}>
                                             <Icon className={cn("w-3.5 h-3.5", entry.status === 'RUNNING' && 'animate-spin')} />
                                             <span className="text-[10px] font-black uppercase tracking-wider">{entry.status}</span>
                                         </div>
@@ -257,7 +257,7 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
                             )}
                         </DialogTitle>
                     </DialogHeader>
-                    <div className="flex-1 min-h-0 overflow-y-auto bg-black/90 rounded-2xl p-4 font-mono text-[12px] leading-relaxed scrollbar-thin">
+                    <div className="flex-1 min-h-0 overflow-y-auto bg-black/90 rounded-md p-4 font-mono text-xs leading-relaxed scrollbar-thin">
                         {logLoading ? (
                             <div className="flex items-center gap-2 text-zinc-500">
                                 <Loader2 className="w-4 h-4 animate-spin" />

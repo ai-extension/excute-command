@@ -52,7 +52,7 @@ export const WorkflowPickerDialog: React.FC<WorkflowPickerDialogProps> = ({
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[500px] bg-card border-border rounded-2xl shadow-premium p-0 overflow-hidden">
+            <DialogContent className="sm:max-w-[500px] bg-card border-border rounded-md shadow-premium p-0 overflow-hidden">
                 <DialogHeader className="p-6 pb-4 border-b border-border/50">
                     <DialogTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
                         <Zap className="w-4 h-4 text-primary" />
@@ -66,7 +66,7 @@ export const WorkflowPickerDialog: React.FC<WorkflowPickerDialogProps> = ({
                             placeholder="Search workflows..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            className="pl-10 h-10 rounded-xl bg-background border-border/50 text-xs font-bold"
+                            className="pl-10 h-9 rounded-md bg-background border-border/50 text-xs font-bold"
                             autoFocus
                         />
                         {isLoading && (
@@ -86,11 +86,11 @@ export const WorkflowPickerDialog: React.FC<WorkflowPickerDialogProps> = ({
                             workflows.map((workflow) => (
                                 <div
                                     key={workflow.id}
-                                    className="group flex items-center justify-between p-3 rounded-xl hover:bg-muted/50 cursor-pointer transition-all border border-transparent hover:border-border/50"
+                                    className="group flex items-center justify-between p-3 rounded-md hover:bg-muted/50 cursor-pointer transition-all border border-transparent hover:border-border/50"
                                     onClick={() => onSelect(workflow)}
                                 >
                                     <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20 group-hover:scale-110 transition-transform">
+                                        <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center border border-primary/20 group-hover:scale-110 transition-transform">
                                             <Zap className="w-4 h-4 text-primary" />
                                         </div>
                                         <div>
@@ -103,7 +103,7 @@ export const WorkflowPickerDialog: React.FC<WorkflowPickerDialogProps> = ({
                                     <Button
                                         size="sm"
                                         variant="ghost"
-                                        className="h-8 w-8 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                                        className="h-8 w-8 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
                                     >
                                         <Plus className="w-4 h-4" />
                                     </Button>
@@ -113,7 +113,7 @@ export const WorkflowPickerDialog: React.FC<WorkflowPickerDialogProps> = ({
                     </div>
                 </div>
                 <div className="p-4 bg-muted/10 border-t border-border/50 text-center">
-                    <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-40">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-40">
                         Select a template to initialize scheduling
                     </p>
                 </div>

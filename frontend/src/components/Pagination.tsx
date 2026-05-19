@@ -161,7 +161,7 @@ export const Pagination: React.FC<PaginationProps> = ({ total, offset, limit, it
 
                 {totalPages > 5 && (
                     <form onSubmit={handleJumpPage} className="flex items-center border border-border rounded-md overflow-hidden h-8 bg-background shadow-sm hover:border-primary/40 focus-within:border-primary/50 transition-colors ml-1">
-                        <span className="px-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground border-r border-border h-full flex items-center">Go</span>
+                        <span className="px-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground border-r border-border h-full flex items-center">Go</span>
                         <Input
                             type="number"
                             min={1}
@@ -175,7 +175,7 @@ export const Pagination: React.FC<PaginationProps> = ({ total, offset, limit, it
                             type="submit"
                             disabled={!jumpPage || parseInt(jumpPage) < 1 || parseInt(jumpPage) > totalPages}
                             variant="ghost"
-                            className="h-full rounded-none border-l border-border px-3 text-[9px] font-black uppercase tracking-widest text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
+                            className="h-full rounded-none border-l border-border px-3 text-[10px] font-black uppercase tracking-widest text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
                         >
                             ↵
                         </Button>

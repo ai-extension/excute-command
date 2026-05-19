@@ -81,7 +81,7 @@ export function ConfirmDialog({
                         variant="ghost"
                         onClick={onClose}
                         disabled={isLoading}
-                        className="flex-1 rounded-xl h-10 font-bold uppercase tracking-widest text-[10px]"
+                        className="flex-1 rounded-md h-9 font-bold uppercase tracking-widest text-[10px]"
                     >
                         {cancelText}
                     </Button>
@@ -89,7 +89,7 @@ export function ConfirmDialog({
                         type="button"
                         onClick={onConfirm}
                         disabled={isLoading}
-                        className={cn("flex-1 rounded-xl h-10 font-bold uppercase tracking-widest text-[10px]", config.btnClass)}
+                        className={cn("flex-1 rounded-md h-9 font-bold uppercase tracking-widest text-[10px]", config.btnClass)}
                     >
                         {isLoading ? 'Processing...' : confirmText}
                     </Button>

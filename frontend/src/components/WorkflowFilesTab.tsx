@@ -142,16 +142,16 @@ export const WorkflowFilesTab: React.FC<WorkflowFilesTabProps> = ({ workflowId, 
     if (!workflowId) {
         return (
             <div className="space-y-6">
-                <div className="bg-card p-6 rounded-xl border border-border">
+                <div className="bg-card p-6 rounded-md border border-border">
                     <div className="space-y-1.5">
                         <label className="text-[10px] font-bold uppercase tracking-widest text-primary">Destination Directory</label>
                         <Input
                             value={targetFolder}
                             onChange={(e) => setTargetFolder(e.target.value)}
                             placeholder="e.g. /var/www/html/uploads"
-                            className="bg-background border-border h-10 text-sm font-medium"
+                            className="bg-background border-border h-9 text-sm font-medium"
                         />
-                        <p className="text-[9px] font-medium text-muted-foreground mt-2 italic">
+                        <p className="text-[10px] font-medium text-muted-foreground mt-2 italic">
                             All uploaded files will be copied to this folder on target servers. (Default: <span className="text-primary font-bold">/tmp/</span> if empty)
                         </p>
                     </div>
@@ -167,7 +167,7 @@ export const WorkflowFilesTab: React.FC<WorkflowFilesTabProps> = ({ workflowId, 
                     </div>
                 </div>
 
-                <div className="flex flex-col items-center justify-center py-12 bg-muted/30 rounded-xl border border-dashed border-border text-center">
+                <div className="flex flex-col items-center justify-center py-12 bg-muted/30 rounded-md border border-dashed border-border text-center">
                     <File className="w-10 h-10 text-muted-foreground/30 mb-3" />
                     <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Upload Disabled for New Drafts</h4>
                     <p className="text-[10px] text-muted-foreground/60 mt-1 max-w-[200px]">
@@ -212,16 +212,16 @@ export const WorkflowFilesTab: React.FC<WorkflowFilesTabProps> = ({ workflowId, 
                 </div>
             </div>
 
-            <div className="grid gap-4 bg-card p-6 rounded-xl border border-border">
+            <div className="grid gap-4 bg-card p-6 rounded-md border border-border">
                 <div className="space-y-1.5">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-primary">Destination Directory</label>
                     <Input
                         value={targetFolder}
                         onChange={(e) => setTargetFolder(e.target.value)}
                         placeholder="e.g. /opt/app/scripts"
-                        className="bg-background border-border h-10 text-sm font-medium focus:ring-1 focus:ring-primary/30"
+                        className="bg-background border-border h-9 text-sm font-medium focus:ring-1 focus:ring-primary/30"
                     />
-                    <p className="text-[9px] font-medium text-muted-foreground mt-2">
+                    <p className="text-[10px] font-medium text-muted-foreground mt-2">
                         Directory on the remote servers where files will be copied. (Default: <span className="text-primary font-bold">/tmp/</span> if empty)
                     </p>
                 </div>
@@ -253,7 +253,7 @@ export const WorkflowFilesTab: React.FC<WorkflowFilesTabProps> = ({ workflowId, 
                         )}
                         {files.map(f => (
                             <div key={f.id} className="p-4 flex items-center gap-4 hover:bg-muted/50 transition-colors">
-                                <div className="p-2 bg-primary/10 rounded-lg shrink-0">
+                                <div className="p-2 bg-primary/10 rounded-md shrink-0">
                                     <File className="w-5 h-5 text-primary" />
                                 </div>
 

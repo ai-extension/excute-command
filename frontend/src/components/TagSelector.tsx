@@ -82,7 +82,7 @@ export function TagSelector({ selectedTags, onChange, className }: TagSelectorPr
             <DropdownMenuTrigger asChild>
                 <Button
                     variant="outline"
-                    className={cn("justify-start h-auto min-h-[40px] px-3 py-2 w-full flex-wrap gap-2 text-left font-normal bg-muted/30 border-border rounded-xl", className)}
+                    className={cn("justify-start h-auto min-h-[40px] px-3 py-2 w-full flex-wrap gap-2 text-left font-normal bg-muted/30 border-border rounded-md", className)}
                 >
                     {selectedTags.length > 0 ? (
                         selectedTags.map(tag => (

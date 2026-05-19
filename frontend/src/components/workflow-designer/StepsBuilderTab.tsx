@@ -89,10 +89,10 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
         <>
             <div className="space-y-6 animate-in fade-in slide-in-from-left-2 duration-300">
                 {groups.length === 0 ? (
-                    <div className="h-64 flex flex-col items-center justify-center gap-4 opacity-50 border-2 border-dashed border-border rounded-2xl bg-card">
+                    <div className="h-64 flex flex-col items-center justify-center gap-4 opacity-50 border-2 border-dashed border-border rounded-md bg-card">
                         <Layers className="w-12 h-12 text-muted-foreground" />
-                        <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Blueprint is currently empty</p>
-                        <Button onClick={handleAddGroup} variant="outline" className="rounded-full px-6">Initialize Architecture</Button>
+                        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Blueprint is currently empty</p>
+                        <Button onClick={handleAddGroup} variant="outline" className="rounded-md px-6">Initialize Architecture</Button>
                     </div>
                 ) : (
                     <DragDropContext onDragEnd={handleDragEnd}>
@@ -110,7 +110,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                     ref={provided.innerRef}
                                                     {...provided.draggableProps}
                                                     className={cn(
-                                                        "bg-card border rounded-xl overflow-hidden transition-all",
+                                                        "bg-card border rounded-md overflow-hidden transition-all",
                                                         snapshot.isDragging ? "border-primary/50 shadow-xl shadow-black/20" : "border-border shadow-sm"
                                                     )}
                                                 >
@@ -119,11 +119,11 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                         <div className="flex items-center gap-3 shrink-0">
                                                             <div
                                                                 {...provided.dragHandleProps}
-                                                                className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground/50 hover:text-foreground hover:bg-muted cursor-grab active:cursor-grabbing transition-colors shrink-0"
+                                                                className="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground/50 hover:text-foreground hover:bg-muted cursor-grab active:cursor-grabbing transition-colors shrink-0"
                                                             >
                                                                 <GripVertical className="w-4 h-4" />
                                                             </div>
-                                                            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
+                                                            <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
                                                                 <Layers className="w-4 h-4 text-primary" />
                                                             </div>
                                                             <div className="flex flex-col flex-1 min-w-0">
@@ -156,48 +156,48 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                         {/* MIDDLE: Configuration Badges */}
                                                         <div className="flex-1 flex flex-wrap items-center justify-center gap-1.5 px-2 min-w-0">
                                                             {group.skip && (
-                                                                <Badge variant="outline" className="h-5 px-2 text-[8px] font-black uppercase tracking-widest bg-red-500/10 text-red-500 border-red-500/20 whitespace-nowrap">
+                                                                <Badge variant="outline" className="h-5 px-2 text-[10px] font-black uppercase tracking-widest bg-red-500/10 text-red-500 border-red-500/20 whitespace-nowrap">
                                                                     <XCircle className="w-3 h-3 mr-1" /> Skipped
                                                                 </Badge>
                                                             )}
                                                             {group.mcp_report_log && (
-                                                                <Badge variant="outline" className="h-5 px-2 text-[8px] font-black uppercase tracking-widest bg-blue-500/10 text-blue-500 border-blue-500/20 whitespace-nowrap">
+                                                                <Badge variant="outline" className="h-5 px-2 text-[10px] font-black uppercase tracking-widest bg-blue-500/10 text-blue-500 border-blue-500/20 whitespace-nowrap">
                                                                     <FileText className="w-3 h-3 mr-1" /> MCP Log
                                                                 </Badge>
                                                             )}
                                                             {group.retry_enabled && (
-                                                                <Badge variant="outline" className="h-5 px-2 text-[8px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-500 border-amber-500/20 whitespace-nowrap">
+                                                                <Badge variant="outline" className="h-5 px-2 text-[10px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-500 border-amber-500/20 whitespace-nowrap">
                                                                     <RefreshCw className="w-3 h-3 mr-1" /> Retry
                                                                 </Badge>
                                                             )}
                                                             {group.continue_on_failure && (
-                                                                <Badge variant="outline" className="h-5 px-2 text-[8px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-500 border-amber-500/20 whitespace-nowrap">
+                                                                <Badge variant="outline" className="h-5 px-2 text-[10px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-500 border-amber-500/20 whitespace-nowrap">
                                                                     <AlertCircle className="w-3 h-3 mr-1" /> Continue
                                                                 </Badge>
                                                             )}
                                                             {group.is_copy_enabled && (
-                                                                <Badge variant="outline" className="h-5 px-2 text-[8px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-500 border-emerald-500/20 whitespace-nowrap">
+                                                                <Badge variant="outline" className="h-5 px-2 text-[10px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-500 border-emerald-500/20 whitespace-nowrap">
                                                                     <File className="w-3 h-3 mr-1" /> Relay
                                                                 </Badge>
                                                             )}
                                                             {group.loop_enabled && group.for && (
-                                                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-[9px] font-bold text-indigo-500 max-w-[140px] truncate" title={`Loop: ${group.for}`}>
+                                                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-bold text-indigo-500 max-w-[140px] truncate" title={`Loop: ${group.for}`}>
                                                                     <Repeat className="w-3 h-3 shrink-0" /> <span className="truncate">{group.for}</span>
                                                                 </span>
                                                             )}
                                                             {group.condition && (
-                                                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/20 text-[9px] font-bold text-amber-500 max-w-[140px] truncate" title={`Condition: ${group.condition}`}>
+                                                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/20 text-[10px] font-bold text-amber-500 max-w-[140px] truncate" title={`Condition: ${group.condition}`}>
                                                                     <span className="truncate">if {group.condition}</span>
                                                                 </span>
                                                             )}
                                                             {group.default_server_id && (
-                                                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-bold text-emerald-500" title={`Server: ${group.default_server?.name || availableServers.find(s => s.id === group.default_server_id)?.name || group.default_server_id}`}>
+                                                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-bold text-emerald-500" title={`Server: ${group.default_server?.name || availableServers.find(s => s.id === group.default_server_id)?.name || group.default_server_id}`}>
                                                                     <Server className="w-3 h-3 shrink-0" />
                                                                     <span className="truncate max-w-[100px]">{group.default_server?.name || availableServers.find(s => s.id === group.default_server_id)?.name || group.default_server_id}</span>
                                                                 </span>
                                                             )}
                                                             {group.use_tty && (
-                                                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-[9px] font-bold text-indigo-500">
+                                                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-bold text-indigo-500">
                                                                     <Terminal className="w-3 h-3 shrink-0" /> TTY
                                                                 </span>
                                                             )}
@@ -212,7 +212,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                     setGroups(ng);
                                                                 }}
                                                                 className={cn(
-                                                                    "px-3 py-1 rounded-md text-[9px] font-bold uppercase tracking-wider transition-all border",
+                                                                    "px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all border",
                                                                     group.is_parallel
                                                                         ? "bg-indigo-500/10 border-indigo-500/20 text-indigo-500"
                                                                         : "bg-background border-border text-muted-foreground hover:bg-muted"
@@ -259,23 +259,23 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                             onClick={() => setOpenTTYSettingsGroupIdx(null)}
                                                                         />
                                                                         {/* Popup card */}
-                                                                        <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 max-w-lg w-[calc(100%-2rem)] max-h-[90vh] overflow-y-auto glass rounded-2xl shadow-2xl shadow-indigo-500/10 animate-in fade-in zoom-in-95 duration-200 border-none flex flex-col">
-                                                                            <div className="px-6 py-5 flex items-center justify-between text-white bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-t-2xl shrink-0">
+                                                                        <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 max-w-lg w-[calc(100%-2rem)] max-h-[90vh] overflow-y-auto glass rounded-md shadow-2xl shadow-indigo-500/10 animate-in fade-in zoom-in-95 duration-200 border-none flex flex-col">
+                                                                            <div className="px-6 py-5 flex items-center justify-between text-white bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-t-md shrink-0">
                                                                                 <div className="flex items-center gap-3">
-                                                                                    <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30">
+                                                                                    <div className="w-10 h-10 rounded-md bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30">
                                                                                         <Terminal className="w-5 h-5" />
                                                                                     </div>
                                                                                     <div className="flex flex-col px-2 pt-3">
-                                                                                        <span className="text-[16px] backdrop-blur-sm font-mono">{group.name} - Terminal</span>
-                                                                                        <span className="text-[9px] opacity-60 mt-1 font-mono">Interactive Shell Configuration</span>
+                                                                                        <span className="text-base backdrop-blur-sm font-mono">{group.name} - Terminal</span>
+                                                                                        <span className="text-[10px] opacity-60 mt-1 font-mono">Interactive Shell Configuration</span>
                                                                                     </div>
                                                                                 </div>
                                                                             </div>
                                                                             <div className="px-8 py-6 space-y-6">
                                                                                 {/* User TTY Mode */}
-                                                                                <div className="flex items-center justify-between p-5 bg-background border border-border/50 rounded-xl shadow-sm">
+                                                                                <div className="flex items-center justify-between p-5 bg-background border border-border/50 rounded-md shadow-sm">
                                                                                     <div className="flex items-center gap-3">
-                                                                                        <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+                                                                                        <div className="w-8 h-8 rounded-md bg-indigo-500/10 flex items-center justify-center">
                                                                                             <Terminal className="w-4 h-4 text-indigo-500" />
                                                                                         </div>
                                                                                         <div className="flex flex-col">
@@ -294,7 +294,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                 </div>
 
                                                                                 {/* Auto Inputs */}
-                                                                                <div className="p-5 bg-background border border-border/50 rounded-xl shadow-sm space-y-4">
+                                                                                <div className="p-5 bg-background border border-border/50 rounded-md shadow-sm space-y-4">
                                                                                     <div className="flex items-center justify-between mb-3">
                                                                                         <div className="flex items-center gap-3">
                                                                                             <div className="flex flex-col">
@@ -305,7 +305,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                         <Button
                                                                                             variant="outline"
                                                                                             size="sm"
-                                                                                            className="h-8 text-[11px] px-3 font-semibold rounded-lg bg-indigo-500/5 hover:bg-indigo-500/10 border-indigo-500/20 text-indigo-500"
+                                                                                            className="h-8 text-xs px-3 font-semibold rounded-md bg-indigo-500/5 hover:bg-indigo-500/10 border-indigo-500/20 text-indigo-500"
                                                                                             onClick={() => {
                                                                                                 const ng = [...groups];
                                                                                                 let current: any[] = [];
@@ -333,13 +333,13 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                             
                                                                                             if (rules.length === 0) {
                                                                                                 return (
-                                                                                                    <div className="text-center py-8 border-2 border-dashed border-border/50 rounded-xl text-muted-foreground text-[11px] font-medium bg-muted/20">
+                                                                                                    <div className="text-center py-8 border-2 border-dashed border-border/50 rounded-md text-muted-foreground text-xs font-medium bg-muted/20">
                                                                                                         No automation rules defined.<br/>Click "Add Rule" to automate keyboard inputs.
                                                                                                     </div>
                                                                                                 );
                                                                                             }
                                                                                             return rules.map((rule, rIdx) => (
-                                                                                                <div key={rIdx} className="flex flex-col gap-3 bg-muted/40 p-4 rounded-xl border border-border/50 relative group/rule transition-all hover:bg-muted/60">
+                                                                                                <div key={rIdx} className="flex flex-col gap-3 bg-muted/40 p-4 rounded-md border border-border/50 relative group/rule transition-all hover:bg-muted/60">
                                                                                                     <div className="flex items-center justify-between w-full">
                                                                                                         <div className="flex-1 space-y-1 w-full mr-3">
                                                                                                             <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Match Pattern</label>
@@ -416,17 +416,17 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                     </div>
                                                                                 </div>
                                                                             </div>
-                                                                            <div className="px-8 py-5 glass border-t border-border/50 flex justify-end gap-3 rounded-b-2xl">
+                                                                            <div className="px-8 py-5 glass border-t border-border/50 flex justify-end gap-3 rounded-b-md">
                                                                                 <Button
                                                                                     variant="outline"
                                                                                     onClick={() => setOpenTTYSettingsGroupIdx(null)}
-                                                                                    className="h-10 text-xs font-bold uppercase tracking-widest px-8 rounded-lg"
+                                                                                    className="h-9 text-xs font-bold uppercase tracking-widest px-8 rounded-md"
                                                                                 >
                                                                                     Discard
                                                                                 </Button>
                                                                                 <Button
                                                                                     onClick={() => setOpenTTYSettingsGroupIdx(null)}
-                                                                                    className="h-10 text-xs font-bold uppercase tracking-widest px-10 premium-gradient text-white rounded-lg shadow-lg shadow-indigo-500/20 active:scale-95 transition-all"
+                                                                                    className="h-9 text-xs font-bold uppercase tracking-widest px-10 premium-gradient text-white rounded-md shadow-lg shadow-indigo-500/20 active:scale-95 transition-all"
                                                                                 >
                                                                                     Apply changes
                                                                                 </Button>
@@ -443,17 +443,17 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                             onClick={() => setOpenSettingsGroupIdx(null)}
                                                                         />
                                                                         {/* Popup card */}
-                                                                        <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 max-w-4xl w-[calc(100%-2rem)] max-h-[90vh] overflow-y-auto glass rounded-2xl shadow-2xl shadow-indigo-500/10 animate-in fade-in zoom-in-95 duration-200 border-none flex flex-col">
+                                                                        <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 max-w-4xl w-[calc(100%-2rem)] max-h-[90vh] overflow-y-auto glass rounded-md shadow-2xl shadow-indigo-500/10 animate-in fade-in zoom-in-95 duration-200 border-none flex flex-col">
                                                                             {/* Header with Premium Gradient */}
-                                                                            <div className="px-6 py-5 flex items-center justify-between text-white premium-gradient rounded-t-2xl shrink-0">
+                                                                            <div className="px-6 py-5 flex items-center justify-between text-white premium-gradient rounded-t-md shrink-0">
                                                                                 <div className="flex items-center gap-3">
-                                                                                    <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30">
+                                                                                    <div className="w-10 h-10 rounded-md bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30">
                                                                                         <SlidersHorizontal className="w-5 h-5" />
                                                                                     </div>
 
                                                                                     <div className="flex flex-col px-2 pt-3">
-                                                                                        <span className="text-[16px] backdrop-blur-sm font-mono">{group.name}</span>
-                                                                                        <span className="text-[9px] opacity-60 mt-1 font-mono">{group.key}</span>
+                                                                                        <span className="text-base backdrop-blur-sm font-mono">{group.name}</span>
+                                                                                        <span className="text-[10px] opacity-60 mt-1 font-mono">{group.key}</span>
                                                                                     </div>
 
                                                                                 </div>
@@ -466,17 +466,17 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                     <section className="space-y-4">
                                                                                         <div className="flex items-center gap-2 mb-2">
                                                                                             <div className="w-1 h-4 bg-amber-500 rounded-full" />
-                                                                                            <h4 className="text-[11px] font-black uppercase tracking-widest text-foreground/70">Execution Logic</h4>
+                                                                                            <h4 className="text-xs font-black uppercase tracking-widest text-foreground/70">Execution Logic</h4>
                                                                                         </div>
 
                                                                                         {/* Condition */}
-                                                                                        <div className="space-y-3 p-5 bg-background border border-border/50 rounded-xl shadow-sm">
+                                                                                        <div className="space-y-3 p-5 bg-background border border-border/50 rounded-md shadow-sm">
                                                                                             <div className="flex items-center justify-between">
                                                                                                 <label className="text-[10px] font-bold text-amber-600 flex items-center gap-1.5 uppercase tracking-wider">
                                                                                                     <AlertCircle className="w-3.5 h-3.5" />
                                                                                                     Active Condition
                                                                                                 </label>
-                                                                                                <span className="text-[9px] font-mono text-muted-foreground/50">Pongo2 Syntax</span>
+                                                                                                <span className="text-[10px] font-mono text-muted-foreground/50">Pongo2 Syntax</span>
                                                                                             </div>
                                                                                             <input
                                                                                                 type="text"
@@ -487,19 +487,19 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                     setGroups(ng);
                                                                                                 }}
                                                                                                 placeholder="e.g. input.env == 'prod'"
-                                                                                                className="w-full h-10 px-4 text-xs font-mono rounded-lg border border-border bg-muted/30 text-amber-600 placeholder:text-muted-foreground/30 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500/40 outline-none transition-all"
+                                                                                                className="w-full h-9 px-4 text-xs font-mono rounded-md border border-border bg-muted/30 text-amber-600 placeholder:text-muted-foreground/30 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500/40 outline-none transition-all"
                                                                                             />
-                                                                                            <div className="p-3 bg-amber-500/5 rounded-lg border border-amber-500/10">
+                                                                                            <div className="p-3 bg-amber-500/5 rounded-md border border-amber-500/10">
                                                                                                 <p className="text-[10px] text-amber-700/70 leading-relaxed">
                                                                                                     Skip this group unless the condition is met.
                                                                                                     <br />
-                                                                                                    <span className="opacity-50 text-[9px]">Use: <code className="bg-white/50 px-1 rounded">input.key</code>, <code className="bg-white/50 px-1 rounded">variable.key</code>, <code className="bg-white/50 px-1 rounded">step.key.status</code>.</span>
+                                                                                                    <span className="opacity-50 text-[10px]">Use: <code className="bg-white/50 px-1 rounded">input.key</code>, <code className="bg-white/50 px-1 rounded">variable.key</code>, <code className="bg-white/50 px-1 rounded">step.key.status</code>.</span>
                                                                                                 </p>
                                                                                             </div>
                                                                                         </div>
 
                                                                                         {/* For Each Loop */}
-                                                                                        <div className="space-y-3 p-5 bg-background border border-border/50 rounded-xl shadow-sm">
+                                                                                        <div className="space-y-3 p-5 bg-background border border-border/50 rounded-md shadow-sm">
                                                                                             <div className="flex items-center justify-between">
                                                                                                 <label className="text-[10px] font-bold text-indigo-600 flex items-center gap-1.5 uppercase tracking-wider">
                                                                                                     <Repeat className="w-3.5 h-3.5" />
@@ -520,7 +520,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                         <label className="text-[10px] font-medium text-foreground/50 uppercase tracking-wider">
                                                                                                             Iteration Variable
                                                                                                         </label>
-                                                                                                        <span className="text-[9px] font-mono text-muted-foreground/50">Array or {"{{variable}}"}</span>
+                                                                                                        <span className="text-[10px] font-mono text-muted-foreground/50">Array or {"{{variable}}"}</span>
                                                                                                     </div>
                                                                                                     <input
                                                                                                         type="text"
@@ -531,9 +531,9 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                             setGroups(ng);
                                                                                                         }}
                                                                                                         placeholder="e.g. {{input.items}}"
-                                                                                                        className="w-full h-10 px-4 text-xs font-mono rounded-lg border border-border bg-muted/30 text-indigo-600 placeholder:text-muted-foreground/30 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/40 outline-none transition-all"
+                                                                                                        className="w-full h-9 px-4 text-xs font-mono rounded-md border border-border bg-muted/30 text-indigo-600 placeholder:text-muted-foreground/30 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/40 outline-none transition-all"
                                                                                                     />
-                                                                                                    <div className="p-3 bg-indigo-500/5 rounded-lg border border-indigo-500/10">
+                                                                                                    <div className="p-3 bg-indigo-500/5 rounded-md border border-indigo-500/10">
                                                                                                         <p className="text-[10px] text-indigo-700/70 leading-relaxed">
                                                                                                             Iterate the group steps over this array. Steps can use <code className="bg-white/50 px-1 rounded">{"{{item}}"}</code>.
                                                                                                         </p>
@@ -543,7 +543,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                         </div>
 
                                                                                         {/* Server override */}
-                                                                                        <div className="space-y-3 p-5 bg-background border border-border/50 rounded-xl shadow-sm">
+                                                                                        <div className="space-y-3 p-5 bg-background border border-border/50 rounded-md shadow-sm">
                                                                                             <label className="text-[10px] font-bold text-foreground/70 uppercase tracking-wider flex items-center gap-1.5">
                                                                                                 <Server className="w-3.5 h-3.5" />
                                                                                                 Server Override
@@ -565,7 +565,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                 onSearch={handleSearchServers}
                                                                                                 placeholder="— Use workflow default —"
                                                                                                 isSearchable={true}
-                                                                                                triggerClassName="h-10 text-xs rounded-lg border-border/50"
+                                                                                                triggerClassName="h-9 text-xs rounded-md border-border/50"
                                                                                             />
                                                                                         </div>
                                                                                     </section>
@@ -575,16 +575,16 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                 <div className="space-y-6">
                                                                                     <div className="flex items-center gap-2 mb-2">
                                                                                         <div className="w-1 h-4 bg-primary rounded-full" />
-                                                                                        <h4 className="text-[11px] font-black uppercase tracking-widest text-foreground/70">Safety & Compliance</h4>
+                                                                                        <h4 className="text-xs font-black uppercase tracking-widest text-foreground/70">Safety & Compliance</h4>
                                                                                     </div>
 
                                                         <div className="grid grid-cols-1 gap-4">
                                                                                             {/* Toggles Grid */}
-                                                                                            <div className="p-5 bg-background border border-border/50 rounded-xl shadow-sm space-y-5">
+                                                                                            <div className="p-5 bg-background border border-border/50 rounded-md shadow-sm space-y-5">
                                                                                                 {/* Skip Group */}
                                                                                                 <div className="flex items-center justify-between pb-5 border-b border-border/50">
                                                                                                     <div className="flex items-center gap-3">
-                                                                                                        <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center">
+                                                                                                        <div className="w-8 h-8 rounded-md bg-red-500/10 flex items-center justify-center">
                                                                                                             <XCircle className="w-4 h-4 text-red-500" />
                                                                                                         </div>
                                                                                                         <div className="flex flex-col">
@@ -605,7 +605,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                 {/* MCP Log Reporting */}
                                                                                             <div className="flex items-center justify-between">
                                                                                                 <div className="flex items-center gap-3">
-                                                                                                    <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                                                                                                    <div className="w-8 h-8 rounded-md bg-blue-500/10 flex items-center justify-center">
                                                                                                         <FileText className="w-4 h-4 text-blue-500" />
                                                                                                     </div>
                                                                                                     <div className="flex flex-col">
@@ -626,7 +626,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                             {/* Continue on Failure */}
                                                                                             <div className="flex items-center justify-between">
                                                                                                 <div className="flex items-center gap-3">
-                                                                                                    <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                                                                                                    <div className="w-8 h-8 rounded-md bg-amber-500/10 flex items-center justify-center">
                                                                                                         <AlertCircle className="w-4 h-4 text-amber-500" />
                                                                                                     </div>
                                                                                                     <div className="flex flex-col">
@@ -648,7 +648,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                             <div className="pt-5 border-t border-border/50 space-y-4">
                                                                                                 <div className="flex items-center justify-between">
                                                                                                     <div className="flex items-center gap-3">
-                                                                                                        <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+                                                                                                        <div className="w-8 h-8 rounded-md bg-indigo-500/10 flex items-center justify-center">
                                                                                                             <RefreshCw className="w-4 h-4 text-indigo-500" />
                                                                                                         </div>
                                                                                                         <div className="flex flex-col">
@@ -671,9 +671,9 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                 </div>
 
                                                                                                 {group.retry_enabled && (
-                                                                                                    <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2 duration-200 bg-muted/30 p-4 rounded-xl border border-indigo-500/10 mt-2">
+                                                                                                    <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2 duration-200 bg-muted/30 p-4 rounded-md border border-indigo-500/10 mt-2">
                                                                                                         <div className="space-y-2 text-left">
-                                                                                                            <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground block">Max Attempts</label>
+                                                                                                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block">Max Attempts</label>
                                                                                                             <Input
                                                                                                                 type="number"
                                                                                                                 value={group.retry_limit || 0}
@@ -687,7 +687,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                             />
                                                                                                         </div>
                                                                                                         <div className="space-y-2 text-left">
-                                                                                                            <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground block">Delay (seconds)</label>
+                                                                                                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block">Delay (seconds)</label>
                                                                                                             <Input
                                                                                                                 type="number"
                                                                                                                 value={group.retry_delay || 0}
@@ -706,10 +706,10 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                         </div>
 
                                                                                         {/* Relay Strategy (Separate Section) */}
-                                                                                        <div className="p-5 bg-background border border-border/50 rounded-xl shadow-sm space-y-4">
+                                                                                        <div className="p-5 bg-background border border-border/50 rounded-md shadow-sm space-y-4">
                                                                                             <div className="flex items-center justify-between">
                                                                                                 <div className="flex items-center gap-3">
-                                                                                                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                                                                                                    <div className="w-8 h-8 rounded-md bg-emerald-500/10 flex items-center justify-center">
                                                                                                         <File className="w-4 h-4 text-emerald-500" />
                                                                                                     </div>
                                                                                                     <div className="flex flex-col text-left">
@@ -730,7 +730,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                             {group.is_copy_enabled && (
                                                                                                 <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-200 pt-4 border-t border-border/50">
                                                                                                     <div className="space-y-2 text-left">
-                                                                                                        <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground block">Source Artifact Path</label>
+                                                                                                        <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block">Source Artifact Path</label>
                                                                                                         <Input
                                                                                                             value={group.copy_source_path || ''}
                                                                                                             onChange={(e) => {
@@ -744,7 +744,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                     </div>
                                                                                                     <div className="grid grid-cols-2 gap-4">
                                                                                                         <div className="space-y-2 text-left">
-                                                                                                            <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground block">Destination Server</label>
+                                                                                                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block">Destination Server</label>
                                                                                                             <SearchableSelect
                                                                                                                 options={[
                                                                                                                     ...(group.copy_target_server && !availableServers.some(s => s.id === group.copy_target_server_id)
@@ -764,7 +764,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                             />
                                                                                                         </div>
                                                                                                         <div className="space-y-2 text-left">
-                                                                                                            <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground block">Destination Path</label>
+                                                                                                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block">Destination Path</label>
                                                                                                             <Input
                                                                                                                 value={group.copy_target_path || ''}
                                                                                                                 onChange={(e) => {
@@ -785,17 +785,17 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                             </div>
 
                                                                             {/* Footer Action */}
-                                                                            <div className="px-8 py-5 glass border-t border-border/50 flex justify-end gap-3 rounded-b-2xl">
+                                                                            <div className="px-8 py-5 glass border-t border-border/50 flex justify-end gap-3 rounded-b-md">
                                                                                 <Button
                                                                                     variant="outline"
                                                                                     onClick={() => setOpenSettingsGroupIdx(null)}
-                                                                                    className="h-10 text-xs font-bold uppercase tracking-widest px-8 rounded-lg"
+                                                                                    className="h-9 text-xs font-bold uppercase tracking-widest px-8 rounded-md"
                                                                                 >
                                                                                     Discard
                                                                                 </Button>
                                                                                 <Button
                                                                                     onClick={() => setOpenSettingsGroupIdx(null)}
-                                                                                    className="h-10 text-xs font-bold uppercase tracking-widest px-10 premium-gradient text-white rounded-lg shadow-lg shadow-indigo-500/20 active:scale-95 transition-all"
+                                                                                    className="h-9 text-xs font-bold uppercase tracking-widest px-10 premium-gradient text-white rounded-md shadow-lg shadow-indigo-500/20 active:scale-95 transition-all"
                                                                                 >
                                                                                     Apply changes
                                                                                 </Button>
@@ -833,7 +833,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                 ref={provided.innerRef}
                                                                                 {...provided.draggableProps}
                                                                                 className={cn(
-                                                                                    "flex items-center gap-4 p-4 rounded-lg border transition-all group/step",
+                                                                                    "flex items-center gap-4 p-4 rounded-md border transition-all group/step",
                                                                                     snapshot.isDragging ? "bg-card border-primary/40 shadow-lg" : "bg-background/50 border-border/50 hover:bg-background"
                                                                                 )}
                                                                             >
@@ -848,7 +848,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                 </div>
                                                                                 <div className="flex-1 grid grid-cols-12 gap-3">
                                                                                     <div className="col-span-3 space-y-1">
-                                                                                        <label className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Action Label</label>
+                                                                                        <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Action Label</label>
                                                                                         <Input
                                                                                             value={step.name}
                                                                                             onChange={(e) => {
@@ -856,10 +856,10 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                 ng[gIdx]!.steps![sIdx].name = e.target.value;
                                                                                                 setGroups(ng);
                                                                                             }}
-                                                                                            className="bg-muted/50 border-border h-8 text-[11px] font-medium rounded-md px-2"
+                                                                                            className="bg-muted/50 border-border h-8 text-xs font-medium rounded-md px-2"
                                                                                         />
                                                                                         <div className="flex items-center gap-1 mt-1">
-                                                                                            <span className="text-[9px] font-mono text-muted-foreground/50">Key:</span>
+                                                                                            <span className="text-[10px] font-mono text-muted-foreground/50">Key:</span>
                                                                                             <Input
                                                                                                 value={step.action_key || ''}
                                                                                                 onChange={(e) => {
@@ -867,13 +867,13 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                     ng[gIdx]!.steps![sIdx].action_key = e.target.value.replace(/[^a-zA-Z0-9_]/g, '');
                                                                                                     setGroups(ng);
                                                                                                 }}
-                                                                                                className="h-5 text-[9px] px-1 font-mono bg-transparent border-transparent hover:border-border/50 focus:bg-background"
+                                                                                                className="h-5 text-[10px] px-1 font-mono bg-transparent border-transparent hover:border-border/50 focus:bg-background"
                                                                                                 placeholder="action_key"
                                                                                             />
                                                                                         </div>
                                                                                     </div>
                                                                                     <div className="col-span-2 space-y-1">
-                                                                                        <label className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Type</label>
+                                                                                        <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Type</label>
                                                                                         <select
                                                                                             value={step.action_type || 'COMMAND'}
                                                                                             onChange={(e) => {
@@ -889,7 +889,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                 }
                                                                                                 setGroups(ng);
                                                                                             }}
-                                                                                            className="h-8 px-2 w-full text-[11px] font-semibold border border-border rounded-md bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 cursor-pointer"
+                                                                                            className="h-8 px-2 w-full text-xs font-semibold border border-border rounded-md bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 cursor-pointer"
                                                                                         >
                                                                                             <option value="COMMAND">Command</option>
                                                                                             <option value="WORKFLOW">Workflow</option>
@@ -899,7 +899,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                     <div className="col-span-7 space-y-3">
                                                                                         {(!step.action_type || step.action_type === 'COMMAND') ? (
                                                                                             <div className="space-y-1">
-                                                                                                <label className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Execution Sequence</label>
+                                                                                                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Execution Sequence</label>
                                                                                                 <Textarea
                                                                                                     value={step.command_text}
                                                                                                     onChange={(e) => {
@@ -907,18 +907,18 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                         ng[gIdx]!.steps![sIdx].command_text = e.target.value;
                                                                                                         setGroups(ng);
                                                                                                     }}
-                                                                                                    className="bg-muted/50 border-border min-h-[40px] text-[11px] font-mono rounded-md px-2 py-2 resize-y"
+                                                                                                    className="bg-muted/50 border-border min-h-[40px] text-xs font-mono rounded-md px-2 py-2 resize-y"
                                                                                                     placeholder="Enter command sequence..."
                                                                                                 />
                                                                                             </div>
                                                                                         ) : step.action_type === 'HTTP' ? (
-                                                                                            <div className="space-y-3 bg-muted/20 border border-border/50 rounded-lg p-3">
+                                                                                            <div className="space-y-3 bg-muted/20 border border-border/50 rounded-md p-3">
                                                                                                 <div className="flex items-center justify-between">
                                                                                                     <label className="text-[10px] font-bold uppercase tracking-widest text-emerald-500">HTTP Configuration</label>
                                                                                                     <Button
                                                                                                         variant="outline"
                                                                                                         size="sm"
-                                                                                                        className="h-6 text-[9px] px-2 py-0 border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10"
+                                                                                                        className="h-6 text-[10px] px-2 py-0 border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10"
                                                                                                         onClick={() => setPasteModal({ open: true, gIdx, sIdx, text: '' })}
                                                                                                     >
                                                                                                         Paste cURL
@@ -948,12 +948,12 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                             setGroups(ng);
                                                                                                         }}
                                                                                                         placeholder="https://api.example.com/..."
-                                                                                                        className="h-8 text-[11px] font-mono bg-background border-border flex-1"
+                                                                                                        className="h-8 text-xs font-mono bg-background border-border flex-1"
                                                                                                     />
                                                                                                 </div>
                                                                                                   <div className="space-y-3">
                                                                         <div className="space-y-1">
-                                                                            <label className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Headers (JSON)</label>
+                                                                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Headers (JSON)</label>
                                                                             <Textarea
                                                                                 value={step.http_headers || ''}
                                                                                 onChange={(e) => {
@@ -966,7 +966,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                             />
                                                                         </div>
                                                                         <div className="space-y-1">
-                                                                            <label className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Body</label>
+                                                                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Body</label>
                                                                             <Textarea
                                                                                 value={step.http_body || ''}
                                                                                 onChange={(e) => {
@@ -1027,7 +1027,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                         ) : (
                                                                                             <div className="space-y-2">
                                                                                                 <div className="space-y-1">
-                                                                                                    <label className="text-[8px] font-bold uppercase tracking-widest text-indigo-500">Target Workflow</label>
+                                                                                                    <label className="text-[10px] font-bold uppercase tracking-widest text-indigo-500">Target Workflow</label>
                                                                                                     <SearchableSelect
                                                                                                         options={allWorkflows.filter(w => w.id !== id).map(w => ({
                                                                                                             label: w.name,
@@ -1044,7 +1044,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                         onSearch={handleSearchWorkflows}
                                                                                                         placeholder="— Select workflow —"
                                                                                                         searchPlaceholder="Search workflows..."
-                                                                                                        triggerClassName="h-8 px-2 w-full text-[11px] font-semibold border-indigo-500/30 rounded-md bg-background text-foreground"
+                                                                                                        triggerClassName="h-8 px-2 w-full text-xs font-semibold border-indigo-500/30 rounded-md bg-background text-foreground"
                                                                                                     />
                                                                                                 </div>
                                                                                                 {/* Dynamic inputs for selected target workflow */}
@@ -1055,8 +1055,8 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                         try { return JSON.parse(step.target_workflow_inputs || '{}'); } catch { return {}; }
                                                                                                     })();
                                                                                                     return (
-                                                                                                        <div className="space-y-3 bg-indigo-500/5 border border-indigo-500/20 rounded-lg p-3">
-                                                                                                            <label className="text-[8px] font-bold uppercase tracking-widest text-indigo-500">Workflow Inputs</label>
+                                                                                                        <div className="space-y-3 bg-indigo-500/5 border border-indigo-500/20 rounded-md p-3">
+                                                                                                            <label className="text-[10px] font-bold uppercase tracking-widest text-indigo-500">Workflow Inputs</label>
                                                                                                             {targetWf.inputs.map(inp => {
                                                                                                                 const val = parsedInputs[inp.key] || '';
                                                                                                                 const isVariable = val.startsWith('{{') && val.endsWith('}}');
@@ -1074,7 +1074,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                                 return (
                                                                                                                     <div key={inp.key} className="space-y-1">
                                                                                                                         <div className="flex items-center justify-between">
-                                                                                                                            <span className="text-[9px] font-mono text-muted-foreground truncate" title={inp.label || inp.key}>{inp.label || inp.key}</span>
+                                                                                                                            <span className="text-[10px] font-mono text-muted-foreground truncate" title={inp.label || inp.key}>{inp.label || inp.key}</span>
                                                                                                                             {(inp.type === 'multi-select' || inp.type === 'multi-input') && (
                                                                                                                                 <button
                                                                                                                                     onClick={() => {
@@ -1085,7 +1085,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                                                         }
                                                                                                                                     }}
                                                                                                                                     className={cn(
-                                                                                                                                        "text-[7px] font-black uppercase tracking-widest transition-colors",
+                                                                                                                                        "text-[10px] font-black uppercase tracking-widest transition-colors",
                                                                                                                                         isForeach ? "text-amber-500" : "text-indigo-500/50 hover:text-indigo-500"
                                                                                                                                     )}
                                                                                                                                 >
@@ -1097,7 +1097,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                                         {isForeach ? (
                                                                                                                             <div className="space-y-2 bg-amber-500/5 p-2 rounded border border-amber-500/20">
                                                                                                                                 <div className="space-y-1">
-                                                                                                                                    <label className="text-[7px] font-bold text-amber-500 uppercase">Foreach Array</label>
+                                                                                                                                    <label className="text-[10px] font-bold text-amber-500 uppercase">Foreach Array</label>
                                                                                                                                     <Input
                                                                                                                                         value={foreachVal.source || ''}
                                                                                                                                         onChange={(e) => {
@@ -1108,7 +1108,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                                                     />
                                                                                                                                 </div>
                                                                                                                                 <div className="space-y-1">
-                                                                                                                                    <label className="text-[7px] font-bold text-amber-500 uppercase">Item Template (use {"{{item}}"})</label>
+                                                                                                                                    <label className="text-[10px] font-bold text-amber-500 uppercase">Item Template (use {"{{item}}"})</label>
                                                                                                                                     {inp.type === 'multi-input' ? (
                                                                                                                                         <div className="space-y-2 p-2 bg-background/50 border border-amber-500/10 rounded">
                                                                                                                                             {getMultiInputKeys(inp.default_value).map(key => {
@@ -1116,14 +1116,14 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
 
                                                                                                                                                 return (
                                                                                                                                                     <div key={key} className="flex items-center gap-1">
-                                                                                                                                                        <span className="text-[7px] font-bold text-amber-500/70 w-12 truncate">{key}</span>
+                                                                                                                                                        <span className="text-[10px] font-bold text-amber-500/70 w-12 truncate">{key}</span>
                                                                                                                                                         <Input
                                                                                                                                                             value={currentVal}
                                                                                                                                                             onChange={(e) => {
                                                                                                                                                                 const newTemplate = { ...(typeof foreachVal.template === 'object' ? foreachVal.template : {}), [key]: e.target.value };
                                                                                                                                                                 updateInput(JSON.stringify({ ...foreachVal, template: newTemplate }));
                                                                                                                                                             }}
-                                                                                                                                                            className="h-6 text-[9px] border-amber-500/20 bg-background"
+                                                                                                                                                            className="h-6 text-[10px] border-amber-500/20 bg-background"
                                                                                                                                                             placeholder={`{{item}}`}
                                                                                                                                                         />
                                                                                                                                                     </div>
@@ -1178,7 +1178,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                                                                     updateInput(JSON.stringify(next));
                                                                                                                                                 }}
                                                                                                                                                 className={cn(
-                                                                                                                                                    "px-1.5 py-0.5 rounded text-[8px] font-bold transition-all border",
+                                                                                                                                                    "px-1.5 py-0.5 rounded text-[10px] font-bold transition-all border",
                                                                                                                                                     isSelected
                                                                                                                                                         ? "bg-indigo-500 text-white border-indigo-500"
                                                                                                                                                         : "bg-background text-muted-foreground border-border hover:border-indigo-500/50"
@@ -1210,7 +1210,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                                                                 <div key={rIdx} className="space-y-1 p-2 bg-background border border-indigo-500/10 rounded relative group/mrow">
                                                                                                                                                     {keys.map(k => (
                                                                                                                                                         <div key={k} className="flex items-center gap-1">
-                                                                                                                                                            <span className="text-[7px] font-bold text-muted-foreground/50 w-12 truncate">{k}</span>
+                                                                                                                                                            <span className="text-[10px] font-bold text-muted-foreground/50 w-12 truncate">{k}</span>
                                                                                                                                                             <Input
                                                                                                                                                                 value={row[k] || ''}
                                                                                                                                                                 onChange={(e) => {
@@ -1218,7 +1218,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                                                                                     next[rIdx] = { ...next[rIdx], [k]: e.target.value };
                                                                                                                                                                     updateInput(JSON.stringify(next));
                                                                                                                                                                 }}
-                                                                                                                                                                className="h-6 text-[9px] bg-muted/20 border-border/50"
+                                                                                                                                                                className="h-6 text-[10px] bg-muted/20 border-border/50"
                                                                                                                                                             />
                                                                                                                                                         </div>
                                                                                                                                                     ))}
@@ -1236,7 +1236,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                                                                 variant="outline"
                                                                                                                                                 size="sm"
                                                                                                                                                 onClick={() => updateInput(JSON.stringify([...rows, {}]))}
-                                                                                                                                                className="w-full h-6 border-dashed border-indigo-500/30 text-[8px] font-black uppercase tracking-widest bg-background"
+                                                                                                                                                className="w-full h-6 border-dashed border-indigo-500/30 text-[10px] font-black uppercase tracking-widest bg-background"
                                                                                                                                             >
                                                                                                                                                 <Plus className="w-2 h-2 mr-1" /> Add Row
                                                                                                                                             </Button>
@@ -1260,8 +1260,8 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                 })()}
                                                                                                 <div className="flex items-center justify-between gap-2 pt-1">
                                                                                                     <div>
-                                                                                                        <span className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Wait for completion</span>
-                                                                                                        <p className="text-[8px] text-muted-foreground/50">Off = run asynchronously</p>
+                                                                                                        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Wait for completion</span>
+                                                                                                        <p className="text-[10px] text-muted-foreground/50">Off = run asynchronously</p>
                                                                                                     </div>
                                                                                                     <Switch
                                                                                                         checked={step.wait_to_finish !== false}
@@ -1308,7 +1308,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                         } as WorkflowStep);
                                                                         setGroups(ng);
                                                                     }}
-                                                                    className="w-full h-10 border border-dashed border-border hover:border-primary/50 hover:bg-primary/5 rounded-lg transition-all group"
+                                                                    className="w-full h-9 border border-dashed border-border hover:border-primary/50 hover:bg-primary/5 rounded-md transition-all group"
                                                                 >
                                                                     <Plus className="w-3.5 h-3.5 mr-2 text-muted-foreground group-hover:text-primary" />
                                                                     <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground group-hover:text-primary">Append Execution Step</span>
@@ -1325,7 +1325,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                         <Button
                                             onClick={handleAddGroup}
                                             variant="outline"
-                                            className="h-12 px-8 rounded-xl bg-primary/5 hover:bg-primary/10 text-primary border-primary/20 font-bold uppercase tracking-widest text-[10px] transition-all"
+                                            className="h-9 px-8 rounded-md bg-primary/5 hover:bg-primary/10 text-primary border-primary/20 font-bold uppercase tracking-widest text-[10px] transition-all"
                                         >
                                             <Plus className="w-4 h-4 mr-2" />
                                             Extend Module Chain
@@ -1342,7 +1342,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
             <Dialog open={pasteModal.open} onOpenChange={(o) => !o && setPasteModal({ ...pasteModal, open: false })}>
                 <DialogContent className="sm:max-w-xl bg-background/95 backdrop-blur-2xl border-white/10 shadow-2xl p-0 overflow-hidden">
                     <div className="bg-emerald-500/10 border-b border-emerald-500/20 px-6 py-4 flex items-center gap-3">
-                        <div className="p-2 bg-emerald-500/20 rounded-lg">
+                        <div className="p-2 bg-emerald-500/20 rounded-md">
                             <Terminal className="w-5 h-5 text-emerald-500" />
                         </div>
                         <div>
@@ -1353,10 +1353,10 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
 
                     <div className="p-6 space-y-4">
                         <div className="relative group">
-                            <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 rounded-xl blur opacity-0 group-focus-within:opacity-100 transition duration-500"></div>
+                            <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 rounded-md blur opacity-0 group-focus-within:opacity-100 transition duration-500"></div>
                             <Textarea
                                 placeholder={'curl -X POST https://api.example.com \\\n  -H "Content-Type: application/json" \\\n  -d \'{"key": "value"}\''}
-                                className="relative min-h-[200px] font-mono text-xs bg-black/40 border-white/5 focus-visible:ring-emerald-500/50 rounded-xl p-4 transition-all"
+                                className="relative min-h-[200px] font-mono text-xs bg-black/40 border-white/5 focus-visible:ring-emerald-500/50 rounded-md p-4 transition-all"
                                 value={pasteModal.text}
                                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setPasteModal({ ...pasteModal, text: e.target.value })}
                             />
@@ -1368,12 +1368,12 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                         <Button
                             variant="ghost"
                             onClick={() => setPasteModal({ ...pasteModal, open: false })}
-                            className="rounded-xl h-10 font-bold uppercase tracking-widest text-[10px] hover:bg-white/5"
+                            className="rounded-md h-9 font-bold uppercase tracking-widest text-[10px] hover:bg-white/5"
                         >
                             Cancel
                         </Button>
                         <Button
-                            className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl h-10 px-8 font-bold uppercase tracking-widest text-[10px] shadow-lg shadow-emerald-500/20 transition-all active:scale-95"
+                            className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-md h-9 px-8 font-bold uppercase tracking-widest text-[10px] shadow-lg shadow-emerald-500/20 transition-all active:scale-95"
                             onClick={() => {
                                 const { text, gIdx, sIdx } = pasteModal;
                                 if (!text) {
@@ -1431,7 +1431,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                     )}>
                         <div className="flex items-center gap-4">
                             <div className={cn(
-                                "p-3 rounded-2xl shadow-inner",
+                                "p-3 rounded-md shadow-inner",
                                 testResult.variant === 'success' ? "bg-emerald-500/20 text-emerald-500" : testResult.variant === 'danger' ? "bg-rose-500/20 text-rose-500" : "bg-primary/20 text-primary"
                             )}>
                                 {testResult.variant === 'success' ? <CheckCircle2 className="w-6 h-6" /> : testResult.variant === 'danger' ? <XCircle className="w-6 h-6" /> : <Info className="w-6 h-6" />}
@@ -1452,7 +1452,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                             onClick={() => {
                                 copyToClipboard(testResult.message);
                             }}
-                            className="h-10 px-4 rounded-xl gap-2 hover:bg-white/5 font-bold uppercase tracking-widest text-[9px] transition-all"
+                            className="h-9 px-4 rounded-md gap-2 hover:bg-white/5 font-bold uppercase tracking-widest text-[10px] transition-all"
                         >
                             <Copy className="w-3.5 h-3.5" />
                             Copy Response
@@ -1462,7 +1462,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                     <div className="p-0 bg-black/20 w-full overflow-hidden">
                         <div className="max-h-[60vh] overflow-auto custom-scrollbar w-full min-w-0">
                             <div className="w-fit min-w-full">
-                                <pre className="p-8 text-[11px] font-mono leading-relaxed bg-transparent whitespace-pre selection:bg-primary/30">
+                                <pre className="p-8 text-xs font-mono leading-relaxed bg-transparent whitespace-pre selection:bg-primary/30">
                                     {(() => {
                                         const responseHeader = "Response:";
                                         const parts = testResult.message.split(responseHeader);
@@ -1504,7 +1504,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                     <DialogFooter className="bg-muted/20 p-4 border-t border-white/5">
                         <Button
                             onClick={() => setTestResult({ ...testResult, open: false })}
-                            className="w-full bg-white/5 hover:bg-white/10 text-foreground border border-white/10 rounded-xl h-12 font-bold uppercase tracking-widest text-[10px] transition-all active:scale-[0.98]"
+                            className="w-full bg-white/5 hover:bg-white/10 text-foreground border border-white/10 rounded-md h-9 font-bold uppercase tracking-widest text-[10px] transition-all active:scale-[0.98]"
                         >
                             Dismiss Window
                         </Button>
