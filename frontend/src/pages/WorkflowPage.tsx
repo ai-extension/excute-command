@@ -555,12 +555,6 @@ const WorkflowPage = () => {
                                             <TableRow key={wf.id} className="group border-border hover:bg-muted/40 transition-colors duration-200">
                                                 <TableCell className="px-6 py-4">
                                                     <div className="flex items-center gap-3">
-                                                        <div className={cn(
-                                                            "h-8 w-8 rounded-md flex items-center justify-center shrink-0 border group-hover:scale-110 transition-all duration-500 shadow-sm",
-                                                            wf.is_public ? "bg-indigo-500/10 border-indigo-500/20" : "bg-amber-500/10 border-amber-500/20"
-                                                        )}>
-                                                            <Zap className={cn("w-3.5 h-3.5", wf.is_public ? "text-indigo-500" : "text-amber-500")} />
-                                                        </div>
                                                         <div>
                                                             <div className="flex items-center gap-2">
                                                                 <p className={cn(

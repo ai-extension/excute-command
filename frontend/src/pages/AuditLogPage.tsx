@@ -127,7 +127,7 @@ const AuditLogPage = () => {
             </div>
 
             {/* Filters */}
-            <Card className="bg-card/30 backdrop-blur-md border-border p-4 shadow-sm">
+            <Card className="bg-card border-border p-4 shadow-card">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -201,18 +201,18 @@ const AuditLogPage = () => {
             </Card>
 
             {/* Table */}
-            <div className="flex-1 bg-card/30 backdrop-blur-md rounded-md border border-border shadow-premium overflow-hidden flex flex-col min-h-0">
+            <div className="flex-1 bg-card rounded-md border border-border shadow-card overflow-hidden flex flex-col min-h-0">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
-                            <tr className="border-b border-border bg-slate-500/5">
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Timestamp</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">User</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Action</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Resource</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Status</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">IP Address</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-right">Details</th>
+                            <tr className="border-b border-border bg-muted hover:bg-muted/80">
+                                <th className="h-9 px-6 font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">Timestamp</th>
+                                <th className="h-9 px-6 font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">User</th>
+                                <th className="h-9 px-6 font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">Action</th>
+                                <th className="h-9 px-6 font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">Resource</th>
+                                <th className="h-9 px-6 font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">Status</th>
+                                <th className="h-9 px-6 font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">IP Address</th>
+                                <th className="h-9 px-6 font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground text-right">Details</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border">

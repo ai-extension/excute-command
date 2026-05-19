@@ -278,15 +278,15 @@ const GlobalVariablesPage = () => {
                 primaryAction={null}
             />
 
-            <Card className="border-border bg-card shadow-premium overflow-hidden rounded-md">
+            <Card className="rounded-md border border-border bg-card shadow-card overflow-hidden">
                 <Table>
                     <TableHeader>
-                        <TableRow className="bg-muted/50 border-border hover:bg-muted/50">
-                            <TableHead className="w-[300px] h-14 font-black uppercase tracking-widest text-[10px] px-8">Variable Key</TableHead>
-                            <TableHead className="font-black uppercase tracking-widest text-[10px]">Resolved Value</TableHead>
-                            <TableHead className="font-black uppercase tracking-widest text-[10px]">Reference Code</TableHead>
-                            <TableHead className="font-black uppercase tracking-widest text-[10px]">Created By</TableHead>
-                            <TableHead className="text-right h-14 px-8 font-black uppercase tracking-widest text-[10px]">Actions</TableHead>
+                        <TableRow className="bg-muted hover:bg-muted/80 border-border">
+                            <TableHead className="w-[300px] h-9 font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground px-6">Variable Key</TableHead>
+                            <TableHead className="font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">Resolved Value</TableHead>
+                            <TableHead className="font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">Reference Code</TableHead>
+                            <TableHead className="font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">Created By</TableHead>
+                            <TableHead className="text-right h-9 px-6 font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -301,11 +301,8 @@ const GlobalVariablesPage = () => {
                             </TableRow>
                         ) : variables.length > 0 ? variables.map((v) => (
                             <TableRow key={v.id} className="group border-border hover:bg-muted/30 transition-all duration-200">
-                                <TableCell className="px-8 py-5">
+                                <TableCell className="px-6 py-4">
                                     <div className="flex items-center gap-4">
-                                        <div className="h-10 w-10 rounded-md bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20 shadow-sm shrink-0">
-                                            <Globe className="w-5 h-5 text-indigo-500" />
-                                        </div>
                                         <div>
                                             <p className="text-sm font-black tracking-tight text-primary uppercase">{v.key}</p>
                                             <p className="text-xs text-muted-foreground font-medium line-clamp-1 opacity-70 mt-0.5">
@@ -356,7 +353,7 @@ const GlobalVariablesPage = () => {
                                         <span className="text-[10px] text-muted-foreground/40 italic">—</span>
                                     )}
                                 </TableCell>
-                                <TableCell className="text-right px-8">
+                                <TableCell className="text-right px-6">
                                     <div className="flex justify-end gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all duration-300">
                                         <Button
                                             variant="ghost"
@@ -400,6 +397,7 @@ const GlobalVariablesPage = () => {
                         )}
                     </TableBody>
                 </Table>
+            </Card>
 
                 <Pagination
                     total={total}
@@ -408,7 +406,6 @@ const GlobalVariablesPage = () => {
                     itemName="Global Variables"
                     onPageChange={setOffset}
                 />
-            </Card>
 
             {/* Edit Dialog */}
             <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>

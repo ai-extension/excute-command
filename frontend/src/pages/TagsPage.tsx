@@ -281,14 +281,14 @@ const TagsPage = () => {
                 primaryAction={null}
             />
 
-            <Card className="border-border bg-card shadow-premium overflow-hidden rounded-md">
+            <Card className="rounded-md border border-border bg-card shadow-card overflow-hidden">
                 <Table>
                     <TableHeader>
-                        <TableRow className="bg-muted/50 border-border hover:bg-muted/50">
-                            <TableHead className="w-[300px] h-14 font-black uppercase tracking-widest text-[10px] px-8">Tag</TableHead>
-                            <TableHead className="font-black uppercase tracking-widest text-[10px]">Hex Color</TableHead>
-                            <TableHead className="font-black uppercase tracking-widest text-[10px]">Created By</TableHead>
-                            <TableHead className="text-right h-14 px-8 font-black uppercase tracking-widest text-[10px]">Actions</TableHead>
+                        <TableRow className="bg-muted hover:bg-muted/80 border-border">
+                            <TableHead className="w-[300px] h-9 font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground px-6">Tag</TableHead>
+                            <TableHead className="font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">Hex Color</TableHead>
+                            <TableHead className="font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">Created By</TableHead>
+                            <TableHead className="text-right h-9 px-6 font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -303,7 +303,7 @@ const TagsPage = () => {
                             </TableRow>
                         ) : tags.length > 0 ? tags.map((t) => (
                             <TableRow key={t.id} className="group border-border hover:bg-muted/30 transition-all duration-200">
-                                <TableCell className="px-8 py-5">
+                                <TableCell className="px-6 py-4">
                                     <div className="flex flex-col gap-1.5">
                                         <div className="flex items-center gap-4">
                                             <div
@@ -338,7 +338,7 @@ const TagsPage = () => {
                                         <span className="text-[10px] text-muted-foreground/40 italic">—</span>
                                     )}
                                 </TableCell>
-                                <TableCell className="text-right px-8">
+                                <TableCell className="text-right px-6">
                                     <div className="flex justify-end gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all duration-300">
                                         <Button
                                             variant="ghost"
@@ -382,6 +382,7 @@ const TagsPage = () => {
                         )}
                     </TableBody>
                 </Table>
+            </Card>
 
                 <Pagination
                     total={total}
@@ -390,7 +391,6 @@ const TagsPage = () => {
                     itemName="Tags"
                     onPageChange={setOffset}
                 />
-            </Card>
 
             {/* Edit Dialog */}
             <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>

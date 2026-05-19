@@ -453,6 +453,18 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                             className="w-3 h-3 rounded-full bg-[#27c93f] shadow-inner hover:bg-[#27c93f]/80 transition-colors cursor-pointer"
                         />
                     </div>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                        title={isSidebarOpen ? 'Hide Nav' : 'Show Nav'}
+                        className={cn(
+                            "h-7 w-7 rounded-md transition-all",
+                            isSidebarOpen ? "bg-primary/20 text-primary border border-primary/30" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                        )}
+                    >
+                        <Layout className="w-3.5 h-3.5" />
+                    </Button>
                     <div className="flex items-center gap-3 py-1 px-3 bg-muted/30 rounded-md border border-border/50">
                         <Zap className={cn("w-3.5 h-3.5 shadow-[0_0_10px_rgba(99,102,241,0.5)]", mode === 'LIVE' ? "text-primary" : "text-amber-500")} />
                         <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
@@ -485,80 +497,57 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                         )}
                     </div>
                 </div>
-                <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-1 mr-2">
-                        {((mode === 'LIVE' && (workflow.status === 'RUNNING' || workflow.status === 'PENDING')) ||
-                            (mode === 'HISTORICAL' && (execution?.status === 'RUNNING' || execution?.status === 'PENDING'))) && (
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={handleStop}
-                                    className="h-7 px-3 rounded-md text-[10px] font-black uppercase tracking-widest text-destructive hover:text-white hover:bg-destructive/90 border border-destructive/20 hover:border-destructive transition-all mr-1 group"
-                                >
-                                    <Square className="w-3 h-3 mr-2 fill-current opacity-50 group-hover:opacity-100 transition-opacity" />
-                                    Stop Execution
-                                </Button>
-                            )}
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={handleDownloadLogs}
-                            className="h-7 px-3 rounded-md text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary hover:bg-primary/5 border border-transparent hover:border-primary/20 transition-all"
-                        >
-                            <Download className="w-3.5 h-3.5 mr-2" />
-                            Download Trace
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                            className={cn(
-                                "h-7 px-3 rounded-md text-[10px] font-black uppercase tracking-widest transition-all gap-2",
-                                isSidebarOpen ? "bg-primary/20 text-primary border border-primary/30" : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                            )}
-                        >
-                            <Layout className="w-3.5 h-3.5" />
-                            {isSidebarOpen ? 'Hide Nav' : 'Show Nav'}
-                        </Button>
+                <div className="flex items-center gap-2">
+                    {((mode === 'LIVE' && (workflow.status === 'RUNNING' || workflow.status === 'PENDING')) ||
+                        (mode === 'HISTORICAL' && (execution?.status === 'RUNNING' || execution?.status === 'PENDING'))) && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleStop}
+                                className="h-7 px-3 rounded-md text-[10px] font-black uppercase tracking-widest text-destructive hover:text-white hover:bg-destructive/90 border border-destructive/20 hover:border-destructive transition-all group"
+                            >
+                                <Square className="w-3 h-3 mr-2 fill-current opacity-50 group-hover:opacity-100 transition-opacity" />
+                                Stop Execution
+                            </Button>
+                        )}
+                    {onReRun && workflow && (workflow.status !== 'RUNNING' && workflow.status !== 'PENDING') && (
                         <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => {
-                                setActiveStepID(null);
-                                setActiveGroupID(null);
-                            }}
-                            className={cn(
-                                "h-7 px-3 rounded-md text-[10px] font-black uppercase tracking-widest transition-all",
-                                !activeStepID ? "bg-primary/20 text-primary border border-primary/30" : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                            )}
-                        >
-                            <Monitor className="w-3.5 h-3.5 mr-2" />
-                            Global Trace
-                        </Button>
-                        {onReRun && workflow && (workflow.status !== 'RUNNING' && workflow.status !== 'PENDING') && (
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                    let inputs: Record<string, string> = {};
-                                    if (execution?.inputs) {
-                                        try {
-                                            inputs = JSON.parse(execution.inputs);
-                                        } catch (e) {
-                                            console.error('Failed to parse inputs for rerun:', e);
-                                        }
+                                let inputs: Record<string, string> = {};
+                                if (execution?.inputs) {
+                                    try {
+                                        inputs = JSON.parse(execution.inputs);
+                                    } catch (e) {
+                                        console.error('Failed to parse inputs for rerun:', e);
                                     }
-                                    onReRun(workflow, inputs, undefined, undefined, execution?.id);
-                                }}
-                                className="h-7 px-3 rounded-md text-[10px] font-black uppercase tracking-widest text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/5 border border-emerald-500/20 transition-all ml-1"
-                            >
-                                <Play className="w-3.5 h-3.5 mr-2" />
-                                Run Again
-                            </Button>
+                                }
+                                onReRun(workflow, inputs, undefined, undefined, execution?.id);
+                            }}
+                            className="h-7 px-3 rounded-md text-[10px] font-black uppercase tracking-widest text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/5 border border-emerald-500/20 transition-all"
+                        >
+                            <Play className="w-3.5 h-3.5 mr-2" />
+                            Run Again
+                        </Button>
+                    )}
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                            setActiveStepID(null);
+                            setActiveGroupID(null);
+                        }}
+                        className={cn(
+                            "h-7 px-3 rounded-md text-[10px] font-black uppercase tracking-widest transition-all",
+                            !activeStepID ? "bg-primary/20 text-primary border border-primary/30" : "text-muted-foreground hover:text-foreground hover:bg-muted"
                         )}
-                    </div>
+                    >
+                        <Monitor className="w-3.5 h-3.5 mr-2" />
+                        Global Trace
+                    </Button>
                     <Badge variant="outline" className={cn(
-                        "font-black text-[10px] uppercase tracking-widest px-3 py-1",
+                        "font-black text-[10px] uppercase tracking-widest px-3 py-1 ml-1",
                         mode === 'LIVE' ? "bg-primary/10 border-primary/20 text-primary animate-pulse" : "bg-muted border-border text-muted-foreground"
                     )}>
                         {mode === 'LIVE' ? workflow.status : execution?.status}
@@ -744,6 +733,15 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                         </span>
                     </div>
                 </div>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleDownloadLogs}
+                    className="h-7 px-3 rounded-md text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary hover:bg-primary/5 border border-transparent hover:border-primary/20 transition-all"
+                >
+                    <Download className="w-3.5 h-3.5 mr-2" />
+                    Download Trace
+                </Button>
             </div>
 
             {/* Stop Confirmation Dialog */}

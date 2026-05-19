@@ -301,9 +301,6 @@ const VpnPage = () => {
                             <TableRow key={vpn.id} className="group border-border hover:bg-muted/40 transition-colors">
                                 <TableCell className="px-6 py-4">
                                     <div className="flex items-center gap-3">
-                                        <div className="h-10 w-10 rounded-md bg-muted/80 flex items-center justify-center border border-border group-hover:border-primary/20 group-hover:scale-110 transition-all shadow-sm">
-                                            <Network className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
-                                        </div>
                                         <div>
                                             <p className="text-sm font-black tracking-tight">{vpn.name}</p>
                                             <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter opacity-70">

@@ -509,25 +509,22 @@ const UsersPage = () => {
                 }}
             />
 
-            <Card className="border-border bg-card shadow-premium overflow-hidden rounded-md">
+            <Card className="rounded-md border border-border bg-card shadow-card overflow-hidden">
                 <Table>
                     <TableHeader>
-                        <TableRow className="bg-muted/50 border-border hover:bg-muted/50">
-                            <TableHead className="w-[300px] h-14 font-black uppercase tracking-widest text-[10px] px-8">Identity</TableHead>
-                            <TableHead className="font-black uppercase tracking-widest text-[10px]">Authorization Roles</TableHead>
-                            <TableHead className="font-black uppercase tracking-widest text-[10px]">Last Activity</TableHead>
-                            <TableHead className="font-black uppercase tracking-widest text-[10px]">Status</TableHead>
-                            <TableHead className="text-right h-14 px-8 font-black uppercase tracking-widest text-[10px]">Actions</TableHead>
+                        <TableRow className="bg-muted hover:bg-muted/80 border-border">
+                            <TableHead className="w-[300px] h-9 font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground px-6">Identity</TableHead>
+                            <TableHead className="font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">Authorization Roles</TableHead>
+                            <TableHead className="font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">Last Activity</TableHead>
+                            <TableHead className="font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">Status</TableHead>
+                            <TableHead className="text-right h-9 px-6 font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {users.length > 0 ? users.map((u) => (
                             <TableRow key={u.id} className="group border-border hover:bg-muted/30 transition-all duration-200">
-                                <TableCell className="px-8 py-5">
+                                <TableCell className="px-6 py-4">
                                     <div className="flex items-center gap-4">
-                                        <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary/20 to-indigo-500/20 flex items-center justify-center border border-primary/10 shadow-sm shrink-0">
-                                            <span className="text-xs font-black text-primary uppercase">{u.username.substring(0, 2)}</span>
-                                        </div>
                                         <div>
                                             <p className="text-sm font-black tracking-tight flex items-center gap-2">
                                                 {u.full_name || u.username}
@@ -557,7 +554,7 @@ const UsersPage = () => {
                                         ACTIVE
                                     </Badge>
                                 </TableCell>
-                                <TableCell className="text-right px-8">
+                                <TableCell className="text-right px-6">
                                     <div className="flex justify-end gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all duration-300">
                                         <Button
                                             variant="ghost"
@@ -612,6 +609,7 @@ const UsersPage = () => {
                         )}
                     </TableBody>
                 </Table>
+            </Card>
 
                 <Pagination
                     total={total}
@@ -620,7 +618,6 @@ const UsersPage = () => {
                     itemName="Users"
                     onPageChange={setOffset}
                 />
-            </Card>
 
             <ConfirmDialog
                 isOpen={!!deleteTarget}

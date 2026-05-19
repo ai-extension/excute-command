@@ -40,6 +40,7 @@ export const ServerTable: React.FC<ServerTableProps> = ({
     onOpenTerminal
 }) => {
     return (
+        <>
         <div className="rounded-md border border-border bg-card shadow-card overflow-hidden">
             <Table>
                 <TableHeader>
@@ -57,9 +58,6 @@ export const ServerTable: React.FC<ServerTableProps> = ({
                         <TableRow key={server.id} className="group border-border hover:bg-muted/40 transition-colors">
                             <TableCell className="px-6 py-4">
                                 <div className="flex items-center gap-3">
-                                    <div className="h-10 w-10 rounded-md bg-muted/80 flex items-center justify-center border border-border group-hover:border-primary/20 group-hover:scale-110 transition-all shadow-sm">
-                                        <ServerIcon className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
-                                    </div>
                                     <div>
                                         <div className="flex items-center gap-2">
                                             <p className="text-sm font-black tracking-tight">{server.name}</p>
@@ -188,6 +186,7 @@ export const ServerTable: React.FC<ServerTableProps> = ({
                     )}
                 </TableBody>
             </Table>
+        </div>
 
             <Pagination
                 total={total}
@@ -196,6 +195,6 @@ export const ServerTable: React.FC<ServerTableProps> = ({
                 itemName="Servers"
                 onPageChange={onPageChange}
             />
-        </div>
+        </>
     );
 };
