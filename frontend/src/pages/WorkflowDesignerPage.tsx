@@ -14,7 +14,11 @@ import {
     Globe,
     Pencil,
     Info,
-    Download
+    Download,
+    Upload,
+    ClipboardPaste,
+    AlertCircle,
+    CheckCircle2
 } from 'lucide-react';
 import { DropResult } from '@hello-pangea/dnd';
 
@@ -46,6 +50,15 @@ import { GeneralSettingsTab } from '../components/workflow-designer/GeneralSetti
 import { VariablesTab } from '../components/workflow-designer/VariablesTab';
 import { StepsBuilderTab } from '../components/workflow-designer/StepsBuilderTab';
 import { Switch } from '../components/ui/switch';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
+} from '../components/ui/dialog';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import ResourceHistoryTab from '../components/ResourceHistoryTab';
 
 const WorkflowDesignerPage = () => {
@@ -77,6 +90,14 @@ const WorkflowDesignerPage = () => {
     const [isTemplate, setIsTemplate] = useState(false);
     const [isPublic, setIsPublic] = useState(false);
     const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+    const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+    const [importJson, setImportJson] = useState('');
+    const [importError, setImportError] = useState<string | null>(null);
+    const [importPreview, setImportPreview] = useState<{ name: string; description: string; groupCount: number; stepCount: number } | null>(null);
+    const [isImporting, setIsImporting] = useState(false);
+    const [showImportConfirm, setShowImportConfirm] = useState(false);
+    const importFileRef = React.useRef<HTMLInputElement>(null);
 
     const copyToClipboard = async (text: string, key: string) => {
         const success = await clipboardCopy(text);
@@ -364,6 +385,67 @@ const WorkflowDesignerPage = () => {
         URL.revokeObjectURL(url);
     };
 
+    const handleImportJsonChange = (value: string) => {
+        setImportJson(value);
+        setImportError(null);
+        setImportPreview(null);
+        if (!value.trim()) return;
+        try {
+            const parsed = JSON.parse(value);
+            if (!parsed.name || typeof parsed.name !== 'string') {
+                setImportError('Missing required field: "name"');
+                return;
+            }
+            const grps = parsed.groups || [];
+            const stepCount = grps.reduce((acc: number, g: any) => acc + (g.steps?.length || 0), 0);
+            setImportPreview({ name: parsed.name, description: parsed.description || '', groupCount: grps.length, stepCount });
+        } catch {
+            setImportError('Invalid JSON format');
+        }
+    };
+
+    const handleImportFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const content = event.target?.result as string;
+            setIsImportDialogOpen(true);
+            handleImportJsonChange(content);
+            setImportJson(content);
+        };
+        reader.readAsText(file);
+        if (importFileRef.current) importFileRef.current.value = '';
+    };
+
+    const handleImportUpdate = async () => {
+        if (!id || !importPreview) return;
+        setShowImportConfirm(false);
+        setIsImporting(true);
+        try {
+            const workflowData = JSON.parse(importJson);
+            const response = await apiFetch(`${API_BASE_URL}/workflows/${id}/import`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(workflowData),
+            });
+            if (response.ok) {
+                showToast('Workflow updated from imported JSON', 'success');
+                setIsImportDialogOpen(false);
+                setImportJson('');
+                setImportPreview(null);
+                window.location.reload();
+            } else {
+                const err = await response.json();
+                setImportError(err.error || 'Failed to import');
+            }
+        } catch {
+            setImportError('Failed to import workflow');
+        } finally {
+            setIsImporting(false);
+        }
+    };
+
     const handleAddGroup = () => {
         let maxNum = 0;
         groups.forEach(g => {
@@ -441,6 +523,7 @@ const WorkflowDesignerPage = () => {
     return (
         <WorkflowRunner>
             {(runWorkflow) => (
+                <>
                 <div className="flex flex-col h-[calc(100vh-2rem)] bg-background rounded-xl border border-border overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-500">
                     {/* Loading/Error States */}
                     {isLoading ? (
@@ -519,6 +602,15 @@ const WorkflowDesignerPage = () => {
                                                 </div>
                                             </div>
                                         </div>
+                                        <input type="file" ref={importFileRef} accept=".json" className="hidden" onChange={handleImportFileChange} />
+                                        <Button
+                                            onClick={() => { setIsImportDialogOpen(true); setImportJson(''); setImportError(null); setImportPreview(null); }}
+                                            variant="outline"
+                                            className="h-8 px-3 rounded-lg border-cyan-500/30 text-cyan-500 hover:bg-cyan-500/10 hover:text-cyan-400 text-[9px] font-bold uppercase tracking-widest transition-all"
+                                        >
+                                            <Upload className="w-3 h-3 mr-1.5" />
+                                            Import
+                                        </Button>
                                         <Button
                                             onClick={handleExport}
                                             variant="outline"
@@ -750,8 +842,106 @@ const WorkflowDesignerPage = () => {
                     )
                     }
                 </div >
-            )
-            }
+
+            <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Upload className="w-5 h-5 text-cyan-500" />
+                            Import JSON — Update This Workflow
+                        </DialogTitle>
+                        <DialogDescription>
+                            Paste or upload JSON to replace the current workflow configuration.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="flex gap-2">
+                            <Button
+                                variant="outline"
+                                onClick={() => importFileRef.current?.click()}
+                                className="h-8 px-3 text-[9px] font-bold uppercase tracking-widest border-dashed"
+                            >
+                                <Upload className="w-3 h-3 mr-1.5" />
+                                Upload File
+                            </Button>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Workflow JSON</label>
+                            <textarea
+                                value={importJson}
+                                onChange={(e) => handleImportJsonChange(e.target.value)}
+                                placeholder={'{\n  "name": "My Workflow",\n  "description": "...",\n  "groups": [...]\n}'}
+                                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 font-mono min-h-[200px] resize-y"
+                                spellCheck={false}
+                            />
+                        </div>
+
+                        {importError && (
+                            <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                                <AlertCircle className="w-4 h-4 text-destructive shrink-0" />
+                                <p className="text-xs font-medium text-destructive">{importError}</p>
+                            </div>
+                        )}
+
+                        {importPreview && (
+                            <div className="p-4 rounded-lg bg-emerald-500/5 border border-emerald-500/20 space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                                    <span className="text-xs font-bold text-emerald-500 uppercase tracking-widest">Valid JSON — Preview</span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 mt-2">
+                                    <div>
+                                        <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Name</p>
+                                        <p className="text-sm font-semibold truncate">{importPreview.name}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Description</p>
+                                        <p className="text-sm font-medium text-muted-foreground truncate">{importPreview.description || '—'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Groups</p>
+                                        <p className="text-sm font-semibold">{importPreview.groupCount}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Steps</p>
+                                        <p className="text-sm font-semibold">{importPreview.stepCount}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => setIsImportDialogOpen(false)}
+                            className="h-9 text-[10px] font-bold uppercase tracking-widest px-6"
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={() => setShowImportConfirm(true)}
+                            disabled={!importPreview || isImporting}
+                            className="h-9 text-[10px] font-bold uppercase tracking-widest px-6 bg-amber-600 hover:bg-amber-700 text-white"
+                        >
+                            {isImporting ? 'Updating...' : 'Update Workflow'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <ConfirmDialog
+                isOpen={showImportConfirm}
+                onClose={() => setShowImportConfirm(false)}
+                onConfirm={handleImportUpdate}
+                title="Overwrite Workflow"
+                description={`This will overwrite "${name}" with the imported JSON. All existing groups, steps, inputs, and variables will be replaced. This action cannot be undone.`}
+                confirmText="Yes, Overwrite"
+                variant="danger"
+                isLoading={isImporting}
+            />
+                </>
+            )}
         </WorkflowRunner >
     );
 };

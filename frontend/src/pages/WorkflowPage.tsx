@@ -19,7 +19,8 @@ import {
     ClipboardPaste,
     AlertCircle,
     CheckCircle2,
-    Download
+    Download,
+    RefreshCw
 } from 'lucide-react';
 import {
     Table,
@@ -99,6 +100,9 @@ const WorkflowPage = () => {
     const [parsedPreview, setParsedPreview] = useState<{ name: string; description: string; groupCount: number; stepCount: number } | null>(null);
     const [isPasteImporting, setIsPasteImporting] = useState(false);
     const [importServerId, setImportServerId] = useState<string>('');
+    const [importMode, setImportMode] = useState<'create' | 'update'>('create');
+    const [updateTargetId, setUpdateTargetId] = useState<string>('');
+    const [showOverwriteConfirm, setShowOverwriteConfirm] = useState(false);
 
     const handleImportClick = () => {
         fileInputRef.current?.click();
@@ -113,6 +117,8 @@ const WorkflowPage = () => {
             const content = event.target?.result as string;
             setIsPasteDialogOpen(true);
             setImportServerId('');
+            setImportMode('create');
+            setUpdateTargetId('');
             handlePasteJsonChange(content);
             setPasteJson(content);
         };
@@ -146,22 +152,45 @@ const WorkflowPage = () => {
         }
     };
 
-    const handlePasteImport = async () => {
-        if (!activeNamespace || !parsedPreview || !importServerId) return;
+    const handlePasteImportConfirm = () => {
+        if (importMode === 'update' && updateTargetId) {
+            setShowOverwriteConfirm(true);
+        } else {
+            handlePasteImport();
+        }
+    };
 
+    const handlePasteImport = async () => {
+        if (!activeNamespace || !parsedPreview) return;
+        if (importMode === 'create' && !importServerId) return;
+
+        setShowOverwriteConfirm(false);
         setIsPasteImporting(true);
         try {
             const workflowData = JSON.parse(pasteJson);
-            workflowData.default_server_id = importServerId;
-            const response = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/workflows/import`, {
-                method: 'POST',
+            if (importServerId) {
+                workflowData.default_server_id = importServerId;
+            }
+
+            let url: string;
+            let method: string;
+            if (importMode === 'update' && updateTargetId) {
+                url = `${API_BASE_URL}/workflows/${updateTargetId}/import`;
+                method = 'PUT';
+            } else {
+                url = `${API_BASE_URL}/namespaces/${activeNamespace.id}/workflows/import`;
+                method = 'POST';
+            }
+
+            const response = await apiFetch(url, {
+                method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(workflowData),
             });
 
             if (response.ok) {
                 const data = await response.json();
-                showToast('Workflow imported successfully', 'success');
+                showToast(importMode === 'update' ? 'Workflow updated successfully' : 'Workflow imported successfully', 'success');
                 setIsPasteDialogOpen(false);
                 setPasteJson('');
                 setParsedPreview(null);
@@ -482,7 +511,7 @@ const WorkflowPage = () => {
                                             </Button>
 
                                             <Button
-                                                onClick={() => { setIsPasteDialogOpen(true); setPasteJson(''); setPasteError(null); setParsedPreview(null); setImportServerId(''); }}
+                                                onClick={() => { setIsPasteDialogOpen(true); setPasteJson(''); setPasteError(null); setParsedPreview(null); setImportServerId(''); setImportMode('create'); setUpdateTargetId(''); }}
                                                 variant="outline"
                                                 className="h-8 px-4 mx-2 rounded-xl border-dashed border-cyan-500/30 text-cyan-500 hover:bg-cyan-500/5 font-black uppercase tracking-widest text-[9px] transition-all gap-2"
                                             >
@@ -876,6 +905,51 @@ const WorkflowPage = () => {
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => { setImportMode('create'); setUpdateTargetId(''); }}
+                                className={cn(
+                                    "flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-xs font-bold uppercase tracking-widest transition-all",
+                                    importMode === 'create'
+                                        ? "border-cyan-500 bg-cyan-500/10 text-cyan-500"
+                                        : "border-border text-muted-foreground hover:border-muted-foreground/50"
+                                )}
+                            >
+                                <Plus className="w-3.5 h-3.5" />
+                                Create New
+                            </button>
+                            <button
+                                onClick={() => setImportMode('update')}
+                                className={cn(
+                                    "flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-xs font-bold uppercase tracking-widest transition-all",
+                                    importMode === 'update'
+                                        ? "border-amber-500 bg-amber-500/10 text-amber-500"
+                                        : "border-border text-muted-foreground hover:border-muted-foreground/50"
+                                )}
+                            >
+                                <RefreshCw className="w-3.5 h-3.5" />
+                                Update Existing
+                            </button>
+                        </div>
+
+                        {importMode === 'update' && (
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold uppercase tracking-widest text-amber-500">Target Workflow to Update (Required)</label>
+                                <SearchableSelect
+                                    options={workflows.map(w => ({
+                                        label: w.name,
+                                        value: w.id,
+                                        searchTerms: `${w.name} ${w.description || ''}`
+                                    }))}
+                                    value={updateTargetId}
+                                    onValueChange={(val) => setUpdateTargetId(val)}
+                                    placeholder="— Select workflow to overwrite —"
+                                    isSearchable={true}
+                                    triggerClassName="h-10 text-sm"
+                                />
+                            </div>
+                        )}
+
                         <div className="space-y-2">
                             <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Workflow JSON</label>
                             <textarea
@@ -922,7 +996,9 @@ const WorkflowPage = () => {
                         )}
 
                         <div className="space-y-2">
-                            <label className="text-[10px] font-bold uppercase tracking-widest text-primary">Default Target Resource (Required)</label>
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-primary">
+                                Default Target Resource {importMode === 'create' ? '(Required)' : '(Optional — leave empty to keep current)'}
+                            </label>
                             <SearchableSelect
                                 options={availableServers.map(s => ({
                                     label: `${s.name} (${s.host})`,
@@ -948,15 +1024,38 @@ const WorkflowPage = () => {
                             Cancel
                         </Button>
                         <Button
-                            onClick={handlePasteImport}
-                            disabled={!parsedPreview || !importServerId || isPasteImporting}
-                            className="h-9 text-[10px] font-bold uppercase tracking-widest px-6 bg-cyan-600 hover:bg-cyan-700 text-white"
+                            onClick={handlePasteImportConfirm}
+                            disabled={
+                                !parsedPreview || isPasteImporting
+                                || (importMode === 'create' && !importServerId)
+                                || (importMode === 'update' && !updateTargetId)
+                            }
+                            className={cn(
+                                "h-9 text-[10px] font-bold uppercase tracking-widest px-6 text-white",
+                                importMode === 'update'
+                                    ? "bg-amber-600 hover:bg-amber-700"
+                                    : "bg-cyan-600 hover:bg-cyan-700"
+                            )}
                         >
-                            {isPasteImporting ? 'Importing...' : 'Import Workflow'}
+                            {isPasteImporting
+                                ? (importMode === 'update' ? 'Updating...' : 'Importing...')
+                                : (importMode === 'update' ? 'Update Workflow' : 'Import Workflow')
+                            }
                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <ConfirmDialog
+                isOpen={showOverwriteConfirm}
+                onClose={() => setShowOverwriteConfirm(false)}
+                onConfirm={handlePasteImport}
+                title="Overwrite Workflow"
+                description={`This will overwrite the workflow "${workflows.find(w => w.id === updateTargetId)?.name || ''}" with the imported JSON. All existing groups, steps, inputs, and variables will be replaced. This action cannot be undone.`}
+                confirmText="Yes, Overwrite"
+                variant="danger"
+                isLoading={isPasteImporting}
+            />
         </div>
     );
 };

@@ -666,6 +666,34 @@ func (h *WorkflowHandler) ImportWorkflow(c *gin.Context) {
 	h.auditLog.LogAction(c, "IMPORT", "WORKFLOW", wf.ID.String(), map[string]string{"name": wf.Name}, "SUCCESS")
 	c.JSON(http.StatusCreated, wf)
 }
+
+func (h *WorkflowHandler) ImportUpdateWorkflow(c *gin.Context) {
+	idStr := c.Param("id")
+	targetID, err := uuid.Parse(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid workflow id"})
+		return
+	}
+
+	var wf domain.Workflow
+	if err := c.ShouldBindJSON(&wf); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	authUser, _ := c.Get("user")
+	userObj := authUser.(*domain.User)
+
+	if err := h.service.ImportUpdateWorkflow(targetID, &wf, userObj); err != nil {
+		h.auditLog.LogAction(c, "IMPORT_UPDATE", "WORKFLOW", targetID.String(), map[string]string{"error": err.Error(), "name": wf.Name}, "FAILED")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	h.auditLog.LogAction(c, "IMPORT_UPDATE", "WORKFLOW", targetID.String(), map[string]string{"name": wf.Name}, "SUCCESS")
+	c.JSON(http.StatusOK, wf)
+}
+
 func (h *WorkflowHandler) TestHttp(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)

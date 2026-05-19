@@ -250,6 +250,7 @@ func main() {
 
 			protected.GET("/workflows/:id", middleware.RBACMiddleware(db, userRepo, "workflows", "READ"), workflowHandler.GetWorkflow)
 			protected.PUT("/workflows/:id", middleware.RBACMiddleware(db, userRepo, "workflows", "WRITE"), workflowHandler.UpdateWorkflow)
+			protected.PUT("/workflows/:id/import", middleware.RBACMiddleware(db, userRepo, "workflows", "WRITE"), workflowHandler.ImportUpdateWorkflow)
 			protected.POST("/workflows/:id/test-http", middleware.RBACMiddleware(db, userRepo, "workflows", "WRITE"), middleware.RBACMiddleware(db, userRepo, "workflows", "EXECUTE"), workflowHandler.TestHttp)
 			protected.POST("/workflows/upload-input", middleware.RBACMiddleware(db, userRepo, "workflows", "EXECUTE"), workflowHandler.UploadInputFile)
 			protected.POST("/workflows/:id/run", middleware.RBACMiddleware(db, userRepo, "workflows", "EXECUTE"), workflowHandler.RunWorkflow)
