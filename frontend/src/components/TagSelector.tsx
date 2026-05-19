@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Tag as TagIcon, Check } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Tag as TagIcon, Search } from 'lucide-react';
 import { Button } from './ui/button';
 import {
     DropdownMenu,
@@ -10,6 +10,7 @@ import {
     DropdownMenuTrigger,
 } from './ui/dropdown-menu';
 import { Badge } from './ui/badge';
+import { Input } from './ui/input';
 import { Tag } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useNamespace } from '../context/NamespaceContext';
@@ -27,23 +28,40 @@ export function TagSelector({ selectedTags, onChange, className }: TagSelectorPr
     const { activeNamespace } = useNamespace();
     const [availableTags, setAvailableTags] = useState<Tag[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [open, setOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
         if (!activeNamespace) return;
-        const fetchTags = async () => {
+        if (!open) return;
+
+        const controller = new AbortController();
+        const timeout = setTimeout(async () => {
             setIsLoading(true);
             try {
-                const response = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/tags`);
+                const params = new URLSearchParams({ limit: '50' });
+                const q = searchQuery.trim();
+                if (q) params.set('search', q);
+                const response = await apiFetch(
+                    `${API_BASE_URL}/namespaces/${activeNamespace.id}/tags?${params.toString()}`,
+                    { signal: controller.signal }
+                );
                 const data = await response.json();
                 setAvailableTags(data.items || (Array.isArray(data) ? data : []));
-            } catch (error) {
-                console.error('Failed to fetch tags:', error);
+            } catch (error: any) {
+                if (error?.name !== 'AbortError') {
+                    console.error('Failed to fetch tags:', error);
+                }
             } finally {
                 setIsLoading(false);
             }
+        }, searchQuery ? 250 : 0);
+
+        return () => {
+            clearTimeout(timeout);
+            controller.abort();
         };
-        fetchTags();
-    }, [activeNamespace, apiFetch]);
+    }, [activeNamespace, apiFetch, open, searchQuery]);
 
     const toggleTag = (tag: Tag) => {
         const isSelected = selectedTags.some(t => t.id === tag.id);
@@ -54,8 +72,13 @@ export function TagSelector({ selectedTags, onChange, className }: TagSelectorPr
         }
     };
 
+    const handleOpenChange = (next: boolean) => {
+        setOpen(next);
+        if (!next) setSearchQuery('');
+    };
+
     return (
-        <DropdownMenu>
+        <DropdownMenu open={open} onOpenChange={handleOpenChange}>
             <DropdownMenuTrigger asChild>
                 <Button
                     variant="outline"
@@ -86,6 +109,20 @@ export function TagSelector({ selectedTags, onChange, className }: TagSelectorPr
                 align="start"
             >
                 <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider opacity-60">Tags</DropdownMenuLabel>
+                <div className="px-1 pb-1.5">
+                    <div className="relative">
+                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground/60" />
+                        <Input
+                            autoFocus
+                            placeholder="Search tags..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onKeyDown={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
+                            className="pl-7 h-7 text-xs bg-muted border-none rounded-md focus-visible:ring-primary/20"
+                        />
+                    </div>
+                </div>
                 <DropdownMenuSeparator />
                 {isLoading ? (
                     <div className="p-2 text-center text-xs text-muted-foreground">Loading...</div>
@@ -97,6 +134,7 @@ export function TagSelector({ selectedTags, onChange, className }: TagSelectorPr
                                 key={tag.id}
                                 checked={isSelected}
                                 onCheckedChange={() => toggleTag(tag)}
+                                onSelect={(e) => e.preventDefault()}
                                 className="gap-2 cursor-pointer font-medium"
                             >
                                 <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: tag.color }} />
@@ -105,7 +143,9 @@ export function TagSelector({ selectedTags, onChange, className }: TagSelectorPr
                         );
                     })
                 ) : (
-                    <div className="p-2 text-center text-xs text-muted-foreground">No tags available</div>
+                    <div className="p-2 text-center text-xs text-muted-foreground">
+                        {searchQuery.trim() ? 'No matching tags' : 'No tags available'}
+                    </div>
                 )}
             </DropdownMenuContent>
         </DropdownMenu>

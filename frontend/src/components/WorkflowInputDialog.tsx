@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
-import { Dialog, DialogContent, DialogFooter, DialogTitle } from './ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Zap, Plus, Trash2 } from 'lucide-react';
 import { generateUUID } from '../lib/utils';
 
@@ -19,6 +19,8 @@ interface WorkflowInputDialogProps {
     uploadUrl?: string;
     headers?: Record<string, string>;
     storageKey?: string;
+    title?: string;
+    description?: string;
 }
 
 const DRAFT_PREFIX = 'wf_input_draft:';
@@ -68,6 +70,8 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
     uploadUrl = '/api/workflows/upload-input',
     headers = {},
     storageKey,
+    title = 'Workflow Inputs',
+    description = 'Provide values for this workflow run.',
 }) => {
     const [values, setValues] = useState<Record<string, string>>({});
     const [files, setFiles] = useState<Record<string, File>>({});
@@ -341,23 +345,29 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent hideClose className="max-w-xl w-[95vw] bg-popover border-border border-2 rounded-2xl p-0 overflow-hidden shadow-2xl flex flex-col focus:outline-none">
-                <DialogTitle className="sr-only">Workflow Input</DialogTitle>
-                <form 
-                    key={isOpen ? 'open' : 'closed'} 
-                    onSubmit={handleSubmit} 
-                    className="flex-1 p-4 space-y-4 overflow-y-auto max-h-[70vh] custom-scrollbar"
+            <DialogContent className="sm:max-w-xl w-[95vw] max-h-[85vh] p-0 overflow-hidden flex flex-col">
+                <DialogHeader className="px-6 pt-6 pb-2 flex-shrink-0">
+                    <DialogTitle className="flex items-center gap-2">
+                        <Zap className="w-5 h-5 text-primary" />
+                        {title}
+                    </DialogTitle>
+                    <DialogDescription>
+                        {description}
+                    </DialogDescription>
+                </DialogHeader>
+                <form
+                    key={isOpen ? 'open' : 'closed'}
+                    onSubmit={handleSubmit}
+                    className="flex-1 px-6 py-4 space-y-4 overflow-y-auto custom-scrollbar"
                 >
                     {inputs.slice().sort((a, b) => (a.order || 0) - (b.order || 0)).map((input) => (
-                        <div key={input.key} className="space-y-3 p-4 bg-muted/20 border border-border/50 rounded-xl group transition-all hover:bg-muted/30 hover:border-border">
-                            <div className="flex items-center justify-between">
-                                <div className="flex flex-col gap-0.5">
-                                    <Label className={`text-[10px] font-bold uppercase tracking-wider transition-colors ${errors[input.key] ? 'text-destructive' : 'text-indigo-500'}`}>
-                                        {input.label || input.key}
-                                    </Label>
-                                </div>
+                        <div key={input.key} className="space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                                <Label className={`text-[10px] font-bold uppercase tracking-widest transition-colors ${errors[input.key] ? 'text-destructive' : (input.required ? 'text-primary' : 'text-muted-foreground')}`}>
+                                    {input.label || input.key}
+                                </Label>
                                 {errors[input.key] && (
-                                    <span className="text-[10px] font-bold text-destructive bg-destructive/10 px-3 py-1 rounded-full animate-pulse">
+                                    <span className="text-[10px] font-medium text-destructive">
                                         {errors[input.key]}
                                     </span>
                                 )}
@@ -581,30 +591,28 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                     ))}
                 </form>
 
-                <DialogFooter className="p-4 border-t border-border bg-muted/20 flex-shrink-0">
-                    <div className="flex w-full gap-2">
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={onCancel}
-                            className="flex-1 h-9 rounded-lg text-[9px] font-black uppercase tracking-widest bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            type="submit"
-                            disabled={isLoading}
-                            onClick={() => handleSubmit()}
-                            className="flex-[2] h-9 rounded-lg premium-gradient text-white text-[9px] font-black uppercase tracking-[0.2em] shadow-premium hover:opacity-90 transition-all gap-2"
-                        >
-                            {isLoading ? (
-                                <div className="w-3 h-3 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                            ) : (
-                                <Zap className="w-3 h-3" />
-                            )}
-                            {isUploading ? "Uploading..." : confirmLabel}
-                        </Button>
-                    </div>
+                <DialogFooter className="px-6 py-4 border-t border-border/50 flex-shrink-0">
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={onCancel}
+                        className="h-9 text-[10px] font-bold uppercase tracking-widest px-6"
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        type="submit"
+                        disabled={isLoading}
+                        onClick={() => handleSubmit()}
+                        className="h-9 text-[10px] font-bold uppercase tracking-widest px-6 premium-gradient gap-2"
+                    >
+                        {isLoading ? (
+                            <div className="w-3 h-3 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                        ) : (
+                            <Zap className="w-3 h-3" />
+                        )}
+                        {isUploading ? 'Uploading...' : confirmLabel}
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
