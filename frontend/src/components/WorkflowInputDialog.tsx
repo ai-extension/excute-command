@@ -7,6 +7,7 @@ import { Label } from './ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Zap, Plus, Trash2 } from 'lucide-react';
 import { generateUUID } from '../lib/utils';
+import { SearchableSelect } from './SearchableSelect';
 
 interface WorkflowInputDialogProps {
     isOpen: boolean;
@@ -375,27 +376,19 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
 
                             <div className="relative">
                                 {input.type === 'select' ? (
-                                    <div className="relative">
-                                        <select
-                                            value={values[input.key] || ''}
-                                            onChange={(e) => {
-                                                const nv = { ...values, [input.key]: e.target.value };
-                                                setValues(nv);
-                                                if (errors[input.key]) setErrors({ ...errors, [input.key]: '' });
-                                            }}
-                                            className={`h-9 w-full pl-3 pr-8 bg-background border focus:border-indigo-500 text-[11px] font-semibold rounded-lg text-foreground appearance-none outline-none cursor-pointer hover:border-border transition-colors ${errors[input.key] ? 'border-destructive' : 'border-border'}`}
-                                        >
-                                            <option value="" disabled className="text-muted-foreground">Select an option...</option>
-                                            {(input.default_value || '').split(',').map((opt) => opt.trim()).filter(Boolean).map((opt) => (
-                                                <option key={opt} value={opt} className="bg-popover text-foreground">{opt}</option>
-                                            ))}
-                                        </select>
-                                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-50 text-foreground">
-                                            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                            </svg>
-                                        </div>
-                                    </div>
+                                    <SearchableSelect
+                                        options={(input.default_value || '').split(',').map((o) => o.trim()).filter(Boolean).map((o) => ({ label: o, value: o }))}
+                                        value={values[input.key] || ''}
+                                        onValueChange={(val: string) => {
+                                            const nv = { ...values, [input.key]: val };
+                                            setValues(nv);
+                                            if (errors[input.key]) setErrors({ ...errors, [input.key]: '' });
+                                        }}
+                                        placeholder="Select an option..."
+                                        searchPlaceholder="Search options..."
+                                        isSearchable
+                                        triggerClassName={`h-9 rounded-lg ${errors[input.key] ? 'border-destructive' : 'border-border'}`}
+                                    />
                                 ) : input.type === 'multi-select' ? (
                                     <div className="flex flex-wrap gap-2 p-3 bg-background border border-border rounded-xl shadow-sm">
                                         {(input.default_value || '').split(',').map((opt) => opt.trim()).filter(Boolean).map((opt) => {
@@ -450,19 +443,18 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                                                                             {field.label || field.key}
                                                                         </span>
                                                                         {field.type === 'select' ? (
-                                                                            <select
+                                                                            <SearchableSelect
+                                                                                options={(field.options || '').split(',').map((o: string) => o.trim()).filter(Boolean).map((o: string) => ({ label: o, value: o }))}
                                                                                 value={row[field.key] || ''}
-                                                                                onChange={(e) => {
-                                                                                    const newValue = updateMultiInputValue(values[input.key], rowIndex, field.key, e.target.value);
+                                                                                onValueChange={(val: string) => {
+                                                                                    const newValue = updateMultiInputValue(values[input.key], rowIndex, field.key, val);
                                                                                     setValues({ ...values, [input.key]: newValue });
                                                                                 }}
-                                                                                className="h-8 w-full px-2 bg-muted/30 border border-border rounded-md text-[11px] font-medium outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 transition-all appearance-none"
-                                                                            >
-                                                                                <option value="">Select...</option>
-                                                                                {(field.options || '').split(',').map((o: string) => o.trim()).filter(Boolean).map((o: string) => (
-                                                                                    <option key={o} value={o}>{o}</option>
-                                                                                ))}
-                                                                            </select>
+                                                                                placeholder="Select..."
+                                                                                searchPlaceholder="Search..."
+                                                                                isSearchable
+                                                                                triggerClassName="h-8 rounded-md bg-muted/30"
+                                                                            />
                                                                         ) : field.type === 'file' ? (
                                                                             <Input
                                                                                 type="file"
