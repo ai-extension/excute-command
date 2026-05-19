@@ -619,8 +619,9 @@ const PageDesignerPage = () => {
                                                                                         ref={innerProvided.innerRef}
                                                                                         {...innerProvided.droppableProps}
                                                                                         className={cn(
-                                                                                            "flex flex-wrap gap-5 items-start min-h-[80px] p-4 rounded-2xl border-2 border-dashed transition-colors",
-                                                                                            innerSnapshot.isDraggingOver ? "border-primary/50 bg-primary/5" : "border-border/40 bg-muted/10"
+                                                                                            "flex flex-wrap gap-5 items-start p-6 rounded-2xl border-2 border-dashed transition-colors",
+                                                                                            widgets.filter(w => w.parent_id === widget.id).length === 0 ? "min-h-[160px]" : "min-h-[120px]",
+                                                                                            innerSnapshot.isDraggingOver ? "border-primary bg-primary/10 ring-2 ring-primary/30" : "border-border/40 bg-muted/10"
                                                                                         )}
                                                                                     >
                                                                                         {widgets.filter(w => w.parent_id === widget.id).map((child, cIdx) => (

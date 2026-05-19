@@ -322,6 +322,7 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                                                                         className="h-8 px-2 w-full text-[11px] font-semibold border border-border rounded-md bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 cursor-pointer"
                                                                     >
                                                                         <option value="input">Input</option>
+                                                                        <option value="textarea">Textarea</option>
                                                                         <option value="number">Number</option>
                                                                         <option value="select">Select</option>
                                                                         <option value="multi-select">Multi-Select</option>
@@ -375,6 +376,17 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                                                                             }}
                                                                             placeholder="Default text... supports multi-line"
                                                                             className="min-h-[60px] text-[11px] border-border bg-background resize-y"
+                                                                        />
+                                                                    ) : input.type === 'textarea' ? (
+                                                                        <Textarea
+                                                                            value={input.default_value}
+                                                                            onChange={(e) => {
+                                                                                const ni = [...inputs];
+                                                                                ni[idx].default_value = e.target.value;
+                                                                                setInputs(ni);
+                                                                            }}
+                                                                            placeholder="Default long text..."
+                                                                            className="min-h-[120px] text-[11px] border-border bg-background resize-y"
                                                                         />
                                                                     ) : input.type === 'number' ? (
                                                                         <Input

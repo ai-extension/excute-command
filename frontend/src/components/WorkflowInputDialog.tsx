@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { WorkflowInput, MultiInputItem } from '../types';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { Dialog, DialogContent, DialogFooter, DialogTitle } from './ui/dialog';
 import { Zap, Plus, Trash2 } from 'lucide-react';
@@ -139,7 +140,7 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                     } else {
                         initialValues[input.key] = '[]';
                     }
-                } else if (input.type === 'input' || input.type === 'number') {
+                } else if (input.type === 'input' || input.type === 'textarea' || input.type === 'number') {
                     initialValues[input.key] = input.default_value || '';
                 } else {
                     initialValues[input.key] = ''; // Select/File starts empty
@@ -533,6 +534,17 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                                             );
                                         })()}
                                     </div>
+                                ) : input.type === 'textarea' ? (
+                                    <Textarea
+                                        value={values[input.key] || ''}
+                                        onChange={(e) => {
+                                            const nv = { ...values, [input.key]: e.target.value };
+                                            setValues(nv);
+                                            if (errors[input.key]) setErrors({ ...errors, [input.key]: '' });
+                                        }}
+                                        className={`min-h-[120px] px-3 py-2 bg-background focus:border-indigo-500 text-[11px] font-semibold rounded-lg transition-all resize-y ${errors[input.key] ? 'border-destructive' : 'border-border'}`}
+                                        placeholder={`Enter value for ${input.label || input.key}...`}
+                                    />
                                 ) : input.type === 'file' ? (
                                     <div className="relative">
                                         <Input
