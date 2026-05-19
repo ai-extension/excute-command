@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import {
-    Zap, Loader2, Monitor, Terminal, Clock, Sun, Moon, Copy, Check, Link2, Search
+    Zap, Loader2, Monitor, Terminal, Clock, Sun, Moon, Copy, Check, Link2, Search,
+    FileText, ImageIcon, Frame, Activity, Table2
 } from 'lucide-react';
 import { cn, copyToClipboard as clipboardCopy } from '../lib/utils';
 import { Page, PageWidget, PageLayout, WorkflowInput } from '../types';
@@ -502,6 +503,124 @@ const PublicPageView = () => {
                                                         </a>
                                                     );
                                                 })()}
+                                            </div>
+                                        </div>
+                                    );
+                                }
+                                if (widget.type === 'TEXT') {
+                                    return (
+                                        <div className="bg-card border border-border rounded-[2rem] overflow-hidden shadow-sm h-full flex flex-col">
+                                            <div className="flex items-center gap-4 px-8 py-4 border-b border-border bg-card">
+                                                <div className="p-2.5 rounded-xl bg-sky-500/10 text-sky-500 ring-1 ring-sky-500/20">
+                                                    <FileText className="w-4 h-4" />
+                                                </div>
+                                                <span className="text-[13px] font-black truncate">{widget.title || 'Text'}</span>
+                                            </div>
+                                            <div className="p-8 flex-1">
+                                                <div className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">{widget.content || ''}</div>
+                                            </div>
+                                        </div>
+                                    );
+                                }
+                                if (widget.type === 'IMAGE') {
+                                    return (
+                                        <div className="bg-card border border-border rounded-[2rem] overflow-hidden shadow-sm h-full flex flex-col">
+                                            <div className="flex items-center gap-4 px-8 py-4 border-b border-border bg-card">
+                                                <div className="p-2.5 rounded-xl bg-pink-500/10 text-pink-500 ring-1 ring-pink-500/20">
+                                                    <ImageIcon className="w-4 h-4" />
+                                                </div>
+                                                <span className="text-[13px] font-black truncate">{widget.title || 'Image'}</span>
+                                            </div>
+                                            <div className="p-6 flex-1 flex items-center justify-center">
+                                                {widget.image_url ? (
+                                                    <img src={widget.image_url} alt={widget.alt_text || ''} className="w-full h-auto max-h-[500px] object-contain rounded-xl" />
+                                                ) : (
+                                                    <div className="h-48 w-full flex items-center justify-center rounded-xl bg-muted/20 text-muted-foreground">
+                                                        <ImageIcon className="w-12 h-12 opacity-20" />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                }
+                                if (widget.type === 'IFRAME') {
+                                    return (
+                                        <div className="bg-card border border-border rounded-[2rem] overflow-hidden shadow-sm h-full flex flex-col">
+                                            <div className="flex items-center gap-4 px-8 py-4 border-b border-border bg-card">
+                                                <div className="p-2.5 rounded-xl bg-violet-500/10 text-violet-500 ring-1 ring-violet-500/20">
+                                                    <Frame className="w-4 h-4" />
+                                                </div>
+                                                <span className="text-[13px] font-black truncate">{widget.title || 'Embedded Content'}</span>
+                                            </div>
+                                            <div className="p-4 flex-1">
+                                                {widget.iframe_url ? (
+                                                    <iframe
+                                                        src={widget.iframe_url}
+                                                        className="w-full rounded-xl border border-border/50"
+                                                        style={{ height: widget.iframe_height || 400 }}
+                                                        sandbox="allow-scripts allow-same-origin allow-popups"
+                                                        title={widget.title || 'Embedded content'}
+                                                    />
+                                                ) : (
+                                                    <div className="h-48 flex items-center justify-center rounded-xl bg-violet-500/5 border border-violet-500/20 text-violet-400">
+                                                        <Frame className="w-8 h-8 opacity-30" />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                }
+                                if (widget.type === 'STATUS') {
+                                    const statusColors: Record<string, { bg: string; text: string; dot: string; ring: string }> = {
+                                        ok: { bg: 'bg-emerald-500/10', text: 'text-emerald-500', dot: 'bg-emerald-500', ring: 'ring-emerald-500/20' },
+                                        warning: { bg: 'bg-amber-500/10', text: 'text-amber-500', dot: 'bg-amber-500', ring: 'ring-amber-500/20' },
+                                        error: { bg: 'bg-rose-500/10', text: 'text-rose-500', dot: 'bg-rose-500', ring: 'ring-rose-500/20' },
+                                        info: { bg: 'bg-sky-500/10', text: 'text-sky-500', dot: 'bg-sky-500', ring: 'ring-sky-500/20' },
+                                    };
+                                    const sc = statusColors[widget.status_value || 'ok'];
+                                    return (
+                                        <div className={cn("border rounded-[2rem] overflow-hidden shadow-sm h-full flex flex-col", sc.bg, `border-${(widget.status_value || 'ok') === 'ok' ? 'emerald' : (widget.status_value || 'ok') === 'warning' ? 'amber' : (widget.status_value || 'ok') === 'error' ? 'rose' : 'sky'}-500/20`)}>
+                                            <div className="p-8 flex flex-col items-center justify-center gap-3 flex-1">
+                                                <div className={cn("w-4 h-4 rounded-full animate-pulse shadow-lg", sc.dot)} />
+                                                <span className={cn("text-lg font-black uppercase tracking-tight", sc.text)}>{widget.status_label || 'Status'}</span>
+                                                {widget.description && (
+                                                    <p className="text-xs text-muted-foreground text-center">{widget.description}</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                }
+                                if (widget.type === 'TABLE') {
+                                    return (
+                                        <div className="bg-card border border-border rounded-[2rem] overflow-hidden shadow-sm h-full flex flex-col">
+                                            <div className="flex items-center gap-4 px-8 py-4 border-b border-border bg-card">
+                                                <div className="p-2.5 rounded-xl bg-orange-500/10 text-orange-500 ring-1 ring-orange-500/20">
+                                                    <Table2 className="w-4 h-4" />
+                                                </div>
+                                                <span className="text-[13px] font-black truncate">{widget.title || 'Data Table'}</span>
+                                            </div>
+                                            <div className="p-6 flex-1 overflow-x-auto">
+                                                <table className="w-full text-sm">
+                                                    <thead>
+                                                        <tr className="border-b-2 border-border">
+                                                            {(widget.table_headers || []).map((h, i) => (
+                                                                <th key={i} className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-muted-foreground">{h}</th>
+                                                            ))}
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {(widget.table_rows || []).map((row, ri) => (
+                                                            <tr key={ri} className="border-b border-border/30 hover:bg-muted/30 transition-colors">
+                                                                {row.map((cell, ci) => (
+                                                                    <td key={ci} className="px-4 py-2.5 text-foreground/80">{cell}</td>
+                                                                ))}
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                                {(!widget.table_rows || widget.table_rows.length === 0) && (
+                                                    <p className="text-center text-muted-foreground/50 py-8 text-sm font-medium">No data</p>
+                                                )}
                                             </div>
                                         </div>
                                     );

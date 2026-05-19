@@ -13,6 +13,8 @@ import { API_BASE_URL } from '../lib/api';
 import { Pagination } from '../components/Pagination';
 import { ResourceFilters } from '../components/ResourceFilters';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import TemplateSelectionDialog from '../components/TemplateSelectionDialog';
+import { PageTemplate } from '../lib/pageTemplates';
 import { useUsers } from '../hooks/useUsers';
 
 const PagesListPage = () => {
@@ -33,6 +35,10 @@ const PagesListPage = () => {
 
     const [limit, setLimit] = useState(15);
     const [offset, setOffset] = useState(0);
+
+    // Template dialog state
+    const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
+    const [isCreating, setIsCreating] = useState(false);
 
     // Delete state
     const [deleteTarget, setDeleteTarget] = useState<Page | null>(null);
@@ -100,15 +106,20 @@ const PagesListPage = () => {
         setOffset(0);
     };
 
-    const handleCreatePage = async () => {
+    const handleCreatePage = () => {
+        setIsTemplateDialogOpen(true);
+    };
+
+    const handleCreateFromTemplate = async (title: string, slug: string, template: PageTemplate) => {
         if (!activeNamespace) return;
+        setIsCreating(true);
 
         const newPage: Partial<Page> = {
-            title: 'New Page',
-            description: 'A new designed page',
-            slug: `page-${Math.random().toString(36).substring(2, 7)}`,
+            title,
+            description: '',
+            slug,
             is_public: false,
-            layout: JSON.stringify({ components: [] }),
+            layout: JSON.stringify(template.layout),
             workflows: []
         };
 
@@ -120,10 +131,13 @@ const PagesListPage = () => {
             });
             const data = await response.json();
             if (response.ok) {
+                setIsTemplateDialogOpen(false);
                 navigate(`/pages/${data.id}/edit`);
             }
         } catch (error) {
             console.error('Failed to create page:', error);
+        } finally {
+            setIsCreating(false);
         }
     };
 
@@ -356,6 +370,13 @@ const PagesListPage = () => {
                 confirmText="Delete Page"
                 variant="danger"
                 isLoading={isDeleting}
+            />
+
+            <TemplateSelectionDialog
+                isOpen={isTemplateDialogOpen}
+                onClose={() => setIsTemplateDialogOpen(false)}
+                onCreate={handleCreateFromTemplate}
+                isCreating={isCreating}
             />
         </div>
     );

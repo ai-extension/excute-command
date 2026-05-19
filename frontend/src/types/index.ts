@@ -281,7 +281,7 @@ export interface PageWorkflow {
 }
 
 export type PageWidgetSize = 'full' | 'half' | 'third';
-export type PageWidgetType = 'TERMINAL' | 'ENDPOINT' | 'LINK' | 'SECTION';
+export type PageWidgetType = 'TERMINAL' | 'ENDPOINT' | 'LINK' | 'SECTION' | 'TEXT' | 'IMAGE' | 'IFRAME' | 'STATUS' | 'TABLE';
 export type PageWidgetReload = 'realtime' | '5' | '10' | '30' | '60';
 
 export interface PageWidget {
@@ -305,6 +305,21 @@ export interface PageWidget {
     // LINK-specific
     url?: string;
     new_tab?: boolean;
+    // TEXT-specific
+    content?: string;
+    // IMAGE-specific
+    image_url?: string;
+    alt_text?: string;
+    // IFRAME-specific
+    iframe_url?: string;
+    iframe_height?: number;
+    // STATUS-specific
+    status_label?: string;
+    status_value?: 'ok' | 'warning' | 'error' | 'info';
+    status_url?: string;
+    // TABLE-specific
+    table_headers?: string[];
+    table_rows?: string[][];
     // SECTION nesting — id of parent SECTION widget (top-level when undefined)
     parent_id?: string;
 }
