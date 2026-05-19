@@ -289,6 +289,35 @@ const PageDesignerPage = () => {
         setWidgets(prev => prev.map(w => w.id === wid ? { ...w, ...updates } : w));
 
     const handleDragEnd = (result: DropResult) => {
+        // Combine path: dropping a widget directly onto a SECTION card moves it inside.
+        // Needed because @hello-pangea/dnd can't reliably hit-test a nested Droppable
+        // that lives inside a sibling Draggable of the same context.
+        if (result.combine) {
+            const sourceId = result.draggableId;
+            const targetId = result.combine.draggableId;
+            const source = widgets.find(w => w.id === sourceId);
+            const target = widgets.find(w => w.id === targetId);
+            if (!source || !target) return;
+            if (target.type !== 'SECTION') return;
+            if (source.id === target.id) return;
+            if (source.type === 'SECTION') return; // no section-in-section
+            if (source.parent_id === target.id) return; // already child here
+
+            const updated = widgets.map(w => w.id === sourceId ? { ...w, parent_id: target.id } : w);
+            const without = updated.filter(w => w.id !== sourceId);
+            const movedWidget = updated.find(w => w.id === sourceId)!;
+
+            const targetChildren = without.filter(w => w.parent_id === target.id);
+            const insertAfterIdx = targetChildren.length > 0
+                ? without.indexOf(targetChildren[targetChildren.length - 1])
+                : without.indexOf(target);
+
+            const reordered = [...without];
+            reordered.splice(insertAfterIdx + 1, 0, movedWidget);
+            setWidgets(reordered);
+            return;
+        }
+
         if (!result.destination) return;
         const srcId = result.source.droppableId;
         const dstId = result.destination.droppableId;
@@ -561,7 +590,7 @@ const PageDesignerPage = () => {
                                     </div>
                                 ) : (
                                     <DragDropContext onDragEnd={handleDragEnd}>
-                                        <Droppable droppableId="canvas">
+                                        <Droppable droppableId="canvas" isCombineEnabled>
                                             {(provided) => (
                                                 <div {...provided.droppableProps} ref={provided.innerRef} className="flex flex-wrap gap-5 items-start">
                                                     {widgets.filter(w => !w.parent_id).map((widget, idx) => (
@@ -571,10 +600,11 @@ const PageDesignerPage = () => {
                                                                     ref={provided.innerRef}
                                                                     {...provided.draggableProps}
                                                                     className={cn(
-                                                                        "transition-all duration-200",
+                                                                        "transition-all duration-200 rounded-3xl",
                                                                         widget.type === 'SECTION' ? "w-full" :
                                                                             widget.size === 'half' ? "w-[calc(50%-10px)]" : widget.size === 'third' ? "w-[calc((100%-40px)/3)]" : "w-full",
-                                                                        snapshot.isDragging && "opacity-80 scale-[1.02] z-50"
+                                                                        snapshot.isDragging && "opacity-80 scale-[1.02] z-50",
+                                                                        snapshot.combineTargetFor && widget.type === 'SECTION' && "ring-2 ring-primary ring-offset-2 ring-offset-background scale-[1.01]"
                                                                     )}
                                                                 >
                                                                     {widget.type === 'ENDPOINT' ? (
