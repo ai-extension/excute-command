@@ -53,8 +53,8 @@ const MultiInputConfigEditor: React.FC<{
     return (
         <div className="space-y-4 pt-4 border-t border-border/30 mt-2">
             <div className="flex items-center justify-between px-1">
-                <span className="text-[9px] font-bold text-primary uppercase tracking-wider">Field Definitions</span>
-                <span className="text-[8px] text-muted-foreground italic">Add keys that will correspond to each row item</span>
+                <span className="text-[10px] font-bold text-primary uppercase tracking-wider">Field Definitions</span>
+                <span className="text-[10px] text-muted-foreground italic">Add keys that will correspond to each row item</span>
             </div>
             
             <DragDropContext onDragEnd={onDragEnd}>
@@ -72,7 +72,7 @@ const MultiInputConfigEditor: React.FC<{
                                             ref={provided.innerRef}
                                             {...provided.draggableProps}
                                             className={cn(
-                                                "group/item bg-muted/30 hover:bg-muted/50 border border-border/50 rounded-xl p-4 transition-all duration-200 relative",
+                                                "group/item bg-muted/30 hover:bg-muted/50 border border-border/50 rounded-md p-4 transition-all duration-200 relative",
                                                 snapshot.isDragging && "shadow-lg border-primary/20 bg-muted/70 z-50"
                                             )}
                                         >
@@ -85,7 +85,7 @@ const MultiInputConfigEditor: React.FC<{
                                                 </div>
                                                 <div className="flex-1 grid grid-cols-12 gap-4 items-start">
                                                     <div className="col-span-4 space-y-1.5">
-                                                        <label className="text-[7px] font-black uppercase tracking-widest text-muted-foreground/70">Variable Key</label>
+                                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70">Variable Key</label>
                                                         <Input
                                                             value={item.key}
                                                             onChange={(e) => {
@@ -94,11 +94,11 @@ const MultiInputConfigEditor: React.FC<{
                                                                 updateItems(ni);
                                                             }}
                                                             placeholder="key"
-                                                            className="h-8 text-[11px] font-mono bg-background border-border/50 focus:border-primary/50"
+                                                            className="h-8 text-xs font-mono bg-background border-border/50 focus:border-primary/50"
                                                         />
                                                     </div>
                                                     <div className="col-span-4 space-y-1.5">
-                                                        <label className="text-[7px] font-black uppercase tracking-widest text-muted-foreground/70">Display Label</label>
+                                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70">Display Label</label>
                                                         <Input
                                                             value={item.label}
                                                             onChange={(e) => {
@@ -107,11 +107,11 @@ const MultiInputConfigEditor: React.FC<{
                                                                 updateItems(ni);
                                                             }}
                                                             placeholder="label"
-                                                            className="h-8 text-[11px] bg-background border-border/50 focus:border-primary/50"
+                                                            className="h-8 text-xs bg-background border-border/50 focus:border-primary/50"
                                                         />
                                                     </div>
                                                     <div className="col-span-4 space-y-1.5">
-                                                        <label className="text-[7px] font-black uppercase tracking-widest text-muted-foreground/70">Field Type</label>
+                                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70">Field Type</label>
                                                         <select
                                                             value={item.type}
                                                             onChange={(e) => {
@@ -119,7 +119,7 @@ const MultiInputConfigEditor: React.FC<{
                                                                 ni[i].type = e.target.value as any;
                                                                 updateItems(ni);
                                                             }}
-                                                            className="h-8 px-2 w-full text-[11px] font-semibold border border-border/50 rounded-md bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 cursor-pointer"
+                                                            className="h-8 px-2 w-full text-xs font-semibold border border-border/50 rounded-md bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 cursor-pointer"
                                                         >
                                                             <option value="input">Input</option>
                                                             <option value="number">Number</option>
@@ -132,7 +132,7 @@ const MultiInputConfigEditor: React.FC<{
 
                                             {item.type === 'select' && (
                                                 <div className=" border-t border-border/20 space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200 mt-3 pt-3 ml-7">
-                                                    <label className="text-[7px] font-black uppercase tracking-widest text-primary/70">Options (comma-separated)</label>
+                                                    <label className="text-[10px] font-black uppercase tracking-widest text-primary/70">Options (comma-separated)</label>
                                                     <Textarea
                                                         value={item.options || ''}
                                                         onChange={(e) => {
@@ -141,7 +141,7 @@ const MultiInputConfigEditor: React.FC<{
                                                             updateItems(ni);
                                                         }}
                                                         placeholder="opt1, opt2, opt3"
-                                                        className="min-h-[40px] text-[11px] bg-background border-border/50 focus:border-primary/50 resize-y"
+                                                        className="min-h-[40px] text-xs bg-background border-border/50 focus:border-primary/50 resize-y"
                                                     />
                                                 </div>
                                             )}
@@ -173,7 +173,7 @@ const MultiInputConfigEditor: React.FC<{
                 onClick={() => {
                     updateItems([...items, { id: generateUUID(), key: '', label: '', type: 'input' }]);
                 }}
-                className="w-full h-9 border-dashed border-primary/30 text-primary bg-primary/5 hover:bg-primary/10 text-[9px] font-black uppercase tracking-[0.2em] rounded-xl transition-all duration-200"
+                className="w-full h-9 border-dashed border-primary/30 text-primary bg-primary/5 hover:bg-primary/10 text-[10px] font-black uppercase tracking-[0.2em] rounded-md transition-all duration-200"
             >
                 <Plus className="w-3.5 h-3.5 mr-2" /> Add Structure Field
             </Button>
@@ -200,26 +200,26 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
             <div className="space-y-6">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-500">
+                        <div className="p-2 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-indigo-500">
                             <Terminal className="w-4 h-4" />
                         </div>
                         <h2 className="text-sm font-bold text-foreground uppercase tracking-tight">Runtime Variable Definitions (Inputs)</h2>
                     </div>
                     <Button
                         onClick={() => setInputs([...inputs, { id: generateUUID(), key: '', label: '', type: 'input', default_value: '', required: true }])}
-                        className="h-8 text-[9px] font-bold uppercase tracking-widest px-4"
+                        className="h-8 text-[10px] font-bold uppercase tracking-widest px-4"
                         variant="outline"
                     >
                         <Plus className="w-3 h-3 mr-2" /> Add Input
                     </Button>
                 </div>
 
-                <div className="bg-card rounded-xl border border-border p-6 shadow-sm overflow-hidden">
+                <div className="bg-card rounded-md border border-border p-6 shadow-sm overflow-hidden">
                     {inputs.length === 0 ? (
                         <div className="py-6 text-center opacity-40 select-none">
                             <Terminal className="w-8 h-8 mx-auto mb-3" />
                             <p className="text-[10px] font-bold uppercase tracking-widest">No runtime variables defined</p>
-                            <p className="text-[9px] mt-1 font-medium italic">Use runtime variables in your steps via {"{{input.key}}"}</p>
+                            <p className="text-[10px] mt-1 font-medium italic">Use runtime variables in your steps via {"{{input.key}}"}</p>
                         </div>
                     ) : (
                         <DragDropContext onDragEnd={handleDragEnd}>
@@ -241,7 +241,7 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                                                         ref={provided.innerRef}
                                                         {...provided.draggableProps}
                                                         className={cn(
-                                                            "p-5 rounded-2xl border transition-all duration-300 relative group",
+                                                            "p-5 rounded-md border transition-all duration-300 relative group",
                                                             snapshot.isDragging 
                                                                 ? "bg-muted/80 border-primary/30 shadow-xl z-50 scale-[1.01]" 
                                                                 : "bg-background/50 border-border/50"
@@ -260,7 +260,7 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                                                             {/* Left side: Label & Key */}
                                                             <div className="col-span-5">
                                                                 <div className="space-y-0">
-                                                                    <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Display Label</label>
+                                                                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Display Label</label>
                                                                     <Input
                                                                         value={input.label}
                                                                         onChange={(e) => {
@@ -269,11 +269,11 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                                                                             setInputs(ni);
                                                                         }}
                                                                         placeholder="What should the user see?"
-                                                                        className="h-8 text-[11px] border-border bg-background"
+                                                                        className="h-8 text-xs border-border bg-background"
                                                                     />
                                                                 </div>
                                                                 <div className="space-y-1.5">
-                                                                    <label className="text-[8px] font-black uppercase tracking-widest text-primary">Variable Key</label>
+                                                                    <label className="text-[10px] font-black uppercase tracking-widest text-primary">Variable Key</label>
 
                                                                     <div className="relative">
                                                                         <Input
@@ -284,7 +284,7 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                                                                                 setInputs(ni);
                                                                             }}
                                                                             placeholder="key"
-                                                                            className="h-8 text-[11px] font-mono border-border bg-background pr-8"
+                                                                            className="h-8 text-xs font-mono border-border bg-background pr-8"
                                                                         />
                                                                         {input.key && (
                                                                             <button
@@ -303,9 +303,9 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                                                             <div className="col-span-6">
                                                                 <div className="space-y-1.5">
                                                                     <div className="flex items-center justify-between">
-                                                                        <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Type</label>
+                                                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Type</label>
                                                                         <div className="flex items-center gap-2">
-                                                                            <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Required</label>
+                                                                            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Required</label>
                                                                             <Switch
                                                                                 checked={input.required ?? true}
                                                                                 onCheckedChange={(val) => {
@@ -319,9 +319,10 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                                                                     <select
                                                                         value={input.type || 'input'}
                                                                         onChange={(e) => { const ni = [...inputs]; ni[idx].type = e.target.value as WorkflowInput['type']; setInputs(ni); }}
-                                                                        className="h-8 px-2 w-full text-[11px] font-semibold border border-border rounded-md bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 cursor-pointer"
+                                                                        className="h-8 px-2 w-full text-xs font-semibold border border-border rounded-md bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 cursor-pointer"
                                                                     >
                                                                         <option value="input">Input</option>
+                                                                        <option value="textarea">Textarea</option>
                                                                         <option value="number">Number</option>
                                                                         <option value="select">Select</option>
                                                                         <option value="multi-select">Multi-Select</option>
@@ -330,7 +331,7 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                                                                     </select>
                                                                 </div>
                                                                 <div className="space-y-1.5">
-                                                                    <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">
+                                                                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                                                                         {input.type === 'select' || input.type === 'multi-select' ? 'Options (comma-separated)'
                                                                             : input.type === 'multi-input' ? 'Configure Fields for Rows'
                                                                                 : input.type === 'file' ? ''
@@ -342,10 +343,10 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                                                                          </div>
                                                                      ) : input.type === 'multi-input' ? (
                                                                         <div className="space-y-4">
-                                                                            <div className="flex items-center justify-between bg-muted/20 p-2 rounded-lg border border-border/50">
+                                                                            <div className="flex items-center justify-between bg-muted/20 p-2 rounded-md border border-border/50">
                                                                                 <div className="space-y-0.5">
-                                                                                    <label className="text-[9px] font-black uppercase tracking-widest text-primary">Collapse initially</label>
-                                                                                    <p className="text-[8px] text-muted-foreground">Start with 0 rows instead of 1</p>
+                                                                                    <label className="text-[10px] font-black uppercase tracking-widest text-primary">Collapse initially</label>
+                                                                                    <p className="text-[10px] text-muted-foreground">Start with 0 rows instead of 1</p>
                                                                                 </div>
                                                                                 <Switch 
                                                                                     checked={input.collapse_initially || false} 
@@ -374,7 +375,18 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                                                                                 setInputs(ni);
                                                                             }}
                                                                             placeholder="Default text... supports multi-line"
-                                                                            className="min-h-[60px] text-[11px] border-border bg-background resize-y"
+                                                                            className="min-h-[60px] text-xs border-border bg-background resize-y"
+                                                                        />
+                                                                    ) : input.type === 'textarea' ? (
+                                                                        <Textarea
+                                                                            value={input.default_value}
+                                                                            onChange={(e) => {
+                                                                                const ni = [...inputs];
+                                                                                ni[idx].default_value = e.target.value;
+                                                                                setInputs(ni);
+                                                                            }}
+                                                                            placeholder="Default long text..."
+                                                                            className="min-h-[120px] text-xs border-border bg-background resize-y"
                                                                         />
                                                                     ) : input.type === 'number' ? (
                                                                         <Input
@@ -386,7 +398,7 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                                                                                 setInputs(ni);
                                                                             }}
                                                                             placeholder="0"
-                                                                            className="h-8 text-[11px] border-border bg-background"
+                                                                            className="h-8 text-xs border-border bg-background"
                                                                         />
                                                                     ) : (
                                                                         <Textarea
@@ -400,7 +412,7 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                                                                                 (input.type === 'select' || input.type === 'multi-select') ? 'option1, option2, option3'
                                                                                     : 'Default value...'
                                                                             }
-                                                                            className="min-h-[60px] text-[11px] border-border bg-background resize-y"
+                                                                            className="min-h-[60px] text-xs border-border bg-background resize-y"
                                                                         />
                                                                     )}
                                                                 </div>
@@ -439,26 +451,26 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
             <div className="space-y-6 pt-6 border-t border-border/50">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-500">
+                        <div className="p-2 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-500">
                             <Database className="w-4 h-4" />
                         </div>
                         <h2 className="text-sm font-bold text-foreground uppercase tracking-tight">Static Variables</h2>
                     </div>
                     <Button
                         onClick={() => setVariables([...variables, { id: generateUUID(), key: '', value: '' }])}
-                        className="h-8 text-[9px] font-bold uppercase tracking-widest px-4"
+                        className="h-8 text-[10px] font-bold uppercase tracking-widest px-4"
                         variant="outline"
                     >
                         <Plus className="w-3 h-3 mr-2" /> Add Variable
                     </Button>
                 </div>
 
-                <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
+                <div className="bg-card rounded-md border border-border p-6 shadow-sm">
                     {variables.length === 0 ? (
                         <div className="py-6 text-center opacity-40 select-none">
                             <Database className="w-8 h-8 mx-auto mb-3" />
                             <p className="text-[10px] font-bold uppercase tracking-widest">No static variables defined</p>
-                            <p className="text-[9px] mt-1 font-medium italic">Reference via {'{{'}{"variable.key"}{'}}'} in steps</p>
+                            <p className="text-[10px] mt-1 font-medium italic">Reference via {'{{'}{"variable.key"}{'}}'} in steps</p>
                         </div>
                     ) : (
                         <DragDropContext onDragEnd={handleDragEnd}>
@@ -476,7 +488,7 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                                                         ref={provided.innerRef}
                                                         {...provided.draggableProps}
                                                         className={cn(
-                                                            "p-4 bg-background/50 rounded-xl border border-border/50 animate-in fade-in slide-in-from-bottom-1 duration-300 relative group",
+                                                            "p-4 bg-background/50 rounded-md border border-border/50 animate-in fade-in slide-in-from-bottom-1 duration-300 relative group",
                                                             snapshot.isDragging && "shadow-xl border-emerald-500/30 bg-emerald-500/5 z-50"
                                                         )}
                                                     >
@@ -490,9 +502,9 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
 
                                                         <div className="grid grid-cols-12 gap-4 items-start pl-4">
                                                             <div className="col-span-4 space-y-1.5">
-                                                                <label className="text-[8px] font-black uppercase tracking-widest text-emerald-500">Variable Key</label>
+                                                                <label className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Variable Key</label>
                                                                 <div className="relative">
-                                                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-muted-foreground/60 font-mono select-none">$</span>
+                                                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground/60 font-mono select-none">$</span>
                                                                     <Input
                                                                         value={variable.key}
                                                                         onChange={(e) => {
@@ -501,7 +513,7 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                                                                             setVariables(nv);
                                                                         }}
                                                                         placeholder="e.g. host"
-                                                                        className="h-8 text-[11px] font-mono border-border bg-background pl-5 pr-8"
+                                                                        className="h-8 text-xs font-mono border-border bg-background pl-5 pr-8"
                                                                     />
                                                                     {variable.key && (
                                                                         <button
@@ -515,7 +527,7 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                                                                 </div>
                                                             </div>
                                                             <div className="col-span-7 space-y-1.5">
-                                                                <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Value</label>
+                                                                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Value</label>
                                                                 <Textarea
                                                                     value={variable.value}
                                                                     onChange={(e) => {
@@ -524,7 +536,7 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                                                                         setVariables(nv);
                                                                     }}
                                                                     placeholder="Static value..."
-                                                                    className="min-h-[32px] h-8 text-[11px] border-border bg-background font-mono resize-y py-1"
+                                                                    className="min-h-[32px] h-8 text-xs border-border bg-background font-mono resize-y py-1"
                                                                 />
                                                             </div>
                                                             <div className="col-span-1 flex justify-end items-start pt-5">
@@ -554,12 +566,12 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                     )}
                 </div>
 
-                <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-lg p-4 flex items-start gap-3">
+                <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-md p-4 flex items-start gap-3">
                     <div className="p-1 rounded-full bg-emerald-500/20 text-emerald-500 shrink-0 mt-0.5">
                         <Zap className="w-3 h-3" />
                     </div>
                     <div className="space-y-1">
-                        <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-tight">Static Variables vs Runtime Inputs</p>
+                        <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-tight">Static Variables vs Runtime Inputs</p>
                         <p className="text-[10px] text-muted-foreground leading-relaxed">
                             <strong>Static Variables</strong> are saved with the workflow and automatically injected at runtime using <code className="bg-emerald-500/10 px-1 rounded text-emerald-600">{"{{variable.key}}"}</code>.<br />
                             <strong>Runtime Inputs</strong> prompt the user for values on each run and are used via <code className="bg-primary/10 px-1 rounded text-primary">{"{{input.key}}"}</code>.

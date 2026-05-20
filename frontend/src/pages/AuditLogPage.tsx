@@ -117,9 +117,9 @@ const AuditLogPage = () => {
                     </div>
                 </div>
                 {namespaceID && (
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/20 animate-in zoom-in duration-300">
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-primary/10 border border-primary/20 animate-in zoom-in duration-300">
                         <Activity className="w-3 h-3 text-primary" />
-                        <span className="text-[9px] font-black uppercase tracking-widest text-primary">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-primary">
                             Filtered by Namespace
                         </span>
                     </div>
@@ -127,7 +127,7 @@ const AuditLogPage = () => {
             </div>
 
             {/* Filters */}
-            <Card className="bg-card/30 backdrop-blur-md border-border p-4 shadow-sm">
+            <Card className="bg-card border-border p-4 shadow-card">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -201,18 +201,18 @@ const AuditLogPage = () => {
             </Card>
 
             {/* Table */}
-            <div className="flex-1 bg-card/30 backdrop-blur-md rounded-3xl border border-border shadow-premium overflow-hidden flex flex-col min-h-0">
+            <div className="flex-1 bg-card rounded-md border border-border shadow-card overflow-hidden flex flex-col min-h-0">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
-                            <tr className="border-b border-border bg-slate-500/5">
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Timestamp</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">User</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Action</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Resource</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Status</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">IP Address</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-right">Details</th>
+                            <tr className="border-b border-border bg-muted hover:bg-muted/80">
+                                <th className="h-9 px-6 font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">Timestamp</th>
+                                <th className="h-9 px-6 font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">User</th>
+                                <th className="h-9 px-6 font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">Action</th>
+                                <th className="h-9 px-6 font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">Resource</th>
+                                <th className="h-9 px-6 font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">Status</th>
+                                <th className="h-9 px-6 font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">IP Address</th>
+                                <th className="h-9 px-6 font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground text-right">Details</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
@@ -236,8 +236,8 @@ const AuditLogPage = () => {
                                     <tr key={log.id} className="hover:bg-slate-500/5 transition-colors group">
                                         <td className="px-6 py-4">
                                             <div className="flex flex-col">
-                                                <span className="text-[11px] font-bold tracking-tight">{safeFormatDate(log.timestamp, 'MMM dd, yyyy')}</span>
-                                                <span className="text-[9px] text-muted-foreground font-medium uppercase tracking-wider">{safeFormatDate(log.timestamp, 'HH:mm:ss')}</span>
+                                                <span className="text-xs font-bold tracking-tight">{safeFormatDate(log.timestamp, 'MMM dd, yyyy')}</span>
+                                                <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{safeFormatDate(log.timestamp, 'HH:mm:ss')}</span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
@@ -256,7 +256,7 @@ const AuditLogPage = () => {
                                         <td className="px-6 py-4">
                                             <div className="flex flex-col gap-0.5">
                                                 <span className="text-[10px] font-black uppercase tracking-widest text-foreground/70">{log.resource_type}</span>
-                                                <span className="text-[9px] text-muted-foreground font-mono truncate max-w-[120px]">{log.resource_id || '-'}</span>
+                                                <span className="text-[10px] text-muted-foreground font-mono truncate max-w-[120px]">{log.resource_id || '-'}</span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">{getStatusBadge(log.status)}</td>
@@ -296,15 +296,15 @@ const AuditLogPage = () => {
 
             {/* Metadata Detail Dialog */}
             <Dialog open={!!selectedLog} onOpenChange={() => setSelectedLog(null)}>
-                <DialogContent className="max-w-3xl bg-background/95 backdrop-blur-xl border-border rounded-[2rem] p-6 shadow-2xl overflow-hidden">
+                <DialogContent className="max-w-3xl bg-background/95 backdrop-blur-xl border-border rounded-md p-6 shadow-2xl overflow-hidden">
                     <DialogHeader className="mb-6">
                         <DialogTitle className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center">
+                            <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
                                 <AlertCircle className="w-5 h-5 text-primary" />
                             </div>
                             <div className="flex flex-col">
                                 <span className="text-lg font-black uppercase tracking-widest">Action Metadata</span>
-                                <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest opacity-60">Log ID: {selectedLog?.id}</span>
+                                <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest opacity-60">Log ID: {selectedLog?.id}</span>
                             </div>
                         </DialogTitle>
                     </DialogHeader>
@@ -312,27 +312,27 @@ const AuditLogPage = () => {
                     {selectedLog && (
                         <div className="space-y-6">
                             <div className="grid grid-cols-2 gap-4">
-                                <div className="p-3 rounded-2xl bg-slate-500/5 border border-border/50">
-                                    <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block mb-1">User</span>
+                                <div className="p-3 rounded-md bg-slate-500/5 border border-border/50">
+                                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1">User</span>
                                     <span className="text-sm font-bold">{selectedLog.username}</span>
                                 </div>
-                                <div className="p-3 rounded-2xl bg-slate-500/5 border border-border/50">
-                                    <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block mb-1">Action</span>
+                                <div className="p-3 rounded-md bg-slate-500/5 border border-border/50">
+                                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1">Action</span>
                                     <span className={`text-sm font-bold ${getActionColor(selectedLog.action)}`}>{selectedLog.action}</span>
                                 </div>
                             </div>
 
                             <div>
                                 <span className="text-[10px] font-black uppercase tracking-widest text-primary mb-3 block">Metadata Payload</span>
-                                <div className="bg-slate-950/50 rounded-2xl p-4 overflow-auto max-h-[450px] border border-white/5 w-full">
-                                    <pre className="text-[11px] font-mono text-blue-400 leading-relaxed whitespace-pre w-full">
+                                <div className="bg-slate-950/50 rounded-md p-4 overflow-auto max-h-[450px] border border-white/5 w-full">
+                                    <pre className="text-xs font-mono text-blue-400 leading-relaxed whitespace-pre w-full">
                                         {selectedLog.metadata ? JSON.stringify(JSON.parse(selectedLog.metadata), null, 4) : 'No metadata available'}
                                     </pre>
                                 </div>
                             </div>
 
                             <Button 
-                                className="w-full h-11 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/20"
+                                className="w-full h-9 rounded-md text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/20"
                                 onClick={() => setSelectedLog(null)}
                             >
                                 Close Details

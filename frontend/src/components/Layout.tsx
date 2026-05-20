@@ -52,10 +52,10 @@ const Layout = () => {
                             className="flex items-center gap-2 px-3 py-1.5 bg-muted/40 rounded-md border border-border/50 text-muted-foreground/60 focus-within:bg-muted/60 transition-all duration-300 cursor-pointer hover:bg-muted/60"
                         >
                             <Search className="w-3.5 h-3.5" />
-                            <span className="text-[11px] font-bold uppercase tracking-widest leading-none">Global Search</span>
+                            <span className="text-xs font-bold uppercase tracking-widest leading-none">Global Search</span>
                             <div className="ml-4 flex items-center gap-1 opacity-40">
-                                <div className="px-1 border border-current rounded text-[9px] font-black italic">cmd</div>
-                                <div className="px-1 border border-current rounded text-[9px] font-black">K</div>
+                                <div className="px-1 border border-current rounded text-[10px] font-black italic">cmd</div>
+                                <div className="px-1 border border-current rounded text-[10px] font-black">K</div>
                             </div>
                         </div>
                     </div>
@@ -67,7 +67,7 @@ const Layout = () => {
                                 variant="ghost"
                                 size="icon"
                                 onClick={toggleTheme}
-                                className="rounded-xl hover:bg-muted text-foreground/60 hover:text-foreground transition-all"
+                                className="rounded-md hover:bg-muted text-foreground/60 hover:text-foreground transition-all"
                             >
                                 {isDark ? (
                                     <Sun className="h-4.5 w-4.5 text-amber-500" />
@@ -83,17 +83,17 @@ const Layout = () => {
                             <DropdownMenuTrigger asChild>
                                 <button className="flex items-center gap-3 hover:opacity-80 transition-opacity outline-none group text-left">
                                     <div className="flex flex-col items-end">
-                                        <span className="text-[11px] font-black text-foreground tracking-tight uppercase group-hover:text-primary transition-colors">{user?.username || 'Identity'}</span>
-                                        <span className="text-[9px] font-bold text-green-500 uppercase tracking-widest">{APP_VERSION}</span>
+                                        <span className="text-xs font-black text-foreground tracking-tight uppercase group-hover:text-primary transition-colors">{user?.username || 'Identity'}</span>
+                                        <span className="text-[10px] font-bold text-green-500 uppercase tracking-widest">{APP_VERSION}</span>
                                     </div>
-                                    <div className="w-10 h-10 rounded-2xl premium-gradient p-[1px] shadow-lg shadow-indigo-500/10 group-hover:scale-105 transition-transform">
-                                        <div className="w-full h-full rounded-2xl bg-card flex items-center justify-center font-black text-xs uppercase">
+                                    <div className="w-10 h-10 rounded-md premium-gradient p-[1px] shadow-lg shadow-indigo-500/10 group-hover:scale-105 transition-transform">
+                                        <div className="w-full h-full rounded-md bg-card flex items-center justify-center font-black text-xs uppercase">
                                             {user?.username ? user.username.substring(0, 2) : '??'}
                                         </div>
                                     </div>
                                 </button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-56 rounded-2xl border-border bg-card shadow-premium p-2 animate-in fade-in zoom-in-95 duration-200">
+                            <DropdownMenuContent align="end" className="w-56 rounded-md border-border bg-card shadow-premium p-2 animate-in fade-in zoom-in-95 duration-200">
                                 <DropdownMenuLabel className="px-3 py-2">
                                     <div className="flex flex-col gap-0.5">
                                         <p className="text-xs font-black uppercase tracking-widest opacity-40">User Profile</p>
@@ -103,14 +103,14 @@ const Layout = () => {
                                 <DropdownMenuSeparator className="bg-border/50 my-1" />
                                 <DropdownMenuItem
                                     onClick={() => navigate('/profile')}
-                                    className="rounded-xl px-3 py-2.5 flex items-center gap-2 cursor-pointer focus:bg-primary/10 transition-colors"
+                                    className="rounded-md px-3 py-2.5 flex items-center gap-2 cursor-pointer focus:bg-primary/10 transition-colors"
                                 >
                                     <UserIcon className="w-4 h-4 text-primary" />
                                     <span className="text-sm font-semibold">Account Detail</span>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                     onClick={() => navigate('/api-keys')}
-                                    className="rounded-xl px-3 py-2.5 flex items-center gap-2 cursor-pointer focus:bg-primary/10 transition-colors"
+                                    className="rounded-md px-3 py-2.5 flex items-center gap-2 cursor-pointer focus:bg-primary/10 transition-colors"
                                 >
                                     <Key className="w-4 h-4 text-primary" />
                                     <span className="text-sm font-semibold">API Keys</span>
@@ -118,7 +118,7 @@ const Layout = () => {
                                 <DropdownMenuSeparator className="bg-border/50 my-1" />
                                 <DropdownMenuItem
                                     onClick={logout}
-                                    className="rounded-xl px-3 py-2.5 flex items-center gap-2 cursor-pointer focus:bg-destructive/10 text-destructive transition-colors"
+                                    className="rounded-md px-3 py-2.5 flex items-center gap-2 cursor-pointer focus:bg-destructive/10 text-destructive transition-colors"
                                 >
                                     <LogOut className="w-4 h-4" />
                                     <span className="text-sm font-black uppercase tracking-widest text-[10px]">Sign Out System</span>

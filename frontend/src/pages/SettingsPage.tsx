@@ -219,20 +219,20 @@ const SettingsPage = () => {
             {/* Notification Area */}
             {(error || success) && (
                 <div className={cn(
-                    "p-4 rounded-2xl border flex items-center gap-3 animate-in fade-in zoom-in duration-300",
+                    "p-4 rounded-md border flex items-center gap-3 animate-in fade-in zoom-in duration-300",
                     error ? "bg-destructive/10 border-destructive/20 text-destructive" : "bg-emerald-500/10 border-emerald-500/20 text-emerald-500"
                 )}>
                     {error ? <AlertCircle className="w-5 h-5" /> : <CheckCircle2 className="w-5 h-5" />}
-                    <p className="text-[11px] font-black uppercase tracking-wider">{error || success}</p>
+                    <p className="text-xs font-black uppercase tracking-wider">{error || success}</p>
                 </div>
             )}
 
             {/* Tabs Navigation */}
-            <div className="flex items-center p-1 bg-muted/30 rounded-2xl border border-border w-fit">
+            <div className="flex items-center p-1 bg-muted/30 rounded-md border border-border w-fit">
                 <button
                     onClick={() => setActiveTab('general')}
                     className={cn(
-                        "flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                        "flex items-center gap-2 px-6 py-2.5 rounded-md text-[10px] font-black uppercase tracking-widest transition-all",
                         activeTab === 'general' ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"
                     )}
                 >
@@ -241,7 +241,7 @@ const SettingsPage = () => {
                 <button
                     onClick={() => setActiveTab('auth')}
                     className={cn(
-                        "flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                        "flex items-center gap-2 px-6 py-2.5 rounded-md text-[10px] font-black uppercase tracking-widest transition-all",
                         activeTab === 'auth' ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"
                     )}
                 >
@@ -250,7 +250,7 @@ const SettingsPage = () => {
                 <button
                     onClick={() => setActiveTab('namespaces')}
                     className={cn(
-                        "flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                        "flex items-center gap-2 px-6 py-2.5 rounded-md text-[10px] font-black uppercase tracking-widest transition-all",
                         activeTab === 'namespaces' ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"
                     )}
                 >
@@ -280,11 +280,11 @@ const SettingsPage = () => {
                                                 value={systemSettings.site_title || ''}
                                                 onChange={(e) => setSystemSettings(prev => ({ ...prev, site_title: e.target.value }))}
                                                 placeholder="CSM APP"
-                                                className="h-11 bg-muted/20 border-border/50 text-sm font-bold"
+                                                className="h-9 bg-muted/20 border-border/50 text-sm font-bold"
                                             />
                                             <Button
                                                 onClick={() => updateSetting('site_title', systemSettings.site_title || '')}
-                                                className="premium-gradient px-6 font-black uppercase tracking-widest text-[9px] h-11"
+                                                className="premium-gradient px-6 font-black uppercase tracking-widest text-[10px] h-9"
                                                 disabled={isSettingsLoading}
                                             >
                                                 Apply
@@ -298,9 +298,9 @@ const SettingsPage = () => {
                                             <Label className="text-[10px] font-black uppercase tracking-widest text-primary/60">System Logo</Label>
                                             <p className="text-[10px] font-medium text-muted-foreground/60">Upload a square image (SVG, PNG, or JPG).</p>
                                         </div>
-                                        <div className="flex items-center gap-6 p-4 bg-muted/20 border border-border/50 rounded-2xl">
-                                            <div className="w-16 h-16 rounded-xl premium-gradient p-[1px] shadow-premium shrink-0">
-                                                <div className="w-full h-full rounded-xl bg-card flex items-center justify-center overflow-hidden">
+                                        <div className="flex items-center gap-6 p-4 bg-muted/20 border border-border/50 rounded-md">
+                                            <div className="w-16 h-16 rounded-md premium-gradient p-[1px] shadow-premium shrink-0">
+                                                <div className="w-full h-full rounded-md bg-card flex items-center justify-center overflow-hidden">
                                                     {systemSettings.site_logo ? (
                                                         <img src={systemSettings.site_logo} alt="Preview" className="w-10 h-10 object-contain" />
                                                     ) : (
@@ -319,7 +319,7 @@ const SettingsPage = () => {
                                                 <Button
                                                     variant="outline"
                                                     onClick={() => document.getElementById('logo-upload')?.click()}
-                                                    className="h-10 border-border/50 font-black uppercase tracking-widest text-[9px] gap-2"
+                                                    className="h-9 border-border/50 font-black uppercase tracking-widest text-[10px] gap-2"
                                                     disabled={isSettingsLoading}
                                                 >
                                                     <Upload className="w-3.5 h-3.5" /> Upload Image
@@ -328,7 +328,7 @@ const SettingsPage = () => {
                                                     <Button
                                                         variant="ghost"
                                                         onClick={() => updateSetting('site_logo', '')}
-                                                        className="h-8 text-destructive hover:text-destructive hover:bg-destructive/5 font-black uppercase tracking-widest text-[8px]"
+                                                        className="h-8 text-destructive hover:text-destructive hover:bg-destructive/5 font-black uppercase tracking-widest text-[10px]"
                                                         disabled={isSettingsLoading}
                                                     >
                                                         Remove Logo
@@ -340,8 +340,8 @@ const SettingsPage = () => {
                                 </div>
 
                                 <div className="pt-6 border-t border-border">
-                                    <div className="p-4 bg-primary/5 border border-primary/10 rounded-2xl flex items-start gap-4">
-                                        <div className="p-2 rounded-lg bg-primary/10">
+                                    <div className="p-4 bg-primary/5 border border-primary/10 rounded-md flex items-start gap-4">
+                                        <div className="p-2 rounded-md bg-primary/10">
                                             <Globe className="w-4 h-4 text-primary" />
                                         </div>
                                         <div className="space-y-1">
@@ -365,11 +365,11 @@ const SettingsPage = () => {
                                 <CardDescription className="text-xs font-medium opacity-70">Configure how users join and access the platform.</CardDescription>
                             </CardHeader>
                             <CardContent className="p-6 space-y-6">
-                                <div className="flex items-center justify-between p-4 bg-muted/20 border border-border/50 rounded-2xl">
+                                <div className="flex items-center justify-between p-4 bg-muted/20 border border-border/50 rounded-md">
                                     <div className="space-y-1">
                                         <div className="flex items-center gap-2">
                                             <Label htmlFor="allow-registration" className="text-sm font-black tracking-tight cursor-pointer">Allow Public Registration</Label>
-                                            <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 border-primary/20 text-primary">Security Policy</Badge>
+                                            <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 border-primary/20 text-primary">Security Policy</Badge>
                                         </div>
                                         <p className="text-[10px] font-medium opacity-60">When enabled, anyone can create an account via the login page.</p>
                                     </div>
@@ -383,10 +383,10 @@ const SettingsPage = () => {
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     {/* Google OAuth Provider */}
-                                    <div className="p-5 bg-muted/20 border border-border/50 rounded-2xl space-y-4">
+                                    <div className="p-5 bg-muted/20 border border-border/50 rounded-md space-y-4">
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2">
-                                                <div className="p-2 rounded-lg bg-white/5 border border-white/10">
+                                                <div className="p-2 rounded-md bg-white/5 border border-white/10">
                                                     <svg className="w-4 h-4" viewBox="0 0 24 24">
                                                         <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
                                                         <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
@@ -405,17 +405,17 @@ const SettingsPage = () => {
 
                                         <div className="space-y-3 pt-2">
                                             <div className="space-y-1.5">
-                                                <Label className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground ml-1">Client ID</Label>
+                                                <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground ml-1">Client ID</Label>
                                                 <Input
                                                     value={systemSettings.google_client_id || ''}
                                                     onChange={(e) => setSystemSettings(prev => ({ ...prev, google_client_id: e.target.value }))}
                                                     onBlur={(e) => updateSetting('google_client_id', e.target.value)}
                                                     placeholder="Enter Google Client ID"
-                                                    className="h-9 bg-background/50 border-border/50 text-[11px] font-medium"
+                                                    className="h-9 bg-background/50 border-border/50 text-xs font-medium"
                                                 />
                                             </div>
                                             <div className="space-y-1.5">
-                                                <Label className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground ml-1">Client Secret</Label>
+                                                <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground ml-1">Client Secret</Label>
                                                 <div className="relative">
                                                     <Input
                                                         type={showSecrets['google'] ? "text" : "password"}
@@ -423,7 +423,7 @@ const SettingsPage = () => {
                                                         onChange={(e) => setSystemSettings(prev => ({ ...prev, google_client_secret: e.target.value }))}
                                                         onBlur={(e) => updateSetting('google_client_secret', e.target.value)}
                                                         placeholder="Enter Google Client Secret"
-                                                        className="h-9 bg-background/50 border-border/50 text-[11px] font-medium pr-10"
+                                                        className="h-9 bg-background/50 border-border/50 text-xs font-medium pr-10"
                                                     />
                                                     <button
                                                         type="button"
@@ -438,10 +438,10 @@ const SettingsPage = () => {
                                     </div>
 
                                     {/* Facebook OAuth Provider */}
-                                    <div className="p-5 bg-muted/20 border border-border/50 rounded-2xl space-y-4">
+                                    <div className="p-5 bg-muted/20 border border-border/50 rounded-md space-y-4">
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2">
-                                                <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                                                <div className="p-2 rounded-md bg-blue-500/10 border border-blue-500/20">
                                                     <svg className="w-4 h-4 text-[#1877F2]" fill="currentColor" viewBox="0 0 24 24">
                                                         <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
                                                     </svg>
@@ -457,17 +457,17 @@ const SettingsPage = () => {
 
                                         <div className="space-y-3 pt-2">
                                             <div className="space-y-1.5">
-                                                <Label className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground ml-1">App ID</Label>
+                                                <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground ml-1">App ID</Label>
                                                 <Input
                                                     value={systemSettings.facebook_client_id || ''}
                                                     onChange={(e) => setSystemSettings(prev => ({ ...prev, facebook_client_id: e.target.value }))}
                                                     onBlur={(e) => updateSetting('facebook_client_id', e.target.value)}
                                                     placeholder="Enter Facebook App ID"
-                                                    className="h-9 bg-background/50 border-border/50 text-[11px] font-medium"
+                                                    className="h-9 bg-background/50 border-border/50 text-xs font-medium"
                                                 />
                                             </div>
                                             <div className="space-y-1.5">
-                                                <Label className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground ml-1">App Secret</Label>
+                                                <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground ml-1">App Secret</Label>
                                                 <div className="relative">
                                                     <Input
                                                         type={showSecrets['facebook'] ? "text" : "password"}
@@ -475,7 +475,7 @@ const SettingsPage = () => {
                                                         onChange={(e) => setSystemSettings(prev => ({ ...prev, facebook_client_secret: e.target.value }))}
                                                         onBlur={(e) => updateSetting('facebook_client_secret', e.target.value)}
                                                         placeholder="Enter Facebook App Secret"
-                                                        className="h-9 bg-background/50 border-border/50 text-[11px] font-medium pr-10"
+                                                        className="h-9 bg-background/50 border-border/50 text-xs font-medium pr-10"
                                                     />
                                                     <button
                                                         type="button"
@@ -491,11 +491,11 @@ const SettingsPage = () => {
                                 </div>
 
                                 <div className="space-y-4 pt-6 border-t border-border">
-                                    <div className="flex items-center justify-between p-4 bg-muted/20 border border-border/50 rounded-2xl">
+                                    <div className="flex items-center justify-between p-4 bg-muted/20 border border-border/50 rounded-md">
                                         <div className="space-y-1">
                                             <div className="flex items-center gap-2">
                                                 <Label htmlFor="token-expiration" className="text-sm font-black tracking-tight cursor-pointer">Token Expiration (Hours)</Label>
-                                                <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 border-primary/20 text-primary">Session Policy</Badge>
+                                                <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 border-primary/20 text-primary">Session Policy</Badge>
                                             </div>
                                             <p className="text-[10px] font-medium opacity-60">Duration in hours before a user session expires. Default is 24h.</p>
                                         </div>
@@ -505,12 +505,12 @@ const SettingsPage = () => {
                                                 type="number"
                                                 value={systemSettings.token_expiration || '24'}
                                                 onChange={(e) => setSystemSettings(prev => ({ ...prev, token_expiration: e.target.value }))}
-                                                className="h-9 bg-background/50 border-border/50 text-[11px] font-medium"
+                                                className="h-9 bg-background/50 border-border/50 text-xs font-medium"
                                                 min="1"
                                             />
                                             <Button
                                                 onClick={() => updateSetting('token_expiration', systemSettings.token_expiration || '24')}
-                                                className="premium-gradient px-3 font-black uppercase tracking-widest text-[8px] h-9"
+                                                className="premium-gradient px-3 font-black uppercase tracking-widest text-[10px] h-9"
                                                 disabled={isSettingsLoading}
                                             >
                                                 Save
@@ -537,7 +537,7 @@ const SettingsPage = () => {
                                         setError('');
                                         setIsCreateOpen(true);
                                     }}
-                                    className="premium-gradient font-black uppercase tracking-widest text-[9px] h-9 px-4 shadow-premium rounded-xl gap-2"
+                                    className="premium-gradient font-black uppercase tracking-widest text-[10px] h-9 px-4 shadow-premium rounded-md gap-2"
                                 >
                                     <Plus className="w-3.5 h-3.5" /> Provision Namespace
                                 </Button>
@@ -549,7 +549,7 @@ const SettingsPage = () => {
                                     <div key={ns.id} className="p-6 flex items-center justify-between group hover:bg-muted/10 transition-colors">
                                         <div className="flex items-center gap-4">
                                             <div className={cn(
-                                                "w-12 h-12 rounded-2xl flex items-center justify-center border transition-all duration-300 group-hover:scale-110",
+                                                "w-12 h-12 rounded-md flex items-center justify-center border transition-all duration-300 group-hover:scale-110",
                                                 ns.name === "Default" ? "bg-primary/10 border-primary/20 text-primary" : "bg-muted border-border text-muted-foreground"
                                             )}>
                                                 <Layers className="w-6 h-6" />
@@ -558,7 +558,7 @@ const SettingsPage = () => {
                                                 <div className="flex items-center gap-2">
                                                     <h3 className="font-black text-sm tracking-tight">{ns.name}</h3>
                                                     {ns.name === "Default" && (
-                                                        <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 border-primary/20 text-primary bg-primary/5">
+                                                        <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 border-primary/20 text-primary bg-primary/5">
                                                             CORE_SYSTEM
                                                         </Badge>
                                                     )}
@@ -570,7 +570,7 @@ const SettingsPage = () => {
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                className="h-9 px-3 rounded-xl text-[9px] font-black uppercase tracking-widest gap-2"
+                                                className="h-9 px-3 rounded-md text-[10px] font-black uppercase tracking-widest gap-2"
                                                 onClick={() => openEdit(ns)}
                                             >
                                                 <Edit2 className="w-3 h-3 text-muted-foreground" /> Edit
@@ -579,7 +579,7 @@ const SettingsPage = () => {
                                                 variant="ghost"
                                                 size="sm"
                                                 className={cn(
-                                                    "h-9 px-3 rounded-xl text-[9px] font-black uppercase tracking-widest gap-2",
+                                                    "h-9 px-3 rounded-md text-[10px] font-black uppercase tracking-widest gap-2",
                                                     (ns.name === "Default" || namespaces.length <= 1) ? "opacity-30 cursor-not-allowed" : "text-destructive hover:bg-destructive/10"
                                                 )}
                                                 disabled={ns.name === "Default" || namespaces.length <= 1}
@@ -613,7 +613,7 @@ const SettingsPage = () => {
                         </DialogDescription>
                     </DialogHeader>
                     {error && (
-                        <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-xl flex items-center gap-3 text-destructive animate-in fade-in zoom-in duration-300">
+                        <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md flex items-center gap-3 text-destructive animate-in fade-in zoom-in duration-300">
                             <AlertCircle className="w-4 h-4 shrink-0" />
                             <p className="text-[10px] font-black uppercase tracking-wide">{error}</p>
                         </div>
@@ -623,7 +623,7 @@ const SettingsPage = () => {
                             <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 ml-1">Namespace Name</label>
                             <Input
                                 placeholder="e.g. Production Cluster"
-                                className="h-12 bg-muted/30 border-border rounded-xl font-bold text-sm"
+                                className="h-9 bg-muted/30 border-border rounded-md font-bold text-sm"
                                 value={formData.name}
                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                 required
@@ -633,7 +633,7 @@ const SettingsPage = () => {
                             <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 ml-1">Contextual Description</label>
                             <Input
                                 placeholder="Strategic purpose of this namespace..."
-                                className="h-12 bg-muted/30 border-border rounded-xl font-bold text-sm"
+                                className="h-9 bg-muted/30 border-border rounded-md font-bold text-sm"
                                 value={formData.description}
                                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                             />
@@ -642,7 +642,7 @@ const SettingsPage = () => {
                             <Button
                                 type="button"
                                 variant="ghost"
-                                className="h-12 flex-1 font-black uppercase tracking-widest text-[9px] rounded-xl"
+                                className="h-9 flex-1 font-black uppercase tracking-widest text-[10px] rounded-md"
                                 onClick={() => {
                                     setIsCreateOpen(false);
                                     setIsEditOpen(false);
@@ -653,7 +653,7 @@ const SettingsPage = () => {
                             <Button
                                 type="submit"
                                 disabled={isLoading}
-                                className="premium-gradient h-12 flex-1 font-black uppercase tracking-widest text-[9px] rounded-xl shadow-premium"
+                                className="premium-gradient h-9 flex-1 font-black uppercase tracking-widest text-[10px] rounded-md shadow-premium"
                             >
                                 {isLoading ? 'PROCESSING...' : isCreateOpen ? 'INITIATE_DEPLOY' : 'SAVE_CONFIG'}
                             </Button>

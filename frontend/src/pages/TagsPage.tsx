@@ -191,14 +191,14 @@ const TagsPage = () => {
                     if (!open) setFormData({ name: '', description: '', color: '#6366f1' });
                 }}>
                     <DialogTrigger asChild>
-                        <Button className="premium-gradient font-black uppercase tracking-widest text-[10px] px-4 shadow-premium rounded-xl gap-2">
+                        <Button className="premium-gradient font-black uppercase tracking-widest text-[10px] px-4 shadow-premium rounded-md gap-2">
                             <Plus className="w-4 h-4" /> Create Tag
                         </Button>
                     </DialogTrigger>
                     <DialogContent className="sm:max-w-[425px]">
                         <DialogHeader>
                             <DialogTitle className="text-2xl font-black tracking-tight">Create Tag</DialogTitle>
-                            <DialogDescription className="text-[11px] font-medium text-muted-foreground">
+                            <DialogDescription className="text-xs font-medium text-muted-foreground">
                                 Add a new tag to the namespace. tags can be used to filter and categorize.
                             </DialogDescription>
                         </DialogHeader>
@@ -207,7 +207,7 @@ const TagsPage = () => {
                                 <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Tag Name</Label>
                                 <Input
                                     placeholder="e.g. Production, High Priority"
-                                    className="h-12 bg-muted/30 border-border rounded-xl font-bold tracking-tight focus:bg-background transition-all"
+                                    className="h-9 bg-muted/30 border-border rounded-md font-bold tracking-tight focus:bg-background transition-all"
                                     value={formData.name}
                                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                     required
@@ -217,7 +217,7 @@ const TagsPage = () => {
                                 <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Description</Label>
                                 <Input
                                     placeholder="Optional description"
-                                    className="h-12 bg-muted/30 border-border rounded-xl font-bold tracking-tight focus:bg-background transition-all"
+                                    className="h-9 bg-muted/30 border-border rounded-md font-bold tracking-tight focus:bg-background transition-all"
                                     value={formData.description}
                                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                                 />
@@ -227,12 +227,12 @@ const TagsPage = () => {
                                 <div className="flex items-center gap-4">
                                     <Input
                                         type="color"
-                                        className="h-12 w-20 p-1 cursor-pointer bg-muted/30 border-border rounded-xl"
+                                        className="h-9 w-20 p-1 cursor-pointer bg-muted/30 border-border rounded-md"
                                         value={formData.color}
                                         onChange={(e) => setFormData({ ...formData, color: e.target.value })}
                                     />
                                     <div
-                                        className="px-4 py-2 rounded-full text-xs font-bold border"
+                                        className="px-4 py-2 rounded-md text-xs font-bold border"
                                         style={{ backgroundColor: `${formData.color}20`, color: formData.color, borderColor: `${formData.color}40` }}
                                     >
                                         {formData.name || 'Preview Tag'}
@@ -243,7 +243,7 @@ const TagsPage = () => {
                                 <Button
                                     type="submit"
                                     disabled={isSubmitting}
-                                    className="premium-gradient font-black uppercase tracking-widest text-[10px] h-12 w-full shadow-premium rounded-xl"
+                                    className="premium-gradient font-black uppercase tracking-widest text-[10px] h-9 w-full shadow-premium rounded-md"
                                 >
                                     {isSubmitting ? "Creating..." : "Save Tag"}
                                 </Button>
@@ -281,14 +281,14 @@ const TagsPage = () => {
                 primaryAction={null}
             />
 
-            <Card className="border-border bg-card shadow-premium overflow-hidden rounded-2xl">
+            <Card className="rounded-md border border-border bg-card shadow-card overflow-hidden">
                 <Table>
                     <TableHeader>
-                        <TableRow className="bg-muted/50 border-border hover:bg-muted/50">
-                            <TableHead className="w-[300px] h-14 font-black uppercase tracking-widest text-[9px] px-8">Tag</TableHead>
-                            <TableHead className="font-black uppercase tracking-widest text-[9px]">Hex Color</TableHead>
-                            <TableHead className="font-black uppercase tracking-widest text-[9px]">Created By</TableHead>
-                            <TableHead className="text-right h-14 px-8 font-black uppercase tracking-widest text-[9px]">Actions</TableHead>
+                        <TableRow className="bg-muted hover:bg-muted/80 border-border">
+                            <TableHead className="w-[300px] h-9 font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground px-6">Tag</TableHead>
+                            <TableHead className="font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">Hex Color</TableHead>
+                            <TableHead className="font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">Created By</TableHead>
+                            <TableHead className="text-right h-9 px-6 font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -303,25 +303,25 @@ const TagsPage = () => {
                             </TableRow>
                         ) : tags.length > 0 ? tags.map((t) => (
                             <TableRow key={t.id} className="group border-border hover:bg-muted/30 transition-all duration-200">
-                                <TableCell className="px-8 py-5">
+                                <TableCell className="px-6 py-4">
                                     <div className="flex flex-col gap-1.5">
                                         <div className="flex items-center gap-4">
                                             <div
-                                                className="px-3 py-1 w-max rounded-full text-xs font-bold border"
+                                                className="px-3 py-1 w-max rounded-md text-xs font-bold border"
                                                 style={{ backgroundColor: `${t.color}20`, color: t.color, borderColor: `${t.color}40` }}
                                             >
                                                 {t.name}
                                             </div>
                                         </div>
                                         {t.description && (
-                                            <p className="text-[11px] font-medium text-muted-foreground line-clamp-2 pr-8">{t.description}</p>
+                                            <p className="text-xs font-medium text-muted-foreground line-clamp-2 pr-8">{t.description}</p>
                                         )}
                                     </div>
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex items-center gap-2">
                                         <div className="w-4 h-4 rounded-full" style={{ backgroundColor: t.color }}></div>
-                                        <code className="text-[11px] font-bold text-muted-foreground lowercase">
+                                        <code className="text-xs font-bold text-muted-foreground lowercase">
                                             {t.color}
                                         </code>
                                     </div>
@@ -329,7 +329,7 @@ const TagsPage = () => {
                                 <TableCell>
                                     {t.created_by_username ? (
                                         <div className="flex items-center gap-1.5">
-                                            <div className="h-5 w-5 rounded-full bg-primary/20 flex items-center justify-center text-[8px] font-black text-primary uppercase shrink-0">
+                                            <div className="h-5 w-5 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-black text-primary uppercase shrink-0">
                                                 {t.created_by_username[0]}
                                             </div>
                                             <span className="text-[10px] font-semibold text-muted-foreground">{t.created_by_username}</span>
@@ -338,12 +338,12 @@ const TagsPage = () => {
                                         <span className="text-[10px] text-muted-foreground/40 italic">—</span>
                                     )}
                                 </TableCell>
-                                <TableCell className="text-right px-8">
+                                <TableCell className="text-right px-6">
                                     <div className="flex justify-end gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all duration-300">
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            className="h-10 w-10 rounded-xl hover:bg-indigo-500/10 hover:text-indigo-500 transition-colors"
+                                            className="h-10 w-10 rounded-md hover:bg-indigo-500/10 hover:text-indigo-500 transition-colors"
                                             onClick={() => openEditDialog(t)}
                                         >
                                             <Edit3 className="w-4 h-4" />
@@ -351,7 +351,7 @@ const TagsPage = () => {
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            className="h-10 w-10 rounded-xl hover:bg-destructive/10 hover:text-destructive transition-colors"
+                                            className="h-10 w-10 rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors"
                                             onClick={() => handleDelete(t)}
                                         >
                                             <Trash2 className="w-4 h-4" />
@@ -365,13 +365,13 @@ const TagsPage = () => {
                                     <div className="flex flex-col items-center justify-center gap-4 opacity-40">
                                         <Paintbrush className="w-10 h-10" />
                                         <div className="space-y-1">
-                                            <p className="text-[11px] font-black uppercase tracking-[0.2em]">No tags found</p>
-                                            <p className="text-[9px] font-bold opacity-60">Create tags to better organize your flows.</p>
+                                            <p className="text-xs font-black uppercase tracking-[0.2em]">No tags found</p>
+                                            <p className="text-[10px] font-bold opacity-60">Create tags to better organize your flows.</p>
                                         </div>
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            className="mt-2 rounded-full border-dashed"
+                                            className="mt-2 rounded-md border-dashed"
                                             onClick={() => setIsCreateOpen(true)}
                                         >
                                             Create First Tag
@@ -382,6 +382,7 @@ const TagsPage = () => {
                         )}
                     </TableBody>
                 </Table>
+            </Card>
 
                 <Pagination
                     total={total}
@@ -390,14 +391,13 @@ const TagsPage = () => {
                     itemName="Tags"
                     onPageChange={setOffset}
                 />
-            </Card>
 
             {/* Edit Dialog */}
             <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
                 <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
                         <DialogTitle className="text-2xl font-black tracking-tight">Edit Tag</DialogTitle>
-                        <DialogDescription className="text-[11px] font-medium text-muted-foreground">
+                        <DialogDescription className="text-xs font-medium text-muted-foreground">
                             Update the tag's name and color.
                         </DialogDescription>
                     </DialogHeader>
@@ -405,7 +405,7 @@ const TagsPage = () => {
                         <div className="space-y-2">
                             <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Tag Name</Label>
                             <Input
-                                className="h-12 bg-muted/30 border-border rounded-xl font-bold tracking-tight"
+                                className="h-9 bg-muted/30 border-border rounded-md font-bold tracking-tight"
                                 value={formData.name}
                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                 required
@@ -415,7 +415,7 @@ const TagsPage = () => {
                             <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Description</Label>
                             <Input
                                 placeholder="Optional description"
-                                className="h-12 bg-muted/30 border-border rounded-xl font-bold tracking-tight"
+                                className="h-9 bg-muted/30 border-border rounded-md font-bold tracking-tight"
                                 value={formData.description}
                                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                             />
@@ -425,12 +425,12 @@ const TagsPage = () => {
                             <div className="flex items-center gap-4">
                                 <Input
                                     type="color"
-                                    className="h-12 w-20 p-1 cursor-pointer bg-muted/30 border-border rounded-xl"
+                                    className="h-9 w-20 p-1 cursor-pointer bg-muted/30 border-border rounded-md"
                                     value={formData.color}
                                     onChange={(e) => setFormData({ ...formData, color: e.target.value })}
                                 />
                                 <div
-                                    className="px-4 py-2 rounded-full text-xs font-bold border"
+                                    className="px-4 py-2 rounded-md text-xs font-bold border"
                                     style={{ backgroundColor: `${formData.color}20`, color: formData.color, borderColor: `${formData.color}40` }}
                                 >
                                     {formData.name || 'Preview Tag'}
@@ -441,7 +441,7 @@ const TagsPage = () => {
                             <Button
                                 type="submit"
                                 disabled={isSubmitting}
-                                className="premium-gradient font-black uppercase tracking-widest text-[10px] h-12 w-full shadow-premium rounded-xl"
+                                className="premium-gradient font-black uppercase tracking-widest text-[10px] h-9 w-full shadow-premium rounded-md"
                             >
                                 {isSubmitting ? "Updating..." : "Update Tag"}
                             </Button>

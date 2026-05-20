@@ -353,7 +353,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     <div
                         key={t.id}
                         className={cn(
-                            "pointer-events-auto flex items-start gap-4 p-4 rounded-2xl border shadow-2xl animate-in slide-in-from-right-full duration-500",
+                            "pointer-events-auto flex items-start gap-4 p-4 rounded-md border shadow-2xl animate-in slide-in-from-right-full duration-500",
                             t.type === 'error' ? "bg-red-500/10 border-red-500/20 text-red-500" :
                                 t.type === 'success' ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500" :
                                     "bg-indigo-500/10 border-indigo-500/20 text-indigo-500"

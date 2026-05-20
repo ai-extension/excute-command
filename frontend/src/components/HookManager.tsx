@@ -108,7 +108,7 @@ const HookManager: React.FC<HookManagerProps> = ({ hooks, workflows, hookType, o
     return (
         <div className="space-y-4">
             <div className="flex items-center justify-between">
-                <h3 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">
+                <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground">
                     {hookType.replace(/_/g, ' ')} HOOKS
                 </h3>
                 <Button
@@ -119,7 +119,7 @@ const HookManager: React.FC<HookManagerProps> = ({ hooks, workflows, hookType, o
                         setSearchTerm('');
                         setIsPickerOpen(true);
                     }}
-                    className="h-8 text-[9px] font-black uppercase tracking-widest rounded-lg border-primary/20 bg-primary/5 text-primary"
+                    className="h-8 text-[10px] font-black uppercase tracking-widest rounded-md border-primary/20 bg-primary/5 text-primary"
                 >
                     <Plus className="w-3 h-3 mr-1" /> Add Hook
                 </Button>
@@ -127,19 +127,19 @@ const HookManager: React.FC<HookManagerProps> = ({ hooks, workflows, hookType, o
 
             <div className="space-y-2">
                 {filteredHooks.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-6 bg-muted/10 border border-dashed border-border rounded-xl">
-                        <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/40">No {hookType.toLowerCase().replace(/_/g, ' ')} hooks configured</p>
+                    <div className="flex flex-col items-center justify-center py-6 bg-muted/10 border border-dashed border-border rounded-md">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40">No {hookType.toLowerCase().replace(/_/g, ' ')} hooks configured</p>
                     </div>
                 ) : (
                     filteredHooks.sort((a, b) => a.order - b.order).map((hook) => (
-                        <div key={hook.id} className="flex items-center justify-between p-3 bg-muted/20 border border-border rounded-xl group transition-all">
+                        <div key={hook.id} className="flex items-center justify-between p-3 bg-muted/20 border border-border rounded-md group transition-all">
                             <div className="flex flex-col gap-1">
                                 <div className="flex items-center gap-2">
                                     <Zap className="w-3 h-3 text-primary" />
-                                    <span className="text-[11px] font-black uppercase tracking-tight text-foreground">{getDisplayName(hook)}</span>
+                                    <span className="text-xs font-black uppercase tracking-tight text-foreground">{getDisplayName(hook)}</span>
                                 </div>
                                 {hook.inputs !== "{}" && (
-                                    <p className="text-[9px] font-medium text-muted-foreground truncate max-w-[250px]">
+                                    <p className="text-[10px] font-medium text-muted-foreground truncate max-w-[250px]">
                                         Inputs: {hook.inputs}
                                     </p>
                                 )}
@@ -148,7 +148,7 @@ const HookManager: React.FC<HookManagerProps> = ({ hooks, workflows, hookType, o
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                className="h-8 w-8 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                                 onClick={() => handleRemoveHook(hook.id)}
                             >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -168,7 +168,7 @@ const HookManager: React.FC<HookManagerProps> = ({ hooks, workflows, hookType, o
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                             <Input
                                 placeholder="Search workflows..."
-                                className="pl-10 h-10 rounded-xl bg-muted/30"
+                                className="pl-10 h-9 rounded-md bg-muted/30"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 autoFocus
@@ -190,12 +190,12 @@ const HookManager: React.FC<HookManagerProps> = ({ hooks, workflows, hookType, o
                                     .map(wf => (
                                         <div
                                             key={wf.id}
-                                            className="flex items-center justify-between p-4 bg-muted/20 hover:bg-muted/40 border border-border rounded-2xl cursor-pointer transition-all group"
+                                            className="flex items-center justify-between p-4 bg-muted/20 hover:bg-muted/40 border border-border rounded-md cursor-pointer transition-all group"
                                             onClick={() => handleAddHook(wf)}
                                         >
                                             <div className="flex flex-col gap-1">
                                                 <span className="font-bold text-sm tracking-tight text-foreground">{wf.name}</span>
-                                                <span className="text-[9px] text-muted-foreground/60 uppercase font-black tracking-widest">{wf.inputs?.length || 0} inputs required</span>
+                                                <span className="text-[10px] text-muted-foreground/60 uppercase font-black tracking-widest">{wf.inputs?.length || 0} inputs required</span>
                                             </div>
                                             <Plus className="w-4 h-4 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
                                         </div>

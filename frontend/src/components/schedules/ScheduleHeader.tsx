@@ -47,7 +47,7 @@ export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
                 </div>
                 <Button
                     onClick={onNewSchedule}
-                    className="h-8 px-4 rounded-xl premium-gradient text-[9px] font-black uppercase tracking-widest shadow-premium transition-all active:scale-95 gap-2"
+                    className="h-8 px-4 rounded-md premium-gradient text-[10px] font-black uppercase tracking-widest shadow-premium transition-all active:scale-95 gap-2"
                 >
                     <Plus className="w-3.5 h-3.5" />
                     New Schedule
@@ -55,11 +55,11 @@ export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
             </div>
 
             <div className="flex flex-col gap-4">
-                <div className="flex bg-muted p-1 rounded-xl border border-border/50 w-fit">
+                <div className="flex bg-muted p-1 rounded-md border border-border/50 w-fit">
                     <button
                         onClick={() => setViewMode('list')}
                         className={cn(
-                            "px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-2",
+                            "px-4 py-1.5 rounded-md text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2",
                             viewMode === 'list' ? "bg-card text-primary shadow-sm border border-border/50" : "text-muted-foreground hover:text-foreground"
                         )}
                     >
@@ -69,7 +69,7 @@ export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
                     <button
                         onClick={() => setViewMode('calendar')}
                         className={cn(
-                            "px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all gap-2 flex items-center",
+                            "px-4 py-1.5 rounded-md text-[10px] font-black uppercase tracking-widest transition-all gap-2 flex items-center",
                             viewMode === 'calendar' ? "bg-card text-primary shadow-sm border border-border/50" : "text-muted-foreground hover:text-foreground"
                         )}
                     >

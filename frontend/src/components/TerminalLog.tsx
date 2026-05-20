@@ -171,7 +171,7 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
 
     return (
         <div className={cn(
-            "flex flex-col bg-background border border-border rounded-2xl overflow-hidden shadow-2xl transition-all duration-500 h-full min-h-0",
+            "flex flex-col bg-background border border-border rounded-md overflow-hidden shadow-2xl transition-all duration-500 h-full min-h-0",
             className
         )}>
             {/* Header */}
@@ -187,7 +187,7 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
                                 "w-1.5 h-1.5 rounded-full",
                                 isActive ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground/30"
                             )} />
-                            <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/40">
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">
                                 {isLive ? (isActive ? 'Session Active' : 'Disconnected') : 'Historical Data'}
                             </span>
                         </div>
@@ -198,7 +198,7 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
                             size="icon"
                             onClick={() => setAutoScroll(!autoScroll)}
                             className={cn(
-                                "h-7 w-7 rounded-lg transition-colors",
+                                "h-7 w-7 rounded-md transition-colors",
                                 autoScroll ? "text-primary bg-primary/10" : "text-muted-foreground hover:bg-muted"
                             )}
                             title="Auto-scroll"
@@ -209,7 +209,7 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
                             variant="ghost"
                             size="icon"
                             onClick={handleDownload}
-                            className="h-7 w-7 rounded-lg text-muted-foreground hover:bg-muted"
+                            className="h-7 w-7 rounded-md text-muted-foreground hover:bg-muted"
                             title="Download logs"
                         >
                             <Download className="w-3.5 h-3.5" />
@@ -218,7 +218,7 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
                             variant="ghost"
                             size="icon"
                             onClick={clearLogs}
-                            className="h-7 w-7 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                            className="h-7 w-7 rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                             title="Clear console"
                         >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -230,7 +230,7 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
             {/* Content */}
             <div
                 ref={scrollRef}
-                className="flex-1 p-4 font-mono text-[13px] overflow-auto min-h-0 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent selection:bg-primary/30"
+                className="flex-1 p-4 font-mono text-sm overflow-auto min-h-0 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent selection:bg-primary/30"
             >
                 {logs.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center opacity-20 gap-3 grayscale">
@@ -257,17 +257,17 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
 
             {/* Footer */}
             <div className="px-4 py-1.5 bg-background border-t border-border flex justify-between items-center">
-                <div className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-widest">
+                <div className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest">
                     Buffer: {logs.length} Lines • Target: {targetID.substring(0, 8)}
                 </div>
                 <div className="flex gap-4">
                     <div className="flex items-center gap-1.5 opacity-40">
                         <div className="w-1.5 h-1.5 rounded bg-muted-foreground/30" />
-                        <span className="text-[9px] font-black uppercase tracking-tighter">Stdout</span>
+                        <span className="text-[10px] font-black uppercase tracking-tighter">Stdout</span>
                     </div>
                     <div className="flex items-center gap-1.5 opacity-40">
                         <div className="w-1.5 h-1.5 rounded bg-destructive/50" />
-                        <span className="text-[9px] font-black uppercase tracking-tighter text-red-400">Stderr</span>
+                        <span className="text-[10px] font-black uppercase tracking-tighter text-red-400">Stderr</span>
                     </div>
                 </div>
             </div>

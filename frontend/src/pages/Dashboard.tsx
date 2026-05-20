@@ -150,7 +150,7 @@ const StatCard = ({ icon: Icon, label, value, sub, color, onClick }: any) => (
         <div className={cn("absolute inset-0 opacity-0 group-hover:opacity-5 transition-opacity duration-500", color)} />
         <CardContent className="p-5">
             <div className="flex items-start justify-between mb-3">
-                <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3", `${color}/10`)}>
+                <div className={cn("w-9 h-9 rounded-md flex items-center justify-center shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3", `${color}/10`)}>
                     <Icon className={cn("w-4.5 h-4.5", color.replace('bg-', 'text-'))} />
                 </div>
                 <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground/30 group-hover:text-primary/60 transition-colors" />
@@ -266,7 +266,7 @@ const Dashboard = () => {
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    <span className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-widest">
+                    <span className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest">
                         {loading ? 'Syncing...' : `Updated ${formatTime(lastRefresh.toISOString())}`}
                     </span>
                     <Button
@@ -274,7 +274,7 @@ const Dashboard = () => {
                         size="sm"
                         onClick={fetchAll}
                         disabled={loading}
-                        className="h-8 px-3 rounded-lg gap-1.5 text-[9px] font-black uppercase tracking-widest text-muted-foreground hover:text-foreground"
+                        className="h-8 px-3 rounded-md gap-1.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-foreground"
                     >
                         <RefreshCw className={cn("w-3 h-3", loading && "animate-spin")} />
                         Refresh
@@ -283,22 +283,22 @@ const Dashboard = () => {
             </div>
 
             {/* ── Hero Banner ── */}
-            <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-premium">
+            <div className="relative overflow-hidden rounded-md border border-border bg-card p-6 shadow-premium">
                 <div className="absolute inset-0 premium-gradient opacity-5" />
                 <div className="absolute top-0 right-0 w-80 h-80 premium-gradient blur-[100px] opacity-10 rounded-full -mr-20 -mt-20" />
                 <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                         <div className="flex items-center gap-2 mb-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                            <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400">System Operational</span>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400">System Operational</span>
                         </div>
                         <h1 className="text-2xl font-black tracking-tighter mb-1">Command Center</h1>
-                        <p className="text-muted-foreground text-[11px] font-medium">
+                        <p className="text-muted-foreground text-xs font-medium">
                             Full overview of <span className="text-primary font-black">{activeNamespace?.name}</span> workspace — workflows, infrastructure & executions.
                         </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                        <Button onClick={() => navigate('/workflows')} className="premium-gradient font-black uppercase tracking-widest text-[10px] px-4 rounded-xl shadow-premium gap-1.5">
+                        <Button onClick={() => navigate('/workflows')} className="premium-gradient font-black uppercase tracking-widest text-[10px] px-4 rounded-md shadow-premium gap-1.5">
                             <Zap className="w-3.5 h-3.5" /> New Workflow
                         </Button>
                     </div>
@@ -322,16 +322,16 @@ const Dashboard = () => {
                         <div className="flex items-center justify-between">
                             <div>
                                 <CardTitle className="text-sm font-black tracking-tight">Execution Trends</CardTitle>
-                                <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/40 mt-0.5 font-black">Success vs Failure Rate (Last 7 Days)</p>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40 mt-0.5 font-black">Success vs Failure Rate (Last 7 Days)</p>
                             </div>
                             <div className="flex items-center gap-2">
                                 <div className="flex items-center gap-1">
                                     <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                                    <span className="text-[8px] font-black uppercase text-muted-foreground/60">Success</span>
+                                    <span className="text-[10px] font-black uppercase text-muted-foreground/60">Success</span>
                                 </div>
                                 <div className="flex items-center gap-1">
                                     <div className="w-2 h-2 rounded-full bg-red-500" />
-                                    <span className="text-[8px] font-black uppercase text-muted-foreground/60">Failed</span>
+                                    <span className="text-[10px] font-black uppercase text-muted-foreground/60">Failed</span>
                                 </div>
                             </div>
                         </div>
@@ -350,16 +350,16 @@ const Dashboard = () => {
                             <div className="flex items-center justify-between">
                                 <div className="flex flex-col">
                                     <span className="text-2xl font-black tracking-tighter text-emerald-400">{stats?.executions.success || 0}</span>
-                                    <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/40">Success</span>
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40">Success</span>
                                 </div>
                                 <div className="flex flex-col text-right">
                                     <span className="text-2xl font-black tracking-tighter text-red-400">{stats?.executions.failed || 0}</span>
-                                    <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/40">Failed</span>
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40">Failed</span>
                                 </div>
                             </div>
 
                             <div className="space-y-1.5">
-                                <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-widest">
+                                <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest">
                                     <span className="text-muted-foreground/60">Reliability</span>
                                     <span className="text-primary">{successRate ?? 0}%</span>
                                 </div>
@@ -375,7 +375,7 @@ const Dashboard = () => {
                                 <Button
                                     variant="outline"
                                     onClick={() => navigate('/history')}
-                                    className="w-full h-8 border-border hover:bg-muted/50 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all"
+                                    className="w-full h-8 border-border hover:bg-muted/50 text-[10px] font-black uppercase tracking-widest rounded-md transition-all"
                                 >
                                     Review Reports
                                 </Button>
@@ -393,9 +393,9 @@ const Dashboard = () => {
                         <div className="flex items-center justify-between">
                             <div>
                                 <CardTitle className="text-sm font-black tracking-tight">Recent Executions</CardTitle>
-                                <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/40 mt-0.5">Latest workflow runs</p>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40 mt-0.5">Latest workflow runs</p>
                             </div>
-                            <Button variant="ghost" size="sm" onClick={() => navigate('/history')} className="h-7 px-2 text-[9px] font-black uppercase tracking-widest gap-1 text-muted-foreground hover:text-foreground">
+                            <Button variant="ghost" size="sm" onClick={() => navigate('/history')} className="h-7 px-2 text-[10px] font-black uppercase tracking-widest gap-1 text-muted-foreground hover:text-foreground">
                                 View All <ArrowUpRight className="w-3 h-3" />
                             </Button>
                         </div>
@@ -412,10 +412,10 @@ const Dashboard = () => {
                                     <div key={exec.id} className="flex items-center gap-3 px-5 py-3 hover:bg-muted/20 transition-colors group">
                                         <StatusDot status={exec.status} />
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-[11px] font-black tracking-tight truncate text-foreground/80">{exec.workflow?.name || exec.workflow_id?.substring(0, 8) || 'Unknown'}</p>
-                                            <p className="text-[9px] text-muted-foreground/40 font-medium">{formatTime(exec.started_at)}</p>
+                                            <p className="text-xs font-black tracking-tight truncate text-foreground/80">{exec.workflow?.name || exec.workflow_id?.substring(0, 8) || 'Unknown'}</p>
+                                            <p className="text-[10px] text-muted-foreground/40 font-medium">{formatTime(exec.started_at)}</p>
                                         </div>
-                                        <Badge className={cn("text-[8px] font-black uppercase tracking-wider px-1.5 py-0 border rounded", statusColor(exec.status))}>
+                                        <Badge className={cn("text-[10px] font-black uppercase tracking-wider px-1.5 py-0 border rounded", statusColor(exec.status))}>
                                             {exec.status}
                                         </Badge>
                                     </div>
@@ -436,11 +436,11 @@ const Dashboard = () => {
                         <div className="flex items-center justify-between">
                             <div>
                                 <CardTitle className="text-sm font-black tracking-tight">Active Schedules</CardTitle>
-                                <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/40 mt-0.5">
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40 mt-0.5">
                                     {stats?.schedules.active || 0} of {stats?.schedules.total || 0} running
                                 </p>
                             </div>
-                            <Button variant="ghost" size="sm" onClick={() => navigate('/schedules')} className="h-7 px-2 text-[9px] font-black uppercase tracking-widest gap-1 text-muted-foreground hover:text-foreground">
+                            <Button variant="ghost" size="sm" onClick={() => navigate('/schedules')} className="h-7 px-2 text-[10px] font-black uppercase tracking-widest gap-1 text-muted-foreground hover:text-foreground">
                                 View All <ArrowUpRight className="w-3 h-3" />
                             </Button>
                         </div>
@@ -454,12 +454,12 @@ const Dashboard = () => {
                             <div className="divide-y divide-border/30">
                                 {stats.schedules.items.map((s: any) => (
                                     <div key={s.id} className="flex items-center gap-3 px-5 py-3 hover:bg-muted/20 transition-colors">
-                                        <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0", s.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-muted text-muted-foreground/40')}>
+                                        <div className={cn("w-8 h-8 rounded-md flex items-center justify-center shrink-0", s.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-muted text-muted-foreground/40')}>
                                             <Calendar className="w-3.5 h-3.5" />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-[11px] font-black tracking-tight truncate">{s.name}</p>
-                                            <p className="text-[9px] text-muted-foreground/40 font-medium uppercase tracking-widest">
+                                            <p className="text-xs font-black tracking-tight truncate">{s.name}</p>
+                                            <p className="text-[10px] text-muted-foreground/40 font-medium uppercase tracking-widest">
                                                 {s.type === 'RECURRING' ? s.cron_expression || 'Recurring' : 'One-time'}
                                             </p>
                                         </div>
@@ -485,9 +485,9 @@ const Dashboard = () => {
                         <div className="flex items-center justify-between">
                             <div>
                                 <CardTitle className="text-sm font-black tracking-tight">Node Fleet</CardTitle>
-                                <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/40 mt-0.5">{stats?.servers.total || 0} registered servers</p>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40 mt-0.5">{stats?.servers.total || 0} registered servers</p>
                             </div>
-                            <Button variant="ghost" size="sm" onClick={() => navigate('/servers')} className="h-7 px-2 text-[9px] font-black uppercase tracking-widest gap-1 text-muted-foreground hover:text-foreground">
+                            <Button variant="ghost" size="sm" onClick={() => navigate('/servers')} className="h-7 px-2 text-[10px] font-black uppercase tracking-widest gap-1 text-muted-foreground hover:text-foreground">
                                 View All <ArrowUpRight className="w-3 h-3" />
                             </Button>
                         </div>
@@ -501,14 +501,14 @@ const Dashboard = () => {
                             <div className="divide-y divide-border/30">
                                 {stats.servers.items.slice(0, 5).map((srv: any) => (
                                     <div key={srv.id} className="flex items-center gap-3 px-5 py-3 hover:bg-muted/20 transition-colors">
-                                        <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center shrink-0 text-cyan-400">
+                                        <div className="w-8 h-8 rounded-md bg-cyan-500/10 flex items-center justify-center shrink-0 text-cyan-400">
                                             <Server className="w-3.5 h-3.5" />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-[11px] font-black tracking-tight truncate">{srv.name}</p>
-                                            <p className="text-[9px] text-muted-foreground/40 font-medium">{srv.ip_address || srv.host}</p>
+                                            <p className="text-xs font-black tracking-tight truncate">{srv.name}</p>
+                                            <p className="text-[10px] text-muted-foreground/40 font-medium">{srv.ip_address || srv.host}</p>
                                         </div>
-                                        <Badge variant="outline" className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0 border-border bg-background">
+                                        <Badge variant="outline" className="text-[10px] font-black uppercase tracking-wider px-1.5 py-0 border-border bg-background">
                                             {srv.auth_type || 'SSH'}
                                         </Badge>
                                     </div>
@@ -527,7 +527,7 @@ const Dashboard = () => {
                 <Card className="lg:col-span-2 border-border bg-card shadow-card overflow-hidden">
                     <CardHeader className="px-5 pt-4 pb-3 border-b border-border/30">
                         <CardTitle className="text-sm font-black tracking-tight">Quick Access</CardTitle>
-                        <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/40 mt-0.5">Navigate to sections</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40 mt-0.5">Navigate to sections</p>
                     </CardHeader>
                     <CardContent className="p-3">
                         <div className="grid grid-cols-2 gap-2">
@@ -545,7 +545,7 @@ const Dashboard = () => {
                                     key={item.path}
                                     onClick={() => navigate(item.path)}
                                     className={cn(
-                                        "flex items-center gap-2 p-2.5 rounded-xl font-black uppercase tracking-wider text-[9px] transition-all duration-200 group",
+                                        "flex items-center gap-2 p-2.5 rounded-md font-black uppercase tracking-wider text-[10px] transition-all duration-200 group",
                                         item.color
                                     )}
                                 >
@@ -564,11 +564,11 @@ const Dashboard = () => {
                     <div className="flex items-center justify-between">
                         <div>
                             <CardTitle className="text-sm font-black tracking-tight">Workflows</CardTitle>
-                            <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/40 mt-0.5">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40 mt-0.5">
                                 {stats?.workflows.total || 0} automations in {activeNamespace?.name}
                             </p>
                         </div>
-                        <Button variant="ghost" size="sm" onClick={() => navigate('/workflows')} className="h-7 px-2 text-[9px] font-black uppercase tracking-widest gap-1 text-muted-foreground hover:text-foreground">
+                        <Button variant="ghost" size="sm" onClick={() => navigate('/workflows')} className="h-7 px-2 text-[10px] font-black uppercase tracking-widest gap-1 text-muted-foreground hover:text-foreground">
                             View All <ArrowUpRight className="w-3 h-3" />
                         </Button>
                     </div>
@@ -586,12 +586,12 @@ const Dashboard = () => {
                                     onClick={() => navigate(`/workflows/${wf.id}`)}
                                     className="flex items-center gap-3 px-5 py-4 hover:bg-muted/20 transition-colors cursor-pointer group"
                                 >
-                                    <div className="w-8 h-8 rounded-xl bg-indigo-500/10 flex items-center justify-center shrink-0 text-indigo-400 group-hover:bg-indigo-500/20 transition-colors">
+                                    <div className="w-8 h-8 rounded-md bg-indigo-500/10 flex items-center justify-center shrink-0 text-indigo-400 group-hover:bg-indigo-500/20 transition-colors">
                                         <Zap className="w-3.5 h-3.5" />
                                     </div>
                                     <div className="min-w-0">
-                                        <p className="text-[11px] font-black tracking-tight truncate">{wf.name}</p>
-                                        <p className="text-[9px] text-muted-foreground/40 font-medium">{wf.group_count || 0} groups</p>
+                                        <p className="text-xs font-black tracking-tight truncate">{wf.name}</p>
+                                        <p className="text-[10px] text-muted-foreground/40 font-medium">{wf.group_count || 0} groups</p>
                                     </div>
                                     <ArrowUpRight className="w-3 h-3 text-muted-foreground/20 group-hover:text-primary/60 ml-auto shrink-0 transition-colors" />
                                 </div>

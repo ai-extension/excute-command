@@ -82,7 +82,7 @@ const LoginPage = () => {
                 <div className="flex flex-col items-center mb-10 gap-4">
                     <div className="relative">
                         <div className="absolute inset-0 bg-primary/40 blur-2xl rounded-full scale-110 animate-pulse" />
-                        <div className="relative premium-gradient p-4 rounded-[2rem] shadow-[0_0_40px_rgba(99,102,241,0.4)] rotate-6 hover:rotate-0 transition-all duration-700 cursor-default group">
+                        <div className="relative premium-gradient p-4 rounded-md shadow-[0_0_40px_rgba(99,102,241,0.4)] rotate-6 hover:rotate-0 transition-all duration-700 cursor-default group">
                             <Zap className="w-10 h-10 text-white group-hover:scale-110 transition-transform" />
                         </div>
                     </div>
@@ -101,7 +101,7 @@ const LoginPage = () => {
                 </div>
 
                 {/* Login Card */}
-                <Card className="bg-[#0f0f0f]/80 border-white/5 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] rounded-[2.5rem] overflow-hidden backdrop-blur-3xl ring-1 ring-white/10 hover:ring-white/20 transition-all duration-500 group">
+                <Card className="bg-[#0f0f0f]/80 border-white/5 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] rounded-md overflow-hidden backdrop-blur-3xl ring-1 ring-white/10 hover:ring-white/20 transition-all duration-500 group">
                     <CardContent className="p-10">
                         <form onSubmit={handleSubmit} className="space-y-6">
                             <div className="space-y-2 group/input">
@@ -109,10 +109,10 @@ const LoginPage = () => {
                                     Identity
                                 </label>
                                 <div className="relative group">
-                                    <div className="absolute inset-0 bg-primary/10 rounded-2xl blur-md opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none" />
+                                    <div className="absolute inset-0 bg-primary/10 rounded-md blur-md opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none" />
                                     <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60 group-focus-within:text-primary transition-all duration-300 pointer-events-none z-10" />
                                     <Input
-                                        className="relative h-14 bg-white/[0.03] border-white/10 rounded-2xl pl-12 text-[13px] font-medium text-white focus-visible:ring-primary/40 focus-visible:border-primary/50 transition-all placeholder:text-muted-foreground/30 z-0"
+                                        className="relative h-14 bg-white/[0.03] border-white/10 rounded-md pl-12 text-sm font-medium text-white focus-visible:ring-primary/40 focus-visible:border-primary/50 transition-all placeholder:text-muted-foreground/30 z-0"
                                         placeholder="Enter your username"
                                         value={username}
                                         onChange={(e) => setUsername(e.target.value)}
@@ -126,11 +126,11 @@ const LoginPage = () => {
                                     Access Key
                                 </label>
                                 <div className="relative group">
-                                    <div className="absolute inset-0 bg-primary/10 rounded-2xl blur-md opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none" />
+                                    <div className="absolute inset-0 bg-primary/10 rounded-md blur-md opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none" />
                                     <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60 group-focus-within:text-primary transition-all duration-300 pointer-events-none z-10" />
                                     <Input
                                         type="password"
-                                        className="relative h-14 bg-white/[0.03] border-white/10 rounded-2xl pl-12 text-[13px] font-medium text-white focus-visible:ring-primary/40 focus-visible:border-primary/50 transition-all placeholder:text-muted-foreground/30 text-2xl z-0"
+                                        className="relative h-14 bg-white/[0.03] border-white/10 rounded-md pl-12 text-sm font-medium text-white focus-visible:ring-primary/40 focus-visible:border-primary/50 transition-all placeholder:text-muted-foreground/30 text-2xl z-0"
                                         placeholder="••••••••"
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
@@ -140,18 +140,18 @@ const LoginPage = () => {
                             </div>
 
                             {error && (
-                                <div className="bg-destructive/5 border border-destructive/20 p-4 rounded-2xl flex items-center gap-3 animate-in fade-in zoom-in-95 duration-500 shadow-[0_0_20px_rgba(239,68,68,0.1)]">
+                                <div className="bg-destructive/5 border border-destructive/20 p-4 rounded-md flex items-center gap-3 animate-in fade-in zoom-in-95 duration-500 shadow-[0_0_20px_rgba(239,68,68,0.1)]">
                                     <div className="p-1.5 rounded-full bg-destructive/10">
                                         <Shield className="w-3.5 h-3.5 text-destructive" />
                                     </div>
-                                    <p className="text-[11px] font-bold text-destructive leading-tight">{error}</p>
+                                    <p className="text-xs font-bold text-destructive leading-tight">{error}</p>
                                 </div>
                             )}
 
                             <Button
                                 type="submit"
                                 disabled={isLoading}
-                                className="w-full h-14 premium-gradient shadow-[0_8px_24px_rgba(99,102,241,0.3)] hover:shadow-[0_12px_32px_rgba(99,102,241,0.5)] active:scale-[0.98] transition-all text-xs font-black uppercase tracking-[0.2em] rounded-2xl gap-3 mt-4 hover:brightness-110 group"
+                                className="w-full h-14 premium-gradient shadow-[0_8px_24px_rgba(99,102,241,0.3)] hover:shadow-[0_12px_32px_rgba(99,102,241,0.5)] active:scale-[0.98] transition-all text-xs font-black uppercase tracking-[0.2em] rounded-md gap-3 mt-4 hover:brightness-110 group"
                             >
                                 {isLoading ? (
                                     <Loader2 className="w-5 h-5 animate-spin" />
@@ -171,7 +171,7 @@ const LoginPage = () => {
                                     <div className="absolute inset-0 flex items-center">
                                         <span className="w-full border-t border-white/5"></span>
                                     </div>
-                                    <div className="relative flex justify-center text-[9px] uppercase font-black tracking-[0.3em]">
+                                    <div className="relative flex justify-center text-[10px] uppercase font-black tracking-[0.3em]">
                                         <span className="bg-[#0f0f0f] px-4 text-muted-foreground/30">Connect via</span>
                                     </div>
                                 </div>
@@ -181,7 +181,7 @@ const LoginPage = () => {
                                         <button
                                             type="button"
                                             onClick={() => handleSocialLogin('Google')}
-                                            className="group relative flex items-center justify-center w-16 h-16 rounded-[1.5rem] bg-white/10 border border-white/20 hover:bg-white/20 hover:border-white/30 hover:scale-110 transition-all duration-500 shadow-2xl overflow-hidden ring-1 ring-white/10 hover:ring-white/20"
+                                            className="group relative flex items-center justify-center w-16 h-16 rounded-md bg-white/10 border border-white/20 hover:bg-white/20 hover:border-white/30 hover:scale-110 transition-all duration-500 shadow-2xl overflow-hidden ring-1 ring-white/10 hover:ring-white/20"
                                             title="Login with Google"
                                         >
                                             <div className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-[#EA4335] via-[#FBBC05] to-[#34A853] opacity-30 group-hover:opacity-100 transition-opacity" />
@@ -209,7 +209,7 @@ const LoginPage = () => {
                                         <button
                                             type="button"
                                             onClick={() => handleSocialLogin('Facebook')}
-                                            className="group relative flex items-center justify-center w-16 h-16 rounded-[1.5rem] bg-[#1877F2]/5 border border-[#1877F2]/10 hover:bg-[#1877F2]/20 hover:border-[#1877F2]/30 hover:scale-110 transition-all duration-500 shadow-2xl overflow-hidden ring-1 ring-[#1877F2]/0 hover:ring-[#1877F2]/20"
+                                            className="group relative flex items-center justify-center w-16 h-16 rounded-md bg-[#1877F2]/5 border border-[#1877F2]/10 hover:bg-[#1877F2]/20 hover:border-[#1877F2]/30 hover:scale-110 transition-all duration-500 shadow-2xl overflow-hidden ring-1 ring-[#1877F2]/0 hover:ring-[#1877F2]/20"
                                             title="Login with Facebook"
                                         >
                                             <div className="absolute inset-x-0 bottom-0 h-1 bg-[#1877F2] opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -225,7 +225,7 @@ const LoginPage = () => {
                         {/* Footer Section */}
                         {allowRegistration && (
                             <div className="mt-10 text-center">
-                                <p className="text-[11px] text-muted-foreground/40 font-bold uppercase tracking-widest">
+                                <p className="text-xs text-muted-foreground/40 font-bold uppercase tracking-widest">
                                     New here?{' '}
                                     <Link to="/register" className="text-primary hover:text-white transition-colors underline-offset-4 hover:underline">
                                         Access System

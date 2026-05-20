@@ -184,7 +184,7 @@ const PageExecutionTerminal: React.FC<PageExecutionTerminalProps> = ({
                     terminalState === 'maximized' ? "w-auto h-auto" :
                         (!size ? "w-full max-w-2xl h-[450px]" : "")
             )}>
-            <div className="w-full h-full bg-[#0a0a0c] border border-white/10 rounded-[2rem] shadow-[0_24px_80px_rgba(0,0,0,0.8),0_0_20px_rgba(var(--primary-rgb),0.1)] overflow-hidden flex flex-col animate-in slide-in-from-right-16 duration-500">
+            <div className="w-full h-full bg-[#0a0a0c] border border-white/10 rounded-md shadow-[0_24px_80px_rgba(0,0,0,0.8),0_0_20px_rgba(var(--primary-rgb),0.1)] overflow-hidden flex flex-col animate-in slide-in-from-right-16 duration-500">
                 {/* Terminal Header */}
                 <div
                     onMouseDown={onHeaderMouseDown}
@@ -222,11 +222,11 @@ const PageExecutionTerminal: React.FC<PageExecutionTerminalProps> = ({
                                 status === 'RUNNING' ? "bg-primary animate-pulse shadow-[0_0_10px_rgba(var(--primary-rgb),0.8)]" :
                                     status === 'SUCCESS' ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" :
                                         "bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.5)]")} />
-                            <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-400">Trace: {status || 'CONNECTING'}</h3>
+                            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Trace: {status || 'CONNECTING'}</h3>
                         </div>
                     </div>
                     {terminalState === 'minimized' && (
-                        <button onClick={() => setTerminalState('normal')} className="p-2 hover:bg-white/10 rounded-lg text-zinc-500 transition-all">
+                        <button onClick={() => setTerminalState('normal')} className="p-2 hover:bg-white/10 rounded-md text-zinc-500 transition-all">
                             <ChevronUp className="w-3 h-3" />
                         </button>
                     )}
@@ -235,7 +235,7 @@ const PageExecutionTerminal: React.FC<PageExecutionTerminalProps> = ({
                 {/* Terminal Body */}
                 {terminalState !== 'minimized' && (
                     <div className="flex-1 flex flex-col min-h-0 bg-black/40">
-                        <div ref={scrollRef} className="flex-1 overflow-y-auto p-8 font-mono text-[12px] leading-relaxed scrollbar-thin selection:bg-primary/40 selection:text-white">
+                        <div ref={scrollRef} className="flex-1 overflow-y-auto p-8 font-mono text-xs leading-relaxed scrollbar-thin selection:bg-primary/40 selection:text-white">
                             {logs.length > 0 ? logs.map((line, i) => (
                                 <div key={i} className="whitespace-pre-wrap min-h-[1.2rem]">
                                     <AnsiText text={line} />

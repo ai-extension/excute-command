@@ -75,10 +75,10 @@ const RegisterPage = () => {
                 <div className="absolute bottom-[-10%] left-[-10%] w-[800px] h-[800px] bg-primary/20 blur-[150px] rounded-full animate-pulse duration-[8s] delay-700" />
 
                 <div className="w-full max-w-md px-6 relative z-10 animate-in fade-in zoom-in-95 duration-700">
-                    <Card className="bg-[#0f0f0f]/80 border-white/5 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] rounded-[2.5rem] overflow-hidden backdrop-blur-3xl ring-2 ring-emerald-500/20 text-center p-10 space-y-6">
+                    <Card className="bg-[#0f0f0f]/80 border-white/5 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] rounded-md overflow-hidden backdrop-blur-3xl ring-2 ring-emerald-500/20 text-center p-10 space-y-6">
                         <div className="flex justify-center relative">
                             <div className="absolute inset-0 bg-emerald-500/40 blur-2xl rounded-full scale-110 animate-pulse" />
-                            <div className="relative bg-emerald-500/20 p-5 rounded-[1.5rem] border border-emerald-500/30">
+                            <div className="relative bg-emerald-500/20 p-5 rounded-md border border-emerald-500/30">
                                 <CheckCircle2 className="w-12 h-12 text-emerald-400" />
                             </div>
                         </div>
@@ -91,7 +91,7 @@ const RegisterPage = () => {
                         <div className="pt-4">
                             <Button
                                 onClick={() => navigate('/login')}
-                                className="w-full h-14 bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_8px_24px_rgba(16,185,129,0.3)] hover:shadow-[0_12px_32px_rgba(16,185,129,0.5)] active:scale-[0.98] transition-all text-xs font-black uppercase tracking-[0.2em] rounded-2xl gap-3"
+                                className="w-full h-14 bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_8px_24px_rgba(16,185,129,0.3)] hover:shadow-[0_12px_32px_rgba(16,185,129,0.5)] active:scale-[0.98] transition-all text-xs font-black uppercase tracking-[0.2em] rounded-md gap-3"
                             >
                                 Enter Workspace
                                 <ArrowRight className="w-4 h-4" />
@@ -115,7 +115,7 @@ const RegisterPage = () => {
                 <div className="flex flex-col items-center mb-10 gap-4">
                     <div className="relative">
                         <div className="absolute inset-0 bg-primary/40 blur-2xl rounded-full scale-110 animate-pulse" />
-                        <div className="relative premium-gradient p-4 rounded-[2rem] shadow-[0_0_40px_rgba(99,102,241,0.4)] rotate-6 hover:rotate-0 transition-all duration-700 cursor-default group">
+                        <div className="relative premium-gradient p-4 rounded-md shadow-[0_0_40px_rgba(99,102,241,0.4)] rotate-6 hover:rotate-0 transition-all duration-700 cursor-default group">
                             <Zap className="w-10 h-10 text-white group-hover:scale-110 transition-transform" />
                         </div>
                     </div>
@@ -134,7 +134,7 @@ const RegisterPage = () => {
                 </div>
 
                 {/* Register Card */}
-                <Card className="bg-[#0f0f0f]/80 border-white/5 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] rounded-[2.5rem] overflow-hidden backdrop-blur-3xl ring-1 ring-white/10 hover:ring-white/20 transition-all duration-500 group">
+                <Card className="bg-[#0f0f0f]/80 border-white/5 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] rounded-md overflow-hidden backdrop-blur-3xl ring-1 ring-white/10 hover:ring-white/20 transition-all duration-500 group">
                     <CardContent className="p-10 pb-8">
                         <form onSubmit={handleSubmit} className="space-y-5">
                             <div className="space-y-2 group/input">
@@ -142,10 +142,10 @@ const RegisterPage = () => {
                                     Username
                                 </label>
                                 <div className="relative group">
-                                    <div className="absolute inset-0 bg-primary/10 rounded-2xl blur-md opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none" />
+                                    <div className="absolute inset-0 bg-primary/10 rounded-md blur-md opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none" />
                                     <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60 group-focus-within:text-primary transition-all duration-300 pointer-events-none z-10" />
                                     <Input
-                                        className="relative h-14 bg-white/[0.03] border-white/10 rounded-2xl pl-12 text-[13px] font-medium text-white focus-visible:ring-primary/40 focus-visible:border-primary/50 transition-all placeholder:text-muted-foreground/30 z-0"
+                                        className="relative h-14 bg-white/[0.03] border-white/10 rounded-md pl-12 text-sm font-medium text-white focus-visible:ring-primary/40 focus-visible:border-primary/50 transition-all placeholder:text-muted-foreground/30 z-0"
                                         placeholder="johndoe"
                                         value={username}
                                         onChange={(e) => setUsername(e.target.value)}
@@ -160,11 +160,11 @@ const RegisterPage = () => {
                                     Email Address
                                 </label>
                                 <div className="relative group">
-                                    <div className="absolute inset-0 bg-primary/10 rounded-2xl blur-md opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none" />
+                                    <div className="absolute inset-0 bg-primary/10 rounded-md blur-md opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none" />
                                     <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60 group-focus-within:text-primary transition-all duration-300 pointer-events-none z-10" />
                                     <Input
                                         type="email"
-                                        className="relative h-14 bg-white/[0.03] border-white/10 rounded-2xl pl-12 text-[13px] font-medium text-white focus-visible:ring-primary/40 focus-visible:border-primary/50 transition-all placeholder:text-muted-foreground/30 z-0"
+                                        className="relative h-14 bg-white/[0.03] border-white/10 rounded-md pl-12 text-sm font-medium text-white focus-visible:ring-primary/40 focus-visible:border-primary/50 transition-all placeholder:text-muted-foreground/30 z-0"
                                         placeholder="john@example.com"
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
@@ -179,11 +179,11 @@ const RegisterPage = () => {
                                     Password
                                 </label>
                                 <div className="relative group">
-                                    <div className="absolute inset-0 bg-primary/10 rounded-2xl blur-md opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none" />
+                                    <div className="absolute inset-0 bg-primary/10 rounded-md blur-md opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none" />
                                     <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60 group-focus-within:text-primary transition-all duration-300 pointer-events-none z-10" />
                                     <Input
                                         type="password"
-                                        className="relative h-14 bg-white/[0.03] border-white/10 rounded-2xl pl-12 text-[13px] font-medium text-white focus-visible:ring-primary/40 focus-visible:border-primary/50 transition-all placeholder:text-muted-foreground/30 text-2xl z-0"
+                                        className="relative h-14 bg-white/[0.03] border-white/10 rounded-md pl-12 text-sm font-medium text-white focus-visible:ring-primary/40 focus-visible:border-primary/50 transition-all placeholder:text-muted-foreground/30 text-2xl z-0"
                                         placeholder="••••••••"
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
@@ -198,11 +198,11 @@ const RegisterPage = () => {
                                     Confirm Key
                                 </label>
                                 <div className="relative group">
-                                    <div className="absolute inset-0 bg-primary/10 rounded-2xl blur-md opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none" />
+                                    <div className="absolute inset-0 bg-primary/10 rounded-md blur-md opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none" />
                                     <Shield className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60 group-focus-within:text-primary transition-all duration-300 pointer-events-none z-10" />
                                     <Input
                                         type="password"
-                                        className="relative h-14 bg-white/[0.03] border-white/10 rounded-2xl pl-12 text-[13px] font-medium text-white focus-visible:ring-primary/40 focus-visible:border-primary/50 transition-all placeholder:text-muted-foreground/30 text-2xl z-0"
+                                        className="relative h-14 bg-white/[0.03] border-white/10 rounded-md pl-12 text-sm font-medium text-white focus-visible:ring-primary/40 focus-visible:border-primary/50 transition-all placeholder:text-muted-foreground/30 text-2xl z-0"
                                         placeholder="••••••••"
                                         value={confirmPassword}
                                         onChange={(e) => setConfirmPassword(e.target.value)}
@@ -213,18 +213,18 @@ const RegisterPage = () => {
                             </div>
 
                             {error && (
-                                <div className="bg-destructive/5 border border-destructive/20 p-4 rounded-2xl flex items-center gap-3 animate-in fade-in zoom-in-95 duration-500 shadow-[0_0_20px_rgba(239,68,68,0.1)]">
+                                <div className="bg-destructive/5 border border-destructive/20 p-4 rounded-md flex items-center gap-3 animate-in fade-in zoom-in-95 duration-500 shadow-[0_0_20px_rgba(239,68,68,0.1)]">
                                     <div className="p-1.5 rounded-full bg-destructive/10">
                                         <Shield className="w-3.5 h-3.5 text-destructive" />
                                     </div>
-                                    <p className="text-[11px] font-bold text-destructive leading-tight">{error}</p>
+                                    <p className="text-xs font-bold text-destructive leading-tight">{error}</p>
                                 </div>
                             )}
 
                             <Button
                                 type="submit"
                                 disabled={isLoading || !allowRegistration}
-                                className="w-full h-14 premium-gradient shadow-[0_8px_24px_rgba(99,102,241,0.3)] hover:shadow-[0_12px_32px_rgba(99,102,241,0.5)] active:scale-[0.98] transition-all text-xs font-black uppercase tracking-[0.2em] rounded-2xl gap-3 mt-4 hover:brightness-110 group"
+                                className="w-full h-14 premium-gradient shadow-[0_8px_24px_rgba(99,102,241,0.3)] hover:shadow-[0_12px_32px_rgba(99,102,241,0.5)] active:scale-[0.98] transition-all text-xs font-black uppercase tracking-[0.2em] rounded-md gap-3 mt-4 hover:brightness-110 group"
                             >
                                 {isLoading ? (
                                     <Loader2 className="w-5 h-5 animate-spin" />
@@ -239,7 +239,7 @@ const RegisterPage = () => {
 
                         {/* Footer Section */}
                         <div className="mt-10 text-center">
-                            <p className="text-[11px] text-muted-foreground/40 font-bold uppercase tracking-widest">
+                            <p className="text-xs text-muted-foreground/40 font-bold uppercase tracking-widest">
                                 Already have an account?{' '}
                                 <Link to="/login" className="text-primary hover:text-white transition-colors underline-offset-4 hover:underline">
                                     Sign In

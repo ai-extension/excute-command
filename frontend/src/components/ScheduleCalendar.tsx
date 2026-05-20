@@ -110,14 +110,14 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({ schedules, onEdit, 
     return (
         <div className="flex gap-4 animate-in fade-in duration-300">
             {/* Calendar grid */}
-            <div className="flex-1 bg-card border border-border rounded-2xl overflow-hidden shadow-premium">
+            <div className="flex-1 bg-card border border-border rounded-md overflow-hidden shadow-premium">
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-border">
                     <div className="flex items-center gap-3">
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 rounded-xl"
+                            className="h-8 w-8 rounded-md"
                             onClick={() => setCurrentDate(subMonths(currentDate, 1))}
                         >
                             <ChevronLeft className="w-4 h-4" />
@@ -128,7 +128,7 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({ schedules, onEdit, 
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 rounded-xl"
+                            className="h-8 w-8 rounded-md"
                             onClick={() => setCurrentDate(addMonths(currentDate, 1))}
                         >
                             <ChevronRight className="w-4 h-4" />
@@ -164,7 +164,7 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({ schedules, onEdit, 
                 {/* Weekday labels */}
                 <div className="grid grid-cols-7 border-b border-border">
                     {WEEKDAYS.map(d => (
-                        <div key={d} className="py-2 text-center text-[9px] font-black uppercase tracking-widest text-muted-foreground/50">
+                        <div key={d} className="py-2 text-center text-[10px] font-black uppercase tracking-widest text-muted-foreground/50">
                             {d}
                         </div>
                     ))}
@@ -207,7 +207,7 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({ schedules, onEdit, 
                                         <div
                                             key={s.id}
                                             className={cn(
-                                                "flex items-center gap-1 px-1 py-0.5 rounded text-[8px] font-bold truncate",
+                                                "flex items-center gap-1 px-1 py-0.5 rounded text-[10px] font-bold truncate",
                                                 s.status === 'ACTIVE'
                                                     ? "bg-emerald-500/15 text-emerald-400"
                                                     : "bg-slate-500/15 text-slate-400"
@@ -222,7 +222,7 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({ schedules, onEdit, 
                                         </div>
                                     ))}
                                     {daySchedules.length > 3 && (
-                                        <span className="text-[8px] text-muted-foreground/50 font-bold px-1">
+                                        <span className="text-[10px] text-muted-foreground/50 font-bold px-1">
                                             +{daySchedules.length - 3} more
                                         </span>
                                     )}
@@ -238,7 +238,7 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({ schedules, onEdit, 
                 "w-72 shrink-0 flex flex-col gap-3 transition-all duration-300",
                 !selectedDay && "opacity-50 pointer-events-none"
             )}>
-                <div className="bg-card border border-border rounded-2xl p-4 shadow-card">
+                <div className="bg-card border border-border rounded-md p-4 shadow-card">
                     {selectedDay ? (
                         <>
                             <div className="flex items-center justify-between mb-3 border-b border-border/50 pb-3">
@@ -247,14 +247,14 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({ schedules, onEdit, 
                                     <p className="text-sm font-black text-foreground">{format(selectedDay, 'EEE, MMM d yyyy')}</p>
                                 </div>
                                 <div className="flex flex-col items-end gap-1.5">
-                                    <Badge variant="outline" className="text-[9px] font-black">
+                                    <Badge variant="outline" className="text-[10px] font-black">
                                         {selectedDaySchedules.length}
                                     </Badge>
                                     {onCreate && (
                                         <Button
                                             size="sm"
                                             variant="secondary"
-                                            className="h-6 text-[9px] font-black px-2 uppercase tracking-widest gap-1 border-border/50 bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer relative z-10"
+                                            className="h-6 text-[10px] font-black px-2 uppercase tracking-widest gap-1 border-border/50 bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer relative z-10"
                                             onClick={() => onCreate(selectedDay)}
                                         >
                                             <CalendarClock className="w-3 h-3" /> Create
@@ -270,7 +270,7 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({ schedules, onEdit, 
                                     {selectedDaySchedules.map(s => (
                                         <div
                                             key={s.id}
-                                            className="bg-muted/30 rounded-xl p-3 border border-border hover:border-primary/30 transition-all group"
+                                            className="bg-muted/30 rounded-md p-3 border border-border hover:border-primary/30 transition-all group"
                                         >
                                             <div className="flex items-start justify-between gap-2">
                                                 <div className="flex-1 min-w-0">
@@ -281,7 +281,7 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({ schedules, onEdit, 
                                                         )} />
                                                         <p className="text-xs font-black truncate">{s.name}</p>
                                                     </div>
-                                                    <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
+                                                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
                                                         {s.type === 'RECURRING' ? (
                                                             <><Repeat className="w-2.5 h-2.5" />{s.cron_expression}</>
                                                         ) : (
@@ -291,7 +291,7 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({ schedules, onEdit, 
                                                     </div>
                                                     <Badge
                                                         className={cn(
-                                                            "mt-1.5 text-[7px] font-black uppercase tracking-widest px-1.5 py-0",
+                                                            "mt-1.5 text-[10px] font-black uppercase tracking-widest px-1.5 py-0",
                                                             s.status === 'ACTIVE'
                                                                 ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
                                                                 : "bg-slate-500/10 text-slate-500 border-slate-500/10"
@@ -304,7 +304,7 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({ schedules, onEdit, 
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
-                                                        className="h-6 w-6 rounded-lg"
+                                                        className="h-6 w-6 rounded-md"
                                                         onClick={(e) => { e.stopPropagation(); onEdit(s); }}
                                                         title="Edit"
                                                     >
@@ -313,7 +313,7 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({ schedules, onEdit, 
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
-                                                        className="h-6 w-6 rounded-lg"
+                                                        className="h-6 w-6 rounded-md"
                                                         onClick={(e) => { e.stopPropagation(); onToggleStatus(s.id); }}
                                                         title={s.status === 'ACTIVE' ? 'Pause' : 'Activate'}
                                                     >

@@ -102,7 +102,7 @@ const RolesPage = () => {
                 </div>
                 <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                     <DialogTrigger asChild>
-                        <Button className="premium-gradient font-black uppercase tracking-widest text-[10px] px-4 shadow-premium rounded-xl gap-2">
+                        <Button className="premium-gradient font-black uppercase tracking-widest text-[10px] px-4 shadow-premium rounded-md gap-2">
                             <Plus className="w-4 h-4" /> Create Role
                         </Button>
                     </DialogTrigger>
@@ -119,7 +119,7 @@ const RolesPage = () => {
                                 <Input
                                     id="name"
                                     placeholder="e.g. Developer"
-                                    className="h-12 bg-muted/30 border-border rounded-xl font-semibold"
+                                    className="h-9 bg-muted/30 border-border rounded-md font-semibold"
                                     value={newRoleData.name}
                                     onChange={(e) => setNewRoleData({ ...newRoleData, name: e.target.value })}
                                     required
@@ -130,7 +130,7 @@ const RolesPage = () => {
                                 <Input
                                     id="description"
                                     placeholder="Brief explanation of this role's purpose"
-                                    className="h-12 bg-muted/30 border-border rounded-xl font-semibold"
+                                    className="h-9 bg-muted/30 border-border rounded-md font-semibold"
                                     value={newRoleData.description}
                                     onChange={(e) => setNewRoleData({ ...newRoleData, description: e.target.value })}
                                 />
@@ -139,7 +139,7 @@ const RolesPage = () => {
                                 <Button
                                     type="submit"
                                     disabled={isSubmitting}
-                                    className="premium-gradient font-black uppercase tracking-widest text-[10px] h-12 w-full shadow-premium rounded-xl"
+                                    className="premium-gradient font-black uppercase tracking-widest text-[10px] h-9 w-full shadow-premium rounded-md"
                                 >
                                     {isSubmitting ? "Defining..." : "Save Role"}
                                 </Button>
@@ -174,10 +174,10 @@ const RolesPage = () => {
                             <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 blur-3xl rounded-full -mr-16 -mt-16 group-hover:bg-primary/10 transition-colors" />
                             <CardHeader className="p-6 relative z-10">
                                 <div className="flex items-center justify-between mb-2">
-                                    <div className="p-2 rounded-xl bg-primary/10 text-primary border border-primary/5 transition-transform group-hover:scale-110 group-hover:rotate-3">
+                                    <div className="p-2 rounded-md bg-primary/10 text-primary border border-primary/5 transition-transform group-hover:scale-110 group-hover:rotate-3">
                                         <Shield className="w-5 h-5" />
                                     </div>
-                                    <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 border-border">
+                                    <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 border-border">
                                         {(role.permissions || []).length} PERMISSIONS
                                     </Badge>
                                 </div>
@@ -189,12 +189,12 @@ const RolesPage = () => {
                             <CardContent className="p-6 pt-0 relative z-10">
                                 <div className="flex flex-wrap gap-1.5 mt-4 min-h-[60px]">
                                     {(role.permissions || []).slice(0, 5).map((p: any) => (
-                                        <Badge key={p.id} className="bg-muted text-muted-foreground font-black text-[8px] uppercase tracking-tighter px-2 rounded-md">
+                                        <Badge key={p.id} className="bg-muted text-muted-foreground font-black text-[10px] uppercase tracking-tighter px-2 rounded-md">
                                             {p.name}
                                         </Badge>
                                     ))}
                                     {(role.permissions || []).length > 5 && (
-                                        <span className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-widest align-middle pt-1 ml-1">
+                                        <span className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-widest align-middle pt-1 ml-1">
                                             + {(role.permissions || []).length - 5} more
                                         </span>
                                     )}
@@ -202,19 +202,19 @@ const RolesPage = () => {
                                 <div className="flex gap-2 mt-6 pt-6 border-t border-border/50">
                                     <Button
                                         variant="outline"
-                                        className="flex-1 h-9 rounded-xl border-border bg-background text-[9px] font-black uppercase tracking-widest shadow-sm hover:bg-muted transition-all"
+                                        className="flex-1 h-9 rounded-md border-border bg-background text-[10px] font-black uppercase tracking-widest shadow-sm hover:bg-muted transition-all"
                                         onClick={() => navigate(`/roles/${role.id}/permissions`)}
                                     >
                                         <Settings className="w-3 h-3 mr-2" /> Permissions
                                     </Button>
-                                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all">
+                                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all">
                                         <Trash2 className="w-4 h-4" />
                                     </Button>
                                 </div>
                             </CardContent>
                         </Card>
                     )) : (
-                        <div className="col-span-full py-20 bg-card border border-dashed border-border rounded-3xl flex flex-col items-center gap-4 text-center">
+                        <div className="col-span-full py-20 bg-card border border-dashed border-border rounded-md flex flex-col items-center gap-4 text-center">
                             <div className="p-4 rounded-full bg-muted/50 border border-border">
                                 <ShieldAlert className="w-8 h-8 text-muted-foreground" />
                             </div>

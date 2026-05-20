@@ -126,7 +126,7 @@ const ProfilePage = () => {
                     <Card className="bg-card border-border shadow-card overflow-hidden">
                         <CardHeader className="p-6 border-b border-border bg-muted/5">
                             <div className="flex items-center gap-3">
-                                <div className="p-2 bg-primary/10 rounded-lg">
+                                <div className="p-2 bg-primary/10 rounded-md">
                                     <User className="w-5 h-5 text-primary" />
                                 </div>
                                 <div>
@@ -139,11 +139,11 @@ const ProfilePage = () => {
                             <form onSubmit={handleUpdateProfile} className="space-y-6">
                                 {profileStatus.type && (
                                     <div className={cn(
-                                        "p-4 rounded-2xl flex items-center gap-3 animate-in fade-in zoom-in duration-300 border",
+                                        "p-4 rounded-md flex items-center gap-3 animate-in fade-in zoom-in duration-300 border",
                                         profileStatus.type === 'success' ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500" : "bg-destructive/10 border-destructive/20 text-destructive"
                                     )}>
                                         {profileStatus.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-                                        <p className="text-[11px] font-black uppercase tracking-wide">{profileStatus.message}</p>
+                                        <p className="text-xs font-black uppercase tracking-wide">{profileStatus.message}</p>
                                     </div>
                                 )}
 
@@ -156,7 +156,7 @@ const ProfilePage = () => {
                                                 value={profileData.username}
                                                 readOnly
                                                 disabled
-                                                className="pl-12 h-12 bg-muted/10 border-border cursor-not-allowed rounded-xl font-bold text-sm"
+                                                className="pl-12 h-9 bg-muted/10 border-border cursor-not-allowed rounded-md font-bold text-sm"
                                             />
                                         </div>
                                     </div>
@@ -169,7 +169,7 @@ const ProfilePage = () => {
                                                 value={profileData.full_name}
                                                 onChange={(e) => setProfileData({ ...profileData, full_name: e.target.value })}
                                                 placeholder="Legal name or alias"
-                                                className="pl-12 h-12 bg-muted/20 border-border focus:bg-muted/40 transition-all rounded-xl font-bold text-sm"
+                                                className="pl-12 h-9 bg-muted/20 border-border focus:bg-muted/40 transition-all rounded-md font-bold text-sm"
                                             />
                                         </div>
                                     </div>
@@ -183,7 +183,7 @@ const ProfilePage = () => {
                                                 value={profileData.email}
                                                 onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
                                                 placeholder="Contact coordinate"
-                                                className="pl-12 h-12 bg-muted/20 border-border focus:bg-muted/40 transition-all rounded-xl font-bold text-sm"
+                                                className="pl-12 h-9 bg-muted/20 border-border focus:bg-muted/40 transition-all rounded-md font-bold text-sm"
                                                 required
                                             />
                                         </div>
@@ -193,7 +193,7 @@ const ProfilePage = () => {
                                 <Button
                                     type="submit"
                                     disabled={isLoading}
-                                    className="w-full premium-gradient h-12 font-black uppercase tracking-[0.2em] text-[10px] rounded-xl shadow-premium gap-3 mt-4"
+                                    className="w-full premium-gradient h-9 font-black uppercase tracking-[0.2em] text-[10px] rounded-md shadow-premium gap-3 mt-4"
                                 >
                                     {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                                     Commit Identity Changes
@@ -202,17 +202,17 @@ const ProfilePage = () => {
                         </CardContent>
                     </Card>
 
-                    <div className="p-6 rounded-3xl bg-primary/5 border border-primary/10 flex items-center justify-between">
+                    <div className="p-6 rounded-md bg-primary/5 border border-primary/10 flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+                            <div className="w-12 h-12 rounded-md bg-primary/10 flex items-center justify-center text-primary">
                                 <Shield className="w-6 h-6" />
                             </div>
                             <div className="space-y-0.5">
-                                <h4 className="text-[11px] font-black uppercase tracking-widest text-primary">Verification Status</h4>
+                                <h4 className="text-xs font-black uppercase tracking-widest text-primary">Verification Status</h4>
                                 <p className="text-[10px] font-medium text-muted-foreground">Authenticated via primary system vault.</p>
                             </div>
                         </div>
-                        <Badge className="bg-emerald-500/10 text-emerald-500 border-none font-black text-[9px] px-3 py-1 uppercase tracking-widest">VERIFIED</Badge>
+                        <Badge className="bg-emerald-500/10 text-emerald-500 border-none font-black text-[10px] px-3 py-1 uppercase tracking-widest">VERIFIED</Badge>
                     </div>
                 </div>
 
@@ -221,7 +221,7 @@ const ProfilePage = () => {
                     <Card className="bg-card border-border shadow-card overflow-hidden">
                         <CardHeader className="p-6 border-b border-border bg-muted/5">
                             <div className="flex items-center gap-3">
-                                <div className="p-2 bg-amber-500/10 rounded-lg">
+                                <div className="p-2 bg-amber-500/10 rounded-md">
                                     <Key className="w-5 h-5 text-amber-500" />
                                 </div>
                                 <div>
@@ -234,11 +234,11 @@ const ProfilePage = () => {
                             <form onSubmit={handleUpdatePassword} className="space-y-6">
                                 {passwordStatus.type && (
                                     <div className={cn(
-                                        "p-4 rounded-2xl flex items-center gap-3 animate-in fade-in zoom-in duration-300 border",
+                                        "p-4 rounded-md flex items-center gap-3 animate-in fade-in zoom-in duration-300 border",
                                         passwordStatus.type === 'success' ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500" : "bg-destructive/10 border-destructive/20 text-destructive"
                                     )}>
                                         {passwordStatus.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-                                        <p className="text-[11px] font-black uppercase tracking-wide">{passwordStatus.message}</p>
+                                        <p className="text-xs font-black uppercase tracking-wide">{passwordStatus.message}</p>
                                     </div>
                                 )}
 
@@ -252,7 +252,7 @@ const ProfilePage = () => {
                                                 value={passwordData.old_password}
                                                 onChange={(e) => setPasswordData({ ...passwordData, old_password: e.target.value })}
                                                 placeholder="Verification required"
-                                                className="pl-12 h-12 bg-muted/20 border-border focus:bg-muted/40 transition-all rounded-xl font-bold text-sm"
+                                                className="pl-12 h-9 bg-muted/20 border-border focus:bg-muted/40 transition-all rounded-md font-bold text-sm"
                                                 required
                                             />
                                         </div>
@@ -267,7 +267,7 @@ const ProfilePage = () => {
                                                 value={passwordData.new_password}
                                                 onChange={(e) => setPasswordData({ ...passwordData, new_password: e.target.value })}
                                                 placeholder="New security string"
-                                                className="pl-12 h-12 bg-muted/20 border-border focus:bg-muted/40 transition-all rounded-xl font-bold text-sm"
+                                                className="pl-12 h-9 bg-muted/20 border-border focus:bg-muted/40 transition-all rounded-md font-bold text-sm"
                                                 required
                                                 minLength={6}
                                             />
@@ -283,7 +283,7 @@ const ProfilePage = () => {
                                                 value={passwordData.confirm_password}
                                                 onChange={(e) => setPasswordData({ ...passwordData, confirm_password: e.target.value })}
                                                 placeholder="Re-enter for precision"
-                                                className="pl-12 h-12 bg-muted/20 border-border focus:bg-muted/40 transition-all rounded-xl font-bold text-sm"
+                                                className="pl-12 h-9 bg-muted/20 border-border focus:bg-muted/40 transition-all rounded-md font-bold text-sm"
                                                 required
                                             />
                                         </div>
@@ -293,7 +293,7 @@ const ProfilePage = () => {
                                 <Button
                                     type="submit"
                                     disabled={isLoading}
-                                    className="w-full bg-amber-500 hover:bg-amber-600 text-white h-12 font-black uppercase tracking-[0.2em] text-[10px] rounded-xl shadow-lg shadow-amber-500/10 gap-3 mt-4 transition-all"
+                                    className="w-full bg-amber-500 hover:bg-amber-600 text-white h-9 font-black uppercase tracking-[0.2em] text-[10px] rounded-md shadow-lg shadow-amber-500/10 gap-3 mt-4 transition-all"
                                 >
                                     {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Shield className="w-4 h-4" />}
                                     Authorize Key Re-deployment

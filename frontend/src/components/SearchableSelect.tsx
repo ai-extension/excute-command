@@ -125,7 +125,7 @@ export const SearchableSelect = ({
             <DropdownMenuPortal>
                 <DropdownMenuContent
                     className={cn(
-                        "z-[200] bg-popover text-popover-foreground backdrop-blur-md border-border/60 shadow-xl rounded-xl p-1.5",
+                        "z-[200] bg-popover text-popover-foreground backdrop-blur-md border-border/60 shadow-xl rounded-md p-1.5",
                         "min-w-[var(--radix-dropdown-menu-trigger-width)] max-w-[400px] w-auto",
                         className
                     )}
@@ -170,7 +170,7 @@ export const SearchableSelect = ({
                                             }
                                         }}
                                         className={cn(
-                                            "px-2.5 py-2 rounded-lg cursor-pointer flex items-center justify-between mb-0.5 last:mb-0 font-bold text-[10px] uppercase tracking-wide transition-all duration-150",
+                                            "px-2.5 py-2 rounded-md cursor-pointer flex items-center justify-between mb-0.5 last:mb-0 font-bold text-[10px] uppercase tracking-wide transition-all duration-150",
                                             isActive
                                                 ? "bg-primary/15 text-primary"
                                                 : "text-popover-foreground/70 hover:bg-muted hover:text-popover-foreground"

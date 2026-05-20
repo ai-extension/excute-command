@@ -39,8 +39,8 @@ function getPageNumbers(currentPage: number, totalPages: number): (number | 'ell
 }
 
 export const Pagination: React.FC<PaginationProps> = ({ total, offset, limit, itemName = "items", onPageChange }) => {
-    const totalPages = Math.ceil(total / limit);
-    const currentPage = Math.floor(offset / limit) + 1;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const currentPage = Math.min(totalPages, Math.floor(offset / limit) + 1);
     const [jumpPage, setJumpPage] = useState("");
 
     useEffect(() => {

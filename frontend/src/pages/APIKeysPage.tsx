@@ -161,7 +161,7 @@ const APIKeysPage = () => {
                 <CardHeader className="p-6 border-b border-border bg-muted/5">
                     <div className="flex items-center justify-between flex-wrap gap-4">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-indigo-500/10 rounded-lg">
+                            <div className="p-2 bg-indigo-500/10 rounded-md">
                                 <Terminal className="w-5 h-5 text-indigo-500" />
                             </div>
                             <div>
@@ -172,7 +172,7 @@ const APIKeysPage = () => {
                         <Button
                             variant="outline"
                             onClick={() => setIsDocDialogOpen(true)}
-                            className="bg-background border-border hover:bg-muted/50 rounded-xl px-5 gap-2 text-[10px] font-black uppercase tracking-widest shadow-sm"
+                            className="bg-background border-border hover:bg-muted/50 rounded-md px-5 gap-2 text-[10px] font-black uppercase tracking-widest shadow-sm"
                         >
                             <Book className="w-3.5 h-3.5 text-indigo-500" />
                             API Documentation
@@ -188,14 +188,14 @@ const APIKeysPage = () => {
                                     placeholder="e.g. Jenkins CI, GitHub Actions"
                                     value={newKeyName}
                                     onChange={(e) => setNewKeyName(e.target.value)}
-                                    className="h-12 bg-background border-border focus:ring-2 focus:ring-primary/20 transition-all rounded-xl font-bold text-sm"
+                                    className="h-9 bg-background border-border focus:ring-2 focus:ring-primary/20 transition-all rounded-md font-bold text-sm"
                                 />
                             </div>
                             <div className="pt-6">
                                 <Button
                                     type="submit"
                                     disabled={isKeyLoading || !newKeyName.trim()}
-                                    className="h-12 premium-gradient rounded-xl px-8 gap-3 text-[11px] font-black uppercase tracking-widest shadow-lg shadow-primary/20"
+                                    className="h-9 premium-gradient rounded-md px-8 gap-3 text-xs font-black uppercase tracking-widest shadow-lg shadow-primary/20"
                                 >
                                     {isKeyLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                                     Initialize Protocol
@@ -206,7 +206,7 @@ const APIKeysPage = () => {
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">
                                 <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 ml-1">Assign API Access Scopes (Optional - Defaults to All)</label>
-                                <div className="text-[9px] font-bold text-primary/60 uppercase tracking-widest">
+                                <div className="text-[10px] font-bold text-primary/60 uppercase tracking-widest">
                                     {selectedScopes.length === 0 ? "Full Access Enabled" : `${selectedScopes.length} Scopes Restricted`}
                                 </div>
                             </div>
@@ -225,7 +225,7 @@ const APIKeysPage = () => {
                                                 }
                                             }}
                                             className={cn(
-                                                "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 border",
+                                                "px-4 py-2 rounded-md text-[10px] font-black uppercase tracking-widest transition-all duration-300 border",
                                                 isSelected
                                                     ? "bg-primary/10 border-primary text-primary shadow-sm"
                                                     : "bg-muted/10 border-border text-muted-foreground/60 hover:border-primary/30 hover:text-primary/60"
@@ -247,10 +247,10 @@ const APIKeysPage = () => {
                                 className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20 accent-primary"
                             />
                             <div className="space-y-0.5">
-                                <label htmlFor="is_mcp" className="text-[11px] font-black uppercase tracking-widest text-primary cursor-pointer w-fit">
+                                <label htmlFor="is_mcp" className="text-xs font-black uppercase tracking-widest text-primary cursor-pointer w-fit">
                                     Enable AI Agent Protocol (MCP)
                                 </label>
-                                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1">
+                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1">
                                     <Book className="w-3 h-3 text-indigo-500" />
                                     Generates connection config for Claude Desktop / Cursor
                                 </p>
@@ -270,17 +270,17 @@ const APIKeysPage = () => {
                     ) : (
                         <div className="grid grid-cols-1 gap-3">
                             {apiKeys.map((key) => (
-                                <div key={key.id} className="group flex items-center justify-between p-5 rounded-2xl bg-muted/5 border border-border/50 hover:bg-muted/10 hover:border-primary/20 transition-all duration-300">
+                                <div key={key.id} className="group flex items-center justify-between p-5 rounded-md bg-muted/5 border border-border/50 hover:bg-muted/10 hover:border-primary/20 transition-all duration-300">
                                     <div className="flex items-center gap-5">
-                                        <div className="w-12 h-12 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 group-hover:bg-indigo-500 group-hover:text-white transition-all duration-500 shadow-inner">
+                                        <div className="w-12 h-12 rounded-md bg-indigo-500/10 flex items-center justify-center text-indigo-500 group-hover:bg-indigo-500 group-hover:text-white transition-all duration-500 shadow-inner">
                                             <Key className="w-5 h-5" />
                                         </div>
                                         <div className="space-y-1.5">
                                             <h4 className="text-base font-black tracking-tight flex items-center gap-2">
                                                 {key.name}
-                                                <Badge className="bg-indigo-500/10 text-indigo-500 border-none text-[8px] px-2 h-4 uppercase tracking-[0.1em] font-black">ACTIVE</Badge>
+                                                <Badge className="bg-indigo-500/10 text-indigo-500 border-none text-[10px] px-2 h-4 uppercase tracking-[0.1em] font-black">ACTIVE</Badge>
                                                 {key.is_mcp && (
-                                                    <Badge className="bg-purple-500/10 text-purple-500 border-none text-[8px] px-2 h-4 uppercase tracking-[0.1em] font-black">MCP</Badge>
+                                                    <Badge className="bg-purple-500/10 text-purple-500 border-none text-[10px] px-2 h-4 uppercase tracking-[0.1em] font-black">MCP</Badge>
                                                 )}
                                             </h4>
                                             <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">
@@ -297,7 +297,7 @@ const APIKeysPage = () => {
                                             {key.scopes && (
                                                 <div className="flex flex-wrap gap-1 mt-2">
                                                     {key.scopes.split(',').map((s: string) => (
-                                                        <Badge key={s} variant="outline" className="text-[7px] px-1.5 h-3.5 bg-primary/5 border-primary/20 text-primary font-bold uppercase tracking-tighter">
+                                                        <Badge key={s} variant="outline" className="text-[10px] px-1.5 h-3.5 bg-primary/5 border-primary/20 text-primary font-bold uppercase tracking-tighter">
                                                             {s}
                                                         </Badge>
                                                     ))}
@@ -309,7 +309,7 @@ const APIKeysPage = () => {
                                         variant="ghost"
                                         size="icon"
                                         onClick={() => handleDeleteKey(key.id)}
-                                        className="text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 rounded-xl w-10 h-10 transition-all"
+                                        className="text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 rounded-md w-10 h-10 transition-all"
                                     >
                                         <Trash2 className="w-4 h-4" />
                                     </Button>
@@ -321,23 +321,23 @@ const APIKeysPage = () => {
             </Card>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="p-8 rounded-3xl bg-primary/5 border border-primary/10 space-y-4">
-                    <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-2">
+                <div className="p-8 rounded-md bg-primary/5 border border-primary/10 space-y-4">
+                    <div className="w-12 h-12 rounded-md bg-primary/10 flex items-center justify-center text-primary mb-2">
                         <Lock className="w-6 h-6" />
                     </div>
                     <div className="space-y-2">
-                        <h4 className="text-[11px] font-black uppercase tracking-widest text-primary">Security Architecture</h4>
+                        <h4 className="text-xs font-black uppercase tracking-widest text-primary">Security Architecture</h4>
                         <p className="text-xs font-medium text-muted-foreground leading-relaxed">
                             Tokens use SHA-256 irreversible hashing for storage. Once generated, the original key cannot be recovered by the system.
                         </p>
                     </div>
                 </div>
-                <div className="p-8 rounded-3xl bg-muted/20 border border-border space-y-4">
-                    <div className="w-12 h-12 rounded-2xl bg-muted-foreground/10 flex items-center justify-center text-muted-foreground mb-2">
+                <div className="p-8 rounded-md bg-muted/20 border border-border space-y-4">
+                    <div className="w-12 h-12 rounded-md bg-muted-foreground/10 flex items-center justify-center text-muted-foreground mb-2">
                         <Terminal className="w-6 h-6" />
                     </div>
                     <div className="space-y-2">
-                        <h4 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">Header Integration</h4>
+                        <h4 className="text-xs font-black uppercase tracking-widest text-muted-foreground">Header Integration</h4>
                         <p className="text-xs font-medium text-muted-foreground leading-relaxed">
                             Invoke the system via <code className="px-1.5 py-0.5 rounded-md bg-muted/40 text-primary">X-API-Key: [your-token]</code> for all programmatic requests.
                         </p>
@@ -347,9 +347,9 @@ const APIKeysPage = () => {
 
             {/* API Key Modal */}
             <Dialog open={isKeyDialogOpen} onOpenChange={setIsKeyDialogOpen}>
-                <DialogContent className="sm:max-w-md bg-card border-border rounded-3xl overflow-hidden p-0 shadow-2xl">
+                <DialogContent className="sm:max-w-md bg-card border-border rounded-md overflow-hidden p-0 shadow-2xl">
                     <DialogHeader className="p-8 pb-0">
-                        <div className="p-4 bg-emerald-500/10 w-fit rounded-2xl mb-6 shadow-inner">
+                        <div className="p-4 bg-emerald-500/10 w-fit rounded-md mb-6 shadow-inner">
                             <Shield className="w-8 h-8 text-emerald-500" />
                         </div>
                         <DialogTitle className="text-3xl font-black tracking-tighter italic uppercase text-emerald-500">System Entry Initialized</DialogTitle>
@@ -364,13 +364,13 @@ const APIKeysPage = () => {
                                 <Input
                                     readOnly
                                     value={generatedKey || ''}
-                                    className="pr-14 h-12 bg-muted/10 border-border rounded-xl font-mono text-sm font-bold text-primary focus:bg-muted/30 transition-all border-dashed shadow-inner"
+                                    className="pr-14 h-9 bg-muted/10 border-border rounded-md font-mono text-sm font-bold text-primary focus:bg-muted/30 transition-all border-dashed shadow-inner"
                                 />
                                 <Button
                                     size="icon"
                                     variant="ghost"
                                     onClick={() => copyToClipboard(generatedKey || '')}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-xl w-10 h-10 transition-all"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-md w-10 h-10 transition-all"
                                 >
                                     {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
                                 </Button>
@@ -383,23 +383,23 @@ const APIKeysPage = () => {
                                     <textarea
                                         readOnly
                                         value={mcpConfig}
-                                        className="w-full h-32 p-3 bg-muted/10 border-border rounded-xl font-mono text-[10px] font-bold text-indigo-400 focus:bg-muted/30 transition-all border-dashed shadow-inner resize-none"
+                                        className="w-full h-32 p-3 bg-muted/10 border-border rounded-md font-mono text-[10px] font-bold text-indigo-400 focus:bg-muted/30 transition-all border-dashed shadow-inner resize-none"
                                     />
                                     <Button
                                         size="icon"
                                         variant="ghost"
                                         onClick={() => copyToClipboard(mcpConfig)}
-                                        className="absolute right-3 top-2 text-muted-foreground hover:text-indigo-500 hover:bg-indigo-500/10 rounded-xl w-8 h-8 transition-all"
+                                        className="absolute right-3 top-2 text-muted-foreground hover:text-indigo-500 hover:bg-indigo-500/10 rounded-md w-8 h-8 transition-all"
                                     >
                                         <Copy className="w-3 h-3" />
                                     </Button>
                                 </div>
                             </div>
                         )}
-                        <div className="p-5 rounded-2xl bg-amber-500/5 border border-amber-500/10 text-amber-500 flex items-start gap-4">
+                        <div className="p-5 rounded-md bg-amber-500/5 border border-amber-500/10 text-amber-500 flex items-start gap-4">
                             <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
                             <div className="space-y-1">
-                                <p className="text-[11px] font-black uppercase tracking-wide">Critical Security Warning</p>
+                                <p className="text-xs font-black uppercase tracking-wide">Critical Security Warning</p>
                                 <p className="text-[10px] font-bold leading-normal uppercase tracking-widest opacity-80">
                                     Final view. This key sequence will be purged from memory and is unrecoverable if lost.
                                 </p>
@@ -409,7 +409,7 @@ const APIKeysPage = () => {
                     <DialogFooter className="p-8 pt-0">
                         <Button
                             onClick={() => setIsKeyDialogOpen(false)}
-                            className="w-full h-12 bg-foreground text-background hover:bg-foreground/90 font-black uppercase tracking-[0.2em] text-[10px] rounded-xl shadow-xl transition-all"
+                            className="w-full h-9 bg-foreground text-background hover:bg-foreground/90 font-black uppercase tracking-[0.2em] text-[10px] rounded-md shadow-xl transition-all"
                         >
                             I have acknowledged and stored the key
                         </Button>
@@ -419,9 +419,9 @@ const APIKeysPage = () => {
 
             {/* API Documentation Modal */}
             <Dialog open={isDocDialogOpen} onOpenChange={setIsDocDialogOpen}>
-                <DialogContent className="sm:max-w-2xl bg-card border-border rounded-3xl overflow-hidden p-0 shadow-2xl">
+                <DialogContent className="sm:max-w-2xl bg-card border-border rounded-md overflow-hidden p-0 shadow-2xl">
                     <DialogHeader className="p-8 pb-0">
-                        <div className="p-4 bg-indigo-500/10 w-fit rounded-2xl mb-6 shadow-inner">
+                        <div className="p-4 bg-indigo-500/10 w-fit rounded-md mb-6 shadow-inner">
                             <Book className="w-8 h-8 text-indigo-500" />
                         </div>
                         <DialogTitle className="text-3xl font-black tracking-tighter italic uppercase text-indigo-500">API Documentation</DialogTitle>
@@ -440,17 +440,17 @@ const APIKeysPage = () => {
                                     <p className="text-xs text-muted-foreground font-medium">{doc.description}</p>
                                 )}
                                 {doc.code && (
-                                    <div className="p-4 rounded-xl bg-muted/20 border border-border font-mono text-xs text-primary font-bold">
+                                    <div className="p-4 rounded-md bg-muted/20 border border-border font-mono text-xs text-primary font-bold">
                                         {doc.code}
                                     </div>
                                 )}
                                 {doc.methods && (
                                     <div className="space-y-3">
                                         {doc.methods.map((m, j) => (
-                                            <div key={j} className="p-4 rounded-xl bg-muted/10 border border-border/50 space-y-2 group hover:bg-muted/20 transition-all">
+                                            <div key={j} className="p-4 rounded-md bg-muted/10 border border-border/50 space-y-2 group hover:bg-muted/20 transition-all">
                                                 <div className="flex items-center gap-3">
-                                                    <Badge className="bg-indigo-500 text-white font-black text-[9px] px-2">{m.method}</Badge>
-                                                    <code className="text-[11px] font-bold text-primary">{m.path}</code>
+                                                    <Badge className="bg-indigo-500 text-white font-black text-[10px] px-2">{m.method}</Badge>
+                                                    <code className="text-xs font-bold text-primary">{m.path}</code>
                                                 </div>
                                                 <p className="text-[10px] text-muted-foreground font-medium ml-1">{m.desc}</p>
                                             </div>
@@ -463,7 +463,7 @@ const APIKeysPage = () => {
                     <DialogFooter className="p-8 pt-0">
                         <Button
                             onClick={() => setIsDocDialogOpen(false)}
-                            className="w-full h-12 bg-foreground text-background hover:bg-foreground/90 font-black uppercase tracking-[0.2em] text-[10px] rounded-xl shadow-xl transition-all"
+                            className="w-full h-9 bg-foreground text-background hover:bg-foreground/90 font-black uppercase tracking-[0.2em] text-[10px] rounded-md shadow-xl transition-all"
                         >
                             Close Documentation
                         </Button>

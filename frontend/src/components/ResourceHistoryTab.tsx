@@ -55,9 +55,9 @@ const ResourceHistoryTab = ({ resourceType, resourceId }: ResourceHistoryTabProp
 
     const getStatusBadge = (status: string) => {
         return status === 'SUCCESS' ? (
-            <Badge className="bg-green-500/10 text-green-500 border-green-500/20 text-[9px] font-black tracking-widest px-2 py-0">SUCCESS</Badge>
+            <Badge className="bg-green-500/10 text-green-500 border-green-500/20 text-[10px] font-black tracking-widest px-2 py-0">SUCCESS</Badge>
         ) : (
-            <Badge className="bg-red-500/10 text-red-500 border-red-500/20 text-[9px] font-black tracking-widest px-2 py-0">FAILED</Badge>
+            <Badge className="bg-red-500/10 text-red-500 border-red-500/20 text-[10px] font-black tracking-widest px-2 py-0">FAILED</Badge>
         );
     };
 
@@ -73,11 +73,11 @@ const ResourceHistoryTab = ({ resourceType, resourceId }: ResourceHistoryTabProp
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="border-b border-border bg-slate-500/5">
-                                <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-muted-foreground">Time</th>
-                                <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-muted-foreground">User</th>
-                                <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-muted-foreground">Action</th>
-                                <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-muted-foreground text-center">Status</th>
-                                <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-muted-foreground text-right">Detail</th>
+                                <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Time</th>
+                                <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground">User</th>
+                                <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Action</th>
+                                <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-center">Status</th>
+                                <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-right">Detail</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border/50">
@@ -99,11 +99,11 @@ const ResourceHistoryTab = ({ resourceType, resourceId }: ResourceHistoryTabProp
                                         <td className="px-5 py-3">
                                             <div className="flex flex-col leading-none">
                                                 <span className="text-[10px] font-extrabold">{format(new Date(log.timestamp), 'MMM dd')}</span>
-                                                <span className="text-[8px] text-muted-foreground font-bold uppercase mt-0.5">{format(new Date(log.timestamp), 'HH:mm:ss')}</span>
+                                                <span className="text-[10px] text-muted-foreground font-bold uppercase mt-0.5">{format(new Date(log.timestamp), 'HH:mm:ss')}</span>
                                             </div>
                                         </td>
                                         <td className="px-5 py-3">
-                                            <span className="text-[11px] font-semibold">{log.username || 'System'}</span>
+                                            <span className="text-xs font-semibold">{log.username || 'System'}</span>
                                         </td>
                                         <td className="px-5 py-3">
                                             <span className="text-[10px] font-black uppercase tracking-widest text-primary/80">{log.action}</span>
@@ -128,7 +128,7 @@ const ResourceHistoryTab = ({ resourceType, resourceId }: ResourceHistoryTabProp
             </Card>
 
             <Dialog open={!!selectedLog} onOpenChange={() => setSelectedLog(null)}>
-                <DialogContent className="max-w-3xl bg-background/95 backdrop-blur-xl border-border rounded-[2rem] p-6 shadow-2xl overflow-hidden">
+                <DialogContent className="max-w-3xl bg-background/95 backdrop-blur-xl border-border rounded-md p-6 shadow-2xl overflow-hidden">
                     <DialogHeader className="mb-4">
                         <DialogTitle className="flex items-center gap-3">
                             <AlertCircle className="w-5 h-5 text-primary" />
@@ -138,8 +138,8 @@ const ResourceHistoryTab = ({ resourceType, resourceId }: ResourceHistoryTabProp
                     
                     {selectedLog && (
                         <div className="space-y-4">
-                            <div className="bg-slate-950/50 rounded-2xl p-4 overflow-auto max-h-[450px] border border-white/5 w-full">
-                                <pre className="text-[11px] font-mono text-blue-400 leading-relaxed whitespace-pre w-full">
+                            <div className="bg-slate-950/50 rounded-md p-4 overflow-auto max-h-[450px] border border-white/5 w-full">
+                                <pre className="text-xs font-mono text-blue-400 leading-relaxed whitespace-pre w-full">
                                     {selectedLog.metadata ? JSON.stringify(JSON.parse(selectedLog.metadata), null, 4) : 'No extra data'}
                                 </pre>
                             </div>

@@ -123,31 +123,31 @@ const ExecutionHistoryPage = () => {
         switch (exec.trigger_source) {
             case 'SCHEDULE':
                 return (
-                    <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 font-black text-[8px] uppercase tracking-widest px-2 py-0.5">
+                    <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 font-black text-[10px] uppercase tracking-widest px-2 py-0.5">
                         <Calendar className="w-3 h-3 mr-1" /> Scheduled
                     </Badge>
                 );
             case 'PAGE':
                 return (
-                    <Badge variant="outline" className="bg-purple-500/10 text-purple-500 border-purple-500/20 font-black text-[8px] uppercase tracking-widest px-2 py-0.5">
+                    <Badge variant="outline" className="bg-purple-500/10 text-purple-500 border-purple-500/20 font-black text-[10px] uppercase tracking-widest px-2 py-0.5">
                         <FileText className="w-3 h-3 mr-1" /> Page: {exec.page?.title || 'Public'}
                     </Badge>
                 );
             case 'HOOK':
                 return (
-                    <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/20 font-black text-[8px] uppercase tracking-widest px-2 py-0.5">
+                    <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/20 font-black text-[10px] uppercase tracking-widest px-2 py-0.5">
                         <Zap className="w-3 h-3 mr-1" /> Hook
                     </Badge>
                 );
             case 'STEP':
                 return (
-                    <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 font-black text-[8px] uppercase tracking-widest px-2 py-0.5">
+                    <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 font-black text-[10px] uppercase tracking-widest px-2 py-0.5">
                         <Zap className="w-3 h-3 mr-1" /> Step Action
                     </Badge>
                 );
             default:
                 return (
-                    <Badge variant="outline" className="bg-slate-500/10 text-slate-400 border-slate-500/20 font-black text-[8px] uppercase tracking-widest px-2 py-0.5">
+                    <Badge variant="outline" className="bg-slate-500/10 text-slate-400 border-slate-500/20 font-black text-[10px] uppercase tracking-widest px-2 py-0.5">
                         <Plus className="w-3 h-3 mr-1" /> Manual
                     </Badge>
                 );
@@ -252,7 +252,7 @@ const ExecutionHistoryPage = () => {
                     />
 
                     {/* Main Content */}
-                    <div className="bg-card/30 backdrop-blur-sm rounded-3xl border border-border p-6 shadow-premium relative overflow-hidden flex-1 flex flex-col min-h-0">
+                    <div className="bg-card/30 backdrop-blur-sm rounded-md border border-border p-6 shadow-premium relative overflow-hidden flex-1 flex flex-col min-h-0">
                         <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
                         <div className="overflow-y-auto flex-1 custom-scrollbar">
                             <WorkflowHistory

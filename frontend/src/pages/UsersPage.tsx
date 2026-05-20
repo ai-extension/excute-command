@@ -278,7 +278,7 @@ const UsersPage = () => {
                                     key={role.id}
                                     onClick={() => toggleRole(role.id)}
                                     className={cn(
-                                        "flex items-center justify-between p-4 rounded-2xl border transition-all duration-300 text-left group",
+                                        "flex items-center justify-between p-4 rounded-md border transition-all duration-300 text-left group",
                                         selectedRoleIDs.includes(role.id)
                                             ? "bg-primary/10 border-primary shadow-sm"
                                             : "bg-muted/30 border-border hover:border-primary/30"
@@ -286,7 +286,7 @@ const UsersPage = () => {
                                 >
                                     <div className="flex items-center gap-3">
                                         <div className={cn(
-                                            "w-10 h-10 rounded-xl flex items-center justify-center transition-colors",
+                                            "w-10 h-10 rounded-md flex items-center justify-center transition-colors",
                                             selectedRoleIDs.includes(role.id) ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground group-hover:bg-primary/20"
                                         )}>
                                             <Shield className="w-5 h-5" />
@@ -310,7 +310,7 @@ const UsersPage = () => {
                         <Button
                             onClick={handleUpdateRoles}
                             disabled={isSubmitting}
-                            className="premium-gradient font-black uppercase tracking-widest text-[10px] h-12 w-full shadow-premium rounded-xl"
+                            className="premium-gradient font-black uppercase tracking-widest text-[10px] h-9 w-full shadow-premium rounded-md"
                         >
                             {isSubmitting ? "Applying Changes..." : "Enforce Authorization"}
                         </Button>
@@ -331,7 +331,7 @@ const UsersPage = () => {
 
                 <Button
                     onClick={() => setIsCreateOpen(true)}
-                    className="px-4 rounded-xl premium-gradient font-black uppercase tracking-widest text-[10px] h-9 shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
+                    className="px-4 rounded-md premium-gradient font-black uppercase tracking-widest text-[10px] h-9 shadow-premium hover:shadow-indigo-500/25 transition-all gap-2"
                 >
                     <UserPlus className="w-3.5 h-3.5" />
                     New User
@@ -353,7 +353,7 @@ const UsersPage = () => {
                             <Input
                                 id="username"
                                 placeholder="e.g. jdoe"
-                                className="h-12 bg-muted/30 border-border rounded-xl font-semibold"
+                                className="h-9 bg-muted/30 border-border rounded-md font-semibold"
                                 value={newUserData.username}
                                 onChange={(e) => setNewUserData({ ...newUserData, username: e.target.value })}
                                 required
@@ -365,7 +365,7 @@ const UsersPage = () => {
                                 id="email"
                                 type="email"
                                 placeholder="jdoe@example.com"
-                                className="h-12 bg-muted/30 border-border rounded-xl font-semibold"
+                                className="h-9 bg-muted/30 border-border rounded-md font-semibold"
                                 value={newUserData.email}
                                 onChange={(e) => setNewUserData({ ...newUserData, email: e.target.value })}
                             />
@@ -375,7 +375,7 @@ const UsersPage = () => {
                             <Input
                                 id="password"
                                 type="password"
-                                className="h-12 bg-muted/30 border-border rounded-xl font-semibold"
+                                className="h-9 bg-muted/30 border-border rounded-md font-semibold"
                                 value={newUserData.password}
                                 onChange={(e) => setNewUserData({ ...newUserData, password: e.target.value })}
                                 required
@@ -385,7 +385,7 @@ const UsersPage = () => {
                             <Button
                                 type="submit"
                                 disabled={isSubmitting}
-                                className="premium-gradient font-black uppercase tracking-widest text-[10px] h-12 w-full shadow-premium rounded-xl"
+                                className="premium-gradient font-black uppercase tracking-widest text-[10px] h-9 w-full shadow-premium rounded-md"
                             >
                                 {isSubmitting ? "Provisioning..." : "Create Identity"}
                             </Button>
@@ -408,7 +408,7 @@ const UsersPage = () => {
                             <Label htmlFor="edit-username" className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Username</Label>
                             <Input
                                 id="edit-username"
-                                className="h-12 bg-muted/30 border-border rounded-xl font-semibold"
+                                className="h-9 bg-muted/30 border-border rounded-md font-semibold"
                                 value={editUserData.username}
                                 onChange={(e) => setEditUserData({ ...editUserData, username: e.target.value })}
                                 required
@@ -419,7 +419,7 @@ const UsersPage = () => {
                             <Input
                                 id="edit-fullname"
                                 placeholder="John Doe"
-                                className="h-12 bg-muted/30 border-border rounded-xl font-semibold"
+                                className="h-9 bg-muted/30 border-border rounded-md font-semibold"
                                 value={editUserData.full_name}
                                 onChange={(e) => setEditUserData({ ...editUserData, full_name: e.target.value })}
                             />
@@ -430,7 +430,7 @@ const UsersPage = () => {
                                 id="edit-email"
                                 type="email"
                                 placeholder="jdoe@example.com"
-                                className="h-12 bg-muted/30 border-border rounded-xl font-semibold"
+                                className="h-9 bg-muted/30 border-border rounded-md font-semibold"
                                 value={editUserData.email}
                                 onChange={(e) => setEditUserData({ ...editUserData, email: e.target.value })}
                             />
@@ -439,7 +439,7 @@ const UsersPage = () => {
                             <Button
                                 type="submit"
                                 disabled={isSubmitting}
-                                className="premium-gradient font-black uppercase tracking-widest text-[10px] h-12 w-full shadow-premium rounded-xl"
+                                className="premium-gradient font-black uppercase tracking-widest text-[10px] h-9 w-full shadow-premium rounded-md"
                             >
                                 {isSubmitting ? "Updating..." : "Save Changes"}
                             </Button>
@@ -464,7 +464,7 @@ const UsersPage = () => {
                                 id="reset-password"
                                 type="password"
                                 placeholder="Minimum 6 characters"
-                                className="h-12 bg-muted/30 border-border rounded-xl font-semibold"
+                                className="h-9 bg-muted/30 border-border rounded-md font-semibold"
                                 value={resetPasswordData.new_password}
                                 onChange={(e) => setResetPasswordData({ ...resetPasswordData, new_password: e.target.value })}
                                 required
@@ -474,7 +474,7 @@ const UsersPage = () => {
                             <Button
                                 type="submit"
                                 disabled={isSubmitting || resetPasswordData.new_password.length < 6}
-                                className="premium-gradient font-black uppercase tracking-widest text-[10px] h-12 w-full shadow-premium rounded-xl"
+                                className="premium-gradient font-black uppercase tracking-widest text-[10px] h-9 w-full shadow-premium rounded-md"
                             >
                                 {isSubmitting ? "Resetting..." : "Reset Password"}
                             </Button>
@@ -509,31 +509,28 @@ const UsersPage = () => {
                 }}
             />
 
-            <Card className="border-border bg-card shadow-premium overflow-hidden rounded-2xl">
+            <Card className="rounded-md border border-border bg-card shadow-card overflow-hidden">
                 <Table>
                     <TableHeader>
-                        <TableRow className="bg-muted/50 border-border hover:bg-muted/50">
-                            <TableHead className="w-[300px] h-14 font-black uppercase tracking-widest text-[9px] px-8">Identity</TableHead>
-                            <TableHead className="font-black uppercase tracking-widest text-[9px]">Authorization Roles</TableHead>
-                            <TableHead className="font-black uppercase tracking-widest text-[9px]">Last Activity</TableHead>
-                            <TableHead className="font-black uppercase tracking-widest text-[9px]">Status</TableHead>
-                            <TableHead className="text-right h-14 px-8 font-black uppercase tracking-widest text-[9px]">Actions</TableHead>
+                        <TableRow className="bg-muted hover:bg-muted/80 border-border">
+                            <TableHead className="w-[300px] h-9 font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground px-6">Identity</TableHead>
+                            <TableHead className="font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">Authorization Roles</TableHead>
+                            <TableHead className="font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">Last Activity</TableHead>
+                            <TableHead className="font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">Status</TableHead>
+                            <TableHead className="text-right h-9 px-6 font-black uppercase tracking-[0.15em] text-[10px] text-muted-foreground">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {users.length > 0 ? users.map((u) => (
                             <TableRow key={u.id} className="group border-border hover:bg-muted/30 transition-all duration-200">
-                                <TableCell className="px-8 py-5">
+                                <TableCell className="px-6 py-4">
                                     <div className="flex items-center gap-4">
-                                        <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary/20 to-indigo-500/20 flex items-center justify-center border border-primary/10 shadow-sm shrink-0">
-                                            <span className="text-xs font-black text-primary uppercase">{u.username.substring(0, 2)}</span>
-                                        </div>
                                         <div>
                                             <p className="text-sm font-black tracking-tight flex items-center gap-2">
                                                 {u.full_name || u.username}
                                                 {u.username === 'admin' && <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />}
                                             </p>
-                                            <p className="text-[11px] text-muted-foreground font-medium flex items-center gap-1.5 mt-0.5">
+                                            <p className="text-xs text-muted-foreground font-medium flex items-center gap-1.5 mt-0.5">
                                                 <Mail className="w-3 h-3 opacity-50" /> {u.email || (u.username + '@system')}
                                             </p>
                                         </div>
@@ -542,27 +539,27 @@ const UsersPage = () => {
                                 <TableCell>
                                     <div className="flex flex-wrap gap-1.5">
                                         {(u.roles || []).map((role: any) => (
-                                            <Badge key={role.id} variant="secondary" className="bg-primary/5 text-primary border-primary/20 font-black text-[9px] px-2.5 py-1 rounded-lg">
+                                            <Badge key={role.id} variant="secondary" className="bg-primary/5 text-primary border-primary/20 font-black text-[10px] px-2.5 py-1 rounded-md">
                                                 {role.name.toUpperCase()}
                                             </Badge>
                                         ))}
                                         {(!u.roles || u.roles.length === 0) && <span className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest italic">Default User</span>}
                                     </div>
                                 </TableCell>
-                                <TableCell className="text-[11px] font-bold text-muted-foreground/60 italic">
+                                <TableCell className="text-xs font-bold text-muted-foreground/60 italic">
                                     {u.updated_at ? new Date(u.updated_at).toLocaleDateString() : 'Never'}
                                 </TableCell>
                                 <TableCell>
-                                    <Badge className="bg-emerald-500/10 text-emerald-500 border-none font-black text-[9px] px-2.5 py-1 rounded-lg shadow-none">
+                                    <Badge className="bg-emerald-500/10 text-emerald-500 border-none font-black text-[10px] px-2.5 py-1 rounded-md shadow-none">
                                         ACTIVE
                                     </Badge>
                                 </TableCell>
-                                <TableCell className="text-right px-8">
+                                <TableCell className="text-right px-6">
                                     <div className="flex justify-end gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all duration-300">
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            className="w-9 rounded-xl hover:bg-amber-500/10 hover:text-amber-600 transition-colors"
+                                            className="w-9 rounded-md hover:bg-amber-500/10 hover:text-amber-600 transition-colors"
                                             onClick={() => openEditDialog(u)}
                                             title="Edit User"
                                         >
@@ -571,7 +568,7 @@ const UsersPage = () => {
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            className="w-9 rounded-xl hover:bg-primary/10 hover:text-primary transition-colors"
+                                            className="w-9 rounded-md hover:bg-primary/10 hover:text-primary transition-colors"
                                             onClick={() => openRolesDialog(u)}
                                             title="Manage Roles"
                                         >
@@ -580,7 +577,7 @@ const UsersPage = () => {
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            className="w-9 rounded-xl hover:bg-indigo-500/10 hover:text-indigo-600 transition-colors"
+                                            className="w-9 rounded-md hover:bg-indigo-500/10 hover:text-indigo-600 transition-colors"
                                             onClick={() => openResetDialog(u)}
                                             title="Reset Password"
                                         >
@@ -590,7 +587,7 @@ const UsersPage = () => {
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                className="w-9 rounded-xl hover:bg-destructive/10 hover:text-destructive transition-colors"
+                                                className="w-9 rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors"
                                                 onClick={() => setDeleteTarget(u)}
                                                 title="Delete User"
                                             >
@@ -605,13 +602,14 @@ const UsersPage = () => {
                                 <TableCell colSpan={5} className="h-48 text-center">
                                     <div className="flex flex-col items-center gap-3 opacity-30">
                                         <Users className="w-12 h-12" />
-                                        <p className="text-[11px] font-black uppercase tracking-widest">{isLoading ? "Synchronizing user registry..." : "No users found matching your criteria"}</p>
+                                        <p className="text-xs font-black uppercase tracking-widest">{isLoading ? "Synchronizing user registry..." : "No users found matching your criteria"}</p>
                                     </div>
                                 </TableCell>
                             </TableRow>
                         )}
                     </TableBody>
                 </Table>
+            </Card>
 
                 <Pagination
                     total={total}
@@ -620,7 +618,6 @@ const UsersPage = () => {
                     itemName="Users"
                     onPageChange={setOffset}
                 />
-            </Card>
 
             <ConfirmDialog
                 isOpen={!!deleteTarget}

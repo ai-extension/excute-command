@@ -2,11 +2,12 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { WorkflowInput, MultiInputItem } from '../types';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
-import { Dialog, DialogContent, DialogFooter, DialogTitle } from './ui/dialog';
+import { Label } from './ui/label';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Zap, Plus, Trash2 } from 'lucide-react';
 import { generateUUID } from '../lib/utils';
+import { SearchableSelect } from './SearchableSelect';
 
 const getSelectDisplayLabel = (opt: string) => {
     const idx = opt.indexOf('::');
@@ -42,6 +43,8 @@ interface WorkflowInputDialogProps {
     uploadUrl?: string;
     headers?: Record<string, string>;
     storageKey?: string;
+    title?: string;
+    description?: string;
 }
 
 const DRAFT_PREFIX = 'wf_input_draft:';
@@ -91,6 +94,8 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
     uploadUrl = '/api/workflows/upload-input',
     headers = {},
     storageKey,
+    title = 'Workflow Inputs',
+    description = 'Provide values for this workflow run.',
 }) => {
     const [values, setValues] = useState<Record<string, string>>({});
     const [files, setFiles] = useState<Record<string, File>>({});
@@ -196,7 +201,7 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                     } else {
                         initialValues[input.key] = '[]';
                     }
-                } else if (input.type === 'input' || input.type === 'number') {
+                } else if (input.type === 'input' || input.type === 'number' || input.type === 'textarea') {
                     const tm = parseTemplateMap(input.default_value);
                     initialValues[input.key] = tm ? '' : (input.default_value || '');
                 } else {
@@ -398,23 +403,29 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent hideClose className="max-w-xl w-[95vw] bg-popover border-border border-2 rounded-2xl p-0 overflow-hidden shadow-2xl flex flex-col focus:outline-none">
-                <DialogTitle className="sr-only">Workflow Input</DialogTitle>
-                <form 
-                    key={isOpen ? 'open' : 'closed'} 
-                    onSubmit={handleSubmit} 
-                    className="flex-1 p-4 space-y-4 overflow-y-auto max-h-[70vh] custom-scrollbar"
+            <DialogContent className="sm:max-w-xl w-[95vw] max-h-[85vh] p-0 overflow-hidden flex flex-col">
+                <DialogHeader className="px-6 pt-6 pb-2 flex-shrink-0">
+                    <DialogTitle className="flex items-center gap-2">
+                        <Zap className="w-5 h-5 text-primary" />
+                        {title}
+                    </DialogTitle>
+                    <DialogDescription>
+                        {description}
+                    </DialogDescription>
+                </DialogHeader>
+                <form
+                    key={isOpen ? 'open' : 'closed'}
+                    onSubmit={handleSubmit}
+                    className="flex-1 px-6 py-4 space-y-4 overflow-y-auto custom-scrollbar"
                 >
                     {inputs.slice().sort((a, b) => (a.order || 0) - (b.order || 0)).map((input) => (
-                        <div key={input.key} className="space-y-3 p-4 bg-muted/20 border border-border/50 rounded-xl group transition-all hover:bg-muted/30 hover:border-border">
-                            <div className="flex items-center justify-between">
-                                <div className="flex flex-col gap-0.5">
-                                    <Label className={`text-[10px] font-bold uppercase tracking-wider transition-colors ${errors[input.key] ? 'text-destructive' : 'text-indigo-500'}`}>
-                                        {input.label || input.key}
-                                    </Label>
-                                </div>
+                        <div key={input.key} className="space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                                <Label className={`text-[10px] font-bold uppercase tracking-widest transition-colors ${errors[input.key] ? 'text-destructive' : (input.required ? 'text-primary' : 'text-muted-foreground')}`}>
+                                    {input.label || input.key}
+                                </Label>
                                 {errors[input.key] && (
-                                    <span className="text-[10px] font-bold text-destructive bg-destructive/10 px-3 py-1 rounded-full animate-pulse">
+                                    <span className="text-[10px] font-medium text-destructive">
                                         {errors[input.key]}
                                     </span>
                                 )}
@@ -422,30 +433,21 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
 
                             <div className="relative">
                                 {input.type === 'select' ? (
-                                    <div className="relative">
-                                        <select
-                                            value={values[input.key] || ''}
-                                            onChange={(e) => {
-                                                let nv = { ...values, [input.key]: e.target.value };
-                                                nv = applyTemplates(nv, input.key);
-                                                setValues(nv);
-                                                if (errors[input.key]) setErrors({ ...errors, [input.key]: '' });
-                                            }}
-                                            className={`h-9 w-full pl-3 pr-8 bg-background border focus:border-indigo-500 text-[11px] font-semibold rounded-lg text-foreground appearance-none outline-none cursor-pointer hover:border-border transition-colors ${errors[input.key] ? 'border-destructive' : 'border-border'}`}
-                                        >
-                                            <option value="" disabled className="text-muted-foreground">Select an option...</option>
-                                            {(input.default_value || '').split(',').map((opt) => opt.trim()).filter(Boolean).map((opt) => (
-                                                <option key={opt} value={opt} className="bg-popover text-foreground">{getSelectDisplayLabel(opt)}</option>
-                                            ))}
-                                        </select>
-                                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-50 text-foreground">
-                                            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                            </svg>
-                                        </div>
-                                    </div>
+                                    <SearchableSelect
+                                        options={(input.default_value || '').split(',').map((o) => o.trim()).filter(Boolean).map((o) => ({ label: o, value: o }))}
+                                        value={values[input.key] || ''}
+                                        onValueChange={(val: string) => {
+                                            const nv = { ...values, [input.key]: val };
+                                            setValues(nv);
+                                            if (errors[input.key]) setErrors({ ...errors, [input.key]: '' });
+                                        }}
+                                        placeholder="Select an option..."
+                                        searchPlaceholder="Search options..."
+                                        isSearchable
+                                        triggerClassName={`h-9 rounded-md ${errors[input.key] ? 'border-destructive' : 'border-border'}`}
+                                    />
                                 ) : input.type === 'multi-select' ? (
-                                    <div className="flex flex-wrap gap-2 p-3 bg-background border border-border rounded-xl shadow-sm">
+                                    <div className="flex flex-wrap gap-2 p-3 bg-background border border-border rounded-md shadow-sm">
                                         {(input.default_value || '').split(',').map((opt) => opt.trim()).filter(Boolean).map((opt) => {
                                             let selected: string[] = [];
                                             try { selected = JSON.parse(values[input.key] || '[]'); } catch (e) { }
@@ -460,7 +462,7 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                                                         const newValue = toggleMultiSelectValue(values[input.key], opt);
                                                         setValues({ ...values, [input.key]: newValue });
                                                     }}
-                                                    className={`h-7 px-3 text-[10px] font-bold rounded-lg transition-all ${isSelected ? 'premium-gradient shadow-sm border-0 text-white' : 'hover:bg-indigo-500/10 hover:text-indigo-500 hover:border-indigo-500/30'}`}
+                                                    className={`h-7 px-3 text-[10px] font-bold rounded-md transition-all ${isSelected ? 'premium-gradient shadow-sm border-0 text-white' : 'hover:bg-indigo-500/10 hover:text-indigo-500 hover:border-indigo-500/30'}`}
                                                 >
                                                     {getSelectDisplayLabel(opt)}
                                                 </Button>
@@ -491,30 +493,29 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                                                 <>
                                                     <div className="flex flex-col gap-2">
                                                         {rows.map((row, rowIndex) => (
-                                                            <div key={rowIndex} className="group/row relative flex flex-wrap gap-3 p-3 bg-background border border-border rounded-lg shadow-sm transition-all hover:border-indigo-500/30">
+                                                            <div key={rowIndex} className="group/row relative flex flex-wrap gap-3 p-3 bg-background border border-border rounded-md shadow-sm transition-all hover:border-indigo-500/30">
                                                                 {config.map((field) => (
                                                                     <div key={field.key} className="flex flex-col gap-1 min-w-[200px] flex-1">
-                                                                        <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground truncate" title={field.label || field.key}>
+                                                                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground truncate" title={field.label || field.key}>
                                                                             {field.label || field.key}
                                                                         </span>
                                                                         {field.type === 'select' ? (
-                                                                            <select
+                                                                            <SearchableSelect
+                                                                                options={(field.options || '').split(',').map((o: string) => o.trim()).filter(Boolean).map((o: string) => ({ label: o, value: o }))}
                                                                                 value={row[field.key] || ''}
-                                                                                onChange={(e) => {
-                                                                                    const newValue = updateMultiInputValue(values[input.key], rowIndex, field.key, e.target.value);
+                                                                                onValueChange={(val: string) => {
+                                                                                    const newValue = updateMultiInputValue(values[input.key], rowIndex, field.key, val);
                                                                                     setValues({ ...values, [input.key]: newValue });
                                                                                 }}
-                                                                                className="h-8 w-full px-2 bg-muted/30 border border-border rounded-md text-[11px] font-medium outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 transition-all appearance-none"
-                                                                            >
-                                                                                <option value="">Select...</option>
-                                                                                {(field.options || '').split(',').map((o: string) => o.trim()).filter(Boolean).map((o: string) => (
-                                                                                    <option key={o} value={o}>{o}</option>
-                                                                                ))}
-                                                                            </select>
+                                                                                placeholder="Select..."
+                                                                                searchPlaceholder="Search..."
+                                                                                isSearchable
+                                                                                triggerClassName="h-8 rounded-md bg-muted/30"
+                                                                            />
                                                                         ) : field.type === 'file' ? (
                                                                             <Input
                                                                                 type="file"
-                                                                                className="h-8 bg-muted/30 border-border rounded-md text-[10px] font-medium file:bg-indigo-500/10 file:text-indigo-500 file:text-[9px] file:font-bold file:h-full file:py-0 file:px-2 file:mr-2 file:border-0 file:rounded-sm cursor-pointer"
+                                                                                className="h-8 bg-muted/30 border-border rounded-md text-[10px] font-medium file:bg-indigo-500/10 file:text-indigo-500 file:text-[10px] file:font-bold file:h-full file:py-0 file:px-2 file:mr-2 file:border-0 file:rounded-sm cursor-pointer"
                                                                                 onChange={(e) => {
                                                                                     const file = e.target.files?.[0];
                                                                                     const newMultiFiles = { ...multiInputFiles };
@@ -532,7 +533,7 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                                                                         ) : (
                                                                             <Input
                                                                                 type={field.type === 'number' ? 'number' : 'text'}
-                                                                                className="h-8 bg-muted/30 border-border rounded-md text-[11px] font-medium focus-visible:ring-1 focus-visible:ring-indigo-500 focus-visible:border-indigo-500"
+                                                                                className="h-8 bg-muted/30 border-border rounded-md text-xs font-medium focus-visible:ring-1 focus-visible:ring-indigo-500 focus-visible:border-indigo-500"
                                                                                 value={row[field.key] || ''}
                                                                                 onChange={(e) => {
                                                                                     const newValue = updateMultiInputValue(values[input.key], rowIndex, field.key, e.target.value);
@@ -584,7 +585,7 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                                                             const newValue = addMultiInputRow(values[input.key]);
                                                             setValues({ ...values, [input.key]: newValue });
                                                         }}
-                                                        className="w-full h-8 border-dashed border-indigo-500/40 text-indigo-500 hover:text-indigo-600 bg-indigo-500/5 hover:bg-indigo-500/10 text-[9px] font-bold uppercase tracking-widest rounded-lg transition-all"
+                                                        className="w-full h-8 border-dashed border-indigo-500/40 text-indigo-500 hover:text-indigo-600 bg-indigo-500/5 hover:bg-indigo-500/10 text-[10px] font-bold uppercase tracking-widest rounded-md transition-all"
                                                     >
                                                         <Plus className="w-3.5 h-3.5 mr-1.5" /> Add Entry
                                                     </Button>
@@ -592,6 +593,17 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                                             );
                                         })()}
                                     </div>
+                                ) : input.type === 'textarea' ? (
+                                    <Textarea
+                                        value={values[input.key] || ''}
+                                        onChange={(e) => {
+                                            const nv = { ...values, [input.key]: e.target.value };
+                                            setValues(nv);
+                                            if (errors[input.key]) setErrors({ ...errors, [input.key]: '' });
+                                        }}
+                                        className={`min-h-[120px] px-3 py-2 bg-background focus:border-indigo-500 text-xs font-semibold rounded-md transition-all resize-y ${errors[input.key] ? 'border-destructive' : 'border-border'}`}
+                                        placeholder={`Enter value for ${input.label || input.key}...`}
+                                    />
                                 ) : input.type === 'file' ? (
                                     <div className="relative">
                                         <Input
@@ -607,7 +619,7 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                                                 }
                                                 if (errors[input.key]) setErrors({ ...errors, [input.key]: '' });
                                             }}
-                                            className={`h-9 px-3 cursor-pointer file:cursor-pointer file:mr-3 file:py-0 file:h-full file:px-3 file:rounded-md file:border-0 file:text-[9px] file:font-bold file:bg-indigo-500/10 file:text-indigo-500 hover:file:bg-indigo-500/20 bg-background focus:border-indigo-500 text-[11px] font-semibold rounded-lg transition-all ${errors[input.key] ? 'border-destructive' : 'border-border'}`}
+                                            className={`h-9 px-3 cursor-pointer file:cursor-pointer file:mr-3 file:py-0 file:h-full file:px-3 file:rounded-md file:border-0 file:text-[10px] file:font-bold file:bg-indigo-500/10 file:text-indigo-500 hover:file:bg-indigo-500/20 bg-background focus:border-indigo-500 text-xs font-semibold rounded-md transition-all ${errors[input.key] ? 'border-destructive' : 'border-border'}`}
                                         />
                                     </div>
                                 ) : templateMaps[input.key] ? (
@@ -631,7 +643,7 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                                             setValues(nv);
                                             if (errors[input.key]) setErrors({ ...errors, [input.key]: '' });
                                         }}
-                                        className={`h-9 px-3 bg-background focus:border-indigo-500 text-[11px] font-semibold rounded-lg transition-all ${errors[input.key] ? 'border-destructive' : 'border-border'}`}
+                                        className={`h-9 px-3 bg-background focus:border-indigo-500 text-xs font-semibold rounded-md transition-all ${errors[input.key] ? 'border-destructive' : 'border-border'}`}
                                         placeholder={`Enter value for ${input.label || input.key}...`}
                                     />
                                 )}
@@ -640,30 +652,28 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                     ))}
                 </form>
 
-                <DialogFooter className="p-4 border-t border-border bg-muted/20 flex-shrink-0">
-                    <div className="flex w-full gap-2">
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={onCancel}
-                            className="flex-1 h-9 rounded-lg text-[9px] font-black uppercase tracking-widest bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            type="submit"
-                            disabled={isLoading}
-                            onClick={() => handleSubmit()}
-                            className="flex-[2] h-9 rounded-lg premium-gradient text-white text-[9px] font-black uppercase tracking-[0.2em] shadow-premium hover:opacity-90 transition-all gap-2"
-                        >
-                            {isLoading ? (
-                                <div className="w-3 h-3 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                            ) : (
-                                <Zap className="w-3 h-3" />
-                            )}
-                            {isUploading ? "Uploading..." : confirmLabel}
-                        </Button>
-                    </div>
+                <DialogFooter className="px-6 py-4 border-t border-border/50 flex-shrink-0">
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={onCancel}
+                        className="h-9 text-[10px] font-bold uppercase tracking-widest px-6"
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        type="submit"
+                        disabled={isLoading}
+                        onClick={() => handleSubmit()}
+                        className="h-9 text-[10px] font-bold uppercase tracking-widest px-6 premium-gradient gap-2"
+                    >
+                        {isLoading ? (
+                            <div className="w-3 h-3 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                        ) : (
+                            <Zap className="w-3 h-3" />
+                        )}
+                        {isUploading ? 'Uploading...' : confirmLabel}
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

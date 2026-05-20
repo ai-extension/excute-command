@@ -56,12 +56,12 @@ const LoginDialog: React.FC<LoginDialogProps> = ({ isOpen, onOpenChange, onSucce
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md bg-[#0f0f0f]/95 border-white/10 backdrop-blur-3xl rounded-[2.5rem] p-0 overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)]">
+            <DialogContent className="sm:max-w-md bg-[#0f0f0f]/95 border-white/10 backdrop-blur-3xl rounded-md p-0 overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)]">
                 <div className="p-10">
                     <DialogHeader className="flex flex-col items-center mb-8 gap-4">
                         <div className="relative">
                             <div className="absolute inset-0 bg-primary/40 blur-2xl rounded-full scale-110 animate-pulse" />
-                            <div className="relative premium-gradient p-3 rounded-2xl shadow-[0_0_30px_rgba(99,102,241,0.4)]">
+                            <div className="relative premium-gradient p-3 rounded-md shadow-[0_0_30px_rgba(99,102,241,0.4)]">
                                 <Zap className="w-6 h-6 text-white" />
                             </div>
                         </div>
@@ -83,7 +83,7 @@ const LoginDialog: React.FC<LoginDialogProps> = ({ isOpen, onOpenChange, onSucce
                             <div className="relative group">
                                 <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60 transition-all pointer-events-none z-10" />
                                 <Input
-                                    className="h-12 bg-white/[0.03] border-white/10 rounded-xl pl-12 text-[13px] font-medium text-white focus-visible:ring-primary/40 focus-visible:border-primary/50 transition-all placeholder:text-muted-foreground/30"
+                                    className="h-9 bg-white/[0.03] border-white/10 rounded-md pl-12 text-sm font-medium text-white focus-visible:ring-primary/40 focus-visible:border-primary/50 transition-all placeholder:text-muted-foreground/30"
                                     placeholder="Username"
                                     value={username}
                                     onChange={(e) => setUsername(e.target.value)}
@@ -100,7 +100,7 @@ const LoginDialog: React.FC<LoginDialogProps> = ({ isOpen, onOpenChange, onSucce
                                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60 transition-all pointer-events-none z-10" />
                                 <Input
                                     type="password"
-                                    className="h-12 bg-white/[0.03] border-white/10 rounded-xl pl-12 text-[13px] font-medium text-white focus-visible:ring-primary/40 focus-visible:border-primary/50 transition-all placeholder:text-muted-foreground/30"
+                                    className="h-9 bg-white/[0.03] border-white/10 rounded-md pl-12 text-sm font-medium text-white focus-visible:ring-primary/40 focus-visible:border-primary/50 transition-all placeholder:text-muted-foreground/30"
                                     placeholder="••••••••"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
@@ -110,7 +110,7 @@ const LoginDialog: React.FC<LoginDialogProps> = ({ isOpen, onOpenChange, onSucce
                         </div>
 
                         {error && (
-                            <div className="bg-destructive/5 border border-destructive/20 p-3 rounded-xl flex items-center gap-3 animate-in fade-in zoom-in-95 duration-500">
+                            <div className="bg-destructive/5 border border-destructive/20 p-3 rounded-md flex items-center gap-3 animate-in fade-in zoom-in-95 duration-500">
                                 <Shield className="w-3.5 h-3.5 text-destructive" />
                                 <p className="text-[10px] font-bold text-destructive leading-tight">{error}</p>
                             </div>
@@ -119,7 +119,7 @@ const LoginDialog: React.FC<LoginDialogProps> = ({ isOpen, onOpenChange, onSucce
                         <Button
                             type="submit"
                             disabled={isLoading}
-                            className="w-full h-12 premium-gradient shadow-[0_8px_24px_rgba(99,102,241,0.3)] text-xs font-black uppercase tracking-[0.2em] rounded-xl gap-3 transition-all hover:brightness-110"
+                            className="w-full h-9 premium-gradient shadow-[0_8px_24px_rgba(99,102,241,0.3)] text-xs font-black uppercase tracking-[0.2em] rounded-md gap-3 transition-all hover:brightness-110"
                         >
                             {isLoading ? (
                                 <Loader2 className="w-5 h-5 animate-spin" />
