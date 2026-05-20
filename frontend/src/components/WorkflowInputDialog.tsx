@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { WorkflowInput, MultiInputItem } from '../types';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -8,6 +8,29 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Zap, Plus, Trash2 } from 'lucide-react';
 import { generateUUID } from '../lib/utils';
 import { SearchableSelect } from './SearchableSelect';
+
+const getSelectDisplayLabel = (opt: string) => {
+    const idx = opt.indexOf('::');
+    return idx >= 0 ? opt.substring(0, idx).trim() : opt;
+};
+
+interface TemplateMap {
+    _template_for: string;
+    [optionValue: string]: string;
+}
+
+const parseTemplateMap = (defaultValue: string): TemplateMap | null => {
+    if (!defaultValue) return null;
+    const trimmed = defaultValue.trim();
+    if (!trimmed.startsWith('{')) return null;
+    try {
+        const parsed = JSON.parse(trimmed);
+        if (parsed && typeof parsed === 'object' && typeof parsed._template_for === 'string') {
+            return parsed as TemplateMap;
+        }
+    } catch { /* not a template map */ }
+    return null;
+};
 
 interface WorkflowInputDialogProps {
     isOpen: boolean;
@@ -81,6 +104,39 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
     const [isUploading, setIsUploading] = useState(false);
     const isLoading = isStarting || isUploading;
 
+    const templateMaps = useMemo(() => {
+        const maps: Record<string, TemplateMap> = {};
+        for (const input of inputs) {
+            const tm = parseTemplateMap(input.default_value);
+            if (tm) maps[input.key] = tm;
+        }
+        return maps;
+    }, [inputs]);
+
+    const templateTargetKeys = useMemo(() => {
+        const keys = new Set<string>();
+        for (const tm of Object.values(templateMaps)) {
+            keys.add(tm._template_for);
+        }
+        return keys;
+    }, [templateMaps]);
+
+    const applyTemplates = (newValues: Record<string, string>, changedKey: string) => {
+        if (!templateTargetKeys.has(changedKey)) return newValues;
+        const selectedValue = newValues[changedKey] || '';
+        const updated = { ...newValues };
+        for (const [inputKey, tm] of Object.entries(templateMaps)) {
+            if (tm._template_for !== changedKey) continue;
+            const matchKey = Object.keys(tm).find(k => k !== '_template_for' && selectedValue.startsWith(k));
+            if (matchKey) {
+                updated[inputKey] = tm[matchKey];
+            } else {
+                updated[inputKey] = '';
+            }
+        }
+        return updated;
+    };
+
     const toggleMultiSelectValue = (currentValue: string, option: string) => {
         let selected: string[] = [];
         try {
@@ -145,8 +201,9 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                     } else {
                         initialValues[input.key] = '[]';
                     }
-                } else if (input.type === 'input' || input.type === 'textarea' || input.type === 'number') {
-                    initialValues[input.key] = input.default_value || '';
+                } else if (input.type === 'input' || input.type === 'number' || input.type === 'textarea') {
+                    const tm = parseTemplateMap(input.default_value);
+                    initialValues[input.key] = tm ? '' : (input.default_value || '');
                 } else {
                     initialValues[input.key] = ''; // Select/File starts empty
                 }
@@ -174,8 +231,8 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
 
     const validate = () => {
         const newErrors: Record<string, string> = {};
-        const safeRegex = /^[\p{L}0-9_\-\. \/\\:\[\]{}"',@#%!+=?;&|\(\)\$\n\r]*$/u;
-        const allowedCharsDesc = 'Letters, 0-9, _, -, ., /, \\, :, [, ], {, }, ", \', @, #, %, !, +, =, ?, ;, &, |, (, ), $, Newline and Space';
+        const safeRegex = /^[\p{L}0-9_\-\. \/\\:\[\]{}"',@#%!+=?;&|\(\)\$\n\r\*]*$/u;
+        const allowedCharsDesc = 'Letters, 0-9, _, -, ., /, \\, :, [, ], {, }, ", \', @, #, %, !, +, =, ?, ;, &, |, (, ), $, *, Newline and Space';
 
         inputs.forEach(input => {
             const val = values[input.key];
@@ -407,7 +464,7 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                                                     }}
                                                     className={`h-7 px-3 text-[10px] font-bold rounded-md transition-all ${isSelected ? 'premium-gradient shadow-sm border-0 text-white' : 'hover:bg-indigo-500/10 hover:text-indigo-500 hover:border-indigo-500/30'}`}
                                                 >
-                                                    {opt}
+                                                    {getSelectDisplayLabel(opt)}
                                                 </Button>
                                             );
                                         })}
@@ -565,6 +622,18 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                                             className={`h-9 px-3 cursor-pointer file:cursor-pointer file:mr-3 file:py-0 file:h-full file:px-3 file:rounded-md file:border-0 file:text-[10px] file:font-bold file:bg-indigo-500/10 file:text-indigo-500 hover:file:bg-indigo-500/20 bg-background focus:border-indigo-500 text-xs font-semibold rounded-md transition-all ${errors[input.key] ? 'border-destructive' : 'border-border'}`}
                                         />
                                     </div>
+                                ) : templateMaps[input.key] ? (
+                                    <Textarea
+                                        value={values[input.key] || ''}
+                                        onChange={(e) => {
+                                            const nv = { ...values, [input.key]: e.target.value };
+                                            setValues(nv);
+                                            if (errors[input.key]) setErrors({ ...errors, [input.key]: '' });
+                                        }}
+                                        rows={5}
+                                        className={`px-3 py-2 bg-background focus:border-indigo-500 text-[11px] font-semibold rounded-lg transition-all resize-y ${errors[input.key] ? 'border-destructive' : 'border-border'}`}
+                                        placeholder={`Select ${templateMaps[input.key]._template_for} to auto-fill template...`}
+                                    />
                                 ) : (
                                     <Input
                                         type={input.type === 'number' ? 'number' : 'text'}

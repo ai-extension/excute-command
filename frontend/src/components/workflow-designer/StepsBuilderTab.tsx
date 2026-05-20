@@ -858,18 +858,25 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                             }}
                                                                                             className="bg-muted/50 border-border h-8 text-xs font-medium rounded-md px-2"
                                                                                         />
-                                                                                        <div className="flex items-center gap-1 mt-1">
-                                                                                            <span className="text-[10px] font-mono text-muted-foreground/50">Key:</span>
-                                                                                            <Input
-                                                                                                value={step.action_key || ''}
-                                                                                                onChange={(e) => {
-                                                                                                    const ng = [...groups];
-                                                                                                    ng[gIdx]!.steps![sIdx].action_key = e.target.value.replace(/[^a-zA-Z0-9_]/g, '');
-                                                                                                    setGroups(ng);
-                                                                                                }}
-                                                                                                className="h-5 text-[10px] px-1 font-mono bg-transparent border-transparent hover:border-border/50 focus:bg-background"
-                                                                                                placeholder="action_key"
-                                                                                            />
+                                                                                        <div className="space-y-0.5 mt-1">
+                                                                                            <div className="flex items-center gap-1">
+                                                                                                <span className="text-[9px] font-mono text-muted-foreground/50">Output Key:</span>
+                                                                                                <Input
+                                                                                                    value={step.action_key || ''}
+                                                                                                    onChange={(e) => {
+                                                                                                        const ng = [...groups];
+                                                                                                        ng[gIdx]!.steps![sIdx].action_key = e.target.value.replace(/[^a-zA-Z0-9_]/g, '');
+                                                                                                        setGroups(ng);
+                                                                                                    }}
+                                                                                                    className="h-5 text-[9px] px-1 font-mono bg-muted/30 border-border/50 hover:border-primary/30 focus:bg-background focus:border-primary/50 rounded"
+                                                                                                    placeholder="e.g. result"
+                                                                                                />
+                                                                                            </div>
+                                                                                            {step.action_key && group.key && (
+                                                                                                <p className="text-[8px] font-mono text-cyan-500/70 pl-0.5">
+                                                                                                    Use: <code className="bg-cyan-500/10 px-1 rounded">{`{{ flow.${group.key}.step.${step.action_key} }}`}</code>
+                                                                                                </p>
+                                                                                            )}
                                                                                         </div>
                                                                                     </div>
                                                                                     <div className="col-span-2 space-y-1">

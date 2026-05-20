@@ -21,7 +21,7 @@ import (
 
 var (
 	// We allow backslash (\) to support literal \n and other escaped characters.
-	SecurityRegex = regexp.MustCompile(`(?s)^[\pL0-9_\-\.\ \/\\:\[\]{}"',@#%!+=?;&|\(\)\$\n\r]*$`)
+	SecurityRegex = regexp.MustCompile(`(?s)^[\pL0-9_\-\.\ \/\\:\[\]{}"',@#%!+=?;&|\(\)\$\n\r\*]*$`)
 )
 
 type WorkflowExecutor struct {
@@ -1346,6 +1346,11 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 				targetServerID = defaultServerID
 			}
 
+			httpMsg := fmt.Sprintf("\033[90m$ %s %s\033[0m\n", method, url)
+			fmt.Fprint(mainLogFile, httpMsg)
+			fmt.Fprint(stepLogFile, httpMsg)
+			e.hub.BroadcastLog(workflowID.String(), executionID.String(), httpMsg)
+
 			output, err = e.serverService.ExecuteHttp(ctx, targetServerID, method, url, body, headersStr, nil, stepLogFile)
 			if err == nil {
 				fmt.Fprint(mainLogFile, output)
@@ -1378,6 +1383,15 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 				fmt.Fprint(stepLogFile, errMsg)
 				return fmt.Errorf("interpolation error: %w", renderErr)
 			}
+
+			cmdPreview := command
+			if len(cmdPreview) > 500 {
+				cmdPreview = cmdPreview[:500] + "..."
+			}
+			cmdMsg := fmt.Sprintf("\033[90m$ %s\033[0m\n", cmdPreview)
+			fmt.Fprint(mainLogFile, cmdMsg)
+			fmt.Fprint(stepLogFile, cmdMsg)
+			e.hub.BroadcastLog(workflowID.String(), executionID.String(), cmdMsg)
 
 			// Resolve AutoInputs variables for this step iteration
 			if len(execCfg.AutoInputs) > 0 {
