@@ -437,7 +437,8 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                                         options={(input.default_value || '').split(',').map((o) => o.trim()).filter(Boolean).map((o) => ({ label: o, value: o }))}
                                         value={values[input.key] || ''}
                                         onValueChange={(val: string) => {
-                                            const nv = { ...values, [input.key]: val };
+                                            let nv = { ...values, [input.key]: val };
+                                            nv = applyTemplates(nv, input.key);
                                             setValues(nv);
                                             if (errors[input.key]) setErrors({ ...errors, [input.key]: '' });
                                         }}
@@ -593,6 +594,18 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                                             );
                                         })()}
                                     </div>
+                                ) : templateMaps[input.key] ? (
+                                    <Textarea
+                                        value={values[input.key] || ''}
+                                        onChange={(e) => {
+                                            const nv = { ...values, [input.key]: e.target.value };
+                                            setValues(nv);
+                                            if (errors[input.key]) setErrors({ ...errors, [input.key]: '' });
+                                        }}
+                                        rows={5}
+                                        className={`px-3 py-2 bg-background focus:border-indigo-500 text-[11px] font-semibold rounded-lg transition-all resize-y ${errors[input.key] ? 'border-destructive' : 'border-border'}`}
+                                        placeholder={`Select ${templateMaps[input.key]._template_for} to auto-fill template...`}
+                                    />
                                 ) : input.type === 'textarea' ? (
                                     <Textarea
                                         value={values[input.key] || ''}
@@ -622,18 +635,6 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                                             className={`h-9 px-3 cursor-pointer file:cursor-pointer file:mr-3 file:py-0 file:h-full file:px-3 file:rounded-md file:border-0 file:text-[10px] file:font-bold file:bg-indigo-500/10 file:text-indigo-500 hover:file:bg-indigo-500/20 bg-background focus:border-indigo-500 text-xs font-semibold rounded-md transition-all ${errors[input.key] ? 'border-destructive' : 'border-border'}`}
                                         />
                                     </div>
-                                ) : templateMaps[input.key] ? (
-                                    <Textarea
-                                        value={values[input.key] || ''}
-                                        onChange={(e) => {
-                                            const nv = { ...values, [input.key]: e.target.value };
-                                            setValues(nv);
-                                            if (errors[input.key]) setErrors({ ...errors, [input.key]: '' });
-                                        }}
-                                        rows={5}
-                                        className={`px-3 py-2 bg-background focus:border-indigo-500 text-[11px] font-semibold rounded-lg transition-all resize-y ${errors[input.key] ? 'border-destructive' : 'border-border'}`}
-                                        placeholder={`Select ${templateMaps[input.key]._template_for} to auto-fill template...`}
-                                    />
                                 ) : (
                                     <Input
                                         type={input.type === 'number' ? 'number' : 'text'}
