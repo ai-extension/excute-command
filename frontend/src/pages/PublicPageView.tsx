@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import {
     Zap, Loader2, Monitor, Terminal, Clock, Sun, Moon, Copy, Check, Link2, Search,
-    FileText, ImageIcon, Frame, Activity, Table2
+    FileText, ImageIcon, Frame, Activity, Table2, ArrowUp
 } from 'lucide-react';
 import { cn, copyToClipboard as clipboardCopy } from '../lib/utils';
 import { Page, PageWidget, PageLayout, WorkflowInput } from '../types';
@@ -102,6 +102,15 @@ const PublicPageView = () => {
         return (localStorage.getItem('public-theme') as 'light' | 'dark') || 'light';
     });
     const [isCopied, setIsCopied] = useState(false);
+
+    // Scroll-to-top button visibility
+    const [showScrollTop, setShowScrollTop] = useState(false);
+    useEffect(() => {
+        const onScroll = () => setShowScrollTop(window.scrollY > 400);
+        window.addEventListener('scroll', onScroll, { passive: true });
+        return () => window.removeEventListener('scroll', onScroll);
+    }, []);
+    const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
 
     // Persist public-theme separately and drive global ThemeProvider so it doesn't override us
     useEffect(() => {
@@ -262,6 +271,22 @@ const PublicPageView = () => {
         }
 
         setInputModal({ isOpen: false, widget: null, workflowInputs: [] });
+
+        // Clear previous execution state before starting new request
+        if (activeWidgetId && activeWidgetId !== widget.id) {
+            setRunningWidgets(prev => ({ ...prev, [activeWidgetId]: false }));
+            setExecutionResults(prev => {
+                const n = { ...prev };
+                delete n[activeWidgetId];
+                return n;
+            });
+        }
+        setActiveExecutionId(null);
+        setActiveWidgetId(null);
+        setExecutionStatus(null);
+        setExecutionLogs('');
+        setIsPollingLogs(false);
+
         setRunningWidgets(prev => ({ ...prev, [widget.id]: true }));
         try {
             const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -772,6 +797,17 @@ const PublicPageView = () => {
                     isOpen={isLoginDialogOpen}
                     onOpenChange={setIsLoginDialogOpen}
                 />
+
+                {/* Go to Top floating button */}
+                {showScrollTop && (
+                    <button
+                        onClick={scrollToTop}
+                        className="fixed bottom-8 right-8 z-50 h-12 w-12 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:scale-110 transition-all duration-200 animate-in fade-in slide-in-from-bottom-4"
+                        title="Back to top"
+                    >
+                        <ArrowUp className="w-5 h-5" />
+                    </button>
+                )}
             </div>
         </div>
     );
