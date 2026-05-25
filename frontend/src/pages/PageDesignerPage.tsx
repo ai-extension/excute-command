@@ -57,6 +57,7 @@ const PageDesignerPage = () => {
     // Widgets
     const [widgets, setWidgets] = useState<PageWidget[]>([]);
     const [editingWidgetId, setEditingWidgetId] = useState<string | null>(null);
+    const [draggingSectionId, setDraggingSectionId] = useState<string | null>(null);
 
     // Available data
     const [availableWorkflows, setAvailableWorkflows] = useState<Workflow[]>([]);
@@ -288,7 +289,13 @@ const PageDesignerPage = () => {
     const updateWidget = (wid: string, updates: Partial<PageWidget>) =>
         setWidgets(prev => prev.map(w => w.id === wid ? { ...w, ...updates } : w));
 
+    const handleDragStart = (start: { draggableId: string }) => {
+        const w = widgets.find(w => w.id === start.draggableId);
+        setDraggingSectionId(w?.type === 'SECTION' ? w.id : null);
+    };
+
     const handleDragEnd = (result: DropResult) => {
+        setDraggingSectionId(null);
         // Combine path: dropping a widget directly onto a SECTION card moves it inside.
         // Needed because @hello-pangea/dnd can't reliably hit-test a nested Droppable
         // that lives inside a sibling Draggable of the same context.
@@ -589,7 +596,7 @@ const PageDesignerPage = () => {
                                         <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Canvas is empty</p>
                                     </div>
                                 ) : (
-                                    <DragDropContext onDragEnd={handleDragEnd}>
+                                    <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
                                         <Droppable droppableId="canvas" isCombineEnabled>
                                             {(provided) => (
                                                 <div {...provided.droppableProps} ref={provided.innerRef} className="flex flex-wrap gap-5 items-start">
@@ -643,7 +650,7 @@ const PageDesignerPage = () => {
                                                                             onRemove={() => removeWidget(widget.id)}
                                                                             dragHandleProps={provided.dragHandleProps}
                                                                         >
-                                                                            <Droppable droppableId={`section-${widget.id}`} type="DEFAULT">
+                                                                            <Droppable droppableId={`section-${widget.id}`} type="DEFAULT" isDropDisabled={draggingSectionId !== null}>
                                                                                 {(innerProvided, innerSnapshot) => (
                                                                                     <div
                                                                                         ref={innerProvided.innerRef}

@@ -173,14 +173,19 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
                             )}
                         </Button>
                         {lastEntry && (
-                            <button
-                                type="button"
-                                onClick={() => triggerRerun(lastEntry.inputs)}
-                                title={`Re-run last (${formatTime(lastEntry.timestamp)})`}
-                                className="h-16 w-16 shrink-0 rounded-md bg-primary/10 hover:bg-primary/20 text-primary border border-primary/40 shadow-premium transition-all active:scale-[0.98] flex items-center justify-center"
-                            >
-                                <RotateCcw className="w-5 h-5" />
-                            </button>
+                            <div className="relative group/retry">
+                                <button
+                                    type="button"
+                                    onClick={() => triggerRerun(lastEntry.inputs)}
+                                    className="h-16 w-16 shrink-0 rounded-md bg-primary/10 hover:bg-primary/20 text-primary border border-primary/40 shadow-premium transition-all active:scale-[0.98] flex items-center justify-center"
+                                >
+                                    <RotateCcw className="w-5 h-5" />
+                                </button>
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 rounded-md bg-popover text-popover-foreground text-[11px] font-bold whitespace-nowrap shadow-lg border border-border opacity-0 group-hover/retry:opacity-100 pointer-events-none transition-opacity duration-150">
+                                    Re-run last execution
+                                    <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-popover" />
+                                </div>
+                            </div>
                         )}
                     </div>
                 )}
