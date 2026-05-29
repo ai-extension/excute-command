@@ -45,7 +45,7 @@ export interface WorkflowStep {
     group_id: string;
     server_id?: string;
     name: string;
-    action_type: 'COMMAND' | 'WORKFLOW' | 'HTTP' | 'DATASET';
+    action_type: 'COMMAND' | 'WORKFLOW' | 'HTTP' | 'DATASET' | 'CONVERT';
     action_key?: string;
     command_text: string;
     http_url?: string;
@@ -58,6 +58,7 @@ export interface WorkflowStep {
     dataset_filter?: string;
     dataset_payload?: string;
     dataset_limit?: number;
+    convert_source?: string;
     target_workflow_id?: string;
     target_workflow_inputs?: string; // JSON string
     wait_to_finish: boolean;

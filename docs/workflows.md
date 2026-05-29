@@ -146,6 +146,9 @@ Run another workflow as a step.
 ### DATASET
 Read or mutate a [Dataset](datasets.md) without leaving the run. Pick a dataset and an operation — **Find Many / Find One / INSERT / UPDATE / DELETE**. Filter and payload are templated. The JSON result is captured into `flow.*` (set an `action_key`, keep Output Format = JSON) for later steps. See the [Datasets guide](datasets.md#-the-dataset-step).
 
+### CONVERT
+Parse a templated text **source** into JSON so later steps can read structured fields. The source (e.g. `{{ flow.grp.step.raw }}`) is rendered, then parsed as JSON; if it isn't valid JSON it's wrapped as a JSON string. Result is captured into `flow.*` (set an `action_key`, Output Format = JSON).
+
 ### TTY
 For interactive prompts (`sudo`, `ssh-keygen`, vault unlocks). Define regex/keystroke pairs; CSM watches output and types responses automatically.
 

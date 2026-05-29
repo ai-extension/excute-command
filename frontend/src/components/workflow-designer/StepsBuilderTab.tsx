@@ -937,7 +937,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                             value={step.action_type || 'COMMAND'}
                                                                                             onChange={(e) => {
                                                                                                 const ng = [...groups];
-                                                                                                const newType = e.target.value as 'COMMAND' | 'WORKFLOW' | 'HTTP' | 'DATASET';
+                                                                                                const newType = e.target.value as 'COMMAND' | 'WORKFLOW' | 'HTTP' | 'DATASET' | 'CONVERT';
                                                                                                 ng[gIdx]!.steps![sIdx].action_type = newType;
                                                                                                 if (newType === 'COMMAND') {
                                                                                                     ng[gIdx]!.steps![sIdx].target_workflow_id = undefined;
@@ -949,6 +949,9 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                 if (newType === 'DATASET' && !ng[gIdx]!.steps![sIdx].dataset_operation) {
                                                                                                     ng[gIdx]!.steps![sIdx].dataset_operation = 'QUERY';
                                                                                                 }
+                                                                                                if (newType === 'CONVERT') {
+                                                                                                    ng[gIdx]!.steps![sIdx].output_format = 'json';
+                                                                                                }
                                                                                                 setGroups(ng);
                                                                                             }}
                                                                                             className="h-8 px-2 w-full text-xs font-semibold border border-border rounded-md bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 cursor-pointer"
@@ -957,6 +960,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                             <option value="WORKFLOW">Workflow</option>
                                                                                             <option value="HTTP">HTTP Request</option>
                                                                                             <option value="DATASET">Dataset</option>
+                                                                                            <option value="CONVERT">Convert → JSON</option>
                                                                                         </select>
                                                                                     </div>
                                                                                     <div className="col-span-7 space-y-3">
@@ -1251,6 +1255,23 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
 
                                                                                                 <p className="text-[9px] text-cyan-500/70 font-medium pt-1 border-t border-border/50">
                                                                                                     Result is captured to <code className="bg-cyan-500/10 px-1 rounded">{`{{ flow.${group.key || 'group'}.step.${step.action_key || 'key'} }}`}</code> (set Action Key + Format=JSON).
+                                                                                                </p>
+                                                                                            </div>
+                                                                                        ) : step.action_type === 'CONVERT' ? (
+                                                                                            <div className="space-y-3 bg-muted/20 border border-border/50 rounded-md p-3">
+                                                                                                <label className="text-[10px] font-bold uppercase tracking-widest text-amber-500">Convert Source → JSON</label>
+                                                                                                <Textarea
+                                                                                                    value={step.convert_source || ''}
+                                                                                                    onChange={(e) => {
+                                                                                                        const ng = [...groups];
+                                                                                                        ng[gIdx]!.steps![sIdx].convert_source = e.target.value;
+                                                                                                        setGroups(ng);
+                                                                                                    }}
+                                                                                                    placeholder={'{{ flow.grp.step.raw }}  or  {{ input.payload }}'}
+                                                                                                    className="text-[10px] font-mono min-h-[80px] bg-background border-border"
+                                                                                                />
+                                                                                                <p className="text-[9px] text-muted-foreground/60 font-mono">
+                                                                                                    Parses the rendered text as JSON (else wraps as a JSON string). Result → <code className="bg-amber-500/10 px-1 rounded">{`{{ flow.${group.key || 'group'}.step.${step.action_key || 'key'} }}`}</code> (set Action Key + Format=JSON).
                                                                                                 </p>
                                                                                             </div>
                                                                                         ) : (

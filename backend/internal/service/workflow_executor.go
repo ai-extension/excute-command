@@ -1309,6 +1309,13 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 			fmt.Fprint(mainLogFile, errMsg)
 			fmt.Fprint(stepLogFile, errMsg)
 		}
+	} else if step.ActionType == "CONVERT" {
+		output, err = e.runConvertStep(step, inputs, variables, flowData, namespaceID, user, item, index, mainLogFile, stepLogFile, workflowID, executionID)
+		if err != nil {
+			errMsg := fmt.Sprintf("\033[1;31m✖ Convert step error: %v\033[0m\n", err)
+			fmt.Fprint(mainLogFile, errMsg)
+			fmt.Fprint(stepLogFile, errMsg)
+		}
 	} else {
 		targetServerID := step.ServerID
 		if targetServerID == uuid.Nil {
@@ -1540,6 +1547,46 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 	e.execRepo.CreateStepResult(stepExec)
 
 	return nil
+}
+
+// runConvertStep parses a templated text source into JSON. If the rendered text is valid
+// JSON it is normalized; otherwise it is wrapped as a JSON string so the result is always
+// valid JSON and usable by later steps via {{ flow.<group>.step.<action_key> }}.
+func (e *WorkflowExecutor) runConvertStep(step *domain.WorkflowStep, inputs map[string]string, variables []domain.WorkflowVariable, flowData map[string]interface{}, namespaceID uuid.UUID, user *domain.User, item interface{}, index int, mainLogFile *os.File, stepLogFile *os.File, workflowID uuid.UUID, executionID uuid.UUID) (string, error) {
+	pcontext := e.getInterpolationContext(inputs, variables, flowData, namespaceID, user, item, index, uuid.Nil, executionID)
+	rendered, err := e.renderTemplate(step.ConvertSource, pcontext)
+	if err != nil {
+		return "", fmt.Errorf("source render error: %w", err)
+	}
+
+	logf := func(format string, a ...interface{}) {
+		msg := fmt.Sprintf(format, a...)
+		fmt.Fprint(mainLogFile, msg)
+		fmt.Fprint(stepLogFile, msg)
+		e.hub.BroadcastLog(workflowID.String(), executionID.String(), msg)
+	}
+
+	trimmed := strings.TrimSpace(rendered)
+	if trimmed == "" {
+		logf("\033[90m$ CONVERT → null (empty source)\033[0m\n")
+		return "null", nil
+	}
+
+	// Parse only if the WHOLE source is one JSON value (dec.More() guards against
+	// trailing junk like "5 hello" being silently truncated to 5).
+	var v interface{}
+	dec := json.NewDecoder(strings.NewReader(trimmed))
+	dec.UseNumber()
+	if derr := dec.Decode(&v); derr == nil && !dec.More() {
+		b, _ := json.Marshal(v)
+		logf("\033[90m$ CONVERT → JSON (parsed)\033[0m\n")
+		return string(b), nil
+	}
+
+	// Not valid JSON → wrap the trimmed text as a JSON string.
+	b, _ := json.Marshal(trimmed)
+	logf("\033[90m$ CONVERT → JSON string (text wrapped)\033[0m\n")
+	return string(b), nil
 }
 
 // defaultDatasetQueryCap bounds how many records a QUERY loads when DatasetLimit is 0.
