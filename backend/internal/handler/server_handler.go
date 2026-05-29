@@ -63,8 +63,15 @@ func (h *ServerHandler) ListServers(c *gin.Context) {
 		}
 	}
 
+	var namespaceID *uuid.UUID
+	if nsStr := c.Param("ns_id"); nsStr != "" {
+		if id, err := uuid.Parse(nsStr); err == nil {
+			namespaceID = &id
+		}
+	}
+
 	userVal, _ := c.Get("user")
-	servers, total, err := h.service.ListServersPaginated(limit, offset, searchTerm, authType, vpnID, createdBy, userVal.(*domain.User))
+	servers, total, err := h.service.ListServersPaginated(namespaceID, limit, offset, searchTerm, authType, vpnID, createdBy, userVal.(*domain.User))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -83,10 +90,17 @@ func (h *ServerHandler) CreateServer(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	nsStr := c.Param("ns_id")
+	nsID, err := uuid.Parse(nsStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid namespace id"})
+		return
+	}
+	server.NamespaceID = nsID
+
 	userVal, _ := c.Get("user")
 	user := userVal.(*domain.User)
-	// But let's check if user has 'create' on 'servers'
-	if !domain.HasPermission(user, "servers", "WRITE", nil, nil, nil) {
+	if !domain.HasPermission(user, "servers", "WRITE", &nsStr, nil, nil) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "permission denied to create server"})
 		return
 	}

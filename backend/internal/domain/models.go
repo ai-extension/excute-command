@@ -164,6 +164,7 @@ type ServerConnection interface {
 
 type Server struct {
 	ID                 uuid.UUID      `json:"id" gorm:"type:uuid;primaryKey"`
+	NamespaceID        uuid.UUID      `json:"namespace_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
 	Name               string         `json:"name" gorm:"not null"`
 	Description        string         `json:"description"`
 	ConnectionType     ConnectionType `json:"connection_type" gorm:"not null;default:'SSH'"`
@@ -193,14 +194,15 @@ type ServerMetrics struct {
 type ServerRepository interface {
 	Create(server *Server) error
 	GetByID(id uuid.UUID, scope *PermissionScope) (*Server, error)
-	List(scope *PermissionScope) ([]Server, error)
-	ListPaginated(limit, offset int, searchTerm string, authType string, vpnID *uuid.UUID, createdBy *uuid.UUID, scope *PermissionScope) ([]Server, int64, error)
+	List(namespaceID *uuid.UUID, scope *PermissionScope) ([]Server, error)
+	ListPaginated(namespaceID *uuid.UUID, limit, offset int, searchTerm string, authType string, vpnID *uuid.UUID, createdBy *uuid.UUID, scope *PermissionScope) ([]Server, int64, error)
 	Update(server *Server) error
 	Delete(id uuid.UUID) error
 }
 
 type VpnConfig struct {
 	ID                 uuid.UUID      `json:"id" gorm:"type:uuid;primaryKey"`
+	NamespaceID        uuid.UUID      `json:"namespace_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
 	Name               string         `json:"name" gorm:"not null"`
 	Description        string         `json:"description"`
 	VpnType            string         `json:"vpn_type" gorm:"not null;default:'SSH'"` // SSH, OPENVPN, WIREGUARD
@@ -224,8 +226,8 @@ type VpnConfig struct {
 type VpnConfigRepository interface {
 	Create(vpn *VpnConfig) error
 	GetByID(id uuid.UUID, scope *PermissionScope) (*VpnConfig, error)
-	List(scope *PermissionScope) ([]VpnConfig, error)
-	ListPaginated(limit, offset int, searchTerm string, vpnType string, authType string, createdBy *uuid.UUID, scope *PermissionScope) ([]VpnConfig, int64, error)
+	List(namespaceID *uuid.UUID, scope *PermissionScope) ([]VpnConfig, error)
+	ListPaginated(namespaceID *uuid.UUID, limit, offset int, searchTerm string, vpnType string, authType string, createdBy *uuid.UUID, scope *PermissionScope) ([]VpnConfig, int64, error)
 	Update(vpn *VpnConfig) error
 	Delete(id uuid.UUID) error
 }

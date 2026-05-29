@@ -113,6 +113,7 @@ func main() {
 	seedDefaultNamespace(db)
 	seedLocalServer(db)
 	seedSystemSettings(db)
+	migrateAssignDefaultNamespace(db)
 
 	// Initialize Hub
 	hub := service.NewHub()
@@ -236,8 +237,8 @@ func main() {
 			protected.GET("/permissions/resource-items", middleware.RBACMiddleware(db, userRepo, "roles", "READ"), permHandler.ListResourceItems)
 			protected.DELETE("/permissions/:id", middleware.RBACMiddleware(db, userRepo, "roles", "DELETE"), permHandler.DeletePermission)
 
-			protected.GET("/servers", middleware.RBACMiddleware(db, userRepo, "servers", "READ"), serverHandler.ListServers)
-			protected.POST("/servers", middleware.RBACMiddleware(db, userRepo, "servers", "WRITE"), serverHandler.CreateServer)
+			protected.GET("/namespaces/:ns_id/servers", middleware.RBACMiddleware(db, userRepo, "servers", "READ"), serverHandler.ListServers)
+			protected.POST("/namespaces/:ns_id/servers", middleware.RBACMiddleware(db, userRepo, "servers", "WRITE"), serverHandler.CreateServer)
 			protected.PUT("/servers/:id", middleware.RBACMiddleware(db, userRepo, "servers", "WRITE"), serverHandler.UpdateServer)
 			protected.DELETE("/servers/:id", middleware.RBACMiddleware(db, userRepo, "servers", "DELETE"), serverHandler.DeleteServer)
 			protected.POST("/servers/:id/execute", middleware.RBACMiddleware(db, userRepo, "servers", "EXECUTE"), serverHandler.ExecuteCommand)
@@ -309,8 +310,8 @@ func main() {
 			protected.DELETE("/tags/:id", middleware.RBACMiddleware(db, userRepo, "tags", "DELETE"), tagHandler.Delete)
 
 			// VPNs
-			protected.GET("/vpns", middleware.RBACMiddleware(db, userRepo, "vpns", "READ"), vpnHandler.List)
-			protected.POST("/vpns", middleware.RBACMiddleware(db, userRepo, "vpns", "WRITE"), vpnHandler.Create)
+			protected.GET("/namespaces/:ns_id/vpns", middleware.RBACMiddleware(db, userRepo, "vpns", "READ"), vpnHandler.List)
+			protected.POST("/namespaces/:ns_id/vpns", middleware.RBACMiddleware(db, userRepo, "vpns", "WRITE"), vpnHandler.Create)
 			protected.PUT("/vpns/:id", middleware.RBACMiddleware(db, userRepo, "vpns", "WRITE"), vpnHandler.Update)
 			protected.DELETE("/vpns/:id", middleware.RBACMiddleware(db, userRepo, "vpns", "DELETE"), vpnHandler.Delete)
 
@@ -562,6 +563,36 @@ func seedDefaultNamespace(db *gorm.DB) {
 	}
 }
 
+// getDefaultNamespaceID returns the ID of the "Default" namespace, or uuid.Nil if missing.
+func getDefaultNamespaceID(db *gorm.DB) uuid.UUID {
+	var ns domain.Namespace
+	if err := db.Where("name = ?", "Default").Limit(1).Find(&ns).Error; err != nil {
+		return uuid.Nil
+	}
+	return ns.ID
+}
+
+// migrateAssignDefaultNamespace backfills the Default namespace onto pre-existing servers and
+// VPN configs that were created before namespace scoping (namespace_id NULL or zero). Idempotent.
+func migrateAssignDefaultNamespace(db *gorm.DB) {
+	defID := getDefaultNamespaceID(db)
+	if defID == uuid.Nil {
+		return
+	}
+	zero := uuid.Nil.String()
+	for _, table := range []string{"servers", "vpn_configs"} {
+		res := db.Exec(
+			"UPDATE "+table+" SET namespace_id = ? WHERE namespace_id IS NULL OR namespace_id = ?",
+			defID, zero,
+		)
+		if res.Error != nil {
+			log.Printf("[Migrate] backfill namespace on %s failed: %v", table, res.Error)
+		} else if res.RowsAffected > 0 {
+			log.Printf("[Migrate] assigned Default namespace to %d %s row(s)", res.RowsAffected, table)
+		}
+	}
+}
+
 func seedLocalServer(db *gorm.DB) {
 	var localServer domain.Server
 	err := db.Where("name = ?", "Local Engine Orchestrator").Limit(1).Find(&localServer).Error
@@ -569,6 +600,7 @@ func seedLocalServer(db *gorm.DB) {
 		log.Println("Seeding local server...")
 		localServer = domain.Server{
 			ID:             uuid.New(),
+			NamespaceID:    getDefaultNamespaceID(db),
 			Name:           "Local Engine Orchestrator",
 			Description:    "The local system where the engine is running.",
 			ConnectionType: domain.ConnectionTypeLocal,

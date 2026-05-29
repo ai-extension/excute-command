@@ -21,15 +21,14 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
     const siteTitle = settings.site_title || "CSM APP";
     const siteLogo = settings.site_logo;
 
-    const globalNavItems = [
-        { name: 'Servers', path: '/servers', icon: Server, type: 'servers' },
-        { name: 'VPN Configs', path: '/vpns', icon: Network, type: 'vpns' },
-    ].filter(item => hasPermission(item.type, 'READ'));
+    const globalNavItems: { name: string; path: string; icon: React.ElementType; type: string }[] = [];
 
     const namespaceNavItems = [
         { name: 'Dashboard', path: '/', icon: LayoutDashboard, type: 'dashboard' },
         { name: 'Workflows', path: '/workflows', icon: Zap, type: 'workflows' },
         { name: 'History', path: '/history', icon: History, type: 'history' },
+        { name: 'Servers', path: '/servers', icon: Server, type: 'servers' },
+        { name: 'VPN Configs', path: '/vpns', icon: Network, type: 'vpns' },
         { name: 'Variables', path: '/variables', icon: Globe, type: 'variables' },
         { name: 'Datasets', path: '/datasets', icon: Table2, type: 'datasets' },
         { name: 'Tags', path: '/tags', icon: Tag, type: 'tags' },

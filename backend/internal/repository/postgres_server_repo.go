@@ -71,9 +71,12 @@ func (r *PostgresServerRepo) decryptServer(server *domain.Server) {
 	}
 }
 
-func (r *PostgresServerRepo) List(scope *domain.PermissionScope) ([]domain.Server, error) {
+func (r *PostgresServerRepo) List(namespaceID *uuid.UUID, scope *domain.PermissionScope) ([]domain.Server, error) {
 	var servers []domain.Server
 	db := applyScope(r.db, scope, "server_tags", "server_id")
+	if namespaceID != nil {
+		db = db.Where("namespace_id = ?", namespaceID)
+	}
 	if err := db.Preload("Vpn").Order("created_at DESC").Find(&servers).Error; err != nil {
 		return nil, err
 	}
@@ -85,10 +88,14 @@ func (r *PostgresServerRepo) List(scope *domain.PermissionScope) ([]domain.Serve
 	return servers, nil
 }
 
-func (r *PostgresServerRepo) ListPaginated(limit, offset int, searchTerm string, authType string, vpnID *uuid.UUID, createdBy *uuid.UUID, scope *domain.PermissionScope) ([]domain.Server, int64, error) {
+func (r *PostgresServerRepo) ListPaginated(namespaceID *uuid.UUID, limit, offset int, searchTerm string, authType string, vpnID *uuid.UUID, createdBy *uuid.UUID, scope *domain.PermissionScope) ([]domain.Server, int64, error) {
 	var servers []domain.Server
 	var total int64
 	db := applyScope(r.db, scope, "server_tags", "server_id")
+
+	if namespaceID != nil {
+		db = db.Where("namespace_id = ?", namespaceID)
+	}
 
 	if searchTerm != "" {
 		s := "%" + searchTerm + "%"

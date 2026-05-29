@@ -9,7 +9,16 @@
       "Bash(go vet *)",
       "Bash(echo \"BE EXIT=$?\")",
       "Bash(echo \"VET_EXIT=$?\")",
-      "Bash(echo \"FE=$?\")"
+      "Bash(echo \"FE=$?\")",
+      "Bash(sed -n '/^type Server struct/,/^}/p' internal/domain/models.go)",
+      "Bash(sed -n '/^type VpnConfig struct/,/^}/p' internal/domain/models.go)",
+      "Bash(sed -n '/^type User struct/,/^}/p' internal/domain/models.go)",
+      "Bash(sed -n '/^type Role struct/,/^}/p' internal/domain/models.go)",
+      "Bash(sed -n '/func seedDefaultNamespace/,/^}/p' cmd/server/main.go)",
+      "Bash(sed -n '/^type PermissionScope struct/,/^}/p' internal/domain/models.go)",
+      "Bash(grep -i \"API_BASE_URL\\\\|fetch\\\\|\\\\`\")",
+      "Bash(sed -n '/func \\(s \\\\*ServerService\\) UpdateServer/,/^}/p' internal/service/server_service.go)",
+      "Bash(sed -n '/func \\(s \\\\*VpnConfigService\\) Update/,/^}/p' internal/service/vpn_service.go)"
     ]
   }
 }

@@ -51,14 +51,14 @@ func (s *ServerService) GetServer(id uuid.UUID, user *domain.User) (*domain.Serv
 	return s.repo.GetByID(id, &scope)
 }
 
-func (s *ServerService) ListServers(user *domain.User) ([]domain.Server, error) {
+func (s *ServerService) ListServers(namespaceID *uuid.UUID, user *domain.User) ([]domain.Server, error) {
 	scope := domain.GetPermissionScope(user, "servers", "READ")
-	return s.repo.List(&scope)
+	return s.repo.List(namespaceID, &scope)
 }
 
-func (s *ServerService) ListServersPaginated(limit, offset int, searchTerm string, authType string, vpnID *uuid.UUID, createdBy *uuid.UUID, user *domain.User) ([]domain.Server, int64, error) {
+func (s *ServerService) ListServersPaginated(namespaceID *uuid.UUID, limit, offset int, searchTerm string, authType string, vpnID *uuid.UUID, createdBy *uuid.UUID, user *domain.User) ([]domain.Server, int64, error) {
 	scope := domain.GetPermissionScope(user, "servers", "READ")
-	return s.repo.ListPaginated(limit, offset, searchTerm, authType, vpnID, createdBy, &scope)
+	return s.repo.ListPaginated(namespaceID, limit, offset, searchTerm, authType, vpnID, createdBy, &scope)
 }
 
 func (s *ServerService) UpdateServer(server *domain.Server, user *domain.User) error {

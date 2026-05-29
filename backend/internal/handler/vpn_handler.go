@@ -47,8 +47,15 @@ func (h *VpnConfigHandler) List(c *gin.Context) {
 		}
 	}
 
+	var namespaceID *uuid.UUID
+	if nsStr := c.Param("ns_id"); nsStr != "" {
+		if id, err := uuid.Parse(nsStr); err == nil {
+			namespaceID = &id
+		}
+	}
+
 	userVal, _ := c.Get("user")
-	vpns, total, err := h.service.ListPaginated(limit, offset, searchTerm, vpnType, authType, createdBy, userVal.(*domain.User))
+	vpns, total, err := h.service.ListPaginated(namespaceID, limit, offset, searchTerm, vpnType, authType, createdBy, userVal.(*domain.User))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -67,9 +74,17 @@ func (h *VpnConfigHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	nsStr := c.Param("ns_id")
+	nsID, err := uuid.Parse(nsStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid namespace id"})
+		return
+	}
+	vpn.NamespaceID = nsID
+
 	userVal, _ := c.Get("user")
 	user := userVal.(*domain.User)
-	if !domain.HasPermission(user, "vpns", "WRITE", nil, nil, nil) {
+	if !domain.HasPermission(user, "vpns", "WRITE", &nsStr, nil, nil) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "permission denied to create vpn"})
 		return
 	}

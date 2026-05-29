@@ -152,7 +152,7 @@ func GetPermissionScope(user *User, permType, action string) PermissionScope {
 // isNamespaceScoped checks if a given permission type refers to a resource that lives inside a namespace.
 func isNamespaceScoped(permType string) bool {
 	switch permType {
-	case "workflows", "history", "executions", "variables", "global-variables", "datasets", "schedules", "pages", "tags":
+	case "workflows", "history", "executions", "variables", "global-variables", "datasets", "schedules", "pages", "tags", "servers", "vpns":
 		return true
 	default:
 		return false

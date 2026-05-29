@@ -33,22 +33,22 @@ func (s *VpnConfigService) GetByID(id uuid.UUID, user *domain.User) (*domain.Vpn
 	return s.repo.GetByID(id, &scope)
 }
 
-func (s *VpnConfigService) List(user *domain.User) ([]domain.VpnConfig, error) {
+func (s *VpnConfigService) List(namespaceID *uuid.UUID, user *domain.User) ([]domain.VpnConfig, error) {
 	if user == nil {
 		scope := domain.PermissionScope{IsGlobal: true}
-		return s.repo.List(&scope)
+		return s.repo.List(namespaceID, &scope)
 	}
 	scope := domain.GetPermissionScope(user, "vpns", "READ")
-	return s.repo.List(&scope)
+	return s.repo.List(namespaceID, &scope)
 }
 
-func (s *VpnConfigService) ListPaginated(limit, offset int, searchTerm string, vpnType string, authType string, createdBy *uuid.UUID, user *domain.User) ([]domain.VpnConfig, int64, error) {
+func (s *VpnConfigService) ListPaginated(namespaceID *uuid.UUID, limit, offset int, searchTerm string, vpnType string, authType string, createdBy *uuid.UUID, user *domain.User) ([]domain.VpnConfig, int64, error) {
 	if user == nil {
 		scope := domain.PermissionScope{IsGlobal: true}
-		return s.repo.ListPaginated(limit, offset, searchTerm, vpnType, authType, createdBy, &scope)
+		return s.repo.ListPaginated(namespaceID, limit, offset, searchTerm, vpnType, authType, createdBy, &scope)
 	}
 	scope := domain.GetPermissionScope(user, "vpns", "READ")
-	return s.repo.ListPaginated(limit, offset, searchTerm, vpnType, authType, createdBy, &scope)
+	return s.repo.ListPaginated(namespaceID, limit, offset, searchTerm, vpnType, authType, createdBy, &scope)
 }
 
 func (s *VpnConfigService) Update(vpn *domain.VpnConfig, user *domain.User) error {
@@ -66,6 +66,7 @@ func (s *VpnConfigService) Update(vpn *domain.VpnConfig, user *domain.User) erro
 	vpn.CreatedBy = existing.CreatedBy
 	vpn.CreatedByUsername = existing.CreatedByUsername
 	vpn.CreatedAt = existing.CreatedAt
+	vpn.NamespaceID = existing.NamespaceID // preserve namespace on update
 
 	return s.repo.Update(vpn)
 }

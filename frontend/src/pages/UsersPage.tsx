@@ -79,7 +79,7 @@ const UsersPage = () => {
 
     const fetchRoles = async (search?: string) => {
         try {
-            let url = `${API_BASE_URL}/roles?limit=50`;
+            let url = `${API_BASE_URL}/roles?limit=15`;
             if (search) url += `&search=${encodeURIComponent(search)}`;
             const response = await apiFetch(url);
             const dataRaw = await response.json();

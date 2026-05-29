@@ -112,9 +112,10 @@ const PageDesignerPage = () => {
     };
 
     const fetchServers = async (search = '') => {
+        if (!activeNamespace) return;
         try {
-            const query = search ? `?search=${encodeURIComponent(search)}` : '';
-            const r = await apiFetch(`${API_BASE_URL}/servers${query}`);
+            const query = search ? `&search=${encodeURIComponent(search)}` : '';
+            const r = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/servers?limit=100${query}`);
             const data = await r.json();
             setServers(data.items || (Array.isArray(data) ? data : []));
         } catch { /* ignore */ }

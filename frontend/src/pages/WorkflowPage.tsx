@@ -303,8 +303,9 @@ const WorkflowPage = () => {
     };
 
     const fetchServers = async (query?: string) => {
+        if (!activeNamespace) return;
         try {
-            let url = `${API_BASE_URL}/servers?limit=15`;
+            let url = `${API_BASE_URL}/namespaces/${activeNamespace.id}/servers?limit=15`;
             if (query) url += `&search=${encodeURIComponent(query)}`;
             const response = await apiFetch(url);
             if (!response.ok) throw new Error(`Servers fetch failed: ${response.status}`);
@@ -322,8 +323,9 @@ const WorkflowPage = () => {
     };
 
     const handleSearchServers = async (query: string) => {
+        if (!activeNamespace) return;
         try {
-            const url = `${API_BASE_URL}/servers?limit=50&search=${encodeURIComponent(query)}`;
+            const url = `${API_BASE_URL}/namespaces/${activeNamespace.id}/servers?limit=15&search=${encodeURIComponent(query)}`;
             const response = await apiFetch(url);
             if (!response.ok) throw new Error(`Search failed: ${response.status}`);
             const data = await response.json();
