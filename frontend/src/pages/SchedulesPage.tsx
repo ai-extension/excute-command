@@ -33,7 +33,7 @@ const SchedulesPage = () => {
     const fetchTags = async (query: string = '') => {
         if (!activeNamespace) return;
         try {
-            const response = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/tags?search=${query}&limit=50`);
+            const response = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/tags?search=${query}&limit=15`);
             const data = await response.json();
             setAvailableTags(data.items || []);
         } catch (error) {

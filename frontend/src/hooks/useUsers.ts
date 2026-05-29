@@ -11,7 +11,7 @@ export const useUsers = () => {
     const fetchUsers = useCallback(async (search?: string) => {
         setIsLoading(true);
         try {
-            let url = `${API_BASE_URL}/users?limit=100`;
+            let url = `${API_BASE_URL}/users?limit=15`;
             if (search) {
                 url += `&search=${encodeURIComponent(search)}`;
             }

@@ -130,7 +130,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
     const nsId = parentWf?.namespace_id;
     useEffect(() => {
         if (!nsId) return;
-        apiFetch(`${API_BASE_URL}/namespaces/${nsId}/datasets?limit=200`)
+        apiFetch(`${API_BASE_URL}/namespaces/${nsId}/datasets?limit=15`)
             .then(r => r.json())
             .then(d => setDatasets(d.items || []))
             .catch(() => { });

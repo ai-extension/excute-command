@@ -105,7 +105,7 @@ const PageDesignerPage = () => {
         if (!activeNamespace) return;
         try {
             const query = search ? `&search=${encodeURIComponent(search)}` : '';
-            const r = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/workflows?limit=100${query}`);
+            const r = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/workflows?limit=15${query}`);
             const data = await r.json();
             setAvailableWorkflows(data.items || (Array.isArray(data) ? data : []));
         } catch { /* ignore */ }
@@ -115,7 +115,7 @@ const PageDesignerPage = () => {
         if (!activeNamespace) return;
         try {
             const query = search ? `&search=${encodeURIComponent(search)}` : '';
-            const r = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/servers?limit=100${query}`);
+            const r = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/servers?limit=15${query}`);
             const data = await r.json();
             setServers(data.items || (Array.isArray(data) ? data : []));
         } catch { /* ignore */ }
