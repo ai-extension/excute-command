@@ -255,7 +255,7 @@ func RBACMiddlewareAny(db *gorm.DB, userRepo domain.UserRepository, permType str
 
 func isNamespaceScoped(permType string) bool {
 	switch permType {
-	case "workflows", "history", "executions", "variables", "global-variables", "schedules", "pages", "tags":
+	case "workflows", "history", "executions", "variables", "global-variables", "datasets", "schedules", "pages", "tags":
 		return true
 	default:
 		return false

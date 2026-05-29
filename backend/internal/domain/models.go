@@ -339,6 +339,12 @@ type WorkflowStep struct {
 	HttpHeaders          string     `json:"http_headers" gorm:"default:'{}'"` // JSON string map[string]string
 	HttpBody             string     `json:"http_body" gorm:"default:''"`
 	OutputFormat         string     `json:"output_format" gorm:"default:'json'"` // json or string
+	// Dataset action (ActionType == "DATASET")
+	DatasetID            *uuid.UUID `json:"dataset_id,omitempty" gorm:"type:uuid;index"`
+	DatasetOperation     string     `json:"dataset_operation" gorm:"default:''"` // QUERY | INSERT | UPDATE | DELETE
+	DatasetFilter        string     `json:"dataset_filter"`                      // "key=val,..." templated; matchConditions syntax
+	DatasetPayload       string     `json:"dataset_payload"`                     // JSON object or array, templated (INSERT/UPDATE)
+	DatasetLimit         int        `json:"dataset_limit" gorm:"default:0"`      // QUERY cap; 0 = default cap
 	TargetWorkflowID     *uuid.UUID `json:"target_workflow_id,omitempty" gorm:"type:uuid;index"`
 	TargetWorkflowInputs string     `json:"target_workflow_inputs,omitempty"` // JSON string of inputs for the target workflow
 	WaitToFinish         *bool      `json:"wait_to_finish" gorm:"default:true"`
@@ -381,6 +387,29 @@ type GlobalVariable struct {
 	CreatedByUsername string     `json:"created_by_username,omitempty" gorm:"<-:create"`
 	CreatedAt         time.Time  `json:"created_at" gorm:"<-:create"`
 	UpdatedAt         time.Time  `json:"updated_at"`
+}
+
+// Dataset is a user-defined collection of records. The schema (Columns) is a loose
+// hint for the UI only — records (Data) accept arbitrary JSON, no validation.
+type Dataset struct {
+	ID                uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey"`
+	NamespaceID       uuid.UUID  `json:"namespace_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
+	Key               string     `json:"key" gorm:"not null"` // template ref: data.<Key>
+	Name              string     `json:"name" gorm:"not null"`
+	Description       string     `json:"description"`
+	Columns           string     `json:"columns" gorm:"type:jsonb;default:'[]'"` // [{name,type}] UI hint only
+	CreatedBy         *uuid.UUID `json:"created_by,omitempty" gorm:"type:uuid;index;<-:create"`
+	CreatedByUsername string     `json:"created_by_username,omitempty" gorm:"<-:create"`
+	CreatedAt         time.Time  `json:"created_at" gorm:"<-:create"`
+	UpdatedAt         time.Time  `json:"updated_at"`
+}
+
+type DatasetRecord struct {
+	ID        uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
+	DatasetID uuid.UUID `json:"dataset_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
+	Data      string    `json:"data" gorm:"type:jsonb;default:'{}'"` // arbitrary JSON object
+	CreatedAt time.Time `json:"created_at" gorm:"<-:create"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type Tag struct {
@@ -537,6 +566,22 @@ type GlobalVariableRepository interface {
 	ListGlobalPaginated(limit, offset int, searchTerm string, scope *PermissionScope) ([]GlobalVariable, int64, error)
 	Update(gv *GlobalVariable) error
 	Delete(id uuid.UUID) error
+}
+
+type DatasetRepository interface {
+	Create(d *Dataset) error
+	GetByID(id uuid.UUID, scope *PermissionScope) (*Dataset, error)
+	List(namespaceID uuid.UUID, scope *PermissionScope) ([]Dataset, error)
+	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, createdBy *uuid.UUID, scope *PermissionScope) ([]Dataset, int64, error)
+	Update(d *Dataset) error
+	Delete(id uuid.UUID) error
+
+	ListRecords(datasetID uuid.UUID, limit, offset int, searchTerm string) ([]DatasetRecord, int64, error)
+	AllRecords(datasetID uuid.UUID) ([]DatasetRecord, error)
+	GetRecord(id uuid.UUID) (*DatasetRecord, error)
+	CreateRecord(r *DatasetRecord) error
+	UpdateRecord(r *DatasetRecord) error
+	DeleteRecord(id uuid.UUID) error
 }
 
 type ScheduleRepository interface {

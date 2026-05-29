@@ -68,6 +68,8 @@ func main() {
 		&domain.WorkflowExecution{},
 		&domain.WorkflowExecutionStep{},
 		&domain.GlobalVariable{},
+		&domain.Dataset{},
+		&domain.DatasetRecord{},
 		&domain.Schedule{},
 		&domain.ScheduleWorkflow{},
 		&domain.Tag{},
@@ -96,6 +98,7 @@ func main() {
 	workflowVariableRepo := repository.NewPostgresWorkflowVariableRepo(db)
 	execRepo := repository.NewPostgresWorkflowExecutionRepo(db)
 	globalVarRepo := repository.NewPostgresGlobalVariableRepo(db)
+	datasetRepo := repository.NewPostgresDatasetRepo(db)
 	scheduleRepo := repository.NewPostgresScheduleRepo(db)
 	tagRepo := repository.NewPostgresTagRepo(db)
 	workflowFileRepo := repository.NewPostgresWorkflowFileRepo(db)
@@ -124,7 +127,8 @@ func main() {
 	terminalService := service.NewTerminalService(serverRepo, hub, vpnConnector, sshPool)
 	workflowService := service.NewWorkflowService(workflowRepo, workflowGroupRepo, workflowStepRepo, workflowInputRepo, workflowVariableRepo, execRepo)
 	globalVarService := service.NewGlobalVariableService(globalVarRepo)
-	workflowExecutor := service.NewWorkflowExecutor(workflowRepo, workflowGroupRepo, workflowStepRepo, workflowInputRepo, execRepo, serverService, hub, globalVarRepo)
+	datasetService := service.NewDatasetService(datasetRepo)
+	workflowExecutor := service.NewWorkflowExecutor(workflowRepo, workflowGroupRepo, workflowStepRepo, workflowInputRepo, execRepo, serverService, hub, globalVarRepo, datasetRepo)
 	scheduleService := service.NewScheduleService(scheduleRepo, execRepo, workflowExecutor)
 	tagService := service.NewTagService(tagRepo)
 	vpnService := service.NewVpnConfigService(vpnRepo)
@@ -152,6 +156,7 @@ func main() {
 	wsHandler := handler.NewWSHandler(hub, terminalService, authService, pageService, workflowService)
 	workflowHandler := handler.NewWorkflowHandler(workflowService, workflowExecutor, serverService, auditLogService)
 	globalVarHandler := handler.NewGlobalVariableHandler(globalVarService, auditLogService)
+	datasetHandler := handler.NewDatasetHandler(datasetService, auditLogService)
 	scheduleHandler := handler.NewScheduleHandler(scheduleService, auditLogService)
 	tagHandler := handler.NewTagHandler(tagService, auditLogService)
 	workflowFileService := service.NewWorkflowFileService(workflowFileRepo)
@@ -277,6 +282,17 @@ func main() {
 			protected.PUT("/global-variables/:id", middleware.RBACMiddleware(db, userRepo, "variables", "WRITE"), globalVarHandler.Update)
 			protected.DELETE("/global-variables/:id", middleware.RBACMiddleware(db, userRepo, "variables", "DELETE"), globalVarHandler.Delete)
 
+			// Datasets
+			protected.GET("/namespaces/:ns_id/datasets", middleware.RBACMiddleware(db, userRepo, "datasets", "READ"), datasetHandler.List)
+			protected.POST("/namespaces/:ns_id/datasets", middleware.RBACMiddleware(db, userRepo, "datasets", "WRITE"), datasetHandler.Create)
+			protected.GET("/datasets/:id", middleware.RBACMiddleware(db, userRepo, "datasets", "READ"), datasetHandler.Get)
+			protected.PUT("/datasets/:id", middleware.RBACMiddleware(db, userRepo, "datasets", "WRITE"), datasetHandler.Update)
+			protected.DELETE("/datasets/:id", middleware.RBACMiddleware(db, userRepo, "datasets", "DELETE"), datasetHandler.Delete)
+			protected.GET("/datasets/:id/records", middleware.RBACMiddleware(db, userRepo, "datasets", "READ"), datasetHandler.ListRecords)
+			protected.POST("/datasets/:id/records", middleware.RBACMiddleware(db, userRepo, "datasets", "WRITE"), datasetHandler.CreateRecord)
+			protected.PUT("/dataset-records/:id", middleware.RBACMiddleware(db, userRepo, "datasets", "WRITE"), datasetHandler.UpdateRecord)
+			protected.DELETE("/dataset-records/:id", middleware.RBACMiddleware(db, userRepo, "datasets", "DELETE"), datasetHandler.DeleteRecord)
+
 			// Schedules
 			protected.GET("/namespaces/:ns_id/schedules", middleware.RBACMiddleware(db, userRepo, "schedules", "READ"), scheduleHandler.List)
 			protected.POST("/namespaces/:ns_id/schedules", middleware.RBACMiddleware(db, userRepo, "schedules", "WRITE"), scheduleHandler.Create)
@@ -390,6 +406,10 @@ func seedAdmin(db *gorm.DB) {
 		{Name: "Read Variables", Type: "variables", Action: "READ"},
 		{Name: "Manage Variables", Type: "variables", Action: "WRITE"},
 		{Name: "Delete Variables", Type: "variables", Action: "DELETE"},
+
+		{Name: "Read Datasets", Type: "datasets", Action: "READ"},
+		{Name: "Manage Datasets", Type: "datasets", Action: "WRITE"},
+		{Name: "Delete Datasets", Type: "datasets", Action: "DELETE"},
 
 		{Name: "Read Tags", Type: "tags", Action: "READ"},
 		{Name: "Manage Tags", Type: "tags", Action: "WRITE"},

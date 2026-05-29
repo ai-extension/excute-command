@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sed -n '120,150p' internal/handler/permission.go)",
+      "Bash(sed -n '248,266p' internal/middleware/rbac.go)",
+      "Bash(sed -n '385,400p' cmd/server/main.go)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(go list *)",
+      "Bash(go vet *)",
+      "Bash(echo \"BE EXIT=$?\")",
+      "Bash(echo \"VET_EXIT=$?\")"
+    ]
+  }
+}

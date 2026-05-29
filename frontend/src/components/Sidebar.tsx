@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Terminal, Settings, Box, ChevronsLeft, ChevronsRight, Zap, LogOut, Users, Shield, Server, Network, History, Globe, Calendar, Tag, Layout, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Terminal, Settings, Box, ChevronsLeft, ChevronsRight, Zap, LogOut, Users, Shield, Server, Network, History, Globe, Calendar, Tag, Layout, ShieldCheck, Table2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 import { useAuth } from '../context/AuthContext';
@@ -31,6 +31,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
         { name: 'Workflows', path: '/workflows', icon: Zap, type: 'workflows' },
         { name: 'History', path: '/history', icon: History, type: 'history' },
         { name: 'Variables', path: '/variables', icon: Globe, type: 'variables' },
+        { name: 'Datasets', path: '/datasets', icon: Table2, type: 'datasets' },
         { name: 'Tags', path: '/tags', icon: Tag, type: 'tags' },
         { name: 'Schedules', path: '/schedules', icon: Calendar, type: 'schedules' },
         { name: 'Pages', path: '/pages', icon: Layout, type: 'pages' },

@@ -45,7 +45,7 @@ export interface WorkflowStep {
     group_id: string;
     server_id?: string;
     name: string;
-    action_type: 'COMMAND' | 'WORKFLOW' | 'HTTP';
+    action_type: 'COMMAND' | 'WORKFLOW' | 'HTTP' | 'DATASET';
     action_key?: string;
     command_text: string;
     http_url?: string;
@@ -53,6 +53,11 @@ export interface WorkflowStep {
     http_headers?: string;
     http_body?: string;
     output_format?: 'json' | 'string';
+    dataset_id?: string;
+    dataset_operation?: 'QUERY' | 'FIND_ONE' | 'INSERT' | 'UPDATE' | 'DELETE';
+    dataset_filter?: string;
+    dataset_payload?: string;
+    dataset_limit?: number;
     target_workflow_id?: string;
     target_workflow_inputs?: string; // JSON string
     wait_to_finish: boolean;
@@ -100,6 +105,33 @@ export interface Tag {
     description: string;
     created_by?: string;
     created_by_username?: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface DatasetColumn {
+    name: string;
+    type: string; // string | number | bool | json (UI hint only)
+    default?: string; // default value pre-filled in the record form
+}
+
+export interface Dataset {
+    id: string;
+    namespace_id: string;
+    key: string;
+    name: string;
+    description: string;
+    columns: string; // JSON string of DatasetColumn[]
+    created_by?: string;
+    created_by_username?: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface DatasetRecord {
+    id: string;
+    dataset_id: string;
+    data: string; // JSON string
     created_at: string;
     updated_at: string;
 }
