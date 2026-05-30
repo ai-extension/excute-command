@@ -31,14 +31,24 @@ const MetricWidget: React.FC<Props> = ({ widget, slug, pageToken }) => {
         { publicSlug: slug, pageToken, reload: widget.reload_interval }
     );
 
+    const firstSelect = widget.dataset?.selects?.[0];
     const value = useMemo(() => {
         if (!isDataset) {
             const n = Number(widget.metric_static_value);
             return Number.isFinite(n) ? n : 0;
         }
-        // Take the first bucket's value (group_by usually empty for METRIC).
-        return items.length > 0 ? items[0].value : 0;
-    }, [isDataset, items, widget.metric_static_value]);
+        if (items.length === 0) return 0;
+        // Prefer the first select's value by label when present; fall back to the legacy
+        // bucket.value (mirrors first select on the backend anyway).
+        const first = items[0];
+        if (firstSelect?.label && first.values && first.values[firstSelect.label] !== undefined) {
+            return first.values[firstSelect.label];
+        }
+        return first.value;
+    }, [isDataset, items, widget.metric_static_value, firstSelect?.label]);
+
+    // Use the first select's label as the metric label when admin didn't set one.
+    const displayLabel = widget.metric_label || firstSelect?.label || '';
 
     return (
         <div className="bg-card border border-border rounded-md overflow-hidden shadow-sm h-full flex flex-col">
@@ -60,9 +70,9 @@ const MetricWidget: React.FC<Props> = ({ widget, slug, pageToken }) => {
                             {formatNumber(value, widget.metric_format)}
                             {widget.metric_unit && <span className="text-lg text-muted-foreground ml-1">{widget.metric_unit}</span>}
                         </div>
-                        {widget.metric_label && (
+                        {displayLabel && (
                             <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                                {widget.metric_label}
+                                {displayLabel}
                             </div>
                         )}
                     </>

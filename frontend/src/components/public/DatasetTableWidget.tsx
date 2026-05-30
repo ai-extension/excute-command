@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Table2 } from 'lucide-react';
-import { PageWidget, DatasetRecord, PageWidgetReload } from '../../types';
+import { PageWidget, DatasetRecord, PageWidgetReload, SelectAggregation } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { API_BASE_URL } from '../../lib/api';
+import { useDatasetAggregate } from '../page-designer/useDatasetAggregate';
 
 interface Props {
     widget: PageWidget;
@@ -28,27 +29,46 @@ const cellText = (v: any): string => {
     return String(v);
 };
 
+// Label for a select, mirroring the backend's default-label rule when admin left it blank.
+const selectLabel = (s: SelectAggregation, idx: number): string => {
+    if (s.label && s.label.trim()) return s.label.trim();
+    const fn = s.fn || 'count';
+    if (s.field) return `${fn}(${s.field})`;
+    return idx === 0 ? String(fn) : `${fn}_${idx + 1}`;
+};
+
 const DatasetTableWidget: React.FC<Props> = ({ widget, slug, pageToken }) => {
     const { apiFetch } = useAuth();
-    const [items, setItems] = useState<DatasetRecord[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
 
     const ds = widget.dataset;
     const cols = ds?.columns && ds.columns.length > 0 ? ds.columns : [];
     const limit = ds?.limit && ds.limit > 0 ? ds.limit : 50;
 
+    const aggregateMode = !!ds && Array.isArray(ds.group_bys) && ds.group_bys.length > 0;
+
+    // Aggregate mode: use the shared hook. We pass undefined when not in aggregate mode
+    // so the hook stays inert (no fetch, empty items).
+    const aggregate = useDatasetAggregate(
+        aggregateMode ? ds : undefined,
+        { publicSlug: slug, pageToken, reload: widget.reload_interval }
+    );
+
+    // Records mode: classic raw-records fetch.
+    const [records, setRecords] = useState<DatasetRecord[]>([]);
+    const [recordsLoading, setRecordsLoading] = useState(false);
+    const [recordsError, setRecordsError] = useState<string | null>(null);
+
     useEffect(() => {
-        if (!ds?.dataset_id) {
-            setItems([]);
-            setError(null);
-            setLoading(false);
+        if (aggregateMode || !ds?.dataset_id) {
+            setRecords([]);
+            setRecordsError(null);
+            setRecordsLoading(false);
             return;
         }
         const guard = { cancelled: false };
 
         const fetchOnce = async (isFirst: boolean) => {
-            if (isFirst) setLoading(true);
+            if (isFirst) setRecordsLoading(true);
             try {
                 const qs = new URLSearchParams();
                 qs.set('limit', String(limit));
@@ -57,22 +77,24 @@ const DatasetTableWidget: React.FC<Props> = ({ widget, slug, pageToken }) => {
                 if (slug) {
                     const headers: Record<string, string> = {};
                     if (pageToken) headers['X-Page-Token'] = pageToken;
-                    res = await fetch(`${API_BASE_URL}/public/pages/${slug}/datasets/${ds.dataset_id}/records?${qs}`, { headers });
+                    res = await fetch(`${API_BASE_URL}/public/pages/${slug}/datasets/${ds.dataset_id}/records?${qs}`, {
+                        headers, credentials: 'include',
+                    });
                 } else {
                     res = await apiFetch(`${API_BASE_URL}/datasets/${ds.dataset_id}/records?${qs}`);
                 }
                 const data = await res.json();
                 if (guard.cancelled) return;
                 if (!res.ok) {
-                    setError(data?.error || 'Failed to load');
+                    setRecordsError(data?.error || 'Failed to load');
                     return;
                 }
-                setError(null);
-                setItems(Array.isArray(data.items) ? data.items : []);
+                setRecordsError(null);
+                setRecords(Array.isArray(data.items) ? data.items : []);
             } catch (e: any) {
-                if (!guard.cancelled) setError(e?.message || 'Network error');
+                if (!guard.cancelled) setRecordsError(e?.message || 'Network error');
             } finally {
-                if (!guard.cancelled && isFirst) setLoading(false);
+                if (!guard.cancelled && isFirst) setRecordsLoading(false);
             }
         };
 
@@ -81,14 +103,55 @@ const DatasetTableWidget: React.FC<Props> = ({ widget, slug, pageToken }) => {
         let timer: ReturnType<typeof setInterval> | null = null;
         if (ms) timer = setInterval(() => fetchOnce(false), ms);
         return () => { guard.cancelled = true; if (timer) clearInterval(timer); };
-    }, [apiFetch, ds?.dataset_id, ds?.filter, limit, slug, pageToken, widget.reload_interval]);
+    }, [aggregateMode, apiFetch, ds?.dataset_id, ds?.filter, limit, slug, pageToken, widget.reload_interval]);
 
-    // Auto-discover columns from records when admin didn't specify any.
-    const headerKeys = cols.length > 0 ? cols : (() => {
-        const keys = new Set<string>();
-        items.slice(0, 20).forEach(r => Object.keys(parseData(r.data)).forEach(k => keys.add(k)));
-        return Array.from(keys);
-    })();
+    const loading = aggregateMode ? aggregate.loading : recordsLoading;
+    const error = aggregateMode ? aggregate.error : recordsError;
+
+    // --- Build header keys + rows from whichever mode is active ---
+    const { headerKeys, rows } = useMemo(() => {
+        if (aggregateMode) {
+            const groupBys = ds!.group_bys || [];
+            const selects = (ds!.selects || []);
+            const allKeys = [
+                ...groupBys,
+                ...selects.map((s, i) => selectLabel(s, i)),
+            ];
+            // Admin-picked columns override; otherwise show every group + select.
+            const keys = cols.length > 0 ? cols : allKeys;
+
+            const rs = aggregate.items.map((bucket) => {
+                // Composite key joined by " | ". Split back to align with group_bys.
+                // Edge case: if a group value itself contains " | ", it'll split wrongly —
+                // accepted limitation in v1.
+                const parts = groupBys.length > 1 ? bucket.key.split(' | ') : [bucket.key];
+                const row: Record<string, any> = {};
+                groupBys.forEach((g, i) => { row[g] = parts[i] ?? ''; });
+                selects.forEach((s, i) => {
+                    const label = selectLabel(s, i);
+                    row[label] = bucket.values ? bucket.values[label] : (i === 0 ? bucket.value : 0);
+                });
+                row._count = bucket.count;
+                return row;
+            });
+            return { headerKeys: keys, rows: rs };
+        }
+
+        // Records mode: auto-discover columns when admin didn't pick any.
+        const discovered = cols.length > 0 ? cols : (() => {
+            const keys = new Set<string>();
+            records.slice(0, 20).forEach(r => Object.keys(parseData(r.data)).forEach(k => keys.add(k)));
+            return Array.from(keys);
+        })();
+        const rs = records.map(r => {
+            const obj = parseData(r.data);
+            const row: Record<string, any> = { ...obj, _id: r.id };
+            return row;
+        });
+        return { headerKeys: discovered, rows: rs };
+    }, [aggregateMode, ds, cols, aggregate.items, records]);
+
+    const empty = rows.length === 0;
 
     return (
         <div className="bg-card border border-border rounded-md overflow-hidden shadow-sm h-full flex flex-col">
@@ -97,13 +160,18 @@ const DatasetTableWidget: React.FC<Props> = ({ widget, slug, pageToken }) => {
                     <Table2 className="w-4 h-4" />
                 </div>
                 <span className="text-sm font-black truncate">{widget.title || 'Data Table'}</span>
+                {aggregateMode && (
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-cyan-500/70">Aggregated</span>
+                )}
                 {loading && <span className="ml-auto text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">Loading…</span>}
             </div>
             <div className="p-4 flex-1 overflow-auto">
                 {error ? (
                     <p className="text-[10px] text-destructive">Error: {error}</p>
-                ) : items.length === 0 ? (
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 py-8 text-center">No records</p>
+                ) : empty ? (
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 py-8 text-center">
+                        No {aggregateMode ? 'data' : 'records'}
+                    </p>
                 ) : (
                     <table className="w-full text-xs">
                         <thead>
@@ -114,16 +182,13 @@ const DatasetTableWidget: React.FC<Props> = ({ widget, slug, pageToken }) => {
                             </tr>
                         </thead>
                         <tbody>
-                            {items.map((r) => {
-                                const obj = parseData(r.data);
-                                return (
-                                    <tr key={r.id} className="border-b border-border/40 hover:bg-muted/30">
-                                        {headerKeys.map(h => (
-                                            <td key={h} className="py-2 px-3 font-mono text-[11px] truncate max-w-[260px]">{cellText(h === '_id' ? r.id : obj[h])}</td>
-                                        ))}
-                                    </tr>
-                                );
-                            })}
+                            {rows.map((row, ri) => (
+                                <tr key={ri} className="border-b border-border/40 hover:bg-muted/30">
+                                    {headerKeys.map(h => (
+                                        <td key={h} className="py-2 px-3 font-mono text-[11px] truncate max-w-[260px]">{cellText(row[h])}</td>
+                                    ))}
+                                </tr>
+                            ))}
                         </tbody>
                     </table>
                 )}

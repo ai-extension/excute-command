@@ -2,8 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Plus, X, FolderPlus } from 'lucide-react';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
-import { cn } from '../lib/utils';
+import { cn, generateUUID } from '../lib/utils';
 import { FieldCombo } from './FieldCombo';
+import { SelectAggregation, AggregateFn } from '../types';
+
+const AGG_FNS: AggregateFn[] = ['count', 'sum', 'avg', 'min', 'max'];
 
 // ---- Filter tree model ----
 export type FCond = { field: string; op: string; value: string };
@@ -130,15 +133,142 @@ const GroupBox: React.FC<GroupBoxProps> = ({ group, onChange, columns, onRemove,
     );
 };
 
+// Editor for the GROUP BY field list + SELECT aggregation list. Each section renders
+// independently: pass groups+onGroupsChange to show the Group By row, pass
+// selects+onSelectsChange to show the Select row. Both omitted → no editor.
+interface AggregationEditorProps {
+    columns: string[];
+    groups?: string[];
+    onGroupsChange?: (v: string[]) => void;
+    selects?: SelectAggregation[];
+    onSelectsChange?: (v: SelectAggregation[]) => void;
+}
+
+const AggregationEditor: React.FC<AggregationEditorProps> = ({
+    columns, groups, onGroupsChange, selects, onSelectsChange,
+}) => {
+    const showGroups = !!onGroupsChange;
+    const showSelects = !!onSelectsChange;
+    if (!showGroups && !showSelects) return null;
+
+    const gList = groups || [];
+    const sList = selects || [];
+
+    const addGroup = () => onGroupsChange!([...gList, '']);
+    const updateGroup = (i: number, v: string) =>
+        onGroupsChange!(gList.map((g, idx) => idx === i ? v : g));
+    const removeGroup = (i: number) =>
+        onGroupsChange!(gList.filter((_, idx) => idx !== i));
+
+    const addSelect = () => onSelectsChange!([
+        ...sList,
+        { id: generateUUID(), fn: 'count', field: '', label: '' },
+    ]);
+    const updateSelect = (i: number, patch: Partial<SelectAggregation>) =>
+        onSelectsChange!(sList.map((s, idx) => idx === i ? { ...s, ...patch } : s));
+    const removeSelect = (i: number) =>
+        onSelectsChange!(sList.filter((_, idx) => idx !== i));
+
+    return (
+        <div className="mt-2 rounded-md border border-border/70 p-2 space-y-2 bg-muted/10">
+            {showGroups && (
+                <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-black uppercase tracking-wider text-cyan-500/70">Group By</span>
+                        <Button type="button" variant="outline" size="sm" className="h-6 text-[10px] px-2 gap-1 rounded-md" onClick={addGroup}>
+                            <Plus className="w-3 h-3" /> Group Field
+                        </Button>
+                    </div>
+                    {gList.length === 0 ? (
+                        <p className="text-[9px] text-muted-foreground/50 italic pl-1">
+                            No group fields — single bucket of all matching records.
+                        </p>
+                    ) : (
+                        <div className="space-y-1.5 pl-2 border-l-2 border-cyan-500/20">
+                            {gList.map((g, i) => (
+                                <div key={i} className="flex items-center gap-1.5">
+                                    <div className="flex-1">
+                                        <FieldCombo value={g} onChange={(v) => updateGroup(i, v)}
+                                            options={columns} placeholder="field"
+                                            className="h-7 px-2 text-[11px] font-mono" />
+                                    </div>
+                                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7 rounded-md hover:bg-destructive/10 hover:text-destructive"
+                                        onClick={() => removeGroup(i)}>
+                                        <X className="w-3.5 h-3.5" />
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {showSelects && (
+                <div className={cn('space-y-1', showGroups && 'pt-1 border-t border-border/40')}>
+                    <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-black uppercase tracking-wider text-cyan-500/70">Select</span>
+                        <Button type="button" variant="outline" size="sm" className="h-6 text-[10px] px-2 gap-1 rounded-md" onClick={addSelect}>
+                            <Plus className="w-3 h-3" /> Select
+                        </Button>
+                    </div>
+                    {sList.length === 0 ? (
+                        <p className="text-[9px] text-muted-foreground/50 italic pl-1">
+                            No selects — defaults to count of records per bucket.
+                        </p>
+                    ) : (
+                        <div className="space-y-1.5 pl-2 border-l-2 border-cyan-500/20">
+                            {sList.map((s, i) => (
+                                <div key={s.id || i} className="grid grid-cols-12 gap-1 items-center">
+                                    <select value={s.fn}
+                                        onChange={(e) => updateSelect(i, { fn: e.target.value as AggregateFn })}
+                                        className="col-span-3 h-7 px-1 text-[10px] font-bold border border-border rounded-md bg-background text-foreground outline-none cursor-pointer">
+                                        {AGG_FNS.map(fn => <option key={fn} value={fn}>{fn.toUpperCase()}</option>)}
+                                    </select>
+                                    <div className="col-span-4">
+                                        <FieldCombo value={s.field || ''} onChange={(v) => updateSelect(i, { field: v })}
+                                            options={columns}
+                                            placeholder={s.fn === 'count' ? '(any field)' : 'numeric field'}
+                                            className="h-7 px-2 text-[11px] font-mono" />
+                                    </div>
+                                    <Input value={s.label || ''}
+                                        onChange={(e) => updateSelect(i, { label: e.target.value })}
+                                        placeholder="label"
+                                        className="col-span-4 h-7 text-[11px] font-mono px-2" />
+                                    <Button type="button" variant="ghost" size="icon"
+                                        className="col-span-1 h-7 w-7 rounded-md hover:bg-destructive/10 hover:text-destructive justify-self-end"
+                                        onClick={() => removeSelect(i)}>
+                                        <X className="w-3.5 h-3.5" />
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+
 interface FilterBuilderProps {
     value: string;            // stored filter string (JSON tree or legacy)
     onChange: (v: string) => void;
     columns: string[];        // field suggestions
+    // Optional aggregation editor (rendered below the boolean filter tree). Each section
+    // shows independently: passing onGroupsChange reveals Group By, passing onSelectsChange
+    // reveals Select. Consumers that only need filtering simply omit both — UI is then
+    // identical to the original FilterBuilder.
+    groups?: string[];
+    onGroupsChange?: (v: string[]) => void;
+    selects?: SelectAggregation[];
+    onSelectsChange?: (v: SelectAggregation[]) => void;
 }
 
 // Controlled-ish: holds the working tree internally, emits a serialized string on edits.
 // Re-syncs from `value` only when it changes externally (not from our own emit).
-export const FilterBuilder: React.FC<FilterBuilderProps> = ({ value, onChange, columns }) => {
+export const FilterBuilder: React.FC<FilterBuilderProps> = ({
+    value, onChange, columns,
+    groups, onGroupsChange, selects, onSelectsChange,
+}) => {
     const [tree, setTree] = useState<FGroup>(() => parseFilterTree(value));
     const lastEmit = useRef<string>(value);
 
@@ -156,5 +286,16 @@ export const FilterBuilder: React.FC<FilterBuilderProps> = ({ value, onChange, c
         onChange(s);
     };
 
-    return <GroupBox group={tree} onChange={update} columns={columns} depth={0} />;
+    return (
+        <div className="space-y-2">
+            <GroupBox group={tree} onChange={update} columns={columns} depth={0} />
+            <AggregationEditor
+                columns={columns}
+                groups={groups}
+                onGroupsChange={onGroupsChange}
+                selects={selects}
+                onSelectsChange={onSelectsChange}
+            />
+        </div>
+    );
 };

@@ -198,15 +198,42 @@ func (h *DatasetHandler) ListRecords(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"items": items, "total": total, "limit": limit, "offset": offset})
 }
 
+// selectBody mirrors the frontend SelectAggregation type for JSON binding.
+type selectBody struct {
+	Field string `json:"field"`
+	Fn    string `json:"fn"`
+	Label string `json:"label"`
+}
+
 // aggregateRequestBody is the wire shape for POST /datasets/:id/aggregate. Keep field
 // names in sync with the frontend DatasetSource type.
 type aggregateRequestBody struct {
-	Filter  string `json:"filter"`
+	Filter   string       `json:"filter"`
+	GroupBys []string     `json:"group_bys"`
+	Selects  []selectBody `json:"selects"`
+	// Legacy single-field
 	GroupBy string `json:"group_by"`
 	Metric  string `json:"metric"`
 	Fn      string `json:"fn"`
 	Limit   int    `json:"limit"`
 	Sort    string `json:"sort"`
+}
+
+func (b aggregateRequestBody) toServiceReq() service.AggregateRequest {
+	selects := make([]service.AggregateSelect, 0, len(b.Selects))
+	for _, s := range b.Selects {
+		selects = append(selects, service.AggregateSelect{Field: s.Field, Fn: s.Fn, Label: s.Label})
+	}
+	return service.AggregateRequest{
+		Filter:   b.Filter,
+		GroupBys: b.GroupBys,
+		Selects:  selects,
+		GroupBy:  b.GroupBy,
+		Metric:   b.Metric,
+		Fn:       b.Fn,
+		Limit:    b.Limit,
+		Sort:     b.Sort,
+	}
 }
 
 func (h *DatasetHandler) Aggregate(c *gin.Context) {
@@ -223,14 +250,7 @@ func (h *DatasetHandler) Aggregate(c *gin.Context) {
 		}
 	}
 	user, _ := c.Get("user")
-	items, err := h.service.Aggregate(datasetID, service.AggregateRequest{
-		Filter:  body.Filter,
-		GroupBy: body.GroupBy,
-		Metric:  body.Metric,
-		Fn:      body.Fn,
-		Limit:   body.Limit,
-		Sort:    body.Sort,
-	}, user.(*domain.User))
+	items, err := h.service.Aggregate(datasetID, body.toServiceReq(), user.(*domain.User))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

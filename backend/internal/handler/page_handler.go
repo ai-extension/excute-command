@@ -608,7 +608,13 @@ func (h *PageHandler) AggregatePublicDataset(c *gin.Context) {
 	}
 
 	var body struct {
-		Filter  string `json:"filter"`
+		Filter   string   `json:"filter"`
+		GroupBys []string `json:"group_bys"`
+		Selects  []struct {
+			Field string `json:"field"`
+			Fn    string `json:"fn"`
+			Label string `json:"label"`
+		} `json:"selects"`
 		GroupBy string `json:"group_by"`
 		Metric  string `json:"metric"`
 		Fn      string `json:"fn"`
@@ -622,13 +628,20 @@ func (h *PageHandler) AggregatePublicDataset(c *gin.Context) {
 		}
 	}
 
+	selects := make([]service.AggregateSelect, 0, len(body.Selects))
+	for _, s := range body.Selects {
+		selects = append(selects, service.AggregateSelect{Field: s.Field, Fn: s.Fn, Label: s.Label})
+	}
+
 	items, err := h.datasetService.AggregatePublic(ds.ID, service.AggregateRequest{
-		Filter:  body.Filter,
-		GroupBy: body.GroupBy,
-		Metric:  body.Metric,
-		Fn:      body.Fn,
-		Limit:   body.Limit,
-		Sort:    body.Sort,
+		Filter:   body.Filter,
+		GroupBys: body.GroupBys,
+		Selects:  selects,
+		GroupBy:  body.GroupBy,
+		Metric:   body.Metric,
+		Fn:       body.Fn,
+		Limit:    body.Limit,
+		Sort:     body.Sort,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

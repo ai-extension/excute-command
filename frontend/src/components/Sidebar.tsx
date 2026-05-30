@@ -23,17 +23,23 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
 
     const globalNavItems: { name: string; path: string; icon: React.ElementType; type: string }[] = [];
 
+    // Main namespace items shown first.
     const namespaceNavItems = [
         { name: 'Dashboard', path: '/', icon: LayoutDashboard, type: 'dashboard' },
         { name: 'Workflows', path: '/workflows', icon: Zap, type: 'workflows' },
         { name: 'History', path: '/history', icon: History, type: 'history' },
-        { name: 'Servers', path: '/servers', icon: Server, type: 'servers' },
-        { name: 'VPN Configs', path: '/vpns', icon: Network, type: 'vpns' },
         { name: 'Variables', path: '/variables', icon: Globe, type: 'variables' },
         { name: 'Datasets', path: '/datasets', icon: Table2, type: 'datasets' },
         { name: 'Tags', path: '/tags', icon: Tag, type: 'tags' },
         { name: 'Schedules', path: '/schedules', icon: Calendar, type: 'schedules' },
         { name: 'Pages', path: '/pages', icon: Layout, type: 'pages' },
+    ].filter(item => hasPermission(item.type, 'READ', null, activeNamespace?.id));
+
+    // Infrastructure items pinned to the bottom of the Operational group — visually
+    // separated so workflow-facing entries aren't lost among server / network plumbing.
+    const infrastructureNavItems = [
+        { name: 'Servers', path: '/servers', icon: Server, type: 'servers' },
+        { name: 'VPN Configs', path: '/vpns', icon: Network, type: 'vpns' },
     ].filter(item => hasPermission(item.type, 'READ', null, activeNamespace?.id));
 
     const identityItems = [
@@ -102,7 +108,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
             <div className="flex-1 flex flex-col gap-6 w-full overflow-y-auto py-4">
 
                 {/* Namespace-scoped items */}
-                {namespaceNavItems.length > 0 && (
+                {(namespaceNavItems.length > 0 || infrastructureNavItems.length > 0) && (
                     <div className="w-full">
                         {!isCollapsed && (
                             <div className="flex items-center gap-1.5 px-4 mb-2 mt-1">
@@ -114,6 +120,16 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
                         <nav className="flex flex-col gap-1.5 w-full pl-0">
                             {namespaceNavItems.map((item) => renderNavLink(item, { indent: false }))}
                         </nav>
+                        {infrastructureNavItems.length > 0 && (
+                            <>
+                                {namespaceNavItems.length > 0 && (
+                                    <div className={cn("my-3", isCollapsed ? "mx-2 h-px bg-border/40" : "mx-4 h-px bg-border/40")} />
+                                )}
+                                <nav className="flex flex-col gap-1.5 w-full pl-0">
+                                    {infrastructureNavItems.map((item) => renderNavLink(item, { indent: false }))}
+                                </nav>
+                            </>
+                        )}
                     </div>
                 )}
 

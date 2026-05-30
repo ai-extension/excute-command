@@ -141,16 +141,29 @@ func (s *DatasetService) ListRecordsFiltered(datasetID uuid.UUID, limit, offset 
 	return matched[offset:end], total, nil
 }
 
+// AggregateSelect is one output column to compute per bucket. Field is the numeric
+// field to reduce (ignored when Fn=='count'); Label names the column in the response.
+type AggregateSelect struct {
+	Field string
+	Fn    string
+	Label string
+}
+
 // AggregateRequest configures a server-side aggregation pass over a dataset's records.
 //
-//   - Filter: same FilterBuilder JSON tree as ListRecordsFiltered (empty = match all).
-//   - GroupBy: field name to bucket by. Empty → single bucket "" (useful for KPI totals).
-//   - Metric:  numeric field aggregated by Fn. Empty + Fn=count → record count.
-//   - Fn:      one of count|sum|avg|min|max (default count).
-//   - Limit:   max buckets returned (0 = no cap; sorted output is still applied first).
-//   - Sort:    value_desc | value_asc | key_asc | key_desc (default value_desc).
+//   - Filter:   same FilterBuilder JSON tree as ListRecordsFiltered (empty = match all).
+//   - GroupBys: field names whose values form a composite bucket key (joined with " | ").
+//   - Selects:  one or more reductions; each becomes a value in bucket.Values keyed by Label.
+//   - Limit:    max buckets returned (0 = no cap; applied after sort).
+//   - Sort:     value_desc | value_asc | key_asc | key_desc — sorts by the FIRST select.
+//
+// Legacy single-field fields (GroupBy, Metric, Fn) are still accepted; when the array
+// fields are empty they are normalized into the new shape so the old API contract holds.
 type AggregateRequest struct {
-	Filter  string
+	Filter   string
+	GroupBys []string
+	Selects  []AggregateSelect
+	// Legacy single-field (kept for backward compat with older frontend builds).
 	GroupBy string
 	Metric  string
 	Fn      string
@@ -158,10 +171,13 @@ type AggregateRequest struct {
 	Sort    string
 }
 
+// AggregateBucket: one output row. Values is the new multi-aggregate map keyed by
+// select Label. Value mirrors the first select for backward compatibility.
 type AggregateBucket struct {
-	Key   string  `json:"key"`
-	Value float64 `json:"value"`
-	Count int64   `json:"count"`
+	Key    string             `json:"key"`
+	Count  int64              `json:"count"`
+	Values map[string]float64 `json:"values"`
+	Value  float64            `json:"value"` // legacy: == Values[firstSelect.Label]
 }
 
 // Aggregate runs a group-by + reduce over a dataset's records. Records are filtered then
@@ -174,6 +190,48 @@ func (s *DatasetService) Aggregate(datasetID uuid.UUID, req AggregateRequest, us
 	return s.aggregateOnly(datasetID, req)
 }
 
+// normalizeAggregate merges the legacy single-field request shape into the new arrays
+// so the rest of aggregateOnly can assume the new shape.
+func normalizeAggregate(req AggregateRequest) (groupBys []string, selects []AggregateSelect) {
+	groupBys = make([]string, 0, len(req.GroupBys))
+	for _, g := range req.GroupBys {
+		if g = strings.TrimSpace(g); g != "" {
+			groupBys = append(groupBys, g)
+		}
+	}
+	if len(groupBys) == 0 && strings.TrimSpace(req.GroupBy) != "" {
+		groupBys = []string{strings.TrimSpace(req.GroupBy)}
+	}
+
+	for _, sel := range req.Selects {
+		fn := strings.ToLower(strings.TrimSpace(sel.Fn))
+		if fn == "" {
+			fn = "count"
+		}
+		label := strings.TrimSpace(sel.Label)
+		if label == "" {
+			label = fn
+			if sel.Field != "" {
+				label = fn + "(" + sel.Field + ")"
+			}
+		}
+		selects = append(selects, AggregateSelect{Field: sel.Field, Fn: fn, Label: label})
+	}
+	if len(selects) == 0 {
+		// Legacy single-select fallback.
+		fn := strings.ToLower(strings.TrimSpace(req.Fn))
+		if fn == "" {
+			fn = "count"
+		}
+		label := fn
+		if req.Metric != "" {
+			label = fn + "(" + req.Metric + ")"
+		}
+		selects = []AggregateSelect{{Field: req.Metric, Fn: fn, Label: label}}
+	}
+	return
+}
+
 // aggregateOnly is the access-check-free aggregation core. Public-page proxies call this
 // after their own membership check.
 func (s *DatasetService) aggregateOnly(datasetID uuid.UUID, req AggregateRequest) ([]AggregateBucket, error) {
@@ -182,22 +240,23 @@ func (s *DatasetService) aggregateOnly(datasetID uuid.UUID, req AggregateRequest
 		return nil, err
 	}
 
-	fn := strings.ToLower(strings.TrimSpace(req.Fn))
-	if fn == "" {
-		fn = "count"
-	}
+	groupBys, selects := normalizeAggregate(req)
 	filter := strings.TrimSpace(req.Filter)
 
-	type acc struct {
-		count   int64 // number of records in the bucket (post-filter)
-		numeric int64 // number of records with a parseable metric value
+	// One accumulator per (bucket, select). We track count separately at bucket scope.
+	type selAcc struct {
+		numeric int64 // records with a parseable metric value for this select
 		sum     float64
 		min     float64
 		max     float64
 		seen    bool
 	}
-	buckets := map[string]*acc{}
-	order := []string{} // preserves first-seen order for stable key sort fallback
+	type bucketAcc struct {
+		count int64
+		sels  []selAcc
+	}
+	buckets := map[string]*bucketAcc{}
+	order := []string{}
 
 	for _, r := range all {
 		m := map[string]interface{}{}
@@ -211,37 +270,50 @@ func (s *DatasetService) aggregateOnly(datasetID uuid.UUID, req AggregateRequest
 			continue
 		}
 
-		key := ""
-		if req.GroupBy != "" {
-			key = stringifyAggValue(m[req.GroupBy])
+		// Composite key: stringify each group_by value, join with " | ". When no
+		// group_bys are configured, every record falls into bucket "".
+		var key string
+		if len(groupBys) == 1 {
+			key = stringifyAggValue(m[groupBys[0]])
+		} else if len(groupBys) > 1 {
+			parts := make([]string, len(groupBys))
+			for i, g := range groupBys {
+				parts[i] = stringifyAggValue(m[g])
+			}
+			key = strings.Join(parts, " | ")
 		}
+
 		b, ok := buckets[key]
 		if !ok {
-			b = &acc{}
+			b = &bucketAcc{sels: make([]selAcc, len(selects))}
 			buckets[key] = b
 			order = append(order, key)
 		}
 		b.count++
 
-		if fn != "count" {
-			if req.Metric == "" {
+		for i, sel := range selects {
+			if sel.Fn == "count" {
+				continue // count uses bucket.count regardless of field
+			}
+			if sel.Field == "" {
 				continue
 			}
-			v, ok := toFloat(m[req.Metric])
+			v, ok := toFloat(m[sel.Field])
 			if !ok {
 				continue
 			}
-			b.numeric++
-			b.sum += v
-			if !b.seen {
-				b.min, b.max = v, v
-				b.seen = true
+			sa := &b.sels[i]
+			sa.numeric++
+			sa.sum += v
+			if !sa.seen {
+				sa.min, sa.max = v, v
+				sa.seen = true
 			} else {
-				if v < b.min {
-					b.min = v
+				if v < sa.min {
+					sa.min = v
 				}
-				if v > b.max {
-					b.max = v
+				if v > sa.max {
+					sa.max = v
 				}
 			}
 		}
@@ -250,24 +322,33 @@ func (s *DatasetService) aggregateOnly(datasetID uuid.UUID, req AggregateRequest
 	out := make([]AggregateBucket, 0, len(order))
 	for _, k := range order {
 		b := buckets[k]
-		var val float64
-		switch fn {
-		case "sum":
-			val = b.sum
-		case "avg":
-			if b.numeric > 0 {
-				val = b.sum / float64(b.numeric)
+		values := make(map[string]float64, len(selects))
+		for i, sel := range selects {
+			var v float64
+			switch sel.Fn {
+			case "sum":
+				v = b.sels[i].sum
+			case "avg":
+				if b.sels[i].numeric > 0 {
+					v = b.sels[i].sum / float64(b.sels[i].numeric)
+				}
+			case "min":
+				v = b.sels[i].min
+			case "max":
+				v = b.sels[i].max
+			default: // count
+				v = float64(b.count)
 			}
-		case "min":
-			val = b.min
-		case "max":
-			val = b.max
-		default: // count
-			val = float64(b.count)
+			values[sel.Label] = v
 		}
-		out = append(out, AggregateBucket{Key: k, Value: val, Count: b.count})
+		bucket := AggregateBucket{Key: k, Count: b.count, Values: values}
+		if len(selects) > 0 {
+			bucket.Value = values[selects[0].Label]
+		}
+		out = append(out, bucket)
 	}
 
+	// Sort uses the first select's value for value_*. Key sorts are unaffected.
 	sortAggBuckets(out, req.Sort)
 	if req.Limit > 0 && len(out) > req.Limit {
 		out = out[:req.Limit]

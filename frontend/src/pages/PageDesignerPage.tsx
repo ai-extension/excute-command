@@ -1259,7 +1259,7 @@ const PageDesignerPage = () => {
                                             <DatasetSourceConfig
                                                 value={activeWidget.dataset}
                                                 onChange={(v) => updateWidget(activeWidget.id, { dataset: v })}
-                                                slots={{ showGroupBy: false, showMetric: false, showFn: false, showSort: false, showColumns: true, showLimit: true }}
+                                                slots={{ showGroupBy: true, showSelects: true, showSort: true, showColumns: true, showLimit: true }}
                                             />
                                             <ReloadIntervalPicker widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
                                         </>

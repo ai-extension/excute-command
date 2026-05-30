@@ -319,11 +319,31 @@ export type PageWidgetReload = 'realtime' | '5' | '10' | '30' | '60';
 export type ChartKind = 'line' | 'bar' | 'pie' | 'area';
 export type AggregateFn = 'count' | 'sum' | 'avg' | 'min' | 'max';
 
+// SelectAggregation: one aggregation column to compute per bucket. `field` is the
+// numeric field to reduce (ignored when fn === 'count'); `label` is the display name
+// used on chart legends/axes and falls back to `${fn}(${field})` when absent.
+export interface SelectAggregation {
+    id?: string;
+    field?: string;
+    fn: AggregateFn;
+    label?: string;
+}
+
 // DatasetSource: dataset-backed widget config. The shape mirrors the backend
 // AggregateRequest. `columns` is TABLE-only.
+//
+// New multi-field shape (preferred):
+//   group_bys: ['region', 'channel']  →  composite key per bucket
+//   selects:   [{fn:'sum',field:'amount',label:'Total'}, {fn:'count',label:'Orders'}]
+//
+// Legacy single-field fields (group_by, metric, fn) are still read for backward
+// compatibility with existing widgets; on save we mirror them into the arrays.
 export interface DatasetSource {
     dataset_id: string;
     filter: string;            // FilterBuilder tree JSON, applied server-side
+    group_bys?: string[];
+    selects?: SelectAggregation[];
+    // Legacy single-field
     group_by?: string;
     metric?: string;
     fn?: AggregateFn;

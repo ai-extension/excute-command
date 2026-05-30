@@ -5,8 +5,9 @@ import { DatasetSource, AggregateFn, PageWidgetReload } from '../../types';
 
 export interface AggregateBucket {
     key: string;
-    value: number;
     count: number;
+    value: number;                       // legacy single value = first select
+    values?: Record<string, number>;     // multi-select map (label → value)
 }
 
 interface Options {
@@ -36,9 +37,15 @@ export const useDatasetAggregate = (src: DatasetSource | undefined, opts: Option
     const datasetId = src?.dataset_id || '';
     const bodyKey = JSON.stringify({
         filter: src?.filter || '',
-        group_by: src?.group_by || '',
-        metric: src?.metric || '',
-        fn: (src?.fn || 'count') as AggregateFn,
+        group_bys: src?.group_bys && src.group_bys.length > 0 ? src.group_bys : undefined,
+        selects: src?.selects && src.selects.length > 0
+            ? src.selects.map(s => ({ field: s.field || '', fn: s.fn, label: s.label || '' }))
+            : undefined,
+        // Legacy single-field — sent only when the new arrays aren't, so the backend
+        // gets a single coherent request regardless of which UI generation produced it.
+        group_by: src?.group_bys && src.group_bys.length > 0 ? '' : (src?.group_by || ''),
+        metric: src?.selects && src.selects.length > 0 ? '' : (src?.metric || ''),
+        fn: src?.selects && src.selects.length > 0 ? '' : ((src?.fn || 'count') as AggregateFn),
         limit: src?.limit || 0,
         sort: src?.sort || 'value_desc',
     });
@@ -59,8 +66,12 @@ export const useDatasetAggregate = (src: DatasetSource | undefined, opts: Option
                 if (opts.publicSlug) {
                     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
                     if (opts.pageToken) headers['X-Page-Token'] = opts.pageToken;
+                    // credentials: 'include' so the auth_token cookie is sent on cross-origin
+                    // dev setups — without it, logged-in admins viewing a password-protected
+                    // page (where the password screen is bypassed by RBAC) wouldn't be in
+                    // the backend's request context and verifyPageToken would 401.
                     res = await fetch(`${API_BASE_URL}/public/pages/${opts.publicSlug}/datasets/${datasetId}/aggregate`, {
-                        method: 'POST', headers, body: bodyKey,
+                        method: 'POST', headers, body: bodyKey, credentials: 'include',
                     });
                 } else {
                     res = await apiFetch(`${API_BASE_URL}/datasets/${datasetId}/aggregate`, {
