@@ -293,6 +293,8 @@ const PageDesignerPage = () => {
     const [tokenTTL, setTokenTTL] = useState<number>(15);
     const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
     const [expirationOption, setExpirationOption] = useState<'none' | '1h' | '1d' | '1w'>('none');
+    const [parentId, setParentId] = useState('');
+    const [availablePages, setAvailablePages] = useState<{ id: string; title: string }[]>([]);
 
     // Widgets
     const [widgets, setWidgets] = useState<PageWidget[]>([]);
@@ -320,6 +322,7 @@ const PageDesignerPage = () => {
                 setIsPublic(data.is_public);
                 setTokenTTL(data.token_ttl_minutes ?? 15);
                 setSelectedTags(data.tags || []);
+                setParentId(data.parent_id || '');
                 if (data.password) {
                     setPassword('********');
                 } else {
@@ -340,6 +343,20 @@ const PageDesignerPage = () => {
 
         if (id) fetchPage();
     }, [id, activeNamespace, apiFetch]);
+
+    // Load sibling pages in this namespace for the "Parent page" selector (excludes self).
+    useEffect(() => {
+        if (!activeNamespace) return;
+        const fetchPages = async () => {
+            try {
+                const r = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/pages?limit=200`);
+                const data = await r.json();
+                const items = data.items || (Array.isArray(data) ? data : []);
+                setAvailablePages(items.filter((p: any) => p.id !== id).map((p: any) => ({ id: p.id, title: p.title })));
+            } catch { /* ignore */ }
+        };
+        fetchPages();
+    }, [activeNamespace, id, apiFetch]);
 
     const fetchWorkflows = async (search = '') => {
         if (!activeNamespace) return;
@@ -397,6 +414,7 @@ const PageDesignerPage = () => {
             const body = {
                 title,
                 description,
+                parent_id: parentId || null,
                 slug,
                 is_public: isPublic,
                 password: password === '********' ? undefined : (password || '__CLEAR_PASSWORD__'),
@@ -865,6 +883,19 @@ const PageDesignerPage = () => {
                                     <div className="space-y-1.5">
                                         <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Description</label>
                                         <Input value={description} onChange={e => setDescription(e.target.value)} className="h-9 bg-background rounded-md" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Parent Page</label>
+                                        <select
+                                            value={parentId}
+                                            onChange={e => setParentId(e.target.value)}
+                                            className="h-9 w-full bg-background border border-border rounded-md px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+                                            <option value="">— None —</option>
+                                            {availablePages.map(p => (
+                                                <option key={p.id} value={p.id}>{p.title}</option>
+                                            ))}
+                                        </select>
+                                        <p className="text-[10px] text-muted-foreground/70">Public pages with a parent show a link back to it.</p>
                                     </div>
                                     <div className="space-y-1.5 pt-2">
                                         <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Tags</label>

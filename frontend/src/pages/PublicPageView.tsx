@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import {
     Zap, Loader2, Monitor, Terminal, Clock, Sun, Moon, Copy, Check, Link2, Search,
-    FileText, ImageIcon, Frame, Activity, Table2, ArrowUp
+    FileText, ImageIcon, Frame, Activity, Table2, ArrowUp, Home
 } from 'lucide-react';
 import { cn, copyToClipboard as clipboardCopy } from '../lib/utils';
 import { Page, PageWidget, PageLayout, WorkflowInput } from '../types';
@@ -432,6 +432,16 @@ const PublicPageView = () => {
                         </p>
 
                         <div className="flex items-center gap-6 pt-2">
+                            {page?.parent?.slug && (
+                                <a
+                                    href={`/public/pages/${page.parent.slug}`}
+                                    className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors"
+                                    title={`Back to ${page.parent.title || 'parent page'}`}
+                                >
+                                    <Home className="w-4 h-4" />
+                                    <span className="text-xs font-black uppercase">{page.parent.title || 'Parent page'}</span>
+                                </a>
+                            )}
                             <div className="flex items-center gap-2">
                                 <Zap className="w-4 h-4 text-primary" />
                                 <span className="text-xs font-black uppercase  text-muted-foreground">

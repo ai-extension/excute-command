@@ -755,6 +755,16 @@ func (h *PageHandler) sanitizePage(page *domain.Page) {
 			page.Workflows[i].Workflow.DefaultServerID = nil // Hide internal server IDs
 		}
 	}
+	// Only expose the minimal parent info needed for the public breadcrumb link;
+	// strip the parent's password/layout/workflows so nothing internal leaks.
+	if page.Parent != nil {
+		page.Parent = &domain.Page{
+			ID:       page.Parent.ID,
+			Title:    page.Parent.Title,
+			Slug:     page.Parent.Slug,
+			IsPublic: page.Parent.IsPublic,
+		}
+	}
 }
 
 func (h *PageHandler) sanitizeExecution(execution *domain.WorkflowExecution) {

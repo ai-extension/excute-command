@@ -32,6 +32,11 @@ func (s *PageService) CreatePage(page *domain.Page, user *domain.User) error {
 		page.CreatedByUsername = user.Username
 	}
 
+	if err := s.validateParent(page.ID, page.NamespaceID, page.ParentID); err != nil {
+		return err
+	}
+	page.Parent = nil // never upsert the parent via this association
+
 	// Always generate IDs for workflows if they don't exist
 	for i := range page.Workflows {
 		if page.Workflows[i].ID == uuid.Nil {
@@ -105,6 +110,13 @@ func (s *PageService) UpdatePage(page *domain.Page, user *domain.User) error {
 		existing.Tags = page.Tags
 	}
 
+	// Parent page (nullable). Set unconditionally so a PUT can also clear it.
+	if err := s.validateParent(existing.ID, existing.NamespaceID, page.ParentID); err != nil {
+		return err
+	}
+	existing.ParentID = page.ParentID
+	existing.Parent = nil
+
 	// Password handling
 	if page.Password == "__CLEAR_PASSWORD__" {
 		existing.Password = ""
@@ -126,6 +138,22 @@ func (s *PageService) UpdatePage(page *domain.Page, user *domain.User) error {
 	}
 
 	return s.repo.Update(existing)
+}
+
+// validateParent ensures a page's chosen parent is valid: it must exist in the same
+// namespace and cannot be the page itself. A nil parentID (no parent) is always valid.
+func (s *PageService) validateParent(pageID, namespaceID uuid.UUID, parentID *uuid.UUID) error {
+	if parentID == nil {
+		return nil
+	}
+	if *parentID == pageID {
+		return errors.New("a page cannot be its own parent")
+	}
+	parent, err := s.repo.GetByID(*parentID, nil)
+	if err != nil || parent == nil || parent.NamespaceID != namespaceID {
+		return errors.New("parent page not found in this namespace")
+	}
+	return nil
 }
 
 func (s *PageService) DeletePage(id uuid.UUID, user *domain.User) error {

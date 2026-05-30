@@ -39,6 +39,7 @@ func (r *PostgresPageRepo) GetByID(id uuid.UUID, scope *domain.PermissionScope) 
 func (r *PostgresPageRepo) GetBySlug(slug string) (*domain.Page, error) {
 	var page domain.Page
 	err := r.db.
+		Preload("Parent").
 		Preload("Workflows", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
 		Preload("Workflows.Workflow").
 		Preload("Workflows.Workflow.Inputs").

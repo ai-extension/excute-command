@@ -413,6 +413,8 @@ export interface Page {
     namespace_id: string;
     title: string;
     description: string;
+    parent_id?: string | null;
+    parent?: { id: string; title: string; slug: string; is_public?: boolean } | null;
     slug: string;
     is_public: boolean;
     password?: string;

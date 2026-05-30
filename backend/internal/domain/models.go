@@ -618,6 +618,8 @@ type Page struct {
 	NamespaceID       uuid.UUID      `json:"namespace_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
 	Title             string         `json:"title" gorm:"not null"`
 	Description       string         `json:"description"`
+	ParentID          *uuid.UUID     `json:"parent_id,omitempty" gorm:"type:uuid;index"`
+	Parent            *Page          `json:"parent,omitempty" gorm:"foreignKey:ParentID;constraint:OnDelete:SET NULL;"`
 	Slug              string         `json:"slug" gorm:"uniqueIndex;not null"`
 	IsPublic          bool           `json:"is_public" gorm:"default:false"`
 	Password          string         `json:"password,omitempty" gorm:"column:password"`
