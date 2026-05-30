@@ -62,7 +62,7 @@ const LogicToggle: React.FC<{ logic: 'AND' | 'OR'; onChange: (l: 'AND' | 'OR') =
     <div className="flex rounded-md overflow-hidden border border-border">
         {(['AND', 'OR'] as const).map(l => (
             <button key={l} type="button" onClick={() => onChange(l)}
-                className={cn('px-2 h-6 text-[10px] font-black tracking-widest transition-colors',
+                className={cn('px-1.5 h-5 text-[9px] font-black tracking-wider transition-colors',
                     logic === l ? 'bg-cyan-500 text-white' : 'bg-background text-muted-foreground hover:bg-muted')}>
                 {l}
             </button>
