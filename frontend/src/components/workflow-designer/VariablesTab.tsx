@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Terminal, Plus, Trash2, Database, Check, Copy, Zap, GripVertical } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { cn, generateUUID } from '../../lib/utils';
@@ -6,7 +6,89 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Switch } from '../ui/switch';
-import { WorkflowInput, WorkflowVariable, MultiInputItem } from '../../types';
+import { WorkflowInput, WorkflowVariable, MultiInputItem, Dataset } from '../../types';
+import { SearchableSelect } from '../SearchableSelect';
+import { FilterBuilder } from '../FilterBuilder';
+import { useAuth } from '../../context/AuthContext';
+import { useNamespace } from '../../context/NamespaceContext';
+import { API_BASE_URL } from '../../lib/api';
+import { DatasetInputConfig, parseDatasetInputConfig, serializeDatasetInputConfig } from '../../lib/datasetInput';
+
+const parseDsColumns = (raw?: string): string[] => {
+    if (!raw) return [];
+    try {
+        const v = JSON.parse(raw);
+        return Array.isArray(v) ? v.filter((c: any) => c && c.name).map((c: any) => c.name) : [];
+    } catch { return []; }
+};
+
+const DatasetInputConfigEditor: React.FC<{
+    defaultValue: string;
+    onChange: (value: string) => void;
+}> = ({ defaultValue, onChange }) => {
+    const { apiFetch } = useAuth();
+    const { activeNamespace } = useNamespace();
+    const [datasets, setDatasets] = useState<Dataset[]>([]);
+
+    useEffect(() => {
+        if (!activeNamespace) return;
+        apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/datasets?limit=200`)
+            .then(r => r.json())
+            .then(d => setDatasets(d.items || []))
+            .catch(() => { });
+    }, [activeNamespace?.id]);
+
+    const cfg: DatasetInputConfig = parseDatasetInputConfig(defaultValue);
+    const update = (patch: Partial<DatasetInputConfig>) =>
+        onChange(serializeDatasetInputConfig({ ...cfg, ...patch }));
+
+    const selectedDs = datasets.find(d => d.id === cfg.dataset_id);
+    const cols = parseDsColumns(selectedDs?.columns);
+
+    return (
+        <div className="space-y-2 pt-2 border-t border-border/30 mt-2">
+            <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-widest text-cyan-500/80">Dataset</label>
+                <SearchableSelect
+                    options={datasets.map(d => ({ label: `${d.name} (${d.key})`, value: d.id, searchTerms: `${d.name} ${d.key}` }))}
+                    value={cfg.dataset_id}
+                    onValueChange={(val) => update({ dataset_id: val || '' })}
+                    isSearchable
+                    placeholder="— Select dataset —"
+                    searchPlaceholder="Search datasets..."
+                    triggerClassName="h-8 px-2 w-full text-xs font-semibold border-border rounded-md bg-background text-foreground"
+                />
+            </div>
+
+            {cfg.dataset_id && (
+                <>
+                    <div className="space-y-1.5">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-cyan-500/80">Base Filter</label>
+                        <FilterBuilder
+                            value={cfg.filter}
+                            onChange={(v) => update({ filter: v })}
+                            columns={[...cols, '_id']}
+                        />
+                        <p className="text-[9px] text-muted-foreground/50 font-mono">Applied automatically at runtime · supports {"{{ input.x }}"}</p>
+                    </div>
+
+                    <div className="space-y-1.5">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-cyan-500/80">Display Template</label>
+                        <Input
+                            value={cfg.display}
+                            onChange={(e) => update({ display: e.target.value })}
+                            placeholder={cols.length > 0 ? `{{item.${cols[0]}}}` : '{{item.name}} - {{item.email}}'}
+                            className="h-8 text-xs font-mono border-border bg-background"
+                        />
+                        <p className="text-[9px] text-muted-foreground/50 font-mono">
+                            How each record is shown in the picker. Use {"{{item.<field>}}"}{cols.length > 0 && ` · fields: ${cols.join(', ')}`}
+                        </p>
+                    </div>
+                </>
+            )}
+        </div>
+    );
+};
 
 const MultiInputConfigEditor: React.FC<{
     defaultValue: string;
@@ -328,6 +410,8 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                                                                         <option value="multi-select">Multi-Select</option>
                                                                         <option value="multi-input">Multi-Input</option>
                                                                         <option value="file">File Upload</option>
+                                                                        <option value="dataset-select">Dataset Record</option>
+                                                                        <option value="dataset-multi-select">Dataset Records (Multi)</option>
                                                                     </select>
                                                                 </div>
                                                                 <div className="space-y-1.5">
@@ -335,12 +419,22 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                                                                         {input.type === 'select' || input.type === 'multi-select' ? 'Options (comma-separated)'
                                                                             : input.type === 'multi-input' ? 'Configure Fields for Rows'
                                                                                 : input.type === 'file' ? ''
-                                                                                    : 'Default Value'}
+                                                                                    : input.type === 'dataset-select' || input.type === 'dataset-multi-select' ? 'Dataset Configuration'
+                                                                                        : 'Default Value'}
                                                                     </label>
                                                                      {input.type === 'file' ? (
                                                                          <div className="h-8 flex items-center px-3 border border-dashed border-border/50 rounded-md bg-muted/10">
                                                                              <span className="text-[10px] text-muted-foreground italic">No default value for files</span>
                                                                          </div>
+                                                                     ) : input.type === 'dataset-select' || input.type === 'dataset-multi-select' ? (
+                                                                        <DatasetInputConfigEditor
+                                                                            defaultValue={input.default_value || ''}
+                                                                            onChange={(newValue) => {
+                                                                                const ni = [...inputs];
+                                                                                ni[idx].default_value = newValue;
+                                                                                setInputs(ni);
+                                                                            }}
+                                                                        />
                                                                      ) : input.type === 'multi-input' ? (
                                                                         <div className="space-y-4">
                                                                             <div className="flex items-center justify-between bg-muted/20 p-2 rounded-md border border-border/50">

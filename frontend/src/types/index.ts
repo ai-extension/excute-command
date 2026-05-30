@@ -238,7 +238,7 @@ export interface WorkflowInput {
     workflow_id: string;
     key: string;
     label: string;
-    type: 'input' | 'textarea' | 'number' | 'select' | 'multi-select' | 'multi-input' | 'file';
+    type: 'input' | 'textarea' | 'number' | 'select' | 'multi-select' | 'multi-input' | 'file' | 'dataset-select' | 'dataset-multi-select';
     default_value: string;
     collapse_initially?: boolean;
     required: boolean;

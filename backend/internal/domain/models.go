@@ -362,7 +362,7 @@ type WorkflowInput struct {
 	WorkflowID   uuid.UUID `json:"workflow_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
 	Key          string    `json:"key" gorm:"not null"`
 	Label        string    `json:"label" gorm:"not null"`
-	Type         string    `json:"type" gorm:"not null;default:'input'"` // input, number, select, multi-select, multi-input, file
+	Type         string    `json:"type" gorm:"not null;default:'input'"` // input, number, select, multi-select, multi-input, file, dataset-select, dataset-multi-select
 	DefaultValue      string    `json:"default_value"`
 	CollapseInitially bool      `json:"collapse_initially" gorm:"default:false"`
 	Required          bool      `json:"required" gorm:"default:false"`
