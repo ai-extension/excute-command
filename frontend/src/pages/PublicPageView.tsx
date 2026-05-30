@@ -733,6 +733,7 @@ const PublicPageView = () => {
                     }}
                     onCancel={closeInputModal}
                     storageKey={inputModal.widget ? `public:${slug}:widget:${inputModal.widget.id}` : undefined}
+                    title={inputModal.widget?.workflow_name || inputModal.widget?.title || 'Workflow Inputs'}
                 />
 
                 {activeExecutionId && slug && (() => {

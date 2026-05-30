@@ -218,6 +218,7 @@ const HookManager: React.FC<HookManagerProps> = ({ hooks, workflows, hookType, o
                     setIsInputDialogOpen(false);
                     setPendingWorkflow(null);
                 }}
+                title={pendingWorkflow?.name || 'Workflow Inputs'}
             />
         </div>
     );

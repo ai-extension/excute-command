@@ -142,6 +142,7 @@ export const WorkflowRunner: React.FC<WorkflowRunnerProps> = ({ children, onRunC
                 onCancel={() => setIsInputOpen(false)}
                 confirmLabel="Run Workflow"
                 storageKey={runningWorkflow ? `workflow:${runningWorkflow.id}` : undefined}
+                title={runningWorkflow?.name || 'Workflow Inputs'}
             />
         </>
     );

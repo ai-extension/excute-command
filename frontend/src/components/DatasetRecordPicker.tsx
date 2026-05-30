@@ -79,7 +79,9 @@ export const DatasetRecordPicker: React.FC<Props> = ({
         return () => { cancelled = true; };
     }, [apiFetch, datasetId, baseFilter, search]);
 
-    // Build options. Merge currently-selected records so they remain visible even when filtered out.
+    // Build options. Fresh records from the API go in FIRST so they win over the
+    // stored selection snapshot — otherwise edits made to a record after it was picked
+    // would never show up in the trigger label or in submitted data.
     const { options, idToRecord } = useMemo(() => {
         const map = new Map<string, Record<string, any>>();
         const add = (r: Record<string, any>) => {
@@ -87,9 +89,11 @@ export const DatasetRecordPicker: React.FC<Props> = ({
             if (!id || map.has(id)) return;
             map.set(id, r);
         };
-        // Selected first so they aren't dropped by the limit.
-        if (multi) selectedMulti.forEach(add); else if (selectedSingle) add(selectedSingle);
         fetched.forEach(add);
+        // Then the cached selection — only kicks in for records not present in the
+        // current fetch (e.g. excluded by search/limit) so the trigger keeps showing
+        // them as selected with whatever snapshot data we have.
+        if (multi) selectedMulti.forEach(add); else if (selectedSingle) add(selectedSingle);
 
         const opts: SelectOption[] = Array.from(map.entries()).map(([id, r]) => {
             const label = renderDatasetTemplate(displayTemplate, r) || id;
@@ -97,6 +101,38 @@ export const DatasetRecordPicker: React.FC<Props> = ({
         });
         return { options: opts, idToRecord: map };
     }, [fetched, selectedSingle, selectedMulti, displayTemplate, multi]);
+
+    // When the fetch returns a fresh copy of an already-selected record, write the
+    // refreshed JSON back to the parent so the value sent at submit time is current.
+    // Compares by JSON string so we don't loop on identical data.
+    useEffect(() => {
+        if (fetched.length === 0) return;
+        if (multi) {
+            if (selectedMulti.length === 0) return;
+            let changed = false;
+            const refreshed = selectedMulti.map(s => {
+                const id = String(s._id ?? '');
+                const fresh = fetched.find(r => String(r._id ?? '') === id);
+                if (fresh && JSON.stringify(fresh) !== JSON.stringify(s)) {
+                    changed = true;
+                    return fresh;
+                }
+                return s;
+            });
+            if (changed) onChange(JSON.stringify(refreshed));
+        } else {
+            if (!selectedSingle) return;
+            const id = String(selectedSingle._id ?? '');
+            if (!id) return;
+            const fresh = fetched.find(r => String(r._id ?? '') === id);
+            if (fresh && JSON.stringify(fresh) !== JSON.stringify(selectedSingle)) {
+                onChange(JSON.stringify(fresh));
+            }
+        }
+        // selectedSingle/selectedMulti intentionally omitted: this effect should run on
+        // each new fetch payload, not on the onChange-driven value updates it produces.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [fetched, multi]);
 
     const singleValue = selectedSingle ? String(selectedSingle._id ?? '') : '';
     const multiValue = selectedMulti.map(r => String(r._id ?? '')).filter(Boolean);
