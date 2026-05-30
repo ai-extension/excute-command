@@ -44,7 +44,12 @@ const DatasetTableWidget: React.FC<Props> = ({ widget, slug, pageToken }) => {
     const cols = ds?.columns && ds.columns.length > 0 ? ds.columns : [];
     const limit = ds?.limit && ds.limit > 0 ? ds.limit : 50;
 
-    const aggregateMode = !!ds && Array.isArray(ds.group_bys) && ds.group_bys.length > 0;
+    // Trigger aggregate mode when admin configured EITHER group fields or selects.
+    // Selects-only (no group) is a valid "summary row" case — backend returns one bucket
+    // with each aggregation as a column.
+    const hasGroups = !!ds?.group_bys?.length;
+    const hasSelects = !!ds?.selects?.length;
+    const aggregateMode = !!ds && (hasGroups || hasSelects);
 
     // Aggregate mode: use the shared hook. We pass undefined when not in aggregate mode
     // so the hook stays inert (no fetch, empty items).

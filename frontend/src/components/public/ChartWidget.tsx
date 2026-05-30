@@ -16,6 +16,13 @@ interface Props {
 const COLORS = ['#06b6d4', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#3b82f6', '#ec4899', '#84cc16'];
 const EMPTY_KEY_LABEL = '(empty)';
 
+const labelFor = (s: SelectAggregation, fallbackIndex: number): string => {
+    if (s.label && s.label.trim()) return s.label.trim();
+    const fn = s.fn || 'count';
+    if (s.field) return `${fn}(${s.field})`;
+    return fallbackIndex === 0 ? String(fn) : `${fn}_${fallbackIndex + 1}`;
+};
+
 // Build a list of {label} entries describing each series Recharts should render. Pulls
 // from the new selects[] array when set, falling back to the legacy single fn+metric
 // shape, or finally to a hardcoded "value" series for static-data charts.
@@ -32,13 +39,6 @@ const resolveSeries = (widget: PageWidget): { label: string }[] => {
     }
     // Static data uses bucket.value directly under the key "value".
     return [{ label: 'value' }];
-};
-
-const labelFor = (s: SelectAggregation, fallbackIndex: number): string => {
-    if (s.label && s.label.trim()) return s.label.trim();
-    const fn = s.fn || 'count';
-    if (s.field) return `${fn}(${s.field})`;
-    return fallbackIndex === 0 ? String(fn) : `${fn}_${fallbackIndex + 1}`;
 };
 
 // Flatten {key, count, values:{label:n}, value} → {key, label1:n, label2:n} so Recharts
