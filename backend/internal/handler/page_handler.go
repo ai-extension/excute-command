@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -777,13 +776,10 @@ func (h *PageHandler) checkPublicAccess(c *gin.Context, page *domain.Page) bool 
 	}
 	userVal, exists := c.Get("user")
 	if !exists {
-		log.Printf("[DEBUG] checkPublicAccess: No user in context for private page %s", page.Slug)
 		return false
 	}
 	user := userVal.(*domain.User)
 	nsIDStr := page.NamespaceID.String()
 	pageIDStr := page.ID.String()
-	hasPerm := domain.HasPermission(user, "pages", "EXECUTE", &nsIDStr, &pageIDStr, nil)
-	log.Printf("[DEBUG] checkPublicAccess: user=%s, page=%s, hasPerm=%v", user.Username, page.Slug, hasPerm)
-	return hasPerm
+	return domain.HasPermission(user, "pages", "EXECUTE", &nsIDStr, &pageIDStr, nil)
 }

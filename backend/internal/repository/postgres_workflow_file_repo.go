@@ -23,7 +23,7 @@ func (r *PostgresWorkflowFileRepo) GetByID(id uuid.UUID, scope *domain.Permissio
 	db := r.db
 	if scope != nil && !scope.IsGlobal {
 		db = db.Joins("JOIN workflows ON workflows.id = workflow_files.workflow_id").
-			Where("workflows.namespace_id IN ? OR workflow_files.workflow_id IN ?", scope.AllowedNamespaceIDs, scope.AllowedItemIDs)
+			Where(fileScopeCond(r.db, scope))
 	}
 	if err := db.Take(&file, "id = ?", id).Error; err != nil {
 		return nil, err
@@ -36,12 +36,25 @@ func (r *PostgresWorkflowFileRepo) GetByWorkflowID(workflowID uuid.UUID, scope *
 	db := r.db
 	if scope != nil && !scope.IsGlobal {
 		db = db.Joins("JOIN workflows ON workflows.id = workflow_files.workflow_id").
-			Where("workflows.namespace_id IN ? OR workflow_files.workflow_id IN ?", scope.AllowedNamespaceIDs, scope.AllowedItemIDs)
+			Where(fileScopeCond(r.db, scope))
 	}
 	if err := db.Where("workflow_id = ?", workflowID).Order("created_at DESC").Find(&files).Error; err != nil {
 		return nil, err
 	}
 	return files, nil
+}
+
+// fileScopeCond builds the workflow-inherited scope condition for workflow_files queries:
+// the parent workflow must be in an allowed namespace, be an allowed item, or carry an
+// allowed tag.
+func fileScopeCond(db *gorm.DB, scope *domain.PermissionScope) *gorm.DB {
+	cond := db.Where("workflows.namespace_id IN ?", scope.AllowedNamespaceIDs).
+		Or("workflow_files.workflow_id IN ?", scope.AllowedItemIDs)
+	if len(scope.AllowedTagIDs) > 0 {
+		sub := db.Table("workflow_tags").Select("workflow_id").Where("tag_id IN ?", scope.AllowedTagIDs)
+		cond = cond.Or("workflow_files.workflow_id IN (?)", sub)
+	}
+	return cond
 }
 
 func (r *PostgresWorkflowFileRepo) Update(file *domain.WorkflowFile) error {

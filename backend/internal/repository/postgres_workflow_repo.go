@@ -407,8 +407,14 @@ func (r *PostgresWorkflowExecutionRepo) GetByID(id uuid.UUID, scope *domain.Perm
 	var exec domain.WorkflowExecution
 	db := r.db
 	if scope != nil && !scope.IsGlobal {
-		db = db.Joins("JOIN workflows ON workflows.id = workflow_executions.workflow_id").
-			Where("workflows.namespace_id IN ? OR workflow_executions.workflow_id IN ?", scope.AllowedNamespaceIDs, scope.AllowedItemIDs)
+		db = db.Joins("JOIN workflows ON workflows.id = workflow_executions.workflow_id")
+		cond := r.db.Where("workflows.namespace_id IN ?", scope.AllowedNamespaceIDs).
+			Or("workflow_executions.workflow_id IN ?", scope.AllowedItemIDs)
+		if len(scope.AllowedTagIDs) > 0 {
+			sub := r.db.Table("workflow_tags").Select("workflow_id").Where("tag_id IN ?", scope.AllowedTagIDs)
+			cond = cond.Or("workflow_executions.workflow_id IN (?)", sub)
+		}
+		db = db.Where(cond)
 	}
 	if err := db.Preload("User").Preload("Workflow.Groups.Steps").Preload("Steps").Take(&exec, "id = ?", id).Error; err != nil {
 		return nil, err
