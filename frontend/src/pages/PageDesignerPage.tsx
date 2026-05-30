@@ -4,7 +4,7 @@ import {
     Save, ChevronLeft, Plus, Trash2, GripVertical,
     Settings as SettingsIcon, Globe, Lock, Copy,
     Terminal, Zap, Monitor, RefreshCw, X, Palette, Clock, ServerIcon, Link2, Type,
-    FileText, ImageIcon, Frame, Activity, Table2
+    FileText, ImageIcon, Frame, Activity, Table2, BarChart3, TrendingUp
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -18,9 +18,249 @@ import { API_BASE_URL } from '../lib/api';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { TagSelector } from '../components/TagSelector';
 import { ButtonStylePicker, resolveButtonStyle } from '../components/ButtonStylePicker';
+import { DatasetSourceConfig } from '../components/page-designer/DatasetSourceConfig';
 
 
 const generateId = () => Math.random().toString(36).slice(2, 10);
+
+// ---- Palette / widget factory ----
+
+interface PaletteItem {
+    type: PageWidget['type'];
+    label: string;
+    description: string;
+    icon: React.ReactNode;
+    iconClass: string; // Full tailwind class fragment so JIT picks each color up.
+    requiresTerminal?: boolean;
+    groupHeading?: string; // When set, renders a section heading BEFORE this item.
+}
+
+const PALETTE_ITEMS: PaletteItem[] = [
+    { type: 'ENDPOINT', label: 'Endpoint', description: 'Workflow trigger button',
+      icon: <Zap className="w-3.5 h-3.5" />,
+      iconClass: 'bg-primary/10 text-primary group-hover:bg-primary/20' },
+    { type: 'TERMINAL', label: 'Terminal Screen', description: 'Command output display',
+      icon: <Terminal className="w-3.5 h-3.5" />,
+      iconClass: 'bg-emerald-500/10 text-emerald-500 group-hover:bg-emerald-500/20',
+      requiresTerminal: true },
+    { type: 'LINK', label: 'External Link', description: 'Quick link button',
+      icon: <Link2 className="w-3.5 h-3.5" />,
+      iconClass: 'bg-indigo-500/10 text-indigo-500 group-hover:bg-indigo-500/20' },
+    { type: 'SECTION', label: 'Section Header', description: 'Title and description',
+      icon: <Type className="w-3.5 h-3.5" />,
+      iconClass: 'bg-amber-500/10 text-amber-500 group-hover:bg-amber-500/20' },
+    { type: 'TEXT', label: 'Text Block', description: 'Rich text content',
+      icon: <FileText className="w-3.5 h-3.5" />,
+      iconClass: 'bg-sky-500/10 text-sky-500 group-hover:bg-sky-500/20',
+      groupHeading: 'Content Widgets' },
+    { type: 'IMAGE', label: 'Image', description: 'Display an image',
+      icon: <ImageIcon className="w-3.5 h-3.5" />,
+      iconClass: 'bg-pink-500/10 text-pink-500 group-hover:bg-pink-500/20' },
+    { type: 'IFRAME', label: 'Iframe Embed', description: 'Embed external content',
+      icon: <Frame className="w-3.5 h-3.5" />,
+      iconClass: 'bg-violet-500/10 text-violet-500 group-hover:bg-violet-500/20' },
+    { type: 'STATUS', label: 'Status Indicator', description: 'Show service status',
+      icon: <Activity className="w-3.5 h-3.5" />,
+      iconClass: 'bg-teal-500/10 text-teal-500 group-hover:bg-teal-500/20' },
+    { type: 'TABLE', label: 'Data Table', description: 'Static or dataset rows',
+      icon: <Table2 className="w-3.5 h-3.5" />,
+      iconClass: 'bg-orange-500/10 text-orange-500 group-hover:bg-orange-500/20' },
+    { type: 'CHART', label: 'Chart', description: 'Bar, line, pie, area',
+      icon: <BarChart3 className="w-3.5 h-3.5" />,
+      iconClass: 'bg-cyan-500/10 text-cyan-500 group-hover:bg-cyan-500/20' },
+    { type: 'METRIC', label: 'Metric / KPI', description: 'Big number from dataset',
+      icon: <TrendingUp className="w-3.5 h-3.5" />,
+      iconClass: 'bg-emerald-500/10 text-emerald-500 group-hover:bg-emerald-500/20' },
+];
+
+// Per-type defaults. Pulled out of the React component so palette drops can use the
+// same factory as the click handlers.
+const createWidget = (
+    type: PageWidget['type'],
+    ctx: { workflows: Workflow[]; servers: Server[] }
+): PageWidget => {
+    const id = generateId();
+    switch (type) {
+        case 'ENDPOINT': return {
+            id, type, title: 'New Endpoint', size: 'half',
+            workflow_id: ctx.workflows[0]?.id || '',
+            workflow_name: ctx.workflows[0]?.name || '',
+            label: ctx.workflows[0]?.name || 'Run',
+            style: 'premium-gradient', show_log: false,
+        };
+        case 'TERMINAL': {
+            const s = ctx.servers.find(s => s.connection_type === 'LOCAL') || ctx.servers[0];
+            return {
+                id, type, title: 'Terminal', size: 'full',
+                server_id: s?.id || '', server_name: s?.name || '',
+                command: 'echo "Hello World"', reload_interval: 'realtime',
+            };
+        }
+        case 'LINK': return {
+            id, type, title: 'External Link', size: 'third',
+            url: 'https://', label: 'Open Link', new_tab: true,
+            style: 'bg-indigo-600 shadow-[0_0_20px_rgba(79,70,229,0.3)]',
+            description: '',
+        };
+        case 'SECTION': return {
+            id, type, title: 'New Section', size: 'full',
+            description: 'Group your widgets here...',
+        };
+        case 'TEXT': return {
+            id, type, title: 'Text Block', size: 'full',
+            content: 'Enter your text here...',
+        };
+        case 'IMAGE': return {
+            id, type, title: 'Image', size: 'half',
+            image_url: '', alt_text: '',
+        };
+        case 'IFRAME': return {
+            id, type, title: 'Embedded Content', size: 'full',
+            iframe_url: '', iframe_height: 400,
+        };
+        case 'STATUS': return {
+            id, type, title: 'Status', size: 'third',
+            status_label: 'Service', status_value: 'ok',
+        };
+        case 'TABLE': return {
+            id, type, title: 'Data Table', size: 'full',
+            data_source: 'static',
+            table_headers: ['Column 1', 'Column 2', 'Column 3'],
+            table_rows: [['Row 1', 'Data', 'Data'], ['Row 2', 'Data', 'Data']],
+        };
+        case 'CHART': return {
+            id, type, title: 'Chart', size: 'half',
+            chart_kind: 'bar',
+            data_source: 'static',
+            chart_static_data: '[{"key":"A","value":10},{"key":"B","value":20},{"key":"C","value":15}]',
+        };
+        case 'METRIC': return {
+            id, type, title: 'Metric', size: 'third',
+            data_source: 'static',
+            metric_label: 'Records',
+            metric_static_value: '0',
+            metric_format: 'number',
+        };
+    }
+};
+
+// Insert a widget into the flat layout array at a specific position within its parent's
+// list (top-level when parentId is undefined). Children of SECTION widgets immediately
+// follow the section in the flat array, so we look up the target slot by mapping the
+// "index within parent's children" to a flat array offset.
+const insertWidgetAt = (
+    list: PageWidget[],
+    w: PageWidget,
+    parentId: string | undefined,
+    indexInList: number
+): PageWidget[] => {
+    const newW = parentId ? { ...w, parent_id: parentId } : w;
+    const inList = list.filter(x => (x.parent_id || undefined) === parentId);
+    const clamped = Math.max(0, Math.min(indexInList, inList.length));
+
+    // Past end → insert after last sibling (or after parent if section is empty).
+    if (clamped >= inList.length) {
+        if (!parentId) return [...list, newW];
+        const parentIdx = list.findIndex(x => x.id === parentId);
+        // Parent vanished mid-drag (shouldn't normally happen) — drop the parent ref and
+        // append at top level so the widget remains visible instead of becoming orphaned.
+        if (parentIdx === -1) return [...list, w];
+        let lastChildFlatIdx = parentIdx;
+        for (let i = parentIdx + 1; i < list.length; i++) {
+            if (list[i].parent_id === parentId) lastChildFlatIdx = i;
+            else if (!list[i].parent_id) break; // hit next top-level → run ended
+        }
+        return [...list.slice(0, lastChildFlatIdx + 1), newW, ...list.slice(lastChildFlatIdx + 1)];
+    }
+
+    // Insert BEFORE the clamped-th sibling.
+    const targetSibling = inList[clamped];
+    const targetFlatIdx = list.findIndex(x => x.id === targetSibling.id);
+    return [...list.slice(0, targetFlatIdx), newW, ...list.slice(targetFlatIdx)];
+};
+
+// Sidebar palette card. Renders identical chrome whether used as the static draggable
+// source or its drag clone (via Draggable.renderClone). Click-to-add is wired here too.
+interface PaletteCardProps {
+    item: PaletteItem;
+    innerRef: (el: HTMLElement | null) => void;
+    draggableProps: any;
+    dragHandleProps: any;
+    isDragging?: boolean;
+    isPlaceholder?: boolean;
+    onClick?: () => void;
+}
+
+const PaletteCard: React.FC<PaletteCardProps> = ({
+    item, innerRef, draggableProps, dragHandleProps, isDragging, isPlaceholder, onClick,
+}) => (
+    <div
+        ref={innerRef as any}
+        {...draggableProps}
+        {...dragHandleProps}
+        onClick={onClick}
+        className={cn(
+            "w-full flex items-center justify-between p-3 rounded-md text-left transition-all border group cursor-grab active:cursor-grabbing select-none",
+            isDragging
+                ? "bg-card border-primary/40 shadow-lg shadow-primary/10"
+                : "border-transparent hover:bg-muted hover:border-border",
+            isPlaceholder && "opacity-40"
+        )}
+    >
+        <div className="flex items-center gap-3">
+            <div className={cn("p-1.5 rounded-md transition-colors", item.iconClass)}>
+                {item.icon}
+            </div>
+            <div>
+                <span className="text-sm font-bold block">{item.label}</span>
+                <span className="text-[10px] text-muted-foreground uppercase font-medium">{item.description}</span>
+            </div>
+        </div>
+        <Plus className="w-4 h-4 text-muted-foreground" />
+    </div>
+);
+
+// Two-button toggle reused by TABLE / CHART / METRIC editor panels.
+const DataSourceToggle: React.FC<{ widget: PageWidget; onChange: (v: Partial<PageWidget>) => void }> = ({ widget, onChange }) => {
+    const cur = widget.data_source || 'static';
+    return (
+        <div className="space-y-1.5">
+            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Data Source</label>
+            <div className="grid grid-cols-2 gap-1">
+                {(['static', 'dataset'] as const).map(opt => (
+                    <button key={opt} type="button"
+                        onClick={() => onChange({ data_source: opt })}
+                        className={cn(
+                            'h-8 rounded-md text-[10px] font-black uppercase tracking-widest transition-colors border',
+                            cur === opt
+                                ? 'bg-primary text-primary-foreground border-primary'
+                                : 'bg-background text-muted-foreground border-border hover:bg-muted'
+                        )}>
+                        {opt}
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+// Reload picker for dataset-backed widgets. 'off' = no polling.
+const ReloadIntervalPicker: React.FC<{ widget: PageWidget; onChange: (v: Partial<PageWidget>) => void }> = ({ widget, onChange }) => (
+    <div className="space-y-1.5">
+        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Auto-Reload</label>
+        <select
+            value={widget.reload_interval || ''}
+            onChange={(e) => onChange({ reload_interval: (e.target.value || undefined) as PageWidget['reload_interval'] })}
+            className="h-8 px-2 w-full text-xs font-bold border border-border rounded-md bg-background text-foreground outline-none cursor-pointer"
+        >
+            <option value="">Off (fetch once)</option>
+            <option value="5">Every 5s</option>
+            <option value="10">Every 10s</option>
+            <option value="30">Every 30s</option>
+            <option value="60">Every 1m</option>
+        </select>
+    </div>
+);
 
 const BUTTON_STYLES = [
     { label: 'Premium Blue', value: 'premium-gradient' },
@@ -179,103 +419,10 @@ const PageDesignerPage = () => {
         }
     };
 
-    const addEndpointWidget = () => {
-        const w: PageWidget = {
-            id: generateId(), type: 'ENDPOINT',
-            title: 'New Endpoint', size: 'half',
-            workflow_id: availableWorkflows[0]?.id || '',
-            workflow_name: availableWorkflows[0]?.name || '',
-            label: availableWorkflows[0]?.name || 'Run',
-            style: 'premium-gradient', show_log: false,
-        };
-        setWidgets(prev => [...prev, w]);
-        setEditingWidgetId(w.id);
-    };
-
-    const addTerminalWidget = () => {
-        const defaultServer = servers.find(s => s.connection_type === 'LOCAL') || servers[0];
-        const w: PageWidget = {
-            id: generateId(), type: 'TERMINAL',
-            title: 'Terminal', size: 'full',
-            server_id: defaultServer?.id || '',
-            server_name: defaultServer?.name || '',
-            command: 'echo "Hello World"', reload_interval: 'realtime',
-        };
-        setWidgets(prev => [...prev, w]);
-        setEditingWidgetId(w.id);
-    };
-
-    const addLinkWidget = () => {
-        const w: PageWidget = {
-            id: generateId(), type: 'LINK',
-            title: 'External Link', size: 'third',
-            url: 'https://',
-            label: 'Open Link',
-            new_tab: true,
-            style: 'bg-indigo-600 shadow-[0_0_20px_rgba(79,70,229,0.3)]',
-            description: '',
-        };
-        setWidgets(prev => [...prev, w]);
-        setEditingWidgetId(w.id);
-    };
-
-    const addSectionWidget = () => {
-        const w: PageWidget = {
-            id: generateId(), type: 'SECTION',
-            title: 'New Section', size: 'full',
-            description: 'Group your widgets here...',
-        };
-        setWidgets(prev => [...prev, w]);
-        setEditingWidgetId(w.id);
-    };
-
-    const addTextWidget = () => {
-        const w: PageWidget = {
-            id: generateId(), type: 'TEXT',
-            title: 'Text Block', size: 'full',
-            content: 'Enter your text here...',
-        };
-        setWidgets(prev => [...prev, w]);
-        setEditingWidgetId(w.id);
-    };
-
-    const addImageWidget = () => {
-        const w: PageWidget = {
-            id: generateId(), type: 'IMAGE',
-            title: 'Image', size: 'half',
-            image_url: '', alt_text: '',
-        };
-        setWidgets(prev => [...prev, w]);
-        setEditingWidgetId(w.id);
-    };
-
-    const addIframeWidget = () => {
-        const w: PageWidget = {
-            id: generateId(), type: 'IFRAME',
-            title: 'Embedded Content', size: 'full',
-            iframe_url: '', iframe_height: 400,
-        };
-        setWidgets(prev => [...prev, w]);
-        setEditingWidgetId(w.id);
-    };
-
-    const addStatusWidget = () => {
-        const w: PageWidget = {
-            id: generateId(), type: 'STATUS',
-            title: 'Status', size: 'third',
-            status_label: 'Service', status_value: 'ok',
-        };
-        setWidgets(prev => [...prev, w]);
-        setEditingWidgetId(w.id);
-    };
-
-    const addTableWidget = () => {
-        const w: PageWidget = {
-            id: generateId(), type: 'TABLE',
-            title: 'Data Table', size: 'full',
-            table_headers: ['Column 1', 'Column 2', 'Column 3'],
-            table_rows: [['Row 1', 'Data', 'Data'], ['Row 2', 'Data', 'Data']],
-        };
+    // Append a new widget of the given type to the end of the layout. Used by click-to-add.
+    // The drag-from-palette path calls insertWidgetAt directly with a positional target.
+    const addWidget = (type: PageWidget['type']) => {
+        const w = createWidget(type, { workflows: availableWorkflows, servers });
         setWidgets(prev => [...prev, w]);
         setEditingWidgetId(w.id);
     };
@@ -291,12 +438,46 @@ const PageDesignerPage = () => {
         setWidgets(prev => prev.map(w => w.id === wid ? { ...w, ...updates } : w));
 
     const handleDragStart = (start: { draggableId: string }) => {
+        // Palette drag: detect SECTION-from-palette via draggableId convention so we can
+        // disable nested section droppables (no section-in-section).
+        if (start.draggableId.startsWith('palette-')) {
+            const type = start.draggableId.replace(/^palette-/, '');
+            setDraggingSectionId(type === 'SECTION' ? 'palette-section' : null);
+            return;
+        }
         const w = widgets.find(w => w.id === start.draggableId);
         setDraggingSectionId(w?.type === 'SECTION' ? w.id : null);
     };
 
     const handleDragEnd = (result: DropResult) => {
         setDraggingSectionId(null);
+
+        // Drag-from-palette path: source is the sidebar palette, so we *create* a new
+        // widget rather than reordering. draggableId is `palette-<TYPE>`.
+        if (result.source.droppableId === 'palette') {
+            const type = result.draggableId.replace(/^palette-/, '') as PageWidget['type'];
+            const ctx = { workflows: availableWorkflows, servers };
+
+            // Combine onto a SECTION card → drop the new widget into the section.
+            if (result.combine) {
+                const target = widgets.find(w => w.id === result.combine!.draggableId);
+                if (!target || target.type !== 'SECTION') return;
+                if (type === 'SECTION') return; // no section-in-section
+                const w = createWidget(type, ctx);
+                setWidgets(prev => insertWidgetAt(prev, w, target.id, Number.MAX_SAFE_INTEGER));
+                setEditingWidgetId(w.id);
+                return;
+            }
+            if (!result.destination) return;
+            const dstId = result.destination.droppableId;
+            const parentId = dstId.startsWith('section-') ? dstId.slice('section-'.length) : undefined;
+            if (type === 'SECTION' && parentId) return; // no section-in-section
+            const w = createWidget(type, ctx);
+            setWidgets(prev => insertWidgetAt(prev, w, parentId, result.destination!.index));
+            setEditingWidgetId(w.id);
+            return;
+        }
+
         // Combine path: dropping a widget directly onto a SECTION card moves it inside.
         // Needed because @hello-pangea/dnd can't reliably hit-test a nested Droppable
         // that lives inside a sibling Draggable of the same context.
@@ -440,145 +621,67 @@ const PageDesignerPage = () => {
                 </div>
             </div>
 
+            <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
             <div className="flex flex-1 overflow-hidden">
                 {/* Sidebar */}
                 <div className="w-72 border-r border-border bg-card flex flex-col overflow-hidden">
                     <div className="p-4 border-b border-border">
-                        <h2 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-3">Add Widget</h2>
+                        <h2 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Add Widget</h2>
+                        <p className="text-[10px] text-muted-foreground/60">Click to add at end, or drag onto the canvas.</p>
                     </div>
-                    <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                        <button onClick={addEndpointWidget}
-                            className="w-full flex items-center justify-between p-3 rounded-md hover:bg-muted text-left transition-all border border-transparent hover:border-border group">
-                            <div className="flex items-center gap-3">
-                                <div className="p-1.5 rounded-md bg-primary/10 text-primary group-hover:bg-primary/20 transition-colors">
-                                    <Zap className="w-3.5 h-3.5" />
-                                </div>
-                                <div>
-                                    <span className="text-sm font-bold block">Endpoint</span>
-                                    <span className="text-[10px] text-muted-foreground uppercase font-medium">Workflow trigger button</span>
-                                </div>
+                    <Droppable
+                        droppableId="palette"
+                        isDropDisabled
+                        renderClone={(provided, _snapshot, rubric) => {
+                            // rubric.draggableId is `palette-<TYPE>` — look up the item to clone.
+                            const type = rubric.draggableId.replace(/^palette-/, '');
+                            const item = PALETTE_ITEMS.find(p => p.type === type);
+                            if (!item) return <div />;
+                            return (
+                                <PaletteCard
+                                    item={item}
+                                    innerRef={provided.innerRef}
+                                    draggableProps={provided.draggableProps}
+                                    dragHandleProps={provided.dragHandleProps}
+                                    isDragging
+                                />
+                            );
+                        }}
+                    >
+                        {(droppableProvided) => (
+                            <div
+                                ref={droppableProvided.innerRef}
+                                {...droppableProvided.droppableProps}
+                                className="flex-1 overflow-y-auto p-3 space-y-2 pb-24"
+                            >
+                                {PALETTE_ITEMS
+                                    .filter(item => !item.requiresTerminal || canUseTerminal)
+                                    .map((item, idx) => (
+                                        <React.Fragment key={item.type}>
+                                            {item.groupHeading && (
+                                                <div className="pt-3 mt-1 border-t border-border/50">
+                                                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/50 mb-2 px-3">{item.groupHeading}</p>
+                                                </div>
+                                            )}
+                                            <Draggable draggableId={`palette-${item.type}`} index={idx}>
+                                                {(provided, snapshot) => (
+                                                    <PaletteCard
+                                                        item={item}
+                                                        innerRef={provided.innerRef}
+                                                        draggableProps={provided.draggableProps}
+                                                        dragHandleProps={provided.dragHandleProps}
+                                                        // Hide source while dragging — the renderClone portal takes over visually.
+                                                        isPlaceholder={snapshot.isDragging}
+                                                        onClick={() => addWidget(item.type)}
+                                                    />
+                                                )}
+                                            </Draggable>
+                                        </React.Fragment>
+                                    ))}
+                                {droppableProvided.placeholder}
                             </div>
-                            <Plus className="w-4 h-4 text-muted-foreground" />
-                        </button>
-
-                        {canUseTerminal && (
-                        <button onClick={addTerminalWidget}
-                            className="w-full flex items-center justify-between p-3 rounded-md hover:bg-muted text-left transition-all border border-transparent hover:border-border group">
-                            <div className="flex items-center gap-3">
-                                <div className="p-1.5 rounded-md bg-emerald-500/10 text-emerald-500 group-hover:bg-emerald-500/20 transition-colors">
-                                    <Terminal className="w-3.5 h-3.5" />
-                                </div>
-                                <div>
-                                    <span className="text-sm font-bold block">Terminal Screen</span>
-                                    <span className="text-[10px] text-muted-foreground uppercase font-medium">Command output display</span>
-                                </div>
-                            </div>
-                            <Plus className="w-4 h-4 text-muted-foreground" />
-                        </button>
                         )}
-
-                        <button onClick={addLinkWidget}
-                            className="w-full flex items-center justify-between p-3 rounded-md hover:bg-muted text-left transition-all border border-transparent hover:border-border group">
-                            <div className="flex items-center gap-3">
-                                <div className="p-1.5 rounded-md bg-indigo-500/10 text-indigo-500 group-hover:bg-indigo-500/20 transition-colors">
-                                    <Link2 className="w-3.5 h-3.5" />
-                                </div>
-                                <div>
-                                    <span className="text-sm font-bold block">External Link</span>
-                                    <span className="text-[10px] text-muted-foreground uppercase font-medium">Quick link button</span>
-                                </div>
-                            </div>
-                            <Plus className="w-4 h-4 text-muted-foreground" />
-                        </button>
-
-                        <button onClick={addSectionWidget}
-                            className="w-full flex items-center justify-between p-3 rounded-md hover:bg-muted text-left transition-all border border-transparent hover:border-border group">
-                            <div className="flex items-center gap-3">
-                                <div className="p-1.5 rounded-md bg-amber-500/10 text-amber-500 group-hover:bg-amber-500/20 transition-colors">
-                                    <Type className="w-3.5 h-3.5" />
-                                </div>
-                                <div>
-                                    <span className="text-sm font-bold block">Section Header</span>
-                                    <span className="text-[10px] text-muted-foreground uppercase font-medium">Title and description</span>
-                                </div>
-                            </div>
-                            <Plus className="w-4 h-4 text-muted-foreground" />
-                        </button>
-
-                        <div className="pt-3 mt-1 border-t border-border/50">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/50 mb-2 px-3">Content Widgets</p>
-                        </div>
-
-                        <button onClick={addTextWidget}
-                            className="w-full flex items-center justify-between p-3 rounded-md hover:bg-muted text-left transition-all border border-transparent hover:border-border group">
-                            <div className="flex items-center gap-3">
-                                <div className="p-1.5 rounded-md bg-sky-500/10 text-sky-500 group-hover:bg-sky-500/20 transition-colors">
-                                    <FileText className="w-3.5 h-3.5" />
-                                </div>
-                                <div>
-                                    <span className="text-sm font-bold block">Text Block</span>
-                                    <span className="text-[10px] text-muted-foreground uppercase font-medium">Rich text content</span>
-                                </div>
-                            </div>
-                            <Plus className="w-4 h-4 text-muted-foreground" />
-                        </button>
-
-                        <button onClick={addImageWidget}
-                            className="w-full flex items-center justify-between p-3 rounded-md hover:bg-muted text-left transition-all border border-transparent hover:border-border group">
-                            <div className="flex items-center gap-3">
-                                <div className="p-1.5 rounded-md bg-pink-500/10 text-pink-500 group-hover:bg-pink-500/20 transition-colors">
-                                    <ImageIcon className="w-3.5 h-3.5" />
-                                </div>
-                                <div>
-                                    <span className="text-sm font-bold block">Image</span>
-                                    <span className="text-[10px] text-muted-foreground uppercase font-medium">Display an image</span>
-                                </div>
-                            </div>
-                            <Plus className="w-4 h-4 text-muted-foreground" />
-                        </button>
-
-                        <button onClick={addIframeWidget}
-                            className="w-full flex items-center justify-between p-3 rounded-md hover:bg-muted text-left transition-all border border-transparent hover:border-border group">
-                            <div className="flex items-center gap-3">
-                                <div className="p-1.5 rounded-md bg-violet-500/10 text-violet-500 group-hover:bg-violet-500/20 transition-colors">
-                                    <Frame className="w-3.5 h-3.5" />
-                                </div>
-                                <div>
-                                    <span className="text-sm font-bold block">Iframe Embed</span>
-                                    <span className="text-[10px] text-muted-foreground uppercase font-medium">Embed external content</span>
-                                </div>
-                            </div>
-                            <Plus className="w-4 h-4 text-muted-foreground" />
-                        </button>
-
-                        <button onClick={addStatusWidget}
-                            className="w-full flex items-center justify-between p-3 rounded-md hover:bg-muted text-left transition-all border border-transparent hover:border-border group">
-                            <div className="flex items-center gap-3">
-                                <div className="p-1.5 rounded-md bg-teal-500/10 text-teal-500 group-hover:bg-teal-500/20 transition-colors">
-                                    <Activity className="w-3.5 h-3.5" />
-                                </div>
-                                <div>
-                                    <span className="text-sm font-bold block">Status Indicator</span>
-                                    <span className="text-[10px] text-muted-foreground uppercase font-medium">Show service status</span>
-                                </div>
-                            </div>
-                            <Plus className="w-4 h-4 text-muted-foreground" />
-                        </button>
-
-                        <button onClick={addTableWidget}
-                            className="w-full flex items-center justify-between p-3 rounded-md hover:bg-muted text-left transition-all border border-transparent hover:border-border group">
-                            <div className="flex items-center gap-3">
-                                <div className="p-1.5 rounded-md bg-orange-500/10 text-orange-500 group-hover:bg-orange-500/20 transition-colors">
-                                    <Table2 className="w-3.5 h-3.5" />
-                                </div>
-                                <div>
-                                    <span className="text-sm font-bold block">Data Table</span>
-                                    <span className="text-[10px] text-muted-foreground uppercase font-medium">Display tabular data</span>
-                                </div>
-                            </div>
-                            <Plus className="w-4 h-4 text-muted-foreground" />
-                        </button>
-                    </div>
+                    </Droppable>
                 </div>
 
                 {/* Canvas */}
@@ -591,16 +694,25 @@ const PageDesignerPage = () => {
                                     <p className="text-muted-foreground text-sm">{description || 'Drag widgets to reorder. Click ⚙ to configure.'}</p>
                                 </div>
 
-                                {widgets.length === 0 ? (
-                                    <div className="h-64 flex flex-col items-center justify-center gap-4 opacity-40 border-2 border-dashed border-border rounded-md bg-card">
-                                        <Monitor className="w-12 h-12 text-muted-foreground" />
-                                        <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Canvas is empty</p>
-                                    </div>
-                                ) : (
-                                    <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-                                        <Droppable droppableId="canvas" isCombineEnabled>
-                                            {(provided) => (
-                                                <div {...provided.droppableProps} ref={provided.innerRef} className="flex flex-wrap gap-5 items-start">
+                                <Droppable droppableId="canvas" isCombineEnabled>
+                                    {(provided, dropSnapshot) => (
+                                        <div
+                                            {...provided.droppableProps}
+                                            ref={provided.innerRef}
+                                            className={cn(
+                                                "flex flex-wrap gap-5 items-start min-h-[16rem] rounded-md transition-colors",
+                                                widgets.length === 0 && "border-2 border-dashed border-border bg-card",
+                                                widgets.length === 0 && dropSnapshot.isDraggingOver && "border-primary bg-primary/5"
+                                            )}
+                                        >
+                                            {widgets.length === 0 && (
+                                                <div className="w-full h-64 flex flex-col items-center justify-center gap-4 opacity-40">
+                                                    <Monitor className="w-12 h-12 text-muted-foreground" />
+                                                    <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
+                                                        {dropSnapshot.isDraggingOver ? 'Drop to add widget' : 'Canvas is empty — drag a widget here'}
+                                                    </p>
+                                                </div>
+                                            )}
                                                     {widgets.filter(w => !w.parent_id).map((widget, idx) => (
                                                         <Draggable key={widget.id} draggableId={widget.id} index={idx}>
                                                             {(provided, snapshot) => (
@@ -637,7 +749,7 @@ const PageDesignerPage = () => {
                                                                             onRemove={() => removeWidget(widget.id)}
                                                                             dragHandleProps={provided.dragHandleProps}
                                                                         />
-                                                                    ) : widget.type === 'TEXT' || widget.type === 'IMAGE' || widget.type === 'IFRAME' || widget.type === 'STATUS' || widget.type === 'TABLE' ? (
+                                                                    ) : widget.type === 'TEXT' || widget.type === 'IMAGE' || widget.type === 'IFRAME' || widget.type === 'STATUS' || widget.type === 'TABLE' || widget.type === 'CHART' || widget.type === 'METRIC' ? (
                                                                         <ContentWidgetCard
                                                                             widget={widget}
                                                                             onEdit={() => setEditingWidgetId(widget.id)}
@@ -696,7 +808,7 @@ const PageDesignerPage = () => {
                                                                                                                 onRemove={() => removeWidget(child.id)}
                                                                                                                 dragHandleProps={childProvided.dragHandleProps}
                                                                                                             />
-                                                                                                        ) : child.type === 'TEXT' || child.type === 'IMAGE' || child.type === 'IFRAME' || child.type === 'STATUS' || child.type === 'TABLE' ? (
+                                                                                                        ) : child.type === 'TEXT' || child.type === 'IMAGE' || child.type === 'IFRAME' || child.type === 'STATUS' || child.type === 'TABLE' || child.type === 'CHART' || child.type === 'METRIC' ? (
                                                                                                             <ContentWidgetCard
                                                                                                                 widget={child}
                                                                                                                 onEdit={() => setEditingWidgetId(child.id)}
@@ -723,12 +835,10 @@ const PageDesignerPage = () => {
                                                             )}
                                                         </Draggable>
                                                     ))}
-                                                    {provided.placeholder}
-                                                </div>
-                                            )}
-                                        </Droppable>
-                                    </DragDropContext>
-                                )}
+                                            {provided.placeholder}
+                                        </div>
+                                    )}
+                                </Droppable>
                             </div>
                         ) : (
                             /* Settings Tab */
@@ -845,6 +955,7 @@ const PageDesignerPage = () => {
                     </div>
                 </div>
             </div>
+            </DragDropContext>
 
             {/* Widget Settings Modal */}
             {activeWidget && (
@@ -1142,30 +1253,158 @@ const PageDesignerPage = () => {
 
                             {activeWidget.type === 'TABLE' && (
                                 <div className="space-y-6">
+                                    <DataSourceToggle widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
+                                    {activeWidget.data_source === 'dataset' ? (
+                                        <>
+                                            <DatasetSourceConfig
+                                                value={activeWidget.dataset}
+                                                onChange={(v) => updateWidget(activeWidget.id, { dataset: v })}
+                                                slots={{ showGroupBy: false, showMetric: false, showFn: false, showSort: false, showColumns: true, showLimit: true }}
+                                            />
+                                            <ReloadIntervalPicker widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1 flex items-center gap-2">
+                                                    <Table2 className="w-3 h-3 text-orange-500" /> Column Headers
+                                                </label>
+                                                <Input
+                                                    value={(activeWidget.table_headers || []).join(', ')}
+                                                    onChange={e => updateWidget(activeWidget.id, { table_headers: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
+                                                    className="h-9 text-sm bg-muted/30 border border-border/50 rounded-md"
+                                                    placeholder="Column 1, Column 2, Column 3"
+                                                />
+                                                <p className="text-[10px] text-muted-foreground px-1">Separate column names with commas</p>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Data Rows</label>
+                                                <textarea
+                                                    value={(activeWidget.table_rows || []).map(row => row.join(', ')).join('\n')}
+                                                    onChange={e => updateWidget(activeWidget.id, {
+                                                        table_rows: e.target.value.split('\n').map(line => line.split(',').map(s => s.trim())).filter(row => row.some(cell => cell))
+                                                    })}
+                                                    className="w-full min-h-[120px] p-4 text-xs bg-muted/30 border border-border/50 rounded-md focus:ring-2 ring-primary/10 outline-none resize-y transition-all font-mono"
+                                                    placeholder="Row 1 Col 1, Row 1 Col 2, Row 1 Col 3&#10;Row 2 Col 1, Row 2 Col 2, Row 2 Col 3"
+                                                />
+                                                <p className="text-[10px] text-muted-foreground px-1">One row per line, separate cells with commas</p>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+
+                            {activeWidget.type === 'CHART' && (
+                                <div className="space-y-6">
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1 flex items-center gap-2">
-                                            <Table2 className="w-3 h-3 text-orange-500" /> Column Headers
+                                            <BarChart3 className="w-3 h-3 text-cyan-500" /> Chart Type
                                         </label>
-                                        <Input
-                                            value={(activeWidget.table_headers || []).join(', ')}
-                                            onChange={e => updateWidget(activeWidget.id, { table_headers: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
-                                            className="h-9 text-sm bg-muted/30 border border-border/50 rounded-md"
-                                            placeholder="Column 1, Column 2, Column 3"
-                                        />
-                                        <p className="text-[10px] text-muted-foreground px-1">Separate column names with commas</p>
+                                        <div className="grid grid-cols-4 gap-1">
+                                            {(['bar', 'line', 'pie', 'area'] as const).map(k => (
+                                                <button key={k} type="button"
+                                                    onClick={() => updateWidget(activeWidget.id, { chart_kind: k })}
+                                                    className={cn(
+                                                        'h-8 rounded-md text-[10px] font-black uppercase tracking-widest transition-colors border',
+                                                        (activeWidget.chart_kind || 'bar') === k
+                                                            ? 'bg-cyan-500 text-white border-cyan-500'
+                                                            : 'bg-background text-muted-foreground border-border hover:bg-muted'
+                                                    )}>
+                                                    {k}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Data Rows</label>
-                                        <textarea
-                                            value={(activeWidget.table_rows || []).map(row => row.join(', ')).join('\n')}
-                                            onChange={e => updateWidget(activeWidget.id, {
-                                                table_rows: e.target.value.split('\n').map(line => line.split(',').map(s => s.trim())).filter(row => row.some(cell => cell))
-                                            })}
-                                            className="w-full min-h-[120px] p-4 text-xs bg-muted/30 border border-border/50 rounded-md focus:ring-2 ring-primary/10 outline-none resize-y transition-all font-mono"
-                                            placeholder="Row 1 Col 1, Row 1 Col 2, Row 1 Col 3&#10;Row 2 Col 1, Row 2 Col 2, Row 2 Col 3"
-                                        />
-                                        <p className="text-[10px] text-muted-foreground px-1">One row per line, separate cells with commas</p>
+                                    <DataSourceToggle widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
+                                    {activeWidget.data_source === 'dataset' ? (
+                                        <>
+                                            <DatasetSourceConfig
+                                                value={activeWidget.dataset}
+                                                onChange={(v) => updateWidget(activeWidget.id, { dataset: v })}
+                                                slots={{ showGroupBy: true, showMetric: true, showFn: true, showLimit: true, showSort: true }}
+                                            />
+                                            <ReloadIntervalPicker widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
+                                        </>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Static Data (JSON)</label>
+                                            <textarea
+                                                value={activeWidget.chart_static_data || ''}
+                                                onChange={(e) => updateWidget(activeWidget.id, { chart_static_data: e.target.value })}
+                                                className="w-full min-h-[120px] p-3 text-[11px] font-mono bg-muted/30 border border-border/50 rounded-md focus:ring-2 ring-primary/10 outline-none resize-y"
+                                                placeholder='[{"key":"A","value":10},{"key":"B","value":20}]'
+                                            />
+                                            {(() => {
+                                                const raw = activeWidget.chart_static_data || '';
+                                                if (!raw.trim()) return <p className="text-[10px] text-muted-foreground px-1">Array of {"{key, value}"} objects</p>;
+                                                try {
+                                                    const v = JSON.parse(raw);
+                                                    if (!Array.isArray(v)) return <p className="text-[10px] text-amber-500 px-1">Expected an array</p>;
+                                                    return <p className="text-[10px] text-emerald-500 px-1">✓ {v.length} entries</p>;
+                                                } catch {
+                                                    return <p className="text-[10px] text-destructive px-1">Invalid JSON</p>;
+                                                }
+                                            })()}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {activeWidget.type === 'METRIC' && (
+                                <div className="space-y-6">
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Label</label>
+                                            <Input
+                                                value={activeWidget.metric_label || ''}
+                                                onChange={(e) => updateWidget(activeWidget.id, { metric_label: e.target.value })}
+                                                className="h-8 text-xs"
+                                                placeholder="e.g. Users"
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Unit</label>
+                                            <Input
+                                                value={activeWidget.metric_unit || ''}
+                                                onChange={(e) => updateWidget(activeWidget.id, { metric_unit: e.target.value })}
+                                                className="h-8 text-xs"
+                                                placeholder="e.g. orders / hr"
+                                            />
+                                        </div>
                                     </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Format</label>
+                                        <select
+                                            value={activeWidget.metric_format || 'number'}
+                                            onChange={(e) => updateWidget(activeWidget.id, { metric_format: e.target.value as PageWidget['metric_format'] })}
+                                            className="h-8 px-2 w-full text-xs font-bold border border-border rounded-md bg-background text-foreground outline-none cursor-pointer"
+                                        >
+                                            <option value="number">Number</option>
+                                            <option value="percent">Percent (×100)</option>
+                                            <option value="currency">Currency</option>
+                                        </select>
+                                    </div>
+                                    <DataSourceToggle widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
+                                    {activeWidget.data_source === 'dataset' ? (
+                                        <>
+                                            <DatasetSourceConfig
+                                                value={activeWidget.dataset}
+                                                onChange={(v) => updateWidget(activeWidget.id, { dataset: v })}
+                                                slots={{ showGroupBy: false, showMetric: true, showFn: true, showLimit: false, showSort: false }}
+                                            />
+                                            <ReloadIntervalPicker widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
+                                        </>
+                                    ) : (
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Static Value</label>
+                                            <Input
+                                                value={activeWidget.metric_static_value || ''}
+                                                onChange={(e) => updateWidget(activeWidget.id, { metric_static_value: e.target.value })}
+                                                className="h-8 text-xs font-mono"
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -1358,6 +1597,8 @@ const WIDGET_META: Record<string, { icon: React.ReactNode; color: string; label:
     IFRAME: { icon: <Frame className="w-3.5 h-3.5" />, color: 'violet', label: 'Iframe' },
     STATUS: { icon: <Activity className="w-3.5 h-3.5" />, color: 'teal', label: 'Status' },
     TABLE: { icon: <Table2 className="w-3.5 h-3.5" />, color: 'orange', label: 'Table' },
+    CHART: { icon: <BarChart3 className="w-3.5 h-3.5" />, color: 'cyan', label: 'Chart' },
+    METRIC: { icon: <TrendingUp className="w-3.5 h-3.5" />, color: 'emerald', label: 'Metric' },
 };
 
 interface ContentWidgetCardProps {
@@ -1419,7 +1660,13 @@ const ContentWidgetCard: React.FC<ContentWidgetCardProps> = ({ widget, onEdit, o
                         </div>
                     );
                 })()}
-                {widget.type === 'TABLE' && (
+                {widget.type === 'TABLE' && widget.data_source === 'dataset' && (
+                    <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-2 py-3">
+                        Dataset: {widget.dataset?.dataset_id ? '✓ configured' : 'not configured'}
+                        {widget.dataset?.columns?.length ? ` · ${widget.dataset.columns.length} cols` : ''}
+                    </div>
+                )}
+                {widget.type === 'TABLE' && widget.data_source !== 'dataset' && (
                     <div className="overflow-x-auto">
                         <table className="w-full text-[10px]">
                             <thead>
@@ -1442,6 +1689,26 @@ const ContentWidgetCard: React.FC<ContentWidgetCardProps> = ({ widget, onEdit, o
                         {(widget.table_rows || []).length > 2 && (
                             <p className="text-[10px] text-muted-foreground/50 mt-1 px-3">+{(widget.table_rows || []).length - 2} more rows</p>
                         )}
+                    </div>
+                )}
+                {widget.type === 'CHART' && (
+                    <div className="h-20 flex items-center justify-center rounded-md bg-cyan-500/5 border border-cyan-500/20 text-cyan-500">
+                        <BarChart3 className="w-5 h-5 mr-2 opacity-60" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest opacity-70">
+                            {(widget.chart_kind || 'bar').toUpperCase()} · {widget.data_source === 'dataset' ? (widget.dataset?.dataset_id ? 'Dataset' : 'No dataset') : 'Static'}
+                        </span>
+                    </div>
+                )}
+                {widget.type === 'METRIC' && (
+                    <div className="flex items-center gap-3 p-3 rounded-md bg-emerald-500/5 border border-emerald-500/20">
+                        <TrendingUp className="w-5 h-5 text-emerald-500 opacity-70" />
+                        <div>
+                            <p className="text-sm font-black text-emerald-600">
+                                {widget.data_source === 'dataset' ? '— from dataset —' : (widget.metric_static_value || '0')}
+                                {widget.metric_unit && <span className="text-[10px] text-muted-foreground ml-1">{widget.metric_unit}</span>}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-widest">{widget.metric_label || 'Metric'}</p>
+                        </div>
                     </div>
                 )}
             </div>

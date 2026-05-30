@@ -27,6 +27,9 @@ import TerminalWidget from '../components/public/TerminalWidget';
 import EndpointWidget from '../components/public/EndpointWidget';
 import PageExecutionTerminal from '../components/public/PageExecutionTerminal';
 import LoginDialog from '../components/LoginDialog';
+import ChartWidget from '../components/public/ChartWidget';
+import MetricWidget from '../components/public/MetricWidget';
+import DatasetTableWidget from '../components/public/DatasetTableWidget';
 
 const PublicPageView = () => {
     const { slug } = useParams();
@@ -616,6 +619,9 @@ const PublicPageView = () => {
                                     );
                                 }
                                 if (widget.type === 'TABLE') {
+                                    if (widget.data_source === 'dataset') {
+                                        return <DatasetTableWidget widget={widget} slug={slug} pageToken={pageToken} />;
+                                    }
                                     return (
                                         <div className="bg-card border border-border rounded-md overflow-hidden shadow-sm h-full flex flex-col">
                                             <div className="flex items-center gap-4 px-8 py-4 border-b border-border bg-card">
@@ -649,6 +655,12 @@ const PublicPageView = () => {
                                             </div>
                                         </div>
                                     );
+                                }
+                                if (widget.type === 'CHART') {
+                                    return <ChartWidget widget={widget} slug={slug} pageToken={pageToken} />;
+                                }
+                                if (widget.type === 'METRIC') {
+                                    return <MetricWidget widget={widget} slug={slug} pageToken={pageToken} />;
                                 }
                                 return null;
                             };

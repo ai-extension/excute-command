@@ -314,8 +314,23 @@ export interface PageWorkflow {
 }
 
 export type PageWidgetSize = 'full' | 'half' | 'third';
-export type PageWidgetType = 'TERMINAL' | 'ENDPOINT' | 'LINK' | 'SECTION' | 'TEXT' | 'IMAGE' | 'IFRAME' | 'STATUS' | 'TABLE';
+export type PageWidgetType = 'TERMINAL' | 'ENDPOINT' | 'LINK' | 'SECTION' | 'TEXT' | 'IMAGE' | 'IFRAME' | 'STATUS' | 'TABLE' | 'CHART' | 'METRIC';
 export type PageWidgetReload = 'realtime' | '5' | '10' | '30' | '60';
+export type ChartKind = 'line' | 'bar' | 'pie' | 'area';
+export type AggregateFn = 'count' | 'sum' | 'avg' | 'min' | 'max';
+
+// DatasetSource: dataset-backed widget config. The shape mirrors the backend
+// AggregateRequest. `columns` is TABLE-only.
+export interface DatasetSource {
+    dataset_id: string;
+    filter: string;            // FilterBuilder tree JSON, applied server-side
+    group_by?: string;
+    metric?: string;
+    fn?: AggregateFn;
+    limit?: number;
+    sort?: 'value_desc' | 'value_asc' | 'key_asc' | 'key_desc';
+    columns?: string[];        // TABLE: which record fields to render as columns
+}
 
 export interface PageWidget {
     id: string;
@@ -353,6 +368,18 @@ export interface PageWidget {
     // TABLE-specific
     table_headers?: string[];
     table_rows?: string[][];
+    // Dataset-backed widgets (TABLE | CHART | METRIC): when 'dataset', read records via
+    // /datasets/:id/aggregate using `dataset`. Otherwise widget uses its static fields.
+    data_source?: 'static' | 'dataset';
+    dataset?: DatasetSource;
+    // CHART-specific
+    chart_kind?: ChartKind;
+    chart_static_data?: string;   // JSON array of {key,value} for data_source==='static'
+    // METRIC-specific
+    metric_label?: string;
+    metric_unit?: string;
+    metric_format?: 'number' | 'percent' | 'currency';
+    metric_static_value?: string; // when data_source==='static'
     // SECTION nesting — id of parent SECTION widget (top-level when undefined)
     parent_id?: string;
 }

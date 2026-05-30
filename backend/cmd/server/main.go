@@ -163,7 +163,7 @@ func main() {
 	workflowFileService := service.NewWorkflowFileService(workflowFileRepo)
 	workflowFileHandler := handler.NewWorkflowFileHandler(workflowFileService, auditLogService)
 	vpnHandler := handler.NewVpnConfigHandler(vpnService, auditLogService)
-	pageHandler := handler.NewPageHandler(pageService, workflowService, workflowExecutor, terminalService, auditLogService)
+	pageHandler := handler.NewPageHandler(pageService, workflowService, workflowExecutor, terminalService, datasetService, auditLogService)
 	settingsHandler := handler.NewSettingsHandler(settingsService, auditLogService)
 	auditLogHandler := handler.NewAuditLogHandler(auditLogService)
 	dashboardHandler := handler.NewDashboardHandler(dashboardService)
@@ -290,6 +290,7 @@ func main() {
 			protected.PUT("/datasets/:id", middleware.RBACMiddleware(db, userRepo, "datasets", "WRITE"), datasetHandler.Update)
 			protected.DELETE("/datasets/:id", middleware.RBACMiddleware(db, userRepo, "datasets", "DELETE"), datasetHandler.Delete)
 			protected.GET("/datasets/:id/records", middleware.RBACMiddleware(db, userRepo, "datasets", "READ"), datasetHandler.ListRecords)
+			protected.POST("/datasets/:id/aggregate", middleware.RBACMiddleware(db, userRepo, "datasets", "READ"), datasetHandler.Aggregate)
 			protected.POST("/datasets/:id/records", middleware.RBACMiddleware(db, userRepo, "datasets", "WRITE"), datasetHandler.CreateRecord)
 			protected.PUT("/dataset-records/:id", middleware.RBACMiddleware(db, userRepo, "datasets", "WRITE"), datasetHandler.UpdateRecord)
 			protected.DELETE("/dataset-records/:id", middleware.RBACMiddleware(db, userRepo, "datasets", "DELETE"), datasetHandler.DeleteRecord)
@@ -351,6 +352,8 @@ func main() {
 		api.POST("/public/pages/:slug/executions/:exec_id/stop", middleware.LoginRateLimiter(), optionalAuth, pageHandler.StopPublicExecution)
 		api.GET("/public/pages/:slug/executions/:exec_id/logs", optionalAuth, pageHandler.GetPublicExecutionLog)
 		api.POST("/public/pages/:slug/upload-input", middleware.LoginRateLimiter(), optionalAuth, pageHandler.UploadPublicInputFile)
+		api.POST("/public/pages/:slug/datasets/:id/aggregate", optionalAuth, pageHandler.AggregatePublicDataset)
+		api.GET("/public/pages/:slug/datasets/:id/records", optionalAuth, pageHandler.ListPublicDatasetRecords)
 	}
 
 	// Serve static files from Vite build output

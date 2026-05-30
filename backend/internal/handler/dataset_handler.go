@@ -198,6 +198,46 @@ func (h *DatasetHandler) ListRecords(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"items": items, "total": total, "limit": limit, "offset": offset})
 }
 
+// aggregateRequestBody is the wire shape for POST /datasets/:id/aggregate. Keep field
+// names in sync with the frontend DatasetSource type.
+type aggregateRequestBody struct {
+	Filter  string `json:"filter"`
+	GroupBy string `json:"group_by"`
+	Metric  string `json:"metric"`
+	Fn      string `json:"fn"`
+	Limit   int    `json:"limit"`
+	Sort    string `json:"sort"`
+}
+
+func (h *DatasetHandler) Aggregate(c *gin.Context) {
+	datasetID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid dataset id"})
+		return
+	}
+	var body aggregateRequestBody
+	if c.Request.ContentLength > 0 {
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	}
+	user, _ := c.Get("user")
+	items, err := h.service.Aggregate(datasetID, service.AggregateRequest{
+		Filter:  body.Filter,
+		GroupBy: body.GroupBy,
+		Metric:  body.Metric,
+		Fn:      body.Fn,
+		Limit:   body.Limit,
+		Sort:    body.Sort,
+	}, user.(*domain.User))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items})
+}
+
 func (h *DatasetHandler) CreateRecord(c *gin.Context) {
 	datasetID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
