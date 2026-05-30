@@ -27,6 +27,16 @@ func (r *PostgresDatasetRepo) GetByID(id uuid.UUID, scope *domain.PermissionScop
 	return &d, nil
 }
 
+// GetByKey looks up a dataset by its (namespace_id, key) pair. Used to enforce key
+// uniqueness within a namespace; intentionally not RBAC-scoped.
+func (r *PostgresDatasetRepo) GetByKey(namespaceID uuid.UUID, key string) (*domain.Dataset, error) {
+	var d domain.Dataset
+	if err := r.db.Where("namespace_id = ? AND key = ?", namespaceID, key).Take(&d).Error; err != nil {
+		return nil, err
+	}
+	return &d, nil
+}
+
 func (r *PostgresDatasetRepo) List(namespaceID uuid.UUID, scope *domain.PermissionScope) ([]domain.Dataset, error) {
 	var ds []domain.Dataset
 	db := applyScope(r.db, scope, "", "")
@@ -106,6 +116,18 @@ func (r *PostgresDatasetRepo) ListRecords(datasetID uuid.UUID, limit, offset int
 func (r *PostgresDatasetRepo) AllRecords(datasetID uuid.UUID) ([]domain.DatasetRecord, error) {
 	var recs []domain.DatasetRecord
 	err := r.db.Where("dataset_id = ?", datasetID).Order("created_at DESC").Find(&recs).Error
+	return recs, err
+}
+
+// AllRecordsCapped loads at most `limit` records (newest first). A limit <= 0 means
+// "no cap". Used by the in-memory filter/aggregate paths to bound memory per request.
+func (r *PostgresDatasetRepo) AllRecordsCapped(datasetID uuid.UUID, limit int) ([]domain.DatasetRecord, error) {
+	var recs []domain.DatasetRecord
+	q := r.db.Where("dataset_id = ?", datasetID).Order("created_at DESC")
+	if limit > 0 {
+		q = q.Limit(limit)
+	}
+	err := q.Find(&recs).Error
 	return recs, err
 }
 

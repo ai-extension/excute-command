@@ -664,6 +664,9 @@ func (h *PageHandler) ListPublicDatasetRecords(c *gin.Context) {
 			limit = v
 		}
 	}
+	if limit > maxPageLimit {
+		limit = maxPageLimit
+	}
 	if o := c.Query("offset"); o != "" {
 		if v, err := strconv.Atoi(o); err == nil && v >= 0 {
 			offset = v

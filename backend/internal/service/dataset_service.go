@@ -11,6 +11,11 @@ import (
 	"github.com/user/csm-backend/internal/domain"
 )
 
+// maxInMemoryScan bounds how many records the in-memory filter/aggregate paths load
+// from a dataset in a single request. It prevents unbounded memory use (and an
+// unauthenticated DoS vector on the public-page dataset endpoints) on very large datasets.
+const maxInMemoryScan = 50000
+
 type DatasetService struct {
 	repo domain.DatasetRepository
 }
@@ -19,10 +24,23 @@ func NewDatasetService(repo domain.DatasetRepository) *DatasetService {
 	return &DatasetService{repo: repo}
 }
 
+// keyExists reports whether another dataset in the namespace already uses this key.
+// excludeID lets Update skip the dataset being edited.
+func (s *DatasetService) keyExists(namespaceID uuid.UUID, key string, excludeID uuid.UUID) bool {
+	if strings.TrimSpace(key) == "" {
+		return false
+	}
+	dup, err := s.repo.GetByKey(namespaceID, key)
+	return err == nil && dup != nil && dup.ID != excludeID
+}
+
 func (s *DatasetService) Create(d *domain.Dataset, user *domain.User) error {
 	d.ID = uuid.New()
 	if d.Columns == "" {
 		d.Columns = "[]"
+	}
+	if s.keyExists(d.NamespaceID, d.Key, uuid.Nil) {
+		return errors.New("a dataset with this key already exists in this namespace")
 	}
 	if user != nil {
 		d.CreatedBy = &user.ID
@@ -52,16 +70,21 @@ func (s *DatasetService) Update(d *domain.Dataset, user *domain.User) error {
 		return err
 	}
 
-	if d.Key != "" {
+	if d.Key != "" && d.Key != existing.Key {
+		if s.keyExists(existing.NamespaceID, d.Key, existing.ID) {
+			return errors.New("a dataset with this key already exists in this namespace")
+		}
 		existing.Key = d.Key
 	}
 	if d.Name != "" {
 		existing.Name = d.Name
 	}
-	if d.Description != "" {
-		existing.Description = d.Description
-	}
-	if d.Columns != "" {
+	// Description and Columns are optional, so update them unconditionally — this lets a
+	// PUT clear them back to empty (the old code silently ignored empty values).
+	existing.Description = d.Description
+	if strings.TrimSpace(d.Columns) == "" {
+		existing.Columns = "[]"
+	} else {
 		existing.Columns = d.Columns
 	}
 
@@ -79,12 +102,14 @@ func (s *DatasetService) Delete(id uuid.UUID, user *domain.User) error {
 // --- Records (schema is loose; we only ensure Data is a valid JSON object) ---
 
 func validRecordData(data string) error {
-	if data == "" {
+	if strings.TrimSpace(data) == "" {
 		return nil
 	}
-	var v interface{}
+	// Records are arbitrary JSON objects; reject arrays/scalars so that filtering and
+	// aggregation (which decode into map[string]interface{}) behave predictably.
+	var v map[string]interface{}
 	if err := json.Unmarshal([]byte(data), &v); err != nil {
-		return errors.New("data must be valid JSON")
+		return errors.New("data must be a valid JSON object")
 	}
 	return nil
 }
@@ -106,7 +131,7 @@ func (s *DatasetService) ListRecordsFiltered(datasetID uuid.UUID, limit, offset 
 		return s.repo.ListRecords(datasetID, limit, offset, searchTerm)
 	}
 
-	all, err := s.repo.AllRecords(datasetID)
+	all, err := s.repo.AllRecordsCapped(datasetID, maxInMemoryScan)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -235,7 +260,7 @@ func normalizeAggregate(req AggregateRequest) (groupBys []string, selects []Aggr
 // aggregateOnly is the access-check-free aggregation core. Public-page proxies call this
 // after their own membership check.
 func (s *DatasetService) aggregateOnly(datasetID uuid.UUID, req AggregateRequest) ([]AggregateBucket, error) {
-	all, err := s.repo.AllRecords(datasetID)
+	all, err := s.repo.AllRecordsCapped(datasetID, maxInMemoryScan)
 	if err != nil {
 		return nil, err
 	}
@@ -324,22 +349,27 @@ func (s *DatasetService) aggregateOnly(datasetID uuid.UUID, req AggregateRequest
 		b := buckets[k]
 		values := make(map[string]float64, len(selects))
 		for i, sel := range selects {
-			var v float64
+			// avg/min/max are only meaningful when the bucket has at least one numeric
+			// sample. When it doesn't, omit the label entirely instead of reporting a
+			// misleading 0 (the frontend treats a missing label as "no data").
 			switch sel.Fn {
 			case "sum":
-				v = b.sels[i].sum
+				values[sel.Label] = b.sels[i].sum
 			case "avg":
 				if b.sels[i].numeric > 0 {
-					v = b.sels[i].sum / float64(b.sels[i].numeric)
+					values[sel.Label] = b.sels[i].sum / float64(b.sels[i].numeric)
 				}
 			case "min":
-				v = b.sels[i].min
+				if b.sels[i].seen {
+					values[sel.Label] = b.sels[i].min
+				}
 			case "max":
-				v = b.sels[i].max
+				if b.sels[i].seen {
+					values[sel.Label] = b.sels[i].max
+				}
 			default: // count
-				v = float64(b.count)
+				values[sel.Label] = float64(b.count)
 			}
-			values[sel.Label] = v
 		}
 		bucket := AggregateBucket{Key: k, Count: b.count, Values: values}
 		if len(selects) > 0 {
@@ -369,7 +399,7 @@ func (s *DatasetService) ListRecordsPublic(datasetID uuid.UUID, limit, offset in
 	if filter == "" {
 		return s.repo.ListRecords(datasetID, limit, offset, searchTerm)
 	}
-	all, err := s.repo.AllRecords(datasetID)
+	all, err := s.repo.AllRecordsCapped(datasetID, maxInMemoryScan)
 	if err != nil {
 		return nil, 0, err
 	}

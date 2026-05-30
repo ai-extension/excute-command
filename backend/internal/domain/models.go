@@ -575,6 +575,7 @@ type GlobalVariableRepository interface {
 type DatasetRepository interface {
 	Create(d *Dataset) error
 	GetByID(id uuid.UUID, scope *PermissionScope) (*Dataset, error)
+	GetByKey(namespaceID uuid.UUID, key string) (*Dataset, error)
 	List(namespaceID uuid.UUID, scope *PermissionScope) ([]Dataset, error)
 	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, createdBy *uuid.UUID, scope *PermissionScope) ([]Dataset, int64, error)
 	ListGlobalPaginated(limit, offset int, searchTerm string, scope *PermissionScope) ([]Dataset, int64, error)
@@ -583,6 +584,7 @@ type DatasetRepository interface {
 
 	ListRecords(datasetID uuid.UUID, limit, offset int, searchTerm string) ([]DatasetRecord, int64, error)
 	AllRecords(datasetID uuid.UUID) ([]DatasetRecord, error)
+	AllRecordsCapped(datasetID uuid.UUID, limit int) ([]DatasetRecord, error)
 	GetRecord(id uuid.UUID) (*DatasetRecord, error)
 	CreateRecord(r *DatasetRecord) error
 	UpdateRecord(r *DatasetRecord) error

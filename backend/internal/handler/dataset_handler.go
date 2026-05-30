@@ -20,6 +20,10 @@ func NewDatasetHandler(service *service.DatasetService, auditLog domain.AuditLog
 	return &DatasetHandler{service: service, auditLog: auditLog}
 }
 
+// maxPageLimit caps a single page size for record/dataset listings so a client cannot
+// request an unbounded result set.
+const maxPageLimit = 500
+
 func pageParams(c *gin.Context) (int, int) {
 	limit := 20
 	offset := 0
@@ -27,6 +31,9 @@ func pageParams(c *gin.Context) (int, int) {
 		if v, err := strconv.Atoi(l); err == nil && v > 0 {
 			limit = v
 		}
+	}
+	if limit > maxPageLimit {
+		limit = maxPageLimit
 	}
 	if o := c.Query("offset"); o != "" {
 		if v, err := strconv.Atoi(o); err == nil && v >= 0 {
