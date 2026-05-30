@@ -59,6 +59,23 @@ func (r *PostgresDatasetRepo) ListPaginated(namespaceID uuid.UUID, limit, offset
 	return ds, total, err
 }
 
+// ListGlobalPaginated returns datasets across ALL namespaces, scoped by RBAC. Used by
+// the role-permissions picker so admins can grant per-dataset rules globally.
+func (r *PostgresDatasetRepo) ListGlobalPaginated(limit, offset int, searchTerm string, scope *domain.PermissionScope) ([]domain.Dataset, int64, error) {
+	var ds []domain.Dataset
+	var total int64
+
+	db := applyScope(r.db, scope, "", "").Model(&domain.Dataset{})
+	if searchTerm != "" {
+		db = db.Where("key ILIKE ? OR name ILIKE ? OR description ILIKE ?", "%"+searchTerm+"%", "%"+searchTerm+"%", "%"+searchTerm+"%")
+	}
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	err := db.Limit(limit).Offset(offset).Order("created_at DESC").Find(&ds).Error
+	return ds, total, err
+}
+
 func (r *PostgresDatasetRepo) Update(d *domain.Dataset) error {
 	return r.db.Save(d).Error
 }

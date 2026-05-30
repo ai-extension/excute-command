@@ -23,6 +23,7 @@ type PermissionHandler struct {
 	userRepo      domain.UserRepository
 	roleRepo      domain.RoleRepository
 	vpnRepo       domain.VpnConfigRepository
+	datasetRepo   domain.DatasetRepository
 	auditLog      domain.AuditLogService
 }
 
@@ -39,6 +40,7 @@ func NewPermissionHandler(
 	userRepo domain.UserRepository,
 	roleRepo domain.RoleRepository,
 	vpnRepo domain.VpnConfigRepository,
+	datasetRepo domain.DatasetRepository,
 	auditLog domain.AuditLogService,
 ) *PermissionHandler {
 	return &PermissionHandler{
@@ -54,6 +56,7 @@ func NewPermissionHandler(
 		userRepo:      userRepo,
 		roleRepo:      roleRepo,
 		vpnRepo:       vpnRepo,
+		datasetRepo:   datasetRepo,
 		auditLog:      auditLog,
 	}
 }
@@ -148,6 +151,13 @@ func (h *PermissionHandler) ListResourceItems(c *gin.Context) {
 		items, total, err = h.roleRepo.ListPaginated(limit, offset, searchTerm)
 	case "vpns":
 		items, total, err = h.vpnRepo.ListPaginated(nil, limit, offset, searchTerm, "", "", nil, &scope)
+	case "datasets":
+		items, total, err = h.datasetRepo.ListGlobalPaginated(limit, offset, searchTerm, &scope)
+	case "audit_logs":
+		// Audit log access is global-only (no per-item grants), so the picker has
+		// nothing to list. Return an empty page so the dialog shows "no items".
+		items = []struct{}{}
+		total = 0
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported resource type: " + resourceType})
 		return

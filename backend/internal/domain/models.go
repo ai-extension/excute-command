@@ -577,6 +577,7 @@ type DatasetRepository interface {
 	GetByID(id uuid.UUID, scope *PermissionScope) (*Dataset, error)
 	List(namespaceID uuid.UUID, scope *PermissionScope) ([]Dataset, error)
 	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, createdBy *uuid.UUID, scope *PermissionScope) ([]Dataset, int64, error)
+	ListGlobalPaginated(limit, offset int, searchTerm string, scope *PermissionScope) ([]Dataset, int64, error)
 	Update(d *Dataset) error
 	Delete(id uuid.UUID) error
 

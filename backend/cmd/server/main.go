@@ -152,7 +152,7 @@ func main() {
 	authHandler := handler.NewAuthHandler(authService, auditLogService)
 	userHandler := handler.NewUserHandler(userRepo, roleRepo, apiKeyRepo, auditLogService)
 	roleHandler := handler.NewRoleHandler(roleRepo, permRepo, auditLogService)
-	permHandler := handler.NewPermissionHandler(permRepo, workflowRepo, globalVarRepo, scheduleRepo, pageRepo, tagRepo, serverRepo, namespaceRepo, execRepo, userRepo, roleRepo, vpnRepo, auditLogService)
+	permHandler := handler.NewPermissionHandler(permRepo, workflowRepo, globalVarRepo, scheduleRepo, pageRepo, tagRepo, serverRepo, namespaceRepo, execRepo, userRepo, roleRepo, vpnRepo, datasetRepo, auditLogService)
 	serverHandler := handler.NewServerHandler(serverService, terminalService, auditLogService)
 	wsHandler := handler.NewWSHandler(hub, terminalService, authService, pageService, workflowService)
 	workflowHandler := handler.NewWorkflowHandler(workflowService, workflowExecutor, serverService, auditLogService)
