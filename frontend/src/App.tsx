@@ -11,6 +11,8 @@ import WorkflowPage from './pages/WorkflowPage';
 import WorkflowDesignerPage from './pages/WorkflowDesignerPage';
 import ExecutionHistoryPage from './pages/ExecutionHistoryPage';
 import GlobalVariablesPage from './pages/GlobalVariablesPage';
+import DatasetsPage from './pages/DatasetsPage';
+import DatasetRecordsPage from './pages/DatasetRecordsPage';
 import SchedulesPage from './pages/SchedulesPage';
 import ScheduleDetailPage from './pages/ScheduleDetailPage';
 import TagsPage from './pages/TagsPage';
@@ -84,6 +86,8 @@ function App() {
                     <Route path="roles" element={<RolesPage />} />
                     <Route path="roles/:id/permissions" element={<RolePermissionsPage />} />
                     <Route path="variables" element={<GlobalVariablesPage />} />
+                    <Route path="datasets" element={<DatasetsPage />} />
+                    <Route path="datasets/:id" element={<DatasetRecordsPage />} />
                     <Route path="tags" element={<TagsPage />} />
                     <Route path="schedules" element={<SchedulesPage />} />
                     <Route path="schedules/:id" element={<ScheduleDetailPage />} />

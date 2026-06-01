@@ -8,6 +8,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Zap, Plus, Trash2 } from 'lucide-react';
 import { generateUUID } from '../lib/utils';
 import { SearchableSelect } from './SearchableSelect';
+import { DatasetRecordPicker } from './DatasetRecordPicker';
+import { parseDatasetInputConfig } from '../lib/datasetInput';
 
 const getSelectDisplayLabel = (opt: string) => {
     const idx = opt.indexOf('::');
@@ -201,6 +203,10 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                     } else {
                         initialValues[input.key] = '[]';
                     }
+                } else if (input.type === 'dataset-multi-select') {
+                    initialValues[input.key] = '[]';
+                } else if (input.type === 'dataset-select') {
+                    initialValues[input.key] = '';
                 } else if (input.type === 'input' || input.type === 'number' || input.type === 'textarea') {
                     const tm = parseTemplateMap(input.default_value);
                     initialValues[input.key] = tm ? '' : (input.default_value || '');
@@ -279,6 +285,16 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
             } else if (input.type === 'file') {
                 if (input.required && !files[input.key]) {
                     newErrors[input.key] = 'This field is required';
+                }
+            } else if (input.type === 'dataset-select') {
+                if (input.required && isValueEmpty) {
+                    newErrors[input.key] = 'Please pick a record';
+                }
+            } else if (input.type === 'dataset-multi-select') {
+                let rows: any[] = [];
+                try { rows = JSON.parse(val || '[]'); } catch { rows = []; }
+                if (input.required && (!Array.isArray(rows) || rows.length === 0)) {
+                    newErrors[input.key] = 'Please pick at least one record';
                 }
             } else {
                 if (input.required && isValueEmpty) {
@@ -617,7 +633,23 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                                         className={`min-h-[120px] px-3 py-2 bg-background focus:border-indigo-500 text-xs font-semibold rounded-md transition-all resize-y ${errors[input.key] ? 'border-destructive' : 'border-border'}`}
                                         placeholder={`Enter value for ${input.label || input.key}...`}
                                     />
-                                ) : input.type === 'file' ? (
+                                ) : input.type === 'dataset-select' || input.type === 'dataset-multi-select' ? (() => {
+                                    const cfg = parseDatasetInputConfig(input.default_value);
+                                    return (
+                                        <DatasetRecordPicker
+                                            datasetId={cfg.dataset_id}
+                                            baseFilter={cfg.filter}
+                                            displayTemplate={cfg.display}
+                                            multi={input.type === 'dataset-multi-select'}
+                                            value={values[input.key] || ''}
+                                            onChange={(v) => {
+                                                setValues({ ...values, [input.key]: v });
+                                                if (errors[input.key]) setErrors({ ...errors, [input.key]: '' });
+                                            }}
+                                            hasError={!!errors[input.key]}
+                                        />
+                                    );
+                                })() : input.type === 'file' ? (
                                     <div className="relative">
                                         <Input
                                             type="file"

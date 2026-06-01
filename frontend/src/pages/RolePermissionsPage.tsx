@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Shield, ArrowLeft, Save, Loader2, Settings2, Plus, Trash2, Globe, Server, User, Key, Lock, FileText, Database, Calendar, Users, LayoutDashboard, Tag, History, Layout, Zap, Network, Settings } from 'lucide-react';
+import { Shield, ShieldCheck, ArrowLeft, Save, Loader2, Settings2, Plus, Trash2, Globe, Server, Key, Lock, FileText, Database, Calendar, Users, LayoutDashboard, Tag, History, Layout, Zap, Settings, Table2 } from 'lucide-react';
 import { API_BASE_URL } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
@@ -32,17 +32,12 @@ const CATEGORIES = [
             { id: 'workflows', label: 'Workflows', icon: FileText, path: '/permissions/resource-items?type=workflows' },
             { id: 'history', label: 'History', icon: History, path: '/permissions/resource-items?type=history' },
             { id: 'variables', label: 'Variables', icon: Database, path: '/permissions/resource-items?type=variables' },
+            { id: 'datasets', label: 'Datasets', icon: Table2, path: '/permissions/resource-items?type=datasets' },
             { id: 'schedules', label: 'Schedules', icon: Calendar, path: '/permissions/resource-items?type=schedules' },
             { id: 'pages', label: 'Pages', icon: Layout, path: '/permissions/resource-items?type=pages' },
-        ]
-    },
-    {
-        id: 'global',
-        label: 'Global',
-        icon: Network,
-        items: [
+            // Servers + VPNs are namespace-scoped now (no longer global).
             { id: 'servers', label: 'Servers', icon: Server, path: '/permissions/resource-items?type=servers' },
-            { id: 'vpns', label: 'VPNs', icon: Key, path: '/vpns' },
+            { id: 'vpns', label: 'VPNs', icon: Key, path: '/permissions/resource-items?type=vpns' },
         ]
     },
     {
@@ -52,6 +47,7 @@ const CATEGORIES = [
         items: [
             { id: 'users', label: 'Users', icon: Users, path: '/users' },
             { id: 'roles', label: 'Roles', icon: Lock, path: '/roles' },
+            { id: 'audit_logs', label: 'Audit Logs', icon: ShieldCheck, path: '/permissions/resource-items?type=audit_logs' },
         ]
     },
     {

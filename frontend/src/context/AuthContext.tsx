@@ -267,7 +267,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const hasPermission = useCallback((type: string, action: string, resourceId: string | null = null, namespaceId: string | null = null, tagIds: string[] = []): boolean => {
         if (!user || !user.username) return false;
-        if (user.username === 'admin') return true;
+        // Superadmin is determined by holding the built-in "admin" role, not by username
+        // (mirrors the backend's domain.IsSuperAdmin).
+        if (user.roles?.some((role: any) => String(role?.name).toLowerCase() === 'admin')) return true;
 
         const allPerms = user.roles?.flatMap(role => role.permissions || []) || [];
 

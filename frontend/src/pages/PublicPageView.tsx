@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import {
     Zap, Loader2, Monitor, Terminal, Clock, Sun, Moon, Copy, Check, Link2, Search,
-    FileText, ImageIcon, Frame, Activity, Table2, ArrowUp
+    FileText, ImageIcon, Frame, Activity, Table2, ArrowUp, Home
 } from 'lucide-react';
 import { cn, copyToClipboard as clipboardCopy } from '../lib/utils';
 import { Page, PageWidget, PageLayout, WorkflowInput } from '../types';
@@ -27,6 +27,9 @@ import TerminalWidget from '../components/public/TerminalWidget';
 import EndpointWidget from '../components/public/EndpointWidget';
 import PageExecutionTerminal from '../components/public/PageExecutionTerminal';
 import LoginDialog from '../components/LoginDialog';
+import ChartWidget from '../components/public/ChartWidget';
+import MetricWidget from '../components/public/MetricWidget';
+import DatasetTableWidget from '../components/public/DatasetTableWidget';
 
 const PublicPageView = () => {
     const { slug } = useParams();
@@ -429,6 +432,16 @@ const PublicPageView = () => {
                         </p>
 
                         <div className="flex items-center gap-6 pt-2">
+                            {page?.parent?.slug && (
+                                <a
+                                    href={`/public/pages/${page.parent.slug}`}
+                                    className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors"
+                                    title={`Back to ${page.parent.title || 'parent page'}`}
+                                >
+                                    <Home className="w-4 h-4" />
+                                    <span className="text-xs font-black uppercase">{page.parent.title || 'Parent page'}</span>
+                                </a>
+                            )}
                             <div className="flex items-center gap-2">
                                 <Zap className="w-4 h-4 text-primary" />
                                 <span className="text-xs font-black uppercase  text-muted-foreground">
@@ -616,6 +629,9 @@ const PublicPageView = () => {
                                     );
                                 }
                                 if (widget.type === 'TABLE') {
+                                    if (widget.data_source === 'dataset') {
+                                        return <DatasetTableWidget widget={widget} slug={slug} pageToken={pageToken} />;
+                                    }
                                     return (
                                         <div className="bg-card border border-border rounded-md overflow-hidden shadow-sm h-full flex flex-col">
                                             <div className="flex items-center gap-4 px-8 py-4 border-b border-border bg-card">
@@ -649,6 +665,12 @@ const PublicPageView = () => {
                                             </div>
                                         </div>
                                     );
+                                }
+                                if (widget.type === 'CHART') {
+                                    return <ChartWidget widget={widget} slug={slug} pageToken={pageToken} />;
+                                }
+                                if (widget.type === 'METRIC') {
+                                    return <MetricWidget widget={widget} slug={slug} pageToken={pageToken} />;
                                 }
                                 return null;
                             };
@@ -721,6 +743,7 @@ const PublicPageView = () => {
                     }}
                     onCancel={closeInputModal}
                     storageKey={inputModal.widget ? `public:${slug}:widget:${inputModal.widget.id}` : undefined}
+                    title={inputModal.widget?.workflow_name || inputModal.widget?.title || 'Workflow Inputs'}
                 />
 
                 {activeExecutionId && slug && (() => {

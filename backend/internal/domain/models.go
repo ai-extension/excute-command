@@ -164,6 +164,7 @@ type ServerConnection interface {
 
 type Server struct {
 	ID                 uuid.UUID      `json:"id" gorm:"type:uuid;primaryKey"`
+	NamespaceID        uuid.UUID      `json:"namespace_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
 	Name               string         `json:"name" gorm:"not null"`
 	Description        string         `json:"description"`
 	ConnectionType     ConnectionType `json:"connection_type" gorm:"not null;default:'SSH'"`
@@ -193,14 +194,15 @@ type ServerMetrics struct {
 type ServerRepository interface {
 	Create(server *Server) error
 	GetByID(id uuid.UUID, scope *PermissionScope) (*Server, error)
-	List(scope *PermissionScope) ([]Server, error)
-	ListPaginated(limit, offset int, searchTerm string, authType string, vpnID *uuid.UUID, createdBy *uuid.UUID, scope *PermissionScope) ([]Server, int64, error)
+	List(namespaceID *uuid.UUID, scope *PermissionScope) ([]Server, error)
+	ListPaginated(namespaceID *uuid.UUID, limit, offset int, searchTerm string, authType string, vpnID *uuid.UUID, createdBy *uuid.UUID, scope *PermissionScope) ([]Server, int64, error)
 	Update(server *Server) error
 	Delete(id uuid.UUID) error
 }
 
 type VpnConfig struct {
 	ID                 uuid.UUID      `json:"id" gorm:"type:uuid;primaryKey"`
+	NamespaceID        uuid.UUID      `json:"namespace_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
 	Name               string         `json:"name" gorm:"not null"`
 	Description        string         `json:"description"`
 	VpnType            string         `json:"vpn_type" gorm:"not null;default:'SSH'"` // SSH, OPENVPN, WIREGUARD
@@ -224,8 +226,8 @@ type VpnConfig struct {
 type VpnConfigRepository interface {
 	Create(vpn *VpnConfig) error
 	GetByID(id uuid.UUID, scope *PermissionScope) (*VpnConfig, error)
-	List(scope *PermissionScope) ([]VpnConfig, error)
-	ListPaginated(limit, offset int, searchTerm string, vpnType string, authType string, createdBy *uuid.UUID, scope *PermissionScope) ([]VpnConfig, int64, error)
+	List(namespaceID *uuid.UUID, scope *PermissionScope) ([]VpnConfig, error)
+	ListPaginated(namespaceID *uuid.UUID, limit, offset int, searchTerm string, vpnType string, authType string, createdBy *uuid.UUID, scope *PermissionScope) ([]VpnConfig, int64, error)
 	Update(vpn *VpnConfig) error
 	Delete(id uuid.UUID) error
 }
@@ -339,6 +341,14 @@ type WorkflowStep struct {
 	HttpHeaders          string     `json:"http_headers" gorm:"default:'{}'"` // JSON string map[string]string
 	HttpBody             string     `json:"http_body" gorm:"default:''"`
 	OutputFormat         string     `json:"output_format" gorm:"default:'json'"` // json or string
+	// Dataset action (ActionType == "DATASET")
+	DatasetID            *uuid.UUID `json:"dataset_id,omitempty" gorm:"type:uuid;index"`
+	DatasetOperation     string     `json:"dataset_operation" gorm:"default:''"` // QUERY | INSERT | UPDATE | DELETE
+	DatasetFilter        string     `json:"dataset_filter"`                      // "key=val,..." templated; matchConditions syntax
+	DatasetPayload       string     `json:"dataset_payload"`                     // JSON object or array, templated (INSERT/UPDATE)
+	DatasetLimit         int        `json:"dataset_limit" gorm:"default:0"`      // QUERY cap; 0 = default cap
+	// Convert action (ActionType == "CONVERT") — parse a templated text source into JSON
+	ConvertSource        string     `json:"convert_source"`
 	TargetWorkflowID     *uuid.UUID `json:"target_workflow_id,omitempty" gorm:"type:uuid;index"`
 	TargetWorkflowInputs string     `json:"target_workflow_inputs,omitempty"` // JSON string of inputs for the target workflow
 	WaitToFinish         *bool      `json:"wait_to_finish" gorm:"default:true"`
@@ -352,7 +362,7 @@ type WorkflowInput struct {
 	WorkflowID   uuid.UUID `json:"workflow_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
 	Key          string    `json:"key" gorm:"not null"`
 	Label        string    `json:"label" gorm:"not null"`
-	Type         string    `json:"type" gorm:"not null;default:'input'"` // input, number, select, multi-select, multi-input, file
+	Type         string    `json:"type" gorm:"not null;default:'input'"` // input, number, select, multi-select, multi-input, file, dataset-select, dataset-multi-select
 	DefaultValue      string    `json:"default_value"`
 	CollapseInitially bool      `json:"collapse_initially" gorm:"default:false"`
 	Required          bool      `json:"required" gorm:"default:false"`
@@ -381,6 +391,29 @@ type GlobalVariable struct {
 	CreatedByUsername string     `json:"created_by_username,omitempty" gorm:"<-:create"`
 	CreatedAt         time.Time  `json:"created_at" gorm:"<-:create"`
 	UpdatedAt         time.Time  `json:"updated_at"`
+}
+
+// Dataset is a user-defined collection of records. The schema (Columns) is a loose
+// hint for the UI only — records (Data) accept arbitrary JSON, no validation.
+type Dataset struct {
+	ID                uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey"`
+	NamespaceID       uuid.UUID  `json:"namespace_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
+	Key               string     `json:"key" gorm:"not null"` // template ref: data.<Key>
+	Name              string     `json:"name" gorm:"not null"`
+	Description       string     `json:"description"`
+	Columns           string     `json:"columns" gorm:"type:jsonb;default:'[]'"` // [{name,type}] UI hint only
+	CreatedBy         *uuid.UUID `json:"created_by,omitempty" gorm:"type:uuid;index;<-:create"`
+	CreatedByUsername string     `json:"created_by_username,omitempty" gorm:"<-:create"`
+	CreatedAt         time.Time  `json:"created_at" gorm:"<-:create"`
+	UpdatedAt         time.Time  `json:"updated_at"`
+}
+
+type DatasetRecord struct {
+	ID        uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
+	DatasetID uuid.UUID `json:"dataset_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
+	Data      string    `json:"data" gorm:"type:jsonb;default:'{}'"` // arbitrary JSON object
+	CreatedAt time.Time `json:"created_at" gorm:"<-:create"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type Tag struct {
@@ -539,6 +572,25 @@ type GlobalVariableRepository interface {
 	Delete(id uuid.UUID) error
 }
 
+type DatasetRepository interface {
+	Create(d *Dataset) error
+	GetByID(id uuid.UUID, scope *PermissionScope) (*Dataset, error)
+	GetByKey(namespaceID uuid.UUID, key string) (*Dataset, error)
+	List(namespaceID uuid.UUID, scope *PermissionScope) ([]Dataset, error)
+	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, createdBy *uuid.UUID, scope *PermissionScope) ([]Dataset, int64, error)
+	ListGlobalPaginated(limit, offset int, searchTerm string, scope *PermissionScope) ([]Dataset, int64, error)
+	Update(d *Dataset) error
+	Delete(id uuid.UUID) error
+
+	ListRecords(datasetID uuid.UUID, limit, offset int, searchTerm string) ([]DatasetRecord, int64, error)
+	AllRecords(datasetID uuid.UUID) ([]DatasetRecord, error)
+	AllRecordsCapped(datasetID uuid.UUID, limit int) ([]DatasetRecord, error)
+	GetRecord(id uuid.UUID) (*DatasetRecord, error)
+	CreateRecord(r *DatasetRecord) error
+	UpdateRecord(r *DatasetRecord) error
+	DeleteRecord(id uuid.UUID) error
+}
+
 type ScheduleRepository interface {
 	Create(s *Schedule) error
 	GetByID(id uuid.UUID, scope *PermissionScope) (*Schedule, error)
@@ -566,6 +618,8 @@ type Page struct {
 	NamespaceID       uuid.UUID      `json:"namespace_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
 	Title             string         `json:"title" gorm:"not null"`
 	Description       string         `json:"description"`
+	ParentID          *uuid.UUID     `json:"parent_id,omitempty" gorm:"type:uuid;index"`
+	Parent            *Page          `json:"parent,omitempty" gorm:"foreignKey:ParentID;constraint:OnDelete:SET NULL;"`
 	Slug              string         `json:"slug" gorm:"uniqueIndex;not null"`
 	IsPublic          bool           `json:"is_public" gorm:"default:false"`
 	Password          string         `json:"password,omitempty" gorm:"column:password"`

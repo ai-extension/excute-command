@@ -45,12 +45,12 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean, onOpenChan
             try {
                 // Determine limits, maybe more if one is empty
                 const workflowsUrl = search
-                    ? `${API_BASE_URL}/namespaces/${activeNamespace.id}/workflows?limit=5&search=${encodeURIComponent(search)}`
-                    : `${API_BASE_URL}/namespaces/${activeNamespace.id}/workflows?limit=5`;
+                    ? `${API_BASE_URL}/namespaces/${activeNamespace.id}/workflows?limit=15&search=${encodeURIComponent(search)}`
+                    : `${API_BASE_URL}/namespaces/${activeNamespace.id}/workflows?limit=15`;
 
                 const schedulesUrl = search
-                    ? `${API_BASE_URL}/namespaces/${activeNamespace.id}/schedules?limit=5&search=${encodeURIComponent(search)}`
-                    : `${API_BASE_URL}/namespaces/${activeNamespace.id}/schedules?limit=5`;
+                    ? `${API_BASE_URL}/namespaces/${activeNamespace.id}/schedules?limit=15&search=${encodeURIComponent(search)}`
+                    : `${API_BASE_URL}/namespaces/${activeNamespace.id}/schedules?limit=15`;
 
                 const [workflowsRes, schedulesRes] = await Promise.all([
                     apiFetch(workflowsUrl),

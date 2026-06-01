@@ -2,8 +2,8 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -23,15 +23,17 @@ type PageHandler struct {
 	workflowService *service.WorkflowService
 	executor        *service.WorkflowExecutor
 	terminalService *service.TerminalService
+	datasetService  *service.DatasetService
 	auditLog        domain.AuditLogService
 }
 
-func NewPageHandler(s *service.PageService, ws *service.WorkflowService, e *service.WorkflowExecutor, ts *service.TerminalService, auditLog domain.AuditLogService) *PageHandler {
+func NewPageHandler(s *service.PageService, ws *service.WorkflowService, e *service.WorkflowExecutor, ts *service.TerminalService, ds *service.DatasetService, auditLog domain.AuditLogService) *PageHandler {
 	return &PageHandler{
 		service:         s,
 		workflowService: ws,
 		executor:        e,
 		terminalService: ts,
+		datasetService:  ds,
 		auditLog:        auditLog,
 	}
 }
@@ -527,6 +529,156 @@ func (h *PageHandler) GetPublicExecutionLog(c *gin.Context) {
 	c.JSON(http.StatusNotFound, gin.H{"error": "log file not found"})
 }
 
+// pageReferencesDataset returns true when the page layout has at least one widget
+// whose dataset.dataset_id matches datasetID. Layout is loose JSON; we tolerate parse
+// failures by returning false (deny access).
+func pageReferencesDataset(layout string, datasetID uuid.UUID) bool {
+	if layout == "" {
+		return false
+	}
+	var doc struct {
+		Widgets []struct {
+			Dataset struct {
+				DatasetID string `json:"dataset_id"`
+			} `json:"dataset"`
+		} `json:"widgets"`
+	}
+	if err := json.Unmarshal([]byte(layout), &doc); err != nil {
+		return false
+	}
+	target := datasetID.String()
+	for _, w := range doc.Widgets {
+		if w.Dataset.DatasetID == target {
+			return true
+		}
+	}
+	return false
+}
+
+// resolvePublicDataset runs all the access checks shared by the public dataset
+// endpoints (slug → page → public/expiry/token → namespace → layout-reference). On
+// failure it writes an HTTP error and returns nil; callers must abort.
+func (h *PageHandler) resolvePublicDataset(c *gin.Context) (*domain.Dataset, *domain.Page) {
+	slug := c.Param("slug")
+	datasetID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid dataset id"})
+		return nil, nil
+	}
+	page, err := h.service.GetPageBySlug(slug)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "page not found"})
+		return nil, nil
+	}
+	if !h.checkPublicAccess(c, page) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "page is not public"})
+		return nil, nil
+	}
+	if page.ExpiresAt != nil && page.ExpiresAt.Before(time.Now()) {
+		c.JSON(http.StatusGone, gin.H{"error": "page has expired"})
+		return nil, nil
+	}
+	if !h.verifyPageToken(c, page) {
+		return nil, nil // verifyPageToken already wrote the error
+	}
+	ds, err := h.datasetService.GetDatasetForPublic(datasetID)
+	if err != nil || ds == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "dataset not found"})
+		return nil, nil
+	}
+	if ds.NamespaceID != page.NamespaceID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "dataset not in page namespace"})
+		return nil, nil
+	}
+	// Reject datasets not referenced by any widget on this page. Without this,
+	// the page slug+token would grant read access to every dataset in the namespace.
+	if !pageReferencesDataset(page.Layout, datasetID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "dataset not used by this page"})
+		return nil, nil
+	}
+	return ds, page
+}
+
+// AggregatePublicDataset proxies POST /public/pages/:slug/datasets/:id/aggregate.
+func (h *PageHandler) AggregatePublicDataset(c *gin.Context) {
+	ds, _ := h.resolvePublicDataset(c)
+	if ds == nil {
+		return
+	}
+
+	var body struct {
+		Filter   string   `json:"filter"`
+		GroupBys []string `json:"group_bys"`
+		Selects  []struct {
+			Field string `json:"field"`
+			Fn    string `json:"fn"`
+			Label string `json:"label"`
+		} `json:"selects"`
+		GroupBy string `json:"group_by"`
+		Metric  string `json:"metric"`
+		Fn      string `json:"fn"`
+		Limit   int    `json:"limit"`
+		Sort    string `json:"sort"`
+	}
+	if c.Request.ContentLength > 0 {
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
+	selects := make([]service.AggregateSelect, 0, len(body.Selects))
+	for _, s := range body.Selects {
+		selects = append(selects, service.AggregateSelect{Field: s.Field, Fn: s.Fn, Label: s.Label})
+	}
+
+	items, err := h.datasetService.AggregatePublic(ds.ID, service.AggregateRequest{
+		Filter:   body.Filter,
+		GroupBys: body.GroupBys,
+		Selects:  selects,
+		GroupBy:  body.GroupBy,
+		Metric:   body.Metric,
+		Fn:       body.Fn,
+		Limit:    body.Limit,
+		Sort:     body.Sort,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items})
+}
+
+// ListPublicDatasetRecords proxies GET /public/pages/:slug/datasets/:id/records.
+func (h *PageHandler) ListPublicDatasetRecords(c *gin.Context) {
+	ds, _ := h.resolvePublicDataset(c)
+	if ds == nil {
+		return
+	}
+
+	limit := 50
+	offset := 0
+	if l := c.Query("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 {
+			limit = v
+		}
+	}
+	if limit > maxPageLimit {
+		limit = maxPageLimit
+	}
+	if o := c.Query("offset"); o != "" {
+		if v, err := strconv.Atoi(o); err == nil && v >= 0 {
+			offset = v
+		}
+	}
+	items, total, err := h.datasetService.ListRecordsPublic(ds.ID, limit, offset, c.Query("search"), c.Query("filter"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items, "total": total, "limit": limit, "offset": offset})
+}
+
 func (h *PageHandler) UploadPublicInputFile(c *gin.Context) {
 	slug := c.Param("slug")
 	page, err := h.service.GetPageBySlug(slug)
@@ -603,6 +755,16 @@ func (h *PageHandler) sanitizePage(page *domain.Page) {
 			page.Workflows[i].Workflow.DefaultServerID = nil // Hide internal server IDs
 		}
 	}
+	// Only expose the minimal parent info needed for the public breadcrumb link;
+	// strip the parent's password/layout/workflows so nothing internal leaks.
+	if page.Parent != nil {
+		page.Parent = &domain.Page{
+			ID:       page.Parent.ID,
+			Title:    page.Parent.Title,
+			Slug:     page.Parent.Slug,
+			IsPublic: page.Parent.IsPublic,
+		}
+	}
 }
 
 func (h *PageHandler) sanitizeExecution(execution *domain.WorkflowExecution) {
@@ -624,13 +786,10 @@ func (h *PageHandler) checkPublicAccess(c *gin.Context, page *domain.Page) bool 
 	}
 	userVal, exists := c.Get("user")
 	if !exists {
-		log.Printf("[DEBUG] checkPublicAccess: No user in context for private page %s", page.Slug)
 		return false
 	}
 	user := userVal.(*domain.User)
 	nsIDStr := page.NamespaceID.String()
 	pageIDStr := page.ID.String()
-	hasPerm := domain.HasPermission(user, "pages", "EXECUTE", &nsIDStr, &pageIDStr, nil)
-	log.Printf("[DEBUG] checkPublicAccess: user=%s, page=%s, hasPerm=%v", user.Username, page.Slug, hasPerm)
-	return hasPerm
+	return domain.HasPermission(user, "pages", "EXECUTE", &nsIDStr, &pageIDStr, nil)
 }

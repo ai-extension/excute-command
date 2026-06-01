@@ -10,7 +10,7 @@ Welcome to the **Command Step Manager (CSM)** documentation. This center is orga
 | :--- | :--- | :--- |
 | **Brand-new to CSM** | [📘 User Manual](user_manual.md) — the "what" and "why" in plain English | [🚀 Getting Started](getting_started.md) |
 | **An operator / team member** | [🚀 Getting Started](getting_started.md) — 5-minute hands-on tour | [📱 Pages](pages.md) for the user-facing UI |
-| **An automation builder** | [⚙️ Workflows](workflows.md) — full orchestration reference | [🔑 Variables](variables.md), [📅 Schedules](schedules.md) |
+| **An automation builder** | [⚙️ Workflows](workflows.md) — full orchestration reference | [🔑 Variables](variables.md), [🗂️ Datasets](datasets.md), [📅 Schedules](schedules.md) |
 | **An admin / SecOps** | [🔐 Roles & Permissions](roles.md) | [📜 Audit Logs](audit_logs.md) |
 | **An AI / integration engineer** | [🤖 MCP Integration](mcp.md) | [⚙️ Workflows](workflows.md) |
 
@@ -31,6 +31,7 @@ Input       → "Parameters" passed at run-time (text, select, switch, file…)
 Page        → "Friendly UI" wrapping a workflow for non-technical users
 Schedule    → "Cron alarm clock" that fires a workflow automatically
 Variable    → "Shared config / secret" available across workflows
+Dataset     → "Structured table" of records, read/written by workflow steps
 Role        → "Permission bundle" assigned to users (namespace-scoped)
 Execution   → A single run instance with status, logs, and history
 Namespace   → Tenant boundary; resources are partitioned per namespace
@@ -72,6 +73,7 @@ Deep references for each subsystem:
 - **[📱 Pages](pages.md)** — page designer, widget catalog, public/private modes, theme, history, log viewer.
 - **[📅 Schedules](schedules.md)** — cron-driven recurring runs.
 - **[🔑 Global Variables](variables.md)** — shared config and secret injection.
+- **[🗂️ Datasets](datasets.md)** — structured record store, read/written via Dataset steps.
 - **[🔐 Roles & Permissions](roles.md)** — namespace-scoped RBAC.
 - **[📜 Audit Logs](audit_logs.md)** — traceability and compliance.
 - **[🤖 MCP Integration](mcp.md)** — exposing workflows to AI agents.

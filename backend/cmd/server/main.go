@@ -68,6 +68,8 @@ func main() {
 		&domain.WorkflowExecution{},
 		&domain.WorkflowExecutionStep{},
 		&domain.GlobalVariable{},
+		&domain.Dataset{},
+		&domain.DatasetRecord{},
 		&domain.Schedule{},
 		&domain.ScheduleWorkflow{},
 		&domain.Tag{},
@@ -96,6 +98,7 @@ func main() {
 	workflowVariableRepo := repository.NewPostgresWorkflowVariableRepo(db)
 	execRepo := repository.NewPostgresWorkflowExecutionRepo(db)
 	globalVarRepo := repository.NewPostgresGlobalVariableRepo(db)
+	datasetRepo := repository.NewPostgresDatasetRepo(db)
 	scheduleRepo := repository.NewPostgresScheduleRepo(db)
 	tagRepo := repository.NewPostgresTagRepo(db)
 	workflowFileRepo := repository.NewPostgresWorkflowFileRepo(db)
@@ -110,6 +113,7 @@ func main() {
 	seedDefaultNamespace(db)
 	seedLocalServer(db)
 	seedSystemSettings(db)
+	migrateAssignDefaultNamespace(db)
 
 	// Initialize Hub
 	hub := service.NewHub()
@@ -124,7 +128,8 @@ func main() {
 	terminalService := service.NewTerminalService(serverRepo, hub, vpnConnector, sshPool)
 	workflowService := service.NewWorkflowService(workflowRepo, workflowGroupRepo, workflowStepRepo, workflowInputRepo, workflowVariableRepo, execRepo)
 	globalVarService := service.NewGlobalVariableService(globalVarRepo)
-	workflowExecutor := service.NewWorkflowExecutor(workflowRepo, workflowGroupRepo, workflowStepRepo, workflowInputRepo, execRepo, serverService, hub, globalVarRepo)
+	datasetService := service.NewDatasetService(datasetRepo)
+	workflowExecutor := service.NewWorkflowExecutor(workflowRepo, workflowGroupRepo, workflowStepRepo, workflowInputRepo, execRepo, serverService, hub, globalVarRepo, datasetRepo)
 	scheduleService := service.NewScheduleService(scheduleRepo, execRepo, workflowExecutor)
 	tagService := service.NewTagService(tagRepo)
 	vpnService := service.NewVpnConfigService(vpnRepo)
@@ -147,17 +152,18 @@ func main() {
 	authHandler := handler.NewAuthHandler(authService, auditLogService)
 	userHandler := handler.NewUserHandler(userRepo, roleRepo, apiKeyRepo, auditLogService)
 	roleHandler := handler.NewRoleHandler(roleRepo, permRepo, auditLogService)
-	permHandler := handler.NewPermissionHandler(permRepo, workflowRepo, globalVarRepo, scheduleRepo, pageRepo, tagRepo, serverRepo, namespaceRepo, execRepo, userRepo, roleRepo, vpnRepo, auditLogService)
+	permHandler := handler.NewPermissionHandler(permRepo, workflowRepo, globalVarRepo, scheduleRepo, pageRepo, tagRepo, serverRepo, namespaceRepo, execRepo, userRepo, roleRepo, vpnRepo, datasetRepo, auditLogService)
 	serverHandler := handler.NewServerHandler(serverService, terminalService, auditLogService)
 	wsHandler := handler.NewWSHandler(hub, terminalService, authService, pageService, workflowService)
 	workflowHandler := handler.NewWorkflowHandler(workflowService, workflowExecutor, serverService, auditLogService)
 	globalVarHandler := handler.NewGlobalVariableHandler(globalVarService, auditLogService)
+	datasetHandler := handler.NewDatasetHandler(datasetService, auditLogService)
 	scheduleHandler := handler.NewScheduleHandler(scheduleService, auditLogService)
 	tagHandler := handler.NewTagHandler(tagService, auditLogService)
 	workflowFileService := service.NewWorkflowFileService(workflowFileRepo)
 	workflowFileHandler := handler.NewWorkflowFileHandler(workflowFileService, auditLogService)
 	vpnHandler := handler.NewVpnConfigHandler(vpnService, auditLogService)
-	pageHandler := handler.NewPageHandler(pageService, workflowService, workflowExecutor, terminalService, auditLogService)
+	pageHandler := handler.NewPageHandler(pageService, workflowService, workflowExecutor, terminalService, datasetService, auditLogService)
 	settingsHandler := handler.NewSettingsHandler(settingsService, auditLogService)
 	auditLogHandler := handler.NewAuditLogHandler(auditLogService)
 	dashboardHandler := handler.NewDashboardHandler(dashboardService)
@@ -231,8 +237,8 @@ func main() {
 			protected.GET("/permissions/resource-items", middleware.RBACMiddleware(db, userRepo, "roles", "READ"), permHandler.ListResourceItems)
 			protected.DELETE("/permissions/:id", middleware.RBACMiddleware(db, userRepo, "roles", "DELETE"), permHandler.DeletePermission)
 
-			protected.GET("/servers", middleware.RBACMiddleware(db, userRepo, "servers", "READ"), serverHandler.ListServers)
-			protected.POST("/servers", middleware.RBACMiddleware(db, userRepo, "servers", "WRITE"), serverHandler.CreateServer)
+			protected.GET("/namespaces/:ns_id/servers", middleware.RBACMiddleware(db, userRepo, "servers", "READ"), serverHandler.ListServers)
+			protected.POST("/namespaces/:ns_id/servers", middleware.RBACMiddleware(db, userRepo, "servers", "WRITE"), serverHandler.CreateServer)
 			protected.PUT("/servers/:id", middleware.RBACMiddleware(db, userRepo, "servers", "WRITE"), serverHandler.UpdateServer)
 			protected.DELETE("/servers/:id", middleware.RBACMiddleware(db, userRepo, "servers", "DELETE"), serverHandler.DeleteServer)
 			protected.POST("/servers/:id/execute", middleware.RBACMiddleware(db, userRepo, "servers", "EXECUTE"), serverHandler.ExecuteCommand)
@@ -277,6 +283,18 @@ func main() {
 			protected.PUT("/global-variables/:id", middleware.RBACMiddleware(db, userRepo, "variables", "WRITE"), globalVarHandler.Update)
 			protected.DELETE("/global-variables/:id", middleware.RBACMiddleware(db, userRepo, "variables", "DELETE"), globalVarHandler.Delete)
 
+			// Datasets
+			protected.GET("/namespaces/:ns_id/datasets", middleware.RBACMiddleware(db, userRepo, "datasets", "READ"), datasetHandler.List)
+			protected.POST("/namespaces/:ns_id/datasets", middleware.RBACMiddleware(db, userRepo, "datasets", "WRITE"), datasetHandler.Create)
+			protected.GET("/datasets/:id", middleware.RBACMiddleware(db, userRepo, "datasets", "READ"), datasetHandler.Get)
+			protected.PUT("/datasets/:id", middleware.RBACMiddleware(db, userRepo, "datasets", "WRITE"), datasetHandler.Update)
+			protected.DELETE("/datasets/:id", middleware.RBACMiddleware(db, userRepo, "datasets", "DELETE"), datasetHandler.Delete)
+			protected.GET("/datasets/:id/records", middleware.RBACMiddleware(db, userRepo, "datasets", "READ"), datasetHandler.ListRecords)
+			protected.POST("/datasets/:id/aggregate", middleware.RBACMiddleware(db, userRepo, "datasets", "READ"), datasetHandler.Aggregate)
+			protected.POST("/datasets/:id/records", middleware.RBACMiddleware(db, userRepo, "datasets", "WRITE"), datasetHandler.CreateRecord)
+			protected.PUT("/dataset-records/:id", middleware.RBACMiddleware(db, userRepo, "datasets", "WRITE"), datasetHandler.UpdateRecord)
+			protected.DELETE("/dataset-records/:id", middleware.RBACMiddleware(db, userRepo, "datasets", "DELETE"), datasetHandler.DeleteRecord)
+
 			// Schedules
 			protected.GET("/namespaces/:ns_id/schedules", middleware.RBACMiddleware(db, userRepo, "schedules", "READ"), scheduleHandler.List)
 			protected.POST("/namespaces/:ns_id/schedules", middleware.RBACMiddleware(db, userRepo, "schedules", "WRITE"), scheduleHandler.Create)
@@ -293,8 +311,8 @@ func main() {
 			protected.DELETE("/tags/:id", middleware.RBACMiddleware(db, userRepo, "tags", "DELETE"), tagHandler.Delete)
 
 			// VPNs
-			protected.GET("/vpns", middleware.RBACMiddleware(db, userRepo, "vpns", "READ"), vpnHandler.List)
-			protected.POST("/vpns", middleware.RBACMiddleware(db, userRepo, "vpns", "WRITE"), vpnHandler.Create)
+			protected.GET("/namespaces/:ns_id/vpns", middleware.RBACMiddleware(db, userRepo, "vpns", "READ"), vpnHandler.List)
+			protected.POST("/namespaces/:ns_id/vpns", middleware.RBACMiddleware(db, userRepo, "vpns", "WRITE"), vpnHandler.Create)
 			protected.PUT("/vpns/:id", middleware.RBACMiddleware(db, userRepo, "vpns", "WRITE"), vpnHandler.Update)
 			protected.DELETE("/vpns/:id", middleware.RBACMiddleware(db, userRepo, "vpns", "DELETE"), vpnHandler.Delete)
 
@@ -334,6 +352,8 @@ func main() {
 		api.POST("/public/pages/:slug/executions/:exec_id/stop", middleware.LoginRateLimiter(), optionalAuth, pageHandler.StopPublicExecution)
 		api.GET("/public/pages/:slug/executions/:exec_id/logs", optionalAuth, pageHandler.GetPublicExecutionLog)
 		api.POST("/public/pages/:slug/upload-input", middleware.LoginRateLimiter(), optionalAuth, pageHandler.UploadPublicInputFile)
+		api.POST("/public/pages/:slug/datasets/:id/aggregate", optionalAuth, pageHandler.AggregatePublicDataset)
+		api.GET("/public/pages/:slug/datasets/:id/records", optionalAuth, pageHandler.ListPublicDatasetRecords)
 	}
 
 	// Serve static files from Vite build output
@@ -390,6 +410,10 @@ func seedAdmin(db *gorm.DB) {
 		{Name: "Read Variables", Type: "variables", Action: "READ"},
 		{Name: "Manage Variables", Type: "variables", Action: "WRITE"},
 		{Name: "Delete Variables", Type: "variables", Action: "DELETE"},
+
+		{Name: "Read Datasets", Type: "datasets", Action: "READ"},
+		{Name: "Manage Datasets", Type: "datasets", Action: "WRITE"},
+		{Name: "Delete Datasets", Type: "datasets", Action: "DELETE"},
 
 		{Name: "Read Tags", Type: "tags", Action: "READ"},
 		{Name: "Manage Tags", Type: "tags", Action: "WRITE"},
@@ -542,6 +566,36 @@ func seedDefaultNamespace(db *gorm.DB) {
 	}
 }
 
+// getDefaultNamespaceID returns the ID of the "Default" namespace, or uuid.Nil if missing.
+func getDefaultNamespaceID(db *gorm.DB) uuid.UUID {
+	var ns domain.Namespace
+	if err := db.Where("name = ?", "Default").Limit(1).Find(&ns).Error; err != nil {
+		return uuid.Nil
+	}
+	return ns.ID
+}
+
+// migrateAssignDefaultNamespace backfills the Default namespace onto pre-existing servers and
+// VPN configs that were created before namespace scoping (namespace_id NULL or zero). Idempotent.
+func migrateAssignDefaultNamespace(db *gorm.DB) {
+	defID := getDefaultNamespaceID(db)
+	if defID == uuid.Nil {
+		return
+	}
+	zero := uuid.Nil.String()
+	for _, table := range []string{"servers", "vpn_configs"} {
+		res := db.Exec(
+			"UPDATE "+table+" SET namespace_id = ? WHERE namespace_id IS NULL OR namespace_id = ?",
+			defID, zero,
+		)
+		if res.Error != nil {
+			log.Printf("[Migrate] backfill namespace on %s failed: %v", table, res.Error)
+		} else if res.RowsAffected > 0 {
+			log.Printf("[Migrate] assigned Default namespace to %d %s row(s)", res.RowsAffected, table)
+		}
+	}
+}
+
 func seedLocalServer(db *gorm.DB) {
 	var localServer domain.Server
 	err := db.Where("name = ?", "Local Engine Orchestrator").Limit(1).Find(&localServer).Error
@@ -549,6 +603,7 @@ func seedLocalServer(db *gorm.DB) {
 		log.Println("Seeding local server...")
 		localServer = domain.Server{
 			ID:             uuid.New(),
+			NamespaceID:    getDefaultNamespaceID(db),
 			Name:           "Local Engine Orchestrator",
 			Description:    "The local system where the engine is running.",
 			ConnectionType: domain.ConnectionTypeLocal,

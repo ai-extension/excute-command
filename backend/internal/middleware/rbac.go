@@ -184,27 +184,27 @@ func RBACMiddlewareAny(db *gorm.DB, userRepo domain.UserRepository, permType str
 		}
 
 		// 1. API Key Scope Check
+		// An API key may only access the resource types listed in its scopes. An empty
+		// scope list grants NO access (least privilege) — previously it meant full access,
+		// which silently turned an unscoped key into an all-powerful one.
 		if scopesVal, exists := c.Get("api_key_scopes"); exists {
-			scopes := scopesVal.(string)
-			if scopes != "" {
-				allowed := false
-				scopeList := strings.Split(scopes, ",")
-				for _, s := range scopeList {
-					if strings.TrimSpace(s) == permType {
-						allowed = true
-						break
-					}
+			scopes, _ := scopesVal.(string)
+			allowed := false
+			for _, s := range strings.Split(scopes, ",") {
+				if strings.TrimSpace(s) == permType {
+					allowed = true
+					break
 				}
-				if !allowed {
-					c.JSON(http.StatusForbidden, gin.H{"error": "API key does not have access to this resource type (" + permType + ")"})
-					c.Abort()
-					return
-				}
+			}
+			if !allowed {
+				c.JSON(http.StatusForbidden, gin.H{"error": "API key does not have access to this resource type (" + permType + ")"})
+				c.Abort()
+				return
 			}
 		}
 
 		// Root admin check
-		if user.Username == "admin" {
+		if domain.IsSuperAdmin(user) {
 			c.Next()
 			return
 		}
@@ -213,8 +213,16 @@ func RBACMiddlewareAny(db *gorm.DB, userRepo domain.UserRepository, permType str
 		namespaceID := c.Param("ns_id")
 		var tagIDs []string
 
-		// Hierarchical Resolution: If we have a resource ID but no namespace ID in URL, try to resolve it from DB
-		if resourceID != "" && isNamespaceScoped(permType) {
+		// Hierarchical Resolution. Some routes key the resource by a param other than :id
+		// (e.g. :exec_id, :file_id) and the resource inherits its namespace/tags from a
+		// parent workflow. Resolve the owning workflow + namespace + tags so the permission
+		// check is item/namespace/tag-aware instead of falling back to a coarse "has any
+		// grant" check.
+		if execID := c.Param("exec_id"); execID != "" {
+			resourceID, namespaceID, tagIDs = resolveExecutionScope(db, execID)
+		} else if fileID := c.Param("file_id"); fileID != "" {
+			resourceID, namespaceID, tagIDs = resolveFileScope(db, fileID)
+		} else if resourceID != "" && isNamespaceScoped(permType) {
 			if namespaceID == "" {
 				namespaceID = resolveNamespaceFromDB(db, permType, resourceID)
 			}
@@ -255,7 +263,7 @@ func RBACMiddlewareAny(db *gorm.DB, userRepo domain.UserRepository, permType str
 
 func isNamespaceScoped(permType string) bool {
 	switch permType {
-	case "workflows", "history", "executions", "variables", "global-variables", "schedules", "pages", "tags":
+	case "workflows", "history", "executions", "variables", "global-variables", "datasets", "schedules", "pages", "tags", "servers", "vpns":
 		return true
 	default:
 		return false
@@ -278,8 +286,14 @@ func resolveNamespaceFromDB(db *gorm.DB, permType string, resourceID string) str
 		table = "pages"
 	case "tags":
 		table = "tags"
-	case "global-variables":
+	case "variables", "global-variables":
 		table = "global_variables"
+	case "datasets":
+		table = "datasets"
+	case "servers":
+		table = "servers"
+	case "vpns":
+		table = "vpn_configs"
 	case "executions":
 		// For executions, we might need to join with workflows
 		db.Table("workflow_executions").
@@ -327,4 +341,43 @@ func resolveTagsFromDB(db *gorm.DB, permType string, resourceID string) []string
 
 	db.Table(joinTable).Select("tag_id").Where(joinCol+" = ?", resourceID).Scan(&tagIDs)
 	return tagIDs
+}
+
+// resolveExecutionScope resolves an execution's owning workflow id, namespace, and tags.
+// Routes keyed by :exec_id use permType "workflows", so the returned workflowID is used as
+// the item-level resource id and namespace/tags drive hierarchical permission checks.
+func resolveExecutionScope(db *gorm.DB, execID string) (workflowID, namespaceID string, tagIDs []string) {
+	var row struct {
+		WorkflowID  string
+		NamespaceID string
+	}
+	db.Table("workflow_executions").
+		Select("workflow_executions.workflow_id, workflows.namespace_id").
+		Joins("JOIN workflows ON workflows.id = workflow_executions.workflow_id").
+		Where("workflow_executions.id = ?", execID).
+		Limit(1).Scan(&row)
+	if row.WorkflowID == "" {
+		return "", "", nil
+	}
+	db.Table("workflow_tags").Select("tag_id").Where("workflow_id = ?", row.WorkflowID).Scan(&tagIDs)
+	return row.WorkflowID, row.NamespaceID, tagIDs
+}
+
+// resolveFileScope resolves a workflow file's owning workflow id, namespace, and tags, so
+// routes keyed by :file_id are checked against the parent workflow's permissions.
+func resolveFileScope(db *gorm.DB, fileID string) (workflowID, namespaceID string, tagIDs []string) {
+	var row struct {
+		WorkflowID  string
+		NamespaceID string
+	}
+	db.Table("workflow_files").
+		Select("workflow_files.workflow_id, workflows.namespace_id").
+		Joins("JOIN workflows ON workflows.id = workflow_files.workflow_id").
+		Where("workflow_files.id = ?", fileID).
+		Limit(1).Scan(&row)
+	if row.WorkflowID == "" {
+		return "", "", nil
+	}
+	db.Table("workflow_tags").Select("tag_id").Where("workflow_id = ?", row.WorkflowID).Scan(&tagIDs)
+	return row.WorkflowID, row.NamespaceID, tagIDs
 }

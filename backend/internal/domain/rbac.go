@@ -1,15 +1,31 @@
 package domain
 
 import (
-	"fmt"
+	"strings"
 )
+
+// IsSuperAdmin reports whether the user has unrestricted access. Superadmin status is
+// granted by holding the built-in "admin" role — NOT by username. Tying it to a username
+// is fragile: if the admin account were deleted, a non-admin could re-register "admin" and
+// inherit full access. Roles can only be assigned by an existing admin, so they are safe.
+func IsSuperAdmin(user *User) bool {
+	if user == nil {
+		return false
+	}
+	for _, role := range user.Roles {
+		if strings.EqualFold(role.Name, "admin") {
+			return true
+		}
+	}
+	return false
+}
 
 // HasPermission checks if a user has a specific permission, considering hierarchy.
 func HasPermission(user *User, permType, action string, namespaceID *string, resourceID *string, tagIDs []string) bool {
 	if user == nil {
 		return false
 	}
-	if user.Username == "admin" {
+	if IsSuperAdmin(user) {
 		return true
 	}
 
@@ -49,8 +65,6 @@ func HasPermission(user *User, permType, action string, namespaceID *string, res
 		}
 	}
 
-	fmt.Printf("DEBUG HasPermission: Failed. user=%s, permType=%s, action=%s, resourceID=%v, roles_count=%d\n",
-		user.Username, permType, action, resourceID, len(user.Roles))
 	return false
 }
 
@@ -92,7 +106,7 @@ func GetPermissionScope(user *User, permType, action string) PermissionScope {
 		return scope
 	}
 
-	if user.Username == "admin" {
+	if IsSuperAdmin(user) {
 		scope.IsGlobal = true
 		return scope
 	}
@@ -143,16 +157,13 @@ func GetPermissionScope(user *User, permType, action string) PermissionScope {
 		// Direct hierarchical perms could be added here
 	}
 
-	fmt.Printf("DEBUG GetPermissionScope: user=%s, permType=%s, action=%s, roles=%d, scope=%+v\n",
-		user.Username, permType, action, len(user.Roles), scope)
-
 	return scope
 }
 
 // isNamespaceScoped checks if a given permission type refers to a resource that lives inside a namespace.
 func isNamespaceScoped(permType string) bool {
 	switch permType {
-	case "workflows", "history", "executions", "variables", "global-variables", "schedules", "pages", "tags":
+	case "workflows", "history", "executions", "variables", "global-variables", "datasets", "schedules", "pages", "tags", "servers", "vpns":
 		return true
 	default:
 		return false

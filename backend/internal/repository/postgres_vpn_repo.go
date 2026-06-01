@@ -70,9 +70,12 @@ func (r *PostgresVpnConfigRepo) GetByID(id uuid.UUID, scope *domain.PermissionSc
 	return &vpn, nil
 }
 
-func (r *PostgresVpnConfigRepo) List(scope *domain.PermissionScope) ([]domain.VpnConfig, error) {
+func (r *PostgresVpnConfigRepo) List(namespaceID *uuid.UUID, scope *domain.PermissionScope) ([]domain.VpnConfig, error) {
 	var vpns []domain.VpnConfig
 	db := applyScope(r.db, scope, "", "")
+	if namespaceID != nil {
+		db = db.Where("namespace_id = ?", namespaceID)
+	}
 	if err := db.Order("created_at DESC").Find(&vpns).Error; err != nil {
 		return nil, err
 	}
@@ -103,10 +106,14 @@ func (r *PostgresVpnConfigRepo) List(scope *domain.PermissionScope) ([]domain.Vp
 	return vpns, nil
 }
 
-func (r *PostgresVpnConfigRepo) ListPaginated(limit, offset int, searchTerm string, vpnType string, authType string, createdBy *uuid.UUID, scope *domain.PermissionScope) ([]domain.VpnConfig, int64, error) {
+func (r *PostgresVpnConfigRepo) ListPaginated(namespaceID *uuid.UUID, limit, offset int, searchTerm string, vpnType string, authType string, createdBy *uuid.UUID, scope *domain.PermissionScope) ([]domain.VpnConfig, int64, error) {
 	var vpns []domain.VpnConfig
 	var total int64
 	db := applyScope(r.db, scope, "", "")
+
+	if namespaceID != nil {
+		db = db.Where("namespace_id = ?", namespaceID)
+	}
 
 	if searchTerm != "" {
 		s := "%" + searchTerm + "%"

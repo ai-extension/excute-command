@@ -147,13 +147,13 @@ func (s *DashboardService) getStats(namespaceID uuid.UUID, user *domain.User, is
 	// 4. Servers (Global resource but accessible)
 	var srvs []domain.Server
 	var srvTotal int64
-	srvs, srvTotal, _ = s.serverRepo.ListPaginated(5, 0, "", "", nil, nil, &srvScope)
+	srvs, srvTotal, _ = s.serverRepo.ListPaginated(nil, 5, 0, "", "", nil, nil, &srvScope)
 	stats.Servers = StatsResult{Total: srvTotal, Items: srvs}
 
 	// 5. VPNs (Global resource)
 	var vpns []domain.VpnConfig
 	var vpnTotal int64
-	vpns, vpnTotal, _ = s.vpnRepo.ListPaginated(5, 0, "", "", "", nil, &vpnScope)
+	vpns, vpnTotal, _ = s.vpnRepo.ListPaginated(nil, 5, 0, "", "", "", nil, &vpnScope)
 	stats.Vpns = StatsResult{Total: vpnTotal, Items: vpns}
 
 	// Users (Global resource)

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Layers, Plus, GripVertical, AlertCircle, Server, SlidersHorizontal, File, Trash2, RefreshCw, FileText, Terminal, Copy, Check, CheckCircle2, XCircle, Info, Repeat } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Layers, Plus, GripVertical, AlertCircle, Server, SlidersHorizontal, File, Trash2, RefreshCw, FileText, Terminal, Copy, Check, CheckCircle2, XCircle, Info, Repeat, X, Braces } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
@@ -7,6 +7,8 @@ import { Switch } from '../ui/switch';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 import { SearchableSelect } from '../SearchableSelect';
+import { FieldCombo } from '../FieldCombo';
+import { FilterBuilder } from '../FilterBuilder';
 import { cn, copyToClipboard, generateUUID } from '../../lib/utils';
 import {
     DropdownMenu,
@@ -19,7 +21,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
 import { ConfirmDialog } from '../ConfirmDialog';
 
-import { WorkflowGroup, WorkflowStep, Server as ServerType, Workflow } from '../../types';
+import { WorkflowGroup, WorkflowStep, Server as ServerType, Workflow, Dataset } from '../../types';
 import { API_BASE_URL } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 
@@ -56,6 +58,43 @@ const getMultiInputKeys = (dv: string | undefined): string[] => {
     return val.split(',').map(k => k.trim()).filter(Boolean);
 };
 
+// ---- Dataset step builders ----
+const parseDsColumns = (raw?: string): { name: string; type: string }[] => {
+    if (!raw) return [];
+    try { const v = JSON.parse(raw); return Array.isArray(v) ? v.filter((c: any) => c && c.name) : []; } catch { return []; }
+};
+
+const PAYLOAD_TYPES = ['string', 'number', 'bool', 'json'];
+type PayloadRow = { key: string; type: string; value: string };
+
+const inferPType = (v: any): string => typeof v === 'number' ? 'number' : typeof v === 'boolean' ? 'bool' : (v && typeof v === 'object') ? 'json' : 'string';
+const pValueToString = (v: any): string => v == null ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v);
+
+// Returns rows if the payload is an editable JSON object (or empty), or null for arrays / invalid JSON.
+const parsePayloadRows = (s?: string): PayloadRow[] | null => {
+    if (!s || !s.trim()) return [];
+    try {
+        const v = JSON.parse(s);
+        if (v && typeof v === 'object' && !Array.isArray(v)) {
+            return Object.keys(v).map(k => ({ key: k, type: inferPType(v[k]), value: pValueToString(v[k]) }));
+        }
+        return null;
+    } catch { return null; }
+};
+const serializePayloadRows = (rows: PayloadRow[]): string => {
+    const obj: Record<string, any> = {};
+    for (const r of rows) {
+        const k = r.key.trim();
+        if (!k) continue;
+        let val: any = r.value;
+        if (r.type === 'number') { const n = Number(r.value); val = Number.isNaN(n) ? r.value : n; }
+        else if (r.type === 'bool') val = r.value === 'true';
+        else if (r.type === 'json') { try { val = JSON.parse(r.value); } catch { val = r.value; } }
+        obj[k] = val;
+    }
+    return JSON.stringify(obj);
+};
+
 interface StepsBuilderTabProps {
     groups: Partial<WorkflowGroup>[];
     setGroups: (groups: Partial<WorkflowGroup>[]) => void;
@@ -83,6 +122,19 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
     const { apiFetch } = useAuth();
 
     const parentWf = allWorkflows.find(w => w.id === id);
+
+    // Datasets for the DATASET step picker (scoped to the parent workflow's namespace).
+    const [datasets, setDatasets] = useState<Dataset[]>([]);
+    // Per-step flag: edit payload as raw JSON instead of the field builder. Keyed by step id.
+    const [rawPayload, setRawPayload] = useState<Record<string, boolean>>({});
+    const nsId = parentWf?.namespace_id;
+    useEffect(() => {
+        if (!nsId) return;
+        apiFetch(`${API_BASE_URL}/namespaces/${nsId}/datasets?limit=15`)
+            .then(r => r.json())
+            .then(d => setDatasets(d.items || []))
+            .catch(() => { });
+    }, [nsId]);
     const parentInputs = parentWf?.inputs || [];
 
     return (
@@ -885,7 +937,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                             value={step.action_type || 'COMMAND'}
                                                                                             onChange={(e) => {
                                                                                                 const ng = [...groups];
-                                                                                                const newType = e.target.value as 'COMMAND' | 'WORKFLOW' | 'HTTP';
+                                                                                                const newType = e.target.value as 'COMMAND' | 'WORKFLOW' | 'HTTP' | 'DATASET' | 'CONVERT';
                                                                                                 ng[gIdx]!.steps![sIdx].action_type = newType;
                                                                                                 if (newType === 'COMMAND') {
                                                                                                     ng[gIdx]!.steps![sIdx].target_workflow_id = undefined;
@@ -894,6 +946,12 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                 if (newType === 'HTTP' && !ng[gIdx]!.steps![sIdx].http_method) {
                                                                                                     ng[gIdx]!.steps![sIdx].http_method = 'GET';
                                                                                                 }
+                                                                                                if (newType === 'DATASET' && !ng[gIdx]!.steps![sIdx].dataset_operation) {
+                                                                                                    ng[gIdx]!.steps![sIdx].dataset_operation = 'QUERY';
+                                                                                                }
+                                                                                                if (newType === 'CONVERT') {
+                                                                                                    ng[gIdx]!.steps![sIdx].output_format = 'json';
+                                                                                                }
                                                                                                 setGroups(ng);
                                                                                             }}
                                                                                             className="h-8 px-2 w-full text-xs font-semibold border border-border rounded-md bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 cursor-pointer"
@@ -901,6 +959,8 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                             <option value="COMMAND">Command</option>
                                                                                             <option value="WORKFLOW">Workflow</option>
                                                                                             <option value="HTTP">HTTP Request</option>
+                                                                                            <option value="DATASET">Dataset</option>
+                                                                                            <option value="CONVERT">Convert → JSON</option>
                                                                                         </select>
                                                                                     </div>
                                                                                     <div className="col-span-7 space-y-3">
@@ -1030,6 +1090,189 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                         Test HTTP
                                                                                                     </Button>
                                                                                                 </div>
+                                                                                            </div>
+                                                                                        ) : step.action_type === 'DATASET' ? (
+                                                                                            <div className="space-y-3 bg-muted/20 border border-border/50 rounded-md p-3">
+                                                                                                <label className="text-[10px] font-bold uppercase tracking-widest text-cyan-500">Dataset Operation</label>
+                                                                                                <div className="flex gap-2">
+                                                                                                    <select
+                                                                                                        value={step.dataset_operation || 'QUERY'}
+                                                                                                        onChange={(e) => {
+                                                                                                            const ng = [...groups];
+                                                                                                            ng[gIdx]!.steps![sIdx].dataset_operation = e.target.value as 'QUERY' | 'FIND_ONE' | 'INSERT' | 'UPDATE' | 'DELETE';
+                                                                                                            setGroups(ng);
+                                                                                                        }}
+                                                                                                        className="h-8 px-2 w-32 text-[10px] font-bold border border-border rounded-md bg-background text-foreground outline-none cursor-pointer"
+                                                                                                    >
+                                                                                                        <option value="QUERY">FIND MANY</option>
+                                                                                                        <option value="FIND_ONE">FIND ONE</option>
+                                                                                                        <option value="INSERT">INSERT</option>
+                                                                                                        <option value="UPDATE">UPDATE</option>
+                                                                                                        <option value="DELETE">DELETE</option>
+                                                                                                    </select>
+                                                                                                    <div className="flex-1">
+                                                                                                        <SearchableSelect
+                                                                                                            options={datasets.map(d => ({ label: `${d.name} (${d.key})`, value: d.id, searchTerms: `${d.name} ${d.key}` }))}
+                                                                                                            value={step.dataset_id || ''}
+                                                                                                            onValueChange={(val) => {
+                                                                                                                const ng = [...groups];
+                                                                                                                ng[gIdx]!.steps![sIdx].dataset_id = val || undefined;
+                                                                                                                setGroups(ng);
+                                                                                                            }}
+                                                                                                            isSearchable
+                                                                                                            placeholder="— Select dataset —"
+                                                                                                            searchPlaceholder="Search datasets..."
+                                                                                                            triggerClassName="h-8 px-2 w-full text-xs font-semibold border-border rounded-md bg-background text-foreground"
+                                                                                                        />
+                                                                                                    </div>
+                                                                                                </div>
+
+                                                                                                {(step.dataset_operation === 'QUERY' || step.dataset_operation === 'FIND_ONE' || step.dataset_operation === 'UPDATE' || step.dataset_operation === 'DELETE' || !step.dataset_operation) && (() => {
+                                                                                                    const dsCols = parseDsColumns(datasets.find(d => d.id === step.dataset_id)?.columns);
+                                                                                                    return (
+                                                                                                        <div className="space-y-1.5">
+                                                                                                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                                                                                                Filter {(step.dataset_operation === 'UPDATE' || step.dataset_operation === 'DELETE') && <span className="text-amber-500">(required)</span>}
+                                                                                                            </label>
+                                                                                                            <FilterBuilder
+                                                                                                                value={step.dataset_filter || ''}
+                                                                                                                onChange={(v) => {
+                                                                                                                    const ng = [...groups];
+                                                                                                                    ng[gIdx]!.steps![sIdx].dataset_filter = v;
+                                                                                                                    setGroups(ng);
+                                                                                                                }}
+                                                                                                                columns={[...dsCols.map(col => col.name), '_id']}
+                                                                                                            />
+                                                                                                            <p className="text-[9px] text-muted-foreground/50 font-mono">~ = contains · AND/OR + groups · value supports {"{{ input.x }}"} / {"{{ flow.. }}"}</p>
+                                                                                                        </div>
+                                                                                                    );
+                                                                                                })()}
+
+                                                                                                {(step.dataset_operation === 'INSERT' || step.dataset_operation === 'UPDATE') && (() => {
+                                                                                                    const stepKey = step.id || `${gIdx}-${sIdx}`;
+                                                                                                    const rows = parsePayloadRows(step.dataset_payload);
+                                                                                                    const isRaw = rawPayload[stepKey] || rows === null; // arrays / invalid JSON force raw
+                                                                                                    const dsCols = parseDsColumns(datasets.find(d => d.id === step.dataset_id)?.columns);
+                                                                                                    const writeRows = (next: PayloadRow[]) => {
+                                                                                                        const ng = [...groups];
+                                                                                                        ng[gIdx]!.steps![sIdx].dataset_payload = serializePayloadRows(next);
+                                                                                                        setGroups(ng);
+                                                                                                    };
+                                                                                                    return (
+                                                                                                        <div className="space-y-1.5">
+                                                                                                            <div className="flex items-center justify-between">
+                                                                                                                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                                                                                                    Payload {step.dataset_operation === 'UPDATE' && <span className="opacity-50">(merged)</span>}
+                                                                                                                </label>
+                                                                                                                <div className="flex items-center gap-1">
+                                                                                                                    {!isRaw && (
+                                                                                                                        <Button type="button" variant="outline" size="sm" className="h-6 text-[10px] px-2 gap-1 rounded-md"
+                                                                                                                            onClick={() => writeRows([...(rows || []), { key: dsCols.find(c => !(rows || []).some(r => r.key === c.name))?.name || '', type: 'string', value: '' }])}>
+                                                                                                                            <Plus className="w-3 h-3" /> Field
+                                                                                                                        </Button>
+                                                                                                                    )}
+                                                                                                                    <Button type="button" variant={isRaw ? 'default' : 'outline'} size="sm" className="h-6 text-[10px] px-2 gap-1 rounded-md"
+                                                                                                                        disabled={rows === null}
+                                                                                                                        onClick={() => setRawPayload({ ...rawPayload, [stepKey]: !rawPayload[stepKey] })}
+                                                                                                                        title={rows === null ? 'Array / invalid JSON — raw only' : 'Toggle raw JSON'}>
+                                                                                                                        <Braces className="w-3 h-3" /> JSON
+                                                                                                                    </Button>
+                                                                                                                </div>
+                                                                                                            </div>
+                                                                                                            {isRaw ? (
+                                                                                                                <Textarea
+                                                                                                                    value={step.dataset_payload || ''}
+                                                                                                                    onChange={(e) => {
+                                                                                                                        const ng = [...groups];
+                                                                                                                        ng[gIdx]!.steps![sIdx].dataset_payload = e.target.value;
+                                                                                                                        setGroups(ng);
+                                                                                                                    }}
+                                                                                                                    placeholder={step.dataset_operation === 'INSERT' ? '{"email":"{{ input.email }}"} or [ {...}, {...} ]' : '{"active": false}'}
+                                                                                                                    className="text-[10px] font-mono min-h-[60px] bg-background border-border"
+                                                                                                                />
+                                                                                                            ) : (rows && rows.length === 0) ? (
+                                                                                                                <p className="text-[9px] text-muted-foreground/50 italic">No fields. Click "Field" to add.</p>
+                                                                                                            ) : (
+                                                                                                                <div className="space-y-1.5">
+                                                                                                                    {(rows || []).map((r, ri) => (
+                                                                                                                        <div key={ri} className="flex items-center gap-1.5">
+                                                                                                                            <div className="w-28">
+                                                                                                                                <FieldCombo
+                                                                                                                                    value={r.key}
+                                                                                                                                    onChange={(v) => {
+                                                                                                                                        const col = dsCols.find(c => c.name === v);
+                                                                                                                                        writeRows((rows || []).map((x, i) => i === ri ? { ...x, key: v, type: col?.type || x.type } : x));
+                                                                                                                                    }}
+                                                                                                                                    options={dsCols.map(col => col.name)}
+                                                                                                                                    placeholder="key"
+                                                                                                                                    className="h-7 px-2 text-[11px] font-mono"
+                                                                                                                                />
+                                                                                                                            </div>
+                                                                                                                            <select value={r.type}
+                                                                                                                                onChange={(e) => writeRows((rows || []).map((x, i) => i === ri ? { ...x, type: e.target.value } : x))}
+                                                                                                                                className="h-7 px-1 w-16 text-[10px] font-bold border border-border rounded-md bg-background text-foreground outline-none cursor-pointer">
+                                                                                                                                {PAYLOAD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                                                                                                            </select>
+                                                                                                                            {r.type === 'bool' ? (
+                                                                                                                                <select value={r.value === 'true' ? 'true' : 'false'}
+                                                                                                                                    onChange={(e) => writeRows((rows || []).map((x, i) => i === ri ? { ...x, value: e.target.value } : x))}
+                                                                                                                                    className="h-7 px-2 flex-1 text-[11px] border border-border rounded-md bg-background text-foreground outline-none cursor-pointer">
+                                                                                                                                    <option value="true">true</option>
+                                                                                                                                    <option value="false">false</option>
+                                                                                                                                </select>
+                                                                                                                            ) : (
+                                                                                                                                <Input value={r.value} placeholder={r.type === 'json' ? '{"k":"v"}' : '{{ input.x }} / value'}
+                                                                                                                                    onChange={(e) => writeRows((rows || []).map((x, i) => i === ri ? { ...x, value: e.target.value } : x))}
+                                                                                                                                    className="h-7 flex-1 text-[11px] font-mono bg-background border-border" />
+                                                                                                                            )}
+                                                                                                                            <Button type="button" variant="ghost" size="icon" className="h-7 w-7 rounded-md hover:bg-destructive/10 hover:text-destructive"
+                                                                                                                                onClick={() => writeRows((rows || []).filter((_, i) => i !== ri))}>
+                                                                                                                                <X className="w-3.5 h-3.5" />
+                                                                                                                            </Button>
+                                                                                                                        </div>
+                                                                                                                    ))}
+                                                                                                                </div>
+                                                                                                            )}
+                                                                                                        </div>
+                                                                                                    );
+                                                                                                })()}
+
+                                                                                                {(step.dataset_operation === 'QUERY' || !step.dataset_operation) && (
+                                                                                                    <div className="space-y-1">
+                                                                                                        <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Limit (0 = default 10k)</label>
+                                                                                                        <Input
+                                                                                                            type="number"
+                                                                                                            value={step.dataset_limit ?? 0}
+                                                                                                            onChange={(e) => {
+                                                                                                                const ng = [...groups];
+                                                                                                                ng[gIdx]!.steps![sIdx].dataset_limit = parseInt(e.target.value) || 0;
+                                                                                                                setGroups(ng);
+                                                                                                            }}
+                                                                                                            className="h-8 w-32 text-xs font-mono bg-background border-border"
+                                                                                                        />
+                                                                                                    </div>
+                                                                                                )}
+
+                                                                                                <p className="text-[9px] text-cyan-500/70 font-medium pt-1 border-t border-border/50">
+                                                                                                    Result is captured to <code className="bg-cyan-500/10 px-1 rounded">{`{{ flow.${group.key || 'group'}.step.${step.action_key || 'key'} }}`}</code> (set Action Key + Format=JSON).
+                                                                                                </p>
+                                                                                            </div>
+                                                                                        ) : step.action_type === 'CONVERT' ? (
+                                                                                            <div className="space-y-3 bg-muted/20 border border-border/50 rounded-md p-3">
+                                                                                                <label className="text-[10px] font-bold uppercase tracking-widest text-amber-500">Convert Source → JSON</label>
+                                                                                                <Textarea
+                                                                                                    value={step.convert_source || ''}
+                                                                                                    onChange={(e) => {
+                                                                                                        const ng = [...groups];
+                                                                                                        ng[gIdx]!.steps![sIdx].convert_source = e.target.value;
+                                                                                                        setGroups(ng);
+                                                                                                    }}
+                                                                                                    placeholder={'{{ flow.grp.step.raw }}  or  {{ input.payload }}'}
+                                                                                                    className="text-[10px] font-mono min-h-[80px] bg-background border-border"
+                                                                                                />
+                                                                                                <p className="text-[9px] text-muted-foreground/60 font-mono">
+                                                                                                    Parses the rendered text as JSON (else wraps as a JSON string). Result → <code className="bg-amber-500/10 px-1 rounded">{`{{ flow.${group.key || 'group'}.step.${step.action_key || 'key'} }}`}</code> (set Action Key + Format=JSON).
+                                                                                                </p>
                                                                                             </div>
                                                                                         ) : (
                                                                                             <div className="space-y-2">

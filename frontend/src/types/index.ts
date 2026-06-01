@@ -45,7 +45,7 @@ export interface WorkflowStep {
     group_id: string;
     server_id?: string;
     name: string;
-    action_type: 'COMMAND' | 'WORKFLOW' | 'HTTP';
+    action_type: 'COMMAND' | 'WORKFLOW' | 'HTTP' | 'DATASET' | 'CONVERT';
     action_key?: string;
     command_text: string;
     http_url?: string;
@@ -53,6 +53,12 @@ export interface WorkflowStep {
     http_headers?: string;
     http_body?: string;
     output_format?: 'json' | 'string';
+    dataset_id?: string;
+    dataset_operation?: 'QUERY' | 'FIND_ONE' | 'INSERT' | 'UPDATE' | 'DELETE';
+    dataset_filter?: string;
+    dataset_payload?: string;
+    dataset_limit?: number;
+    convert_source?: string;
     target_workflow_id?: string;
     target_workflow_inputs?: string; // JSON string
     wait_to_finish: boolean;
@@ -100,6 +106,33 @@ export interface Tag {
     description: string;
     created_by?: string;
     created_by_username?: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface DatasetColumn {
+    name: string;
+    type: string; // string | number | bool | json (UI hint only)
+    default?: string; // default value pre-filled in the record form
+}
+
+export interface Dataset {
+    id: string;
+    namespace_id: string;
+    key: string;
+    name: string;
+    description: string;
+    columns: string; // JSON string of DatasetColumn[]
+    created_by?: string;
+    created_by_username?: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface DatasetRecord {
+    id: string;
+    dataset_id: string;
+    data: string; // JSON string
     created_at: string;
     updated_at: string;
 }
@@ -205,7 +238,7 @@ export interface WorkflowInput {
     workflow_id: string;
     key: string;
     label: string;
-    type: 'input' | 'textarea' | 'number' | 'select' | 'multi-select' | 'multi-input' | 'file';
+    type: 'input' | 'textarea' | 'number' | 'select' | 'multi-select' | 'multi-input' | 'file' | 'dataset-select' | 'dataset-multi-select';
     default_value: string;
     collapse_initially?: boolean;
     required: boolean;
@@ -281,8 +314,43 @@ export interface PageWorkflow {
 }
 
 export type PageWidgetSize = 'full' | 'half' | 'third';
-export type PageWidgetType = 'TERMINAL' | 'ENDPOINT' | 'LINK' | 'SECTION' | 'TEXT' | 'IMAGE' | 'IFRAME' | 'STATUS' | 'TABLE';
+export type PageWidgetType = 'TERMINAL' | 'ENDPOINT' | 'LINK' | 'SECTION' | 'TEXT' | 'IMAGE' | 'IFRAME' | 'STATUS' | 'TABLE' | 'CHART' | 'METRIC';
 export type PageWidgetReload = 'realtime' | '5' | '10' | '30' | '60';
+export type ChartKind = 'line' | 'bar' | 'pie' | 'area';
+export type AggregateFn = 'count' | 'sum' | 'avg' | 'min' | 'max';
+
+// SelectAggregation: one aggregation column to compute per bucket. `field` is the
+// numeric field to reduce (ignored when fn === 'count'); `label` is the display name
+// used on chart legends/axes and falls back to `${fn}(${field})` when absent.
+export interface SelectAggregation {
+    id?: string;
+    field?: string;
+    fn: AggregateFn;
+    label?: string;
+}
+
+// DatasetSource: dataset-backed widget config. The shape mirrors the backend
+// AggregateRequest. `columns` is TABLE-only.
+//
+// New multi-field shape (preferred):
+//   group_bys: ['region', 'channel']  →  composite key per bucket
+//   selects:   [{fn:'sum',field:'amount',label:'Total'}, {fn:'count',label:'Orders'}]
+//
+// Legacy single-field fields (group_by, metric, fn) are still read for backward
+// compatibility with existing widgets; on save we mirror them into the arrays.
+export interface DatasetSource {
+    dataset_id: string;
+    filter: string;            // FilterBuilder tree JSON, applied server-side
+    group_bys?: string[];
+    selects?: SelectAggregation[];
+    // Legacy single-field
+    group_by?: string;
+    metric?: string;
+    fn?: AggregateFn;
+    limit?: number;
+    sort?: 'value_desc' | 'value_asc' | 'key_asc' | 'key_desc';
+    columns?: string[];        // TABLE: which record fields to render as columns
+}
 
 export interface PageWidget {
     id: string;
@@ -320,6 +388,18 @@ export interface PageWidget {
     // TABLE-specific
     table_headers?: string[];
     table_rows?: string[][];
+    // Dataset-backed widgets (TABLE | CHART | METRIC): when 'dataset', read records via
+    // /datasets/:id/aggregate using `dataset`. Otherwise widget uses its static fields.
+    data_source?: 'static' | 'dataset';
+    dataset?: DatasetSource;
+    // CHART-specific
+    chart_kind?: ChartKind;
+    chart_static_data?: string;   // JSON array of {key,value} for data_source==='static'
+    // METRIC-specific
+    metric_label?: string;
+    metric_unit?: string;
+    metric_format?: 'number' | 'percent' | 'currency';
+    metric_static_value?: string; // when data_source==='static'
     // SECTION nesting — id of parent SECTION widget (top-level when undefined)
     parent_id?: string;
 }
@@ -333,6 +413,8 @@ export interface Page {
     namespace_id: string;
     title: string;
     description: string;
+    parent_id?: string | null;
+    parent?: { id: string; title: string; slug: string; is_public?: boolean } | null;
     slug: string;
     is_public: boolean;
     password?: string;

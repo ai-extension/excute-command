@@ -455,13 +455,32 @@ func (h *WorkflowHandler) GetExecutionLogs(c *gin.Context) {
 		return
 	}
 
+	userVal, _ := c.Get("user")
+	user := userVal.(*domain.User)
+
+	// Enforce per-execution access BEFORE serving any log file. This must run for EVERY
+	// branch (including step_id) — otherwise the log files would be served without a scope
+	// check, since the /executions/:exec_id route is not item-scoped by the RBAC middleware.
+	execution, err := h.service.GetExecution(id, user)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "execution not found"})
+		return
+	}
+
 	stepID := c.Query("step_id")
 	groupID := c.Query("group_id")
 	cwd, _ := os.Getwd()
 	execLogDir := filepath.Join(cwd, "data", "logs", "executions", id.String())
 
 	if stepID != "" {
-		path := filepath.Join(execLogDir, stepID+".log")
+		// step_id must be a UUID; reject anything else so it cannot traverse outside
+		// execLogDir (e.g. "../../other-exec/step").
+		stepUUID, err := uuid.Parse(stepID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid step id"})
+			return
+		}
+		path := filepath.Join(execLogDir, stepUUID.String()+".log")
 		if _, err := os.Stat(path); err == nil {
 			c.File(path)
 			return
@@ -470,15 +489,6 @@ func (h *WorkflowHandler) GetExecutionLogs(c *gin.Context) {
 		groupUUID, err := uuid.Parse(groupID)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid group id"})
-			return
-		}
-
-		userVal, _ := c.Get("user")
-		user := userVal.(*domain.User)
-
-		execution, err := h.service.GetExecution(id, user)
-		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "execution not found"})
 			return
 		}
 
@@ -494,16 +504,6 @@ func (h *WorkflowHandler) GetExecutionLogs(c *gin.Context) {
 		c.String(http.StatusOK, logs)
 		return
 	} else {
-		userVal, _ := c.Get("user")
-		user := userVal.(*domain.User)
-
-		// Global Trace Merge Logic
-		execution, err := h.service.GetExecution(id, user)
-		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "execution not found"})
-			return
-		}
-
 		mainLogPath := filepath.Join(execLogDir, "workflow.log")
 		if _, err := os.Stat(mainLogPath); err == nil {
 			c.File(mainLogPath)

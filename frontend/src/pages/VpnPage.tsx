@@ -24,6 +24,7 @@ import { SearchableSelect } from '../components/SearchableSelect';
 import { Textarea } from "../components/ui/textarea";
 import { Label } from "../components/ui/label";
 import { useAuth } from '../context/AuthContext';
+import { useNamespace } from '../context/NamespaceContext';
 import { API_BASE_URL } from '../lib/api';
 import { VpnConfig } from '../types';
 import { Pagination } from '../components/Pagination';
@@ -32,6 +33,7 @@ import { useUsers } from '../hooks/useUsers';
 
 const VpnPage = () => {
     const { apiFetch } = useAuth();
+    const { activeNamespace } = useNamespace();
     const [vpns, setVpns] = useState<VpnConfig[]>([]);
     const [total, setTotal] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
@@ -65,6 +67,7 @@ const VpnPage = () => {
     const [offset, setOffset] = useState(0);
 
     const fetchVpns = async (searchOverride?: string, filtersOverride?: { [key: string]: string }) => {
+        if (!activeNamespace) return;
         setIsLoading(true);
         setError(null);
         try {
@@ -72,7 +75,7 @@ const VpnPage = () => {
             const currentAuthType = filtersOverride?.authType !== undefined ? filtersOverride.authType : authTypeFilter;
             const currentCreatedBy = filtersOverride?.createdBy !== undefined ? filtersOverride.createdBy : selectedCreatedBy;
 
-            let url = `${API_BASE_URL}/vpns?limit=${limit}&offset=${offset}`;
+            let url = `${API_BASE_URL}/namespaces/${activeNamespace.id}/vpns?limit=${limit}&offset=${offset}`;
             if (currentAuthType !== 'ALL') url += `&auth_type=${currentAuthType}`;
             if (currentCreatedBy) url += `&created_by=${currentCreatedBy}`;
             if (currentSearch) url += `&search=${encodeURIComponent(currentSearch)}`;
@@ -103,7 +106,7 @@ const VpnPage = () => {
 
     useEffect(() => {
         fetchVpns();
-    }, [offset, limit, searchTerm, authTypeFilter, selectedCreatedBy]);
+    }, [activeNamespace, offset, limit, searchTerm, authTypeFilter, selectedCreatedBy]);
 
     const handleApplyFilter = (search: string, filters: { [key: string]: any }) => {
         setSearchTerm(search);
@@ -141,7 +144,7 @@ const VpnPage = () => {
         try {
             const url = editingVpn
                 ? `${API_BASE_URL}/vpns/${editingVpn.id}`
-                : `${API_BASE_URL}/vpns`;
+                : `${API_BASE_URL}/namespaces/${activeNamespace?.id}/vpns`;
             const method = editingVpn ? 'PUT' : 'POST';
 
             const response = await apiFetch(url, {

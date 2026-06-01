@@ -31,6 +31,7 @@ type WorkflowExecutor struct {
 	inputRepo     domain.WorkflowInputRepository
 	execRepo      domain.WorkflowExecutionRepository
 	globalVarRepo domain.GlobalVariableRepository
+	datasetRepo   domain.DatasetRepository
 	serverService *ServerService
 	hub           *Hub
 	activeExecs   sync.Map // map[uuid.UUID]context.CancelFunc
@@ -47,6 +48,7 @@ func NewWorkflowExecutor(
 	serverService *ServerService,
 	hub *Hub,
 	globalVarRepo domain.GlobalVariableRepository,
+	datasetRepo domain.DatasetRepository,
 ) *WorkflowExecutor {
 	// Register custom pongo2 filters
 	pongo2.RegisterFilter("json", func(in *pongo2.Value, param *pongo2.Value) (*pongo2.Value, *pongo2.Error) {
@@ -223,6 +225,7 @@ func NewWorkflowExecutor(
 		inputRepo:     inputRepo,
 		execRepo:      execRepo,
 		globalVarRepo: globalVarRepo,
+		datasetRepo:   datasetRepo,
 		serverService: serverService,
 		hub:           hub,
 		execDoneChans: sync.Map{},
@@ -1299,6 +1302,20 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 	// Dispatch based on action type
 	if step.ActionType == "WORKFLOW" {
 		output, err = e.runWorkflowStep(ctx, step, inputs, variables, flowData, namespaceID, mainLogFile, stepLogFile, workflowID, executionID, user, fromExecutionID)
+	} else if step.ActionType == "DATASET" {
+		output, err = e.runDatasetStep(step, inputs, variables, flowData, namespaceID, user, item, index, mainLogFile, stepLogFile, workflowID, executionID)
+		if err != nil {
+			errMsg := fmt.Sprintf("\033[1;31m✖ Dataset step error: %v\033[0m\n", err)
+			fmt.Fprint(mainLogFile, errMsg)
+			fmt.Fprint(stepLogFile, errMsg)
+		}
+	} else if step.ActionType == "CONVERT" {
+		output, err = e.runConvertStep(step, inputs, variables, flowData, namespaceID, user, item, index, mainLogFile, stepLogFile, workflowID, executionID)
+		if err != nil {
+			errMsg := fmt.Sprintf("\033[1;31m✖ Convert step error: %v\033[0m\n", err)
+			fmt.Fprint(mainLogFile, errMsg)
+			fmt.Fprint(stepLogFile, errMsg)
+		}
 	} else {
 		targetServerID := step.ServerID
 		if targetServerID == uuid.Nil {
@@ -1530,6 +1547,254 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 	e.execRepo.CreateStepResult(stepExec)
 
 	return nil
+}
+
+// runConvertStep parses a templated text source into JSON. If the rendered text is valid
+// JSON it is normalized; otherwise it is wrapped as a JSON string so the result is always
+// valid JSON and usable by later steps via {{ flow.<group>.step.<action_key> }}.
+func (e *WorkflowExecutor) runConvertStep(step *domain.WorkflowStep, inputs map[string]string, variables []domain.WorkflowVariable, flowData map[string]interface{}, namespaceID uuid.UUID, user *domain.User, item interface{}, index int, mainLogFile *os.File, stepLogFile *os.File, workflowID uuid.UUID, executionID uuid.UUID) (string, error) {
+	pcontext := e.getInterpolationContext(inputs, variables, flowData, namespaceID, user, item, index, uuid.Nil, executionID)
+	rendered, err := e.renderTemplate(step.ConvertSource, pcontext)
+	if err != nil {
+		return "", fmt.Errorf("source render error: %w", err)
+	}
+
+	logf := func(format string, a ...interface{}) {
+		msg := fmt.Sprintf(format, a...)
+		fmt.Fprint(mainLogFile, msg)
+		fmt.Fprint(stepLogFile, msg)
+		e.hub.BroadcastLog(workflowID.String(), executionID.String(), msg)
+	}
+
+	trimmed := strings.TrimSpace(rendered)
+	if trimmed == "" {
+		logf("\033[90m$ CONVERT → null (empty source)\033[0m\n")
+		return "null", nil
+	}
+
+	// Parse only if the WHOLE source is one JSON value (dec.More() guards against
+	// trailing junk like "5 hello" being silently truncated to 5).
+	var v interface{}
+	dec := json.NewDecoder(strings.NewReader(trimmed))
+	dec.UseNumber()
+	if derr := dec.Decode(&v); derr == nil && !dec.More() {
+		b, _ := json.Marshal(v)
+		logf("\033[90m$ CONVERT → JSON (parsed)\033[0m\n")
+		return string(b), nil
+	}
+
+	// Not valid JSON → wrap the trimmed text as a JSON string.
+	b, _ := json.Marshal(trimmed)
+	logf("\033[90m$ CONVERT → JSON string (text wrapped)\033[0m\n")
+	return string(b), nil
+}
+
+// defaultDatasetQueryCap bounds how many records a QUERY loads when DatasetLimit is 0.
+const defaultDatasetQueryCap = 10000
+
+// runDatasetStep handles a step of action_type=DATASET. It runs in the orchestrator (no shell),
+// performing QUERY / INSERT / UPDATE / DELETE against a dataset's records. The returned string is
+// JSON and — when the step has an action_key and output_format=json — is captured into flowData
+// so later steps can read it via {{ flow.<group>.step.<action_key> }}.
+func (e *WorkflowExecutor) runDatasetStep(step *domain.WorkflowStep, inputs map[string]string, variables []domain.WorkflowVariable, flowData map[string]interface{}, namespaceID uuid.UUID, user *domain.User, item interface{}, index int, mainLogFile *os.File, stepLogFile *os.File, workflowID uuid.UUID, executionID uuid.UUID) (string, error) {
+	if e.datasetRepo == nil {
+		return "", fmt.Errorf("dataset repository not configured")
+	}
+	if step.DatasetID == nil {
+		return "", fmt.Errorf("dataset step has no dataset selected")
+	}
+
+	scope := domain.PermissionScope{IsGlobal: true}
+	ds, err := e.datasetRepo.GetByID(*step.DatasetID, &scope)
+	if err != nil {
+		return "", fmt.Errorf("dataset not found: %w", err)
+	}
+
+	pcontext := e.getInterpolationContext(inputs, variables, flowData, namespaceID, user, item, index, uuid.Nil, executionID)
+
+	// Render filter and payload templates so they can reference inputs / prior step output.
+	renderedFilter, _ := e.renderTemplate(step.DatasetFilter, pcontext)
+	renderedFilter = strings.TrimSpace(renderedFilter)
+	renderedPayload, _ := e.renderTemplate(step.DatasetPayload, pcontext)
+
+	op := strings.ToUpper(strings.TrimSpace(step.DatasetOperation))
+
+	logf := func(format string, a ...interface{}) {
+		msg := fmt.Sprintf(format, a...)
+		fmt.Fprint(mainLogFile, msg)
+		fmt.Fprint(stepLogFile, msg)
+		e.hub.BroadcastLog(workflowID.String(), executionID.String(), msg)
+	}
+
+	logf("\033[90m$ DATASET %s on \"%s\" (key=%s)\033[0m\n", op, ds.Name, ds.Key)
+
+	recordToMap := func(r domain.DatasetRecord) map[string]interface{} {
+		m := map[string]interface{}{}
+		if r.Data != "" {
+			dec := json.NewDecoder(strings.NewReader(r.Data))
+			dec.UseNumber()
+			_ = dec.Decode(&m)
+		}
+		m["_id"] = r.ID.String()
+		return m
+	}
+
+	switch op {
+	case "QUERY":
+		recs, err := e.datasetRepo.AllRecords(*step.DatasetID)
+		if err != nil {
+			return "", err
+		}
+		limit := step.DatasetLimit
+		if limit <= 0 {
+			limit = defaultDatasetQueryCap
+		}
+		out := []map[string]interface{}{}
+		for _, r := range recs {
+			m := recordToMap(r)
+			if evalFilterString(m, renderedFilter) {
+				out = append(out, m)
+				if len(out) >= limit {
+					break
+				}
+			}
+		}
+		logf("\033[90m→ %d record(s) matched\033[0m\n", len(out))
+		b, _ := json.Marshal(out)
+		return string(b), nil
+
+	case "FIND_ONE":
+		recs, err := e.datasetRepo.AllRecords(*step.DatasetID)
+		if err != nil {
+			return "", err
+		}
+		for _, r := range recs {
+			m := recordToMap(r)
+			if evalFilterString(m, renderedFilter) {
+				logf("\033[90m→ 1 record matched\033[0m\n")
+				b, _ := json.Marshal(m)
+				return string(b), nil
+			}
+		}
+		logf("\033[90m→ no record matched\033[0m\n")
+		return "null", nil
+
+	case "INSERT":
+		objs, err := parseDatasetPayload(renderedPayload)
+		if err != nil {
+			return "", err
+		}
+		if len(objs) == 0 {
+			return "", fmt.Errorf("INSERT requires a payload")
+		}
+		created := []map[string]interface{}{}
+		for _, obj := range objs {
+			b, _ := json.Marshal(obj)
+			rec := &domain.DatasetRecord{ID: uuid.New(), DatasetID: *step.DatasetID, Data: string(b)}
+			if err := e.datasetRepo.CreateRecord(rec); err != nil {
+				return "", err
+			}
+			obj["_id"] = rec.ID.String()
+			created = append(created, obj)
+		}
+		logf("\033[90m→ inserted %d record(s)\033[0m\n", len(created))
+		b, _ := json.Marshal(created)
+		return string(b), nil
+
+	case "UPDATE":
+		if filterIsEmpty(renderedFilter) {
+			return "", fmt.Errorf("UPDATE requires a non-empty filter")
+		}
+		objs, err := parseDatasetPayload(renderedPayload)
+		if err != nil {
+			return "", err
+		}
+		if len(objs) != 1 {
+			return "", fmt.Errorf("UPDATE payload must be a single JSON object")
+		}
+		patch := objs[0]
+		recs, err := e.datasetRepo.AllRecords(*step.DatasetID)
+		if err != nil {
+			return "", err
+		}
+		ids := []string{}
+		for _, r := range recs {
+			m := recordToMap(r)
+			if !evalFilterString(m, renderedFilter) {
+				continue
+			}
+			// Merge patch into existing data (keep _id out of stored data).
+			delete(m, "_id")
+			for k, v := range patch {
+				m[k] = v
+			}
+			b, _ := json.Marshal(m)
+			r.Data = string(b)
+			if err := e.datasetRepo.UpdateRecord(&r); err != nil {
+				return "", err
+			}
+			ids = append(ids, r.ID.String())
+		}
+		logf("\033[90m→ updated %d record(s)\033[0m\n", len(ids))
+		b, _ := json.Marshal(map[string]interface{}{"affected": len(ids), "ids": ids})
+		return string(b), nil
+
+	case "DELETE":
+		if filterIsEmpty(renderedFilter) {
+			return "", fmt.Errorf("DELETE requires a non-empty filter")
+		}
+		recs, err := e.datasetRepo.AllRecords(*step.DatasetID)
+		if err != nil {
+			return "", err
+		}
+		ids := []string{}
+		for _, r := range recs {
+			m := recordToMap(r)
+			if !evalFilterString(m, renderedFilter) {
+				continue
+			}
+			if err := e.datasetRepo.DeleteRecord(r.ID); err != nil {
+				return "", err
+			}
+			ids = append(ids, r.ID.String())
+		}
+		logf("\033[90m→ deleted %d record(s)\033[0m\n", len(ids))
+		b, _ := json.Marshal(map[string]interface{}{"affected": len(ids), "ids": ids})
+		return string(b), nil
+
+	default:
+		return "", fmt.Errorf("unknown dataset operation: %q", step.DatasetOperation)
+	}
+}
+
+// parseDatasetPayload accepts a JSON object or array of objects and returns a slice of maps.
+func parseDatasetPayload(raw string) ([]map[string]interface{}, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, nil
+	}
+	dec := json.NewDecoder(strings.NewReader(raw))
+	dec.UseNumber()
+	var v interface{}
+	if err := dec.Decode(&v); err != nil {
+		return nil, fmt.Errorf("payload is not valid JSON: %w", err)
+	}
+	switch t := v.(type) {
+	case map[string]interface{}:
+		return []map[string]interface{}{t}, nil
+	case []interface{}:
+		out := []map[string]interface{}{}
+		for _, e := range t {
+			if m, ok := e.(map[string]interface{}); ok {
+				out = append(out, m)
+			} else {
+				return nil, fmt.Errorf("payload array must contain only JSON objects")
+			}
+		}
+		return out, nil
+	default:
+		return nil, fmt.Errorf("payload must be a JSON object or array of objects")
+	}
 }
 
 // runWorkflowStep handles a step of action_type=WORKFLOW, running a target workflow either
@@ -2057,69 +2322,49 @@ func matchConditions(item map[string]interface{}, pairs []string) bool {
 		k = strings.TrimSpace(parts[0])
 		v = strings.TrimSpace(parts[1])
 
-		itemValRaw := item[k]
-		itemVal := fmt.Sprintf("%v", itemValRaw)
-
-		// Numeric comparison attempt
-		fItem, err1 := strconv.ParseFloat(itemVal, 64)
-		fParam, err2 := strconv.ParseFloat(v, 64)
-
-		isNumeric := err1 == nil && err2 == nil
-
-		switch op {
-		case "=":
-			if itemVal != v {
-				return false
-			}
-		case "!=":
-			if itemVal == v {
-				return false
-			}
-		case ">":
-			if isNumeric {
-				if fItem <= fParam {
-					return false
-				}
-			} else {
-				if itemVal <= v {
-					return false
-				}
-			}
-		case "<":
-			if isNumeric {
-				if fItem >= fParam {
-					return false
-				}
-			} else {
-				if itemVal >= v {
-					return false
-				}
-			}
-		case ">=":
-			if isNumeric {
-				if fItem < fParam {
-					return false
-				}
-			} else {
-				if itemVal < v {
-					return false
-				}
-			}
-		case "<=":
-			if isNumeric {
-				if fItem > fParam {
-					return false
-				}
-			} else {
-				if itemVal > v {
-					return false
-				}
-			}
-		case "~": // Contains
-			if !strings.Contains(itemVal, v) {
-				return false
-			}
+		if !matchOne(item, k, op, v) {
+			return false
 		}
+	}
+	return true
+}
+
+// matchOne evaluates a single condition against a record field. Operator and value are
+// explicit (no re-parsing), so values may safely contain operator characters.
+func matchOne(item map[string]interface{}, field, op, value string) bool {
+	itemVal := fmt.Sprintf("%v", item[field])
+
+	fItem, err1 := strconv.ParseFloat(itemVal, 64)
+	fParam, err2 := strconv.ParseFloat(value, 64)
+	isNumeric := err1 == nil && err2 == nil
+
+	switch op {
+	case "=":
+		return itemVal == value
+	case "!=":
+		return itemVal != value
+	case ">":
+		if isNumeric {
+			return fItem > fParam
+		}
+		return itemVal > value
+	case "<":
+		if isNumeric {
+			return fItem < fParam
+		}
+		return itemVal < value
+	case ">=":
+		if isNumeric {
+			return fItem >= fParam
+		}
+		return itemVal >= value
+	case "<=":
+		if isNumeric {
+			return fItem <= fParam
+		}
+		return itemVal <= value
+	case "~":
+		return strings.Contains(itemVal, value)
 	}
 	return true
 }

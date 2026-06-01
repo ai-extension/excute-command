@@ -4,6 +4,7 @@ import { XCircle } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
+import { useNamespace } from '../context/NamespaceContext';
 import { API_BASE_URL } from '../lib/api';
 import { Server, VpnConfig } from '../types';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -17,6 +18,7 @@ import { ServerTerminalDialog } from '../components/servers/ServerTerminalDialog
 
 const ServerPage = () => {
     const { apiFetch } = useAuth();
+    const { activeNamespace } = useNamespace();
     const [servers, setServers] = useState<Server[]>([]);
     const [total, setTotal] = useState(0);
     const [vpns, setVpns] = useState<VpnConfig[]>([]);
@@ -55,6 +57,7 @@ const ServerPage = () => {
     const [metrics, setMetrics] = useState<{ [key: string]: any }>({});
 
     const fetchServers = async (searchOverride?: string, filtersOverride?: { [key: string]: string }) => {
+        if (!activeNamespace) return;
         setIsLoading(true);
         setError(null);
         try {
@@ -63,7 +66,7 @@ const ServerPage = () => {
             const currentVpn = filtersOverride?.vpn !== undefined ? filtersOverride.vpn : vpnFilter;
             const currentUser = filtersOverride?.user !== undefined ? filtersOverride.user : selectedUser;
 
-            let url = `${API_BASE_URL}/servers?limit=${limit}&offset=${offset}`;
+            let url = `${API_BASE_URL}/namespaces/${activeNamespace.id}/servers?limit=${limit}&offset=${offset}`;
             if (currentAuthType !== 'ALL') url += `&auth_type=${currentAuthType}`;
             if (currentVpn !== 'ALL' && currentVpn !== 'NONE') {
                 url += `&vpn_id=${currentVpn}`;
@@ -118,8 +121,9 @@ const ServerPage = () => {
     };
 
     const fetchVpns = async (search?: string) => {
+        if (!activeNamespace) return;
         try {
-            let url = `${API_BASE_URL}/vpns?limit=15`;
+            let url = `${API_BASE_URL}/namespaces/${activeNamespace.id}/vpns?limit=15`;
             if (search) url += `&search=${encodeURIComponent(search)}`;
             const response = await apiFetch(url);
             if (!response.ok) return;
@@ -133,11 +137,11 @@ const ServerPage = () => {
 
     useEffect(() => {
         fetchVpns();
-    }, []);
+    }, [activeNamespace]);
 
     useEffect(() => {
         fetchServers();
-    }, [offset, limit, searchTerm, authTypeFilter, vpnFilter, selectedUser]);
+    }, [activeNamespace, offset, limit, searchTerm, authTypeFilter, vpnFilter, selectedUser]);
 
     useEffect(() => {
         if (servers.length > 0) {
@@ -181,7 +185,7 @@ const ServerPage = () => {
         try {
             const url = editingServer
                 ? `${API_BASE_URL}/servers/${editingServer.id}`
-                : `${API_BASE_URL}/servers`;
+                : `${API_BASE_URL}/namespaces/${activeNamespace?.id}/servers`;
             const method = editingServer ? 'PUT' : 'POST';
 
             const payload = { ...formData };
