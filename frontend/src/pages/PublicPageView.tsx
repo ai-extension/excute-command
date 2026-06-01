@@ -435,10 +435,12 @@ const PublicPageView = () => {
                             {page?.parent?.slug && (
                                 <a
                                     href={`/public/pages/${page.parent.slug}`}
-                                    className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors"
+                                    className="flex items-center gap-2 text-muted-foreground hover:text-amber-500 transition-colors group"
                                     title={`Back to ${page.parent.title || 'parent page'}`}
                                 >
-                                    <Home className="w-4 h-4" />
+                                    <span className="flex items-center justify-center w-7 h-7 rounded-full bg-amber-500/10 text-amber-500 group-hover:bg-amber-500/20 transition-colors">
+                                        <Home className="w-4 h-4" />
+                                    </span>
                                     <span className="text-xs font-black uppercase">{page.parent.title || 'Parent page'}</span>
                                 </a>
                             )}
