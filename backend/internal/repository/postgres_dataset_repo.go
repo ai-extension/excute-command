@@ -1,6 +1,9 @@
 package repository
 
 import (
+	"encoding/json"
+	"sort"
+
 	"github.com/google/uuid"
 	"github.com/user/csm-backend/internal/domain"
 	"gorm.io/gorm"
@@ -145,6 +148,55 @@ func (r *PostgresDatasetRepo) CreateRecord(rec *domain.DatasetRecord) error {
 
 func (r *PostgresDatasetRepo) UpdateRecord(rec *domain.DatasetRecord) error {
 	return r.db.Save(rec).Error
+}
+
+// buildIncrementAndSetSQL constructs a single UPDATE statement that merges setPatch
+// (top-level jsonb concat) and applies numeric deltas to each named field, reading the
+// current value from the pre-update `data` column so it is race-free. Field names and
+// deltas are passed as bound parameters (never interpolated). Returns the SQL and args.
+func buildIncrementAndSetSQL(datasetID uuid.UUID, ids []uuid.UUID, setPatch map[string]interface{}, deltas map[string]float64) (string, []interface{}, error) {
+	args := []interface{}{}
+
+	// Base: existing data merged with the constant set-patch (same for every matched row).
+	expr := "COALESCE(data, '{}'::jsonb)"
+	if len(setPatch) > 0 {
+		b, err := json.Marshal(setPatch)
+		if err != nil {
+			return "", nil, err
+		}
+		expr += " || ?::jsonb"
+		args = append(args, string(b))
+	}
+
+	// Wrap each inc field. COALESCE((data->>field)::numeric, 0) reads the OLD value, so a
+	// missing field counts as 0. Sorted for a deterministic statement (testability).
+	keys := make([]string, 0, len(deltas))
+	for k := range deltas {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		expr = "jsonb_set(" + expr + ", ARRAY[?]::text[], (COALESCE((data->>?)::numeric, 0) + (?)::numeric)::text::jsonb)"
+		args = append(args, k, k, deltas[k])
+	}
+
+	sql := "UPDATE dataset_records SET data = " + expr + ", updated_at = now() WHERE id IN ? AND dataset_id = ?"
+	args = append(args, ids, datasetID)
+	return sql, args, nil
+}
+
+// IncrementAndSet atomically applies setPatch + numeric deltas to the given records in one
+// statement. See buildIncrementAndSetSQL. A no-op (empty ids) returns 0, nil.
+func (r *PostgresDatasetRepo) IncrementAndSet(datasetID uuid.UUID, ids []uuid.UUID, setPatch map[string]interface{}, deltas map[string]float64) (int64, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	sql, args, err := buildIncrementAndSetSQL(datasetID, ids, setPatch, deltas)
+	if err != nil {
+		return 0, err
+	}
+	res := r.db.Exec(sql, args...)
+	return res.RowsAffected, res.Error
 }
 
 func (r *PostgresDatasetRepo) DeleteRecord(id uuid.UUID) error {

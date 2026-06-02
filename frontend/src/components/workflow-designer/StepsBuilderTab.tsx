@@ -70,13 +70,18 @@ type PayloadRow = { key: string; type: string; value: string };
 const inferPType = (v: any): string => typeof v === 'number' ? 'number' : typeof v === 'boolean' ? 'bool' : (v && typeof v === 'object') ? 'json' : 'string';
 const pValueToString = (v: any): string => v == null ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v);
 
+// An {"$inc": n} object is the increment operator (UPDATE only), not a literal value.
+const isIncOp = (v: any): boolean => !!v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === 1 && '$inc' in v;
+
 // Returns rows if the payload is an editable JSON object (or empty), or null for arrays / invalid JSON.
 const parsePayloadRows = (s?: string): PayloadRow[] | null => {
     if (!s || !s.trim()) return [];
     try {
         const v = JSON.parse(s);
         if (v && typeof v === 'object' && !Array.isArray(v)) {
-            return Object.keys(v).map(k => ({ key: k, type: inferPType(v[k]), value: pValueToString(v[k]) }));
+            return Object.keys(v).map(k => isIncOp(v[k])
+                ? { key: k, type: 'inc', value: pValueToString(v[k].$inc) }
+                : { key: k, type: inferPType(v[k]), value: pValueToString(v[k]) });
         }
         return null;
     } catch { return null; }
@@ -90,6 +95,9 @@ const serializePayloadRows = (rows: PayloadRow[]): string => {
         if (r.type === 'number') { const n = Number(r.value); val = Number.isNaN(n) ? r.value : n; }
         else if (r.type === 'bool') val = r.value === 'true';
         else if (r.type === 'json') { try { val = JSON.parse(r.value); } catch { val = r.value; } }
+        // inc: literal number stays a number; a template (e.g. {{ input.n }}) stays a string,
+        // which the backend coerces at run time.
+        else if (r.type === 'inc') { const n = Number(r.value); val = { $inc: (r.value.trim() !== '' && !Number.isNaN(n)) ? n : r.value }; }
         obj[k] = val;
     }
     return JSON.stringify(obj);
@@ -1211,7 +1219,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                                             <select value={r.type}
                                                                                                                                 onChange={(e) => writeRows((rows || []).map((x, i) => i === ri ? { ...x, type: e.target.value } : x))}
                                                                                                                                 className="h-7 px-1 w-16 text-[10px] font-bold border border-border rounded-md bg-background text-foreground outline-none cursor-pointer">
-                                                                                                                                {PAYLOAD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                                                                                                                {(step.dataset_operation === 'UPDATE' ? [...PAYLOAD_TYPES, 'inc'] : PAYLOAD_TYPES).map(t => <option key={t} value={t}>{t}</option>)}
                                                                                                                             </select>
                                                                                                                             {r.type === 'bool' ? (
                                                                                                                                 <select value={r.value === 'true' ? 'true' : 'false'}
@@ -1221,7 +1229,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                                                     <option value="false">false</option>
                                                                                                                                 </select>
                                                                                                                             ) : (
-                                                                                                                                <Input value={r.value} placeholder={r.type === 'json' ? '{"k":"v"}' : '{{ input.x }} / value'}
+                                                                                                                                <Input value={r.value} placeholder={r.type === 'inc' ? 'delta e.g. 1 or -1' : r.type === 'json' ? '{"k":"v"}' : '{{ input.x }} / value'}
                                                                                                                                     onChange={(e) => writeRows((rows || []).map((x, i) => i === ri ? { ...x, value: e.target.value } : x))}
                                                                                                                                     className="h-7 flex-1 text-[11px] font-mono bg-background border-border" />
                                                                                                                             )}

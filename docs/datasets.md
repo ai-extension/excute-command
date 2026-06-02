@@ -63,11 +63,31 @@ Both **Filter** and **Payload** are Pongo2 templates — they can embed `{{ inpu
 | **Find Many** (`QUERY`) | Load records, apply the filter, cap to `limit`. | Array of records: `[{ "_id": "…", … }]` |
 | **Find One** (`FIND_ONE`) | Return the first record matching the filter. | A single record object, or `null` if none. |
 | **INSERT** | Create one record (object) or many (array). | The created record(s), with `_id`. |
-| **UPDATE** | Match by filter, **merge** the payload into each match. | `{ "affected": n, "ids": [...] }` |
+| **UPDATE** | Match by filter, **merge** the payload into each match. Supports [update operators](#update-operators) like `$inc`. | `{ "affected": n, "ids": [...] }` |
 | **DELETE** | Match by filter, delete each. | `{ "affected": n, "ids": [...] }` |
 
 > [!IMPORTANT]
 > **UPDATE and DELETE require a non-empty filter** — a guard against wiping the whole dataset by accident. **UPDATE merges** (existing fields are preserved); it does not replace the row.
+
+### Update operators
+
+By default an UPDATE field is a **literal set** — `{"active": false}` writes `false`. To compute a new value from the row's **current** value, use an operator object instead of a literal.
+
+| Operator | Payload | Effect |
+| :--- | :--- | :--- |
+| `$inc` | `{"count": {"$inc": 1}}` | Add `1` to `count` on each matched row. Use a negative number to decrement. |
+
+```json
+{"status": "done", "retries": {"$inc": 1}, "stock": {"$inc": -1}}
+```
+
+- A **missing or null** target field counts as `0`, so `$inc` initializes it (`{"$inc": 1}` on an absent field → `1`).
+- The target must be **numeric** (or absent); a non-numeric current value fails the step.
+- `$inc` is **UPDATE-only** — using it in an INSERT payload is an error.
+- The delta may be a template: `{"$inc": {{ input.qty }}}`.
+
+> [!NOTE]
+> **`$inc` is atomic.** The increment is computed from the live database value in a single statement, so two concurrent runs incrementing the same row will **not** lose an update. A plain literal set still overwrites the whole field, so prefer `$inc` for counters. (Reading a value in one step and writing `value + 1` back in a later step is **not** atomic — use `$inc`.)
 
 ### Filter syntax
 Comma-separated conditions, matched against each record's fields:

@@ -1687,6 +1687,11 @@ func (e *WorkflowExecutor) runDatasetStep(step *domain.WorkflowStep, inputs map[
 		if len(objs) == 0 {
 			return "", fmt.Errorf("INSERT requires a payload")
 		}
+		for _, obj := range objs {
+			if f := operatorField(obj); f != "" {
+				return "", fmt.Errorf("field %q: update operators ($inc) are only supported in UPDATE, not INSERT", f)
+			}
+		}
 		created := []map[string]interface{}{}
 		for _, obj := range objs {
 			b, _ := json.Marshal(obj)
@@ -1712,28 +1717,49 @@ func (e *WorkflowExecutor) runDatasetStep(step *domain.WorkflowStep, inputs map[
 		if len(objs) != 1 {
 			return "", fmt.Errorf("UPDATE payload must be a single JSON object")
 		}
-		patch := objs[0]
+		setFields, deltas, err := splitUpdatePatch(objs[0])
+		if err != nil {
+			return "", err
+		}
 		recs, err := e.datasetRepo.AllRecords(*step.DatasetID)
 		if err != nil {
 			return "", err
 		}
-		ids := []string{}
+		matched := []domain.DatasetRecord{}
 		for _, r := range recs {
-			m := recordToMap(r)
-			if !evalFilterString(m, renderedFilter) {
-				continue
+			if evalFilterString(recordToMap(r), renderedFilter) {
+				matched = append(matched, r)
 			}
-			// Merge patch into existing data (keep _id out of stored data).
-			delete(m, "_id")
-			for k, v := range patch {
-				m[k] = v
+		}
+		ids := make([]string, 0, len(matched))
+		if len(deltas) > 0 {
+			// Atomic path: merge set-fields and apply numeric deltas in one statement,
+			// recomputing each field from the current DB value (race-free).
+			matchedIDs := make([]uuid.UUID, 0, len(matched))
+			for _, r := range matched {
+				matchedIDs = append(matchedIDs, r.ID)
 			}
-			b, _ := json.Marshal(m)
-			r.Data = string(b)
-			if err := e.datasetRepo.UpdateRecord(&r); err != nil {
+			if _, err := e.datasetRepo.IncrementAndSet(*step.DatasetID, matchedIDs, setFields, deltas); err != nil {
 				return "", err
 			}
-			ids = append(ids, r.ID.String())
+			for _, r := range matched {
+				ids = append(ids, r.ID.String())
+			}
+		} else {
+			// Plain merge: overwrite set-fields into each matched record.
+			for _, r := range matched {
+				m := recordToMap(r)
+				delete(m, "_id")
+				for k, v := range setFields {
+					m[k] = v
+				}
+				b, _ := json.Marshal(m)
+				r.Data = string(b)
+				if err := e.datasetRepo.UpdateRecord(&r); err != nil {
+					return "", err
+				}
+				ids = append(ids, r.ID.String())
+			}
 		}
 		logf("\033[90m→ updated %d record(s)\033[0m\n", len(ids))
 		b, _ := json.Marshal(map[string]interface{}{"affected": len(ids), "ids": ids})
@@ -1765,6 +1791,49 @@ func (e *WorkflowExecutor) runDatasetStep(step *domain.WorkflowStep, inputs map[
 	default:
 		return "", fmt.Errorf("unknown dataset operation: %q", step.DatasetOperation)
 	}
+}
+
+// operatorField returns the first key in obj whose value is an update-operator object
+// (currently {"$inc": ...}), or "" if none. Used to reject operators where they make no
+// sense (INSERT).
+func operatorField(obj map[string]interface{}) string {
+	for k, v := range obj {
+		if m, ok := v.(map[string]interface{}); ok {
+			if _, has := m["$inc"]; has {
+				return k
+			}
+		}
+	}
+	return ""
+}
+
+// splitUpdatePatch separates a rendered UPDATE payload into plain set-fields (overwritten)
+// and numeric increment deltas. A field whose value is an object {"$inc": <number>} is an
+// increment operator; any other value is a literal set. Errors on a malformed operator
+// (extra keys, non-numeric value, or applied to _id).
+func splitUpdatePatch(patch map[string]interface{}) (map[string]interface{}, map[string]float64, error) {
+	setFields := map[string]interface{}{}
+	deltas := map[string]float64{}
+	for k, v := range patch {
+		if obj, ok := v.(map[string]interface{}); ok {
+			if incVal, hasInc := obj["$inc"]; hasInc {
+				if len(obj) != 1 {
+					return nil, nil, fmt.Errorf("field %q: $inc cannot be combined with other keys", k)
+				}
+				if k == "_id" {
+					return nil, nil, fmt.Errorf("$inc cannot target _id")
+				}
+				f, ok := toFloat(incVal)
+				if !ok {
+					return nil, nil, fmt.Errorf("field %q: $inc value must be numeric, got %v", k, incVal)
+				}
+				deltas[k] = f
+				continue
+			}
+		}
+		setFields[k] = v
+	}
+	return setFields, deltas, nil
 }
 
 // parseDatasetPayload accepts a JSON object or array of objects and returns a slice of maps.

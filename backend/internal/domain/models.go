@@ -588,6 +588,10 @@ type DatasetRepository interface {
 	GetRecord(id uuid.UUID) (*DatasetRecord, error)
 	CreateRecord(r *DatasetRecord) error
 	UpdateRecord(r *DatasetRecord) error
+	// IncrementAndSet atomically merges setPatch (top-level) and applies numeric
+	// deltas to each named field on every record in ids, in a single statement.
+	// Missing/absent numeric fields are treated as 0. Returns rows affected.
+	IncrementAndSet(datasetID uuid.UUID, ids []uuid.UUID, setPatch map[string]interface{}, deltas map[string]float64) (int64, error)
 	DeleteRecord(id uuid.UUID) error
 }
 
