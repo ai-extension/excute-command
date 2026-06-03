@@ -2,6 +2,7 @@ package service
 
 import (
 	"encoding/json"
+	"io"
 	"log"
 	"sync"
 	"time"
@@ -44,7 +45,26 @@ type Hub struct {
 	subscribe        chan subscription
 	unsubscribe      chan subscription
 	streams          map[string]*LogStream // Key: executionID
+	logMirrors       map[string]*logMirror // Key: source (child) executionID
 	mu               sync.Mutex
+}
+
+// logMirror duplicates a child execution's main log stream onto a parent
+// step's terminal + log file. It is registered while a WORKFLOW step
+// (WaitToFinish=true) synchronously waits for its target workflow, so the
+// child execution's output shows inline under the parent step — live, on
+// reconnect (catchup), and in the historical view (all read the same step
+// log file). Only lines whose target_id == sourceTargetID (the child
+// workflow ID, i.e. the child's main log stream) are mirrored, to avoid
+// duplicating the per-step trace stream which carries the same command
+// output under a different target_id.
+type logMirror struct {
+	sourceTargetID string    // child workflow ID — only mirror this stream
+	dstTargetID    string    // parent step ID
+	dstExecutionID string    // parent execution ID
+	file           io.Writer // parent step log file (for catchup/historical)
+	mu             sync.Mutex
+	active         bool
 }
 
 type subscription struct {
@@ -62,6 +82,39 @@ func NewHub() *Hub {
 		subscribe:        make(chan subscription),
 		unsubscribe:      make(chan subscription),
 		streams:          make(map[string]*LogStream),
+		logMirrors:       make(map[string]*logMirror),
+	}
+}
+
+// AddLogMirror starts mirroring the child execution srcExecutionID's main log
+// stream (lines broadcast with target_id == sourceTargetID) onto the parent
+// step identified by (dstTargetID, dstExecutionID). file, if non-nil, receives
+// the same content so catchup/historical reads pick it up. Call RemoveLogMirror
+// when the synchronous wait ends (before the step log file is closed).
+func (h *Hub) AddLogMirror(srcExecutionID, sourceTargetID, dstTargetID, dstExecutionID string, file io.Writer) {
+	h.mu.Lock()
+	h.logMirrors[srcExecutionID] = &logMirror{
+		sourceTargetID: sourceTargetID,
+		dstTargetID:    dstTargetID,
+		dstExecutionID: dstExecutionID,
+		file:           file,
+		active:         true,
+	}
+	h.mu.Unlock()
+}
+
+// RemoveLogMirror stops a mirror previously started with AddLogMirror. After it
+// returns, no further writes to the mirror's file happen, so the caller may
+// safely close that file.
+func (h *Hub) RemoveLogMirror(srcExecutionID string) {
+	h.mu.Lock()
+	m := h.logMirrors[srcExecutionID]
+	delete(h.logMirrors, srcExecutionID)
+	h.mu.Unlock()
+	if m != nil {
+		m.mu.Lock()
+		m.active = false
+		m.mu.Unlock()
 	}
 }
 
@@ -264,6 +317,7 @@ func (h *Hub) BroadcastLog(targetID string, executionID string, content string) 
 		}
 		s.mu.Unlock()
 	}
+	mir := h.logMirrors[executionID]
 	h.mu.Unlock()
 
 	msg := map[string]interface{}{
@@ -276,6 +330,48 @@ func (h *Hub) BroadcastLog(targetID string, executionID string, content string) 
 	jsonMsg, _ := json.Marshal(msg)
 
 	h.broadcast <- jsonMsg
+
+	// Mirror the child execution's main stream onto a parent step, if a
+	// synchronous sub-workflow step is waiting on this execution.
+	if mir != nil && targetID == mir.sourceTargetID {
+		h.mirrorLog(mir, content)
+	}
+}
+
+// mirrorLog forwards a child log line onto the parent step: it appends to the
+// parent step log file (for catchup/historical) and broadcasts a copy under the
+// parent (target_id, execution_id) so the parent step terminal shows it live.
+func (h *Hub) mirrorLog(mir *logMirror, content string) {
+	mir.mu.Lock()
+	if !mir.active {
+		mir.mu.Unlock()
+		return
+	}
+	if mir.file != nil {
+		mir.file.Write([]byte(content)) //nolint:errcheck
+	}
+	dstTarget, dstExec := mir.dstTargetID, mir.dstExecutionID
+	mir.mu.Unlock()
+
+	// Keep the parent execution's stream alive so the long-running child does
+	// not let cleanupOrphanedStreams reap the parent's subscription.
+	h.mu.Lock()
+	if s, ok := h.streams[dstExec]; ok {
+		s.mu.Lock()
+		s.LastActivity = time.Now()
+		s.mu.Unlock()
+	}
+	h.mu.Unlock()
+
+	mmsg := map[string]interface{}{
+		"type":         "log",
+		"target_id":    dstTarget,
+		"execution_id": dstExec,
+		"content":      content,
+		"is_catchup":   false,
+	}
+	jsonMmsg, _ := json.Marshal(mmsg)
+	h.broadcast <- jsonMmsg
 }
 
 func (h *Hub) BroadcastStatus(targetID string, executionID string, targetType string, status string) {

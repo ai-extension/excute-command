@@ -2138,6 +2138,13 @@ func (e *WorkflowExecutor) runWorkflowStep(ctx context.Context, step *domain.Wor
 		return "async", nil
 	}
 
+	// Mirror the child execution's main log stream onto this parent step so the
+	// child's output shows inline under the step — live, on reconnect, and in
+	// the historical view. Only active while we synchronously wait for the
+	// child; removed before stepLogFile is closed by the caller.
+	e.hub.AddLogMirror(hookExecID.String(), step.TargetWorkflowID.String(), step.ID.String(), executionID.String(), stepLogFile)
+	defer e.hub.RemoveLogMirror(hookExecID.String())
+
 	err = e.RunWithDepth(ctx, *step.TargetWorkflowID, hookExecID, resolvedInputs, nil, nil, "STEP", 1, user, nil, nil, &executionID)
 	if err != nil {
 		return "", fmt.Errorf("target workflow %s failed: %w", step.TargetWorkflowID, err)
