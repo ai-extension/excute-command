@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/google/uuid"
 	"github.com/pkg/sftp"
 	"github.com/user/csm-backend/internal/domain"
 	"golang.org/x/crypto/ssh"
@@ -49,25 +50,53 @@ func (c *SSHConnection) Execute(ctx context.Context, command string, writers ...
 	session.Stdout = io.MultiWriter(stdoutWriters...)
 	session.Stderr = io.MultiWriter(stderrWriters...)
 
+	// Without a PTY, closing the SSH session does NOT reliably signal the remote
+	// process, so a cancelled command can keep running (orphaned) on the server.
+	// Mitigation: the remote shell records its PID to a pidfile (and removes it on
+	// exit via a trap); on cancellation we open a second session to TERM→KILL that
+	// process, its process group, and its direct children. echo/trap write to a
+	// file, not stdout, so the command's real output (and the CWD marker) is
+	// unaffected.
+	pidPath := fmt.Sprintf("/tmp/.wf_%s.pid", uuid.New().String())
+	wrapped := fmt.Sprintf("echo $$ > %s; trap 'rm -f %s' EXIT; %s", pidPath, pidPath, command)
+
 	done := make(chan struct{})
-	defer close(done)
+	killDone := make(chan struct{})
 
 	go func() {
+		defer close(killDone)
 		select {
 		case <-ctx.Done():
-			// Try to send a signal if possible, though standard SSH sessions
-			// often don't support signals without a PTY.
-			// Closing the session is the most reliable way to stop the remote command.
+			// Unblock the local Run first, then reap the remote process tree.
 			session.Close()
+			if ks, kerr := c.client.NewSession(); kerr == nil {
+				// Best-effort, fully POSIX. The leading "-" targets the process
+				// group (works when the shell is the group leader); the bare PID
+				// and pkill -P cover the common cases otherwise. pkill may be
+				// absent (busybox) — errors are swallowed.
+				_ = ks.Run(fmt.Sprintf(
+					"P=$(cat %s 2>/dev/null); "+
+						"if [ -n \"$P\" ]; then "+
+						"kill -TERM -\"$P\" 2>/dev/null; kill -TERM \"$P\" 2>/dev/null; pkill -TERM -P \"$P\" 2>/dev/null; "+
+						"sleep 2; "+
+						"kill -KILL -\"$P\" 2>/dev/null; kill -KILL \"$P\" 2>/dev/null; pkill -KILL -P \"$P\" 2>/dev/null; "+
+						"fi; rm -f %s",
+					pidPath, pidPath))
+				ks.Close()
+			}
 		case <-done:
 		}
 	}()
 
-	if err := session.Run(command); err != nil {
+	runErr := session.Run(wrapped)
+	close(done)
+	<-killDone // ensure the reaper finished while c.client is still open
+
+	if runErr != nil {
 		if ctx.Err() != nil {
 			return stdout.String() + stderr.String(), ctx.Err()
 		}
-		return stdout.String() + stderr.String(), fmt.Errorf("failed to run command: %w", err)
+		return stdout.String() + stderr.String(), fmt.Errorf("failed to run command: %w", runErr)
 	}
 
 	return stdout.String(), nil

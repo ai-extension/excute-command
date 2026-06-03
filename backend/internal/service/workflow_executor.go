@@ -36,6 +36,7 @@ type WorkflowExecutor struct {
 	hub           *Hub
 	activeExecs   sync.Map // map[uuid.UUID]context.CancelFunc
 	execDoneChans sync.Map // map[uuid.UUID]chan struct{}
+	childExecs    sync.Map // map[uuid.UUID]*sync.Map  parent execID -> set of child execIDs (for stopping the whole subtree)
 	sessionUploads sync.Map // map[uuid.UUID]*sync.Map // execID -> serverID+sessionID string -> bool
 }
 
@@ -241,14 +242,10 @@ func (e *WorkflowExecutor) Run(ctx context.Context, workflowID uuid.UUID, execID
 		e.execDoneChans.Delete(execID)
 	}()
 
-	// Create a cancellable context for this execution
-	execCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	e.activeExecs.Store(execID, cancel)
-	defer e.activeExecs.Delete(execID)
-
-	return e.RunWithDepth(execCtx, workflowID, execID, inputs, scheduledID, pageID, triggerSource, 0, user, startGroupID, startStepID, fromExecutionID)
+	// Note: the cancellable context + activeExecs registration is handled inside
+	// RunWithDepth, so that nested executions (hooks, sub-workflow steps) are also
+	// registered and can be stopped as part of the subtree.
+	return e.RunWithDepth(ctx, workflowID, execID, inputs, scheduledID, pageID, triggerSource, 0, user, startGroupID, startStepID, fromExecutionID)
 }
 
 // GetWaitChan returns a channel that will be closed when the execution finishes.
@@ -260,19 +257,77 @@ func (e *WorkflowExecutor) GetWaitChan(execID uuid.UUID) chan struct{} {
 	return nil
 }
 
+// StopExecution cancels the given execution AND every nested execution it spawned
+// (BEFORE/AFTER hooks and sub-workflow steps), so a stop request halts the whole
+// subtree instead of leaving detached children running.
 func (e *WorkflowExecutor) StopExecution(execID uuid.UUID) error {
+	found := false
+
 	if cancelVal, ok := e.activeExecs.Load(execID); ok {
-		cancel := cancelVal.(context.CancelFunc)
-		cancel()
-		return nil
+		cancelVal.(context.CancelFunc)()
+		found = true
 	}
-	return fmt.Errorf("execution %s not found or already finished", execID)
+
+	// Recurse into children. Safe from infinite loops: ParentExecutionID forms a
+	// tree bounded by the depth cap (<= 4 levels).
+	if setVal, ok := e.childExecs.Load(execID); ok {
+		setVal.(*sync.Map).Range(func(k, _ interface{}) bool {
+			if childID, ok := k.(uuid.UUID); ok {
+				_ = e.StopExecution(childID)
+				found = true
+			}
+			return true
+		})
+		// Subtree is being torn down; drop the set so the map doesn't retain an
+		// empty shell. Any child spawned after this point sees the parent ctx as
+		// cancelled (see the ctx.Err() guards in the hook / async-step goroutines)
+		// and returns without running.
+		e.childExecs.Delete(execID)
+	}
+
+	if !found {
+		return fmt.Errorf("execution %s not found or already finished", execID)
+	}
+	return nil
+}
+
+// registerChild records a parent -> child execution edge so StopExecution can
+// reach nested executions that run on a detached (context.Background) context.
+func (e *WorkflowExecutor) registerChild(parent, child uuid.UUID) {
+	setVal, _ := e.childExecs.LoadOrStore(parent, &sync.Map{})
+	setVal.(*sync.Map).Store(child, struct{}{})
+}
+
+// unregisterChild removes a finished child from its parent's set.
+func (e *WorkflowExecutor) unregisterChild(parent, child uuid.UUID) {
+	if setVal, ok := e.childExecs.Load(parent); ok {
+		setVal.(*sync.Map).Delete(child)
+	}
 }
 
 func (e *WorkflowExecutor) RunWithDepth(ctx context.Context, workflowID uuid.UUID, execID uuid.UUID, inputs map[string]string, scheduledID *uuid.UUID, pageID *uuid.UUID, triggerSource string, depth int, user *domain.User, startGroupID, startStepID, fromExecutionID *uuid.UUID) error {
 	if depth > 3 {
 		return fmt.Errorf("maximum hook depth exceeded (circular dependency?)")
 	}
+
+	// Register this execution so it — and its whole subtree — can be stopped.
+	// Every execution (top-level, hook, or sub-workflow step) gets its own
+	// cancellable context and an entry in activeExecs keyed by execID.
+	execCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	e.activeExecs.Store(execID, cancel)
+	defer e.activeExecs.Delete(execID)
+	// depth > 0 means this is a nested execution spawned by a hook or a
+	// WORKFLOW step; record the parent edge so StopExecution can reach it even
+	// though such children run on a detached (context.Background) base context.
+	// (At depth 0, fromExecutionID is a prior execution for partial-rerun state,
+	// not a live parent, so it must not be linked here.)
+	if depth > 0 && fromExecutionID != nil {
+		parent := *fromExecutionID
+		e.registerChild(parent, execID)
+		defer e.unregisterChild(parent, execID)
+	}
+	ctx = execCtx
 
 	var scope *domain.PermissionScope
 	if depth == 0 {
@@ -769,6 +824,12 @@ func (e *WorkflowExecutor) RunHooks(ctx context.Context, hooks []domain.Workflow
 
 		// Run hook asynchronously so it doesn't block the progress of the workflow/schedule
 		go func(h domain.WorkflowHook, execID uuid.UUID, resolvedInputs map[string]string) {
+			// If the parent execution was already stopped, don't start the hook.
+			// Closes the race where a stop lands between spawning this goroutine
+			// and the child registering itself in the stop tree.
+			if ctx.Err() != nil {
+				return
+			}
 			bgCtx := context.Background()
 			err := e.RunWithDepth(bgCtx, h.TargetWorkflowID, execID, resolvedInputs, nil, nil, "HOOK", depth+1, user, nil, nil, &executionID)
 			if err != nil {
@@ -2057,6 +2118,12 @@ func (e *WorkflowExecutor) runWorkflowStep(ctx context.Context, step *domain.Wor
 	if step.WaitToFinish != nil && !*step.WaitToFinish {
 		// Async: spawn the workflow and immediately return success
 		go func(targetID uuid.UUID, execID uuid.UUID, in map[string]string) {
+			// If the parent execution was already stopped, don't start the child.
+			// Closes the race between spawning this goroutine and the child
+			// registering itself in the stop tree.
+			if ctx.Err() != nil {
+				return
+			}
 			bgCtx := context.Background()
 			err := e.RunWithDepth(bgCtx, targetID, execID, in, nil, nil, "STEP", 1, user, nil, nil, &executionID)
 			if err != nil {
