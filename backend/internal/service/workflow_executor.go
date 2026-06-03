@@ -1301,7 +1301,7 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 
 	// Dispatch based on action type
 	if step.ActionType == "WORKFLOW" {
-		output, err = e.runWorkflowStep(ctx, step, inputs, variables, flowData, namespaceID, mainLogFile, stepLogFile, workflowID, executionID, user, fromExecutionID)
+		output, err = e.runWorkflowStep(ctx, step, inputs, variables, flowData, namespaceID, mainLogFile, stepLogFile, workflowID, executionID, user, fromExecutionID, item, index)
 	} else if step.ActionType == "DATASET" {
 		output, err = e.runDatasetStep(step, inputs, variables, flowData, namespaceID, user, item, index, mainLogFile, stepLogFile, workflowID, executionID)
 		if err != nil {
@@ -1868,7 +1868,7 @@ func parseDatasetPayload(raw string) ([]map[string]interface{}, error) {
 
 // runWorkflowStep handles a step of action_type=WORKFLOW, running a target workflow either
 // synchronously (WaitToFinish=true) or asynchronously as a spawned goroutine.
-func (e *WorkflowExecutor) runWorkflowStep(ctx context.Context, step *domain.WorkflowStep, inputs map[string]string, variables []domain.WorkflowVariable, flowData map[string]interface{}, namespaceID uuid.UUID, mainLogFile *os.File, stepLogFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, user *domain.User, fromExecutionID *uuid.UUID) (string, error) {
+func (e *WorkflowExecutor) runWorkflowStep(ctx context.Context, step *domain.WorkflowStep, inputs map[string]string, variables []domain.WorkflowVariable, flowData map[string]interface{}, namespaceID uuid.UUID, mainLogFile *os.File, stepLogFile *os.File, workflowID uuid.UUID, executionID uuid.UUID, user *domain.User, fromExecutionID *uuid.UUID, item interface{}, index int) (string, error) {
 	if step.TargetWorkflowID == nil {
 		return "", fmt.Errorf("step %q has action_type=WORKFLOW but no target_workflow_id set", step.Name)
 	}
@@ -1888,7 +1888,7 @@ func (e *WorkflowExecutor) runWorkflowStep(ctx context.Context, step *domain.Wor
 	}
 
 	// Interpolate each input value through the current workflow context
-	pcontext := e.getInterpolationContext(inputs, variables, flowData, namespaceID, user, nil, -1, uuid.Nil, executionID)
+	pcontext := e.getInterpolationContext(inputs, variables, flowData, namespaceID, user, item, index, uuid.Nil, executionID)
 	resolvedInputs := make(map[string]string)
 
 	// 1. First, populate with target workflow default values
