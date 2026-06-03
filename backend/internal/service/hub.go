@@ -49,22 +49,26 @@ type Hub struct {
 	mu               sync.Mutex
 }
 
-// logMirror duplicates a child execution's main log stream onto a parent
-// step's terminal + log file. It is registered while a WORKFLOW step
-// (WaitToFinish=true) synchronously waits for its target workflow, so the
-// child execution's output shows inline under the parent step — live, on
-// reconnect (catchup), and in the historical view (all read the same step
-// log file). Only lines whose target_id == sourceTargetID (the child
-// workflow ID, i.e. the child's main log stream) are mirrored, to avoid
-// duplicating the per-step trace stream which carries the same command
-// output under a different target_id.
+// logMirror duplicates a child execution's main log stream onto a parent: the
+// parent step's terminal + step log file, and (when dstMainTargetID is set) the
+// parent's global/aggregated terminal + main log file. It is registered while a
+// WORKFLOW step (WaitToFinish=true) synchronously waits for its target workflow,
+// so the child execution's output shows inline both under the parent step and in
+// the parent's global view — live, on reconnect (catchup), and in the historical
+// view (each view reads its own file). Only lines whose target_id ==
+// sourceTargetID (the child workflow ID, i.e. the child's main log stream) are
+// mirrored, to avoid duplicating the per-step trace stream which carries the
+// same command output under a different target_id. The two destinations use
+// distinct target_ids and distinct files, so no view sees a line twice.
 type logMirror struct {
-	sourceTargetID string    // child workflow ID — only mirror this stream
-	dstTargetID    string    // parent step ID
-	dstExecutionID string    // parent execution ID
-	file           io.Writer // parent step log file (for catchup/historical)
-	mu             sync.Mutex
-	active         bool
+	sourceTargetID  string    // child workflow ID — only mirror this stream
+	dstTargetID     string    // parent step ID
+	dstExecutionID  string    // parent execution ID
+	dstMainTargetID string    // parent workflow ID — global/aggregated terminal ("" to skip)
+	file            io.Writer // parent step log file (for catchup/historical)
+	mainFile        io.Writer // parent main log file (global catchup/historical; nil to skip)
+	mu              sync.Mutex
+	active          bool
 }
 
 type subscription struct {
@@ -87,18 +91,25 @@ func NewHub() *Hub {
 }
 
 // AddLogMirror starts mirroring the child execution srcExecutionID's main log
-// stream (lines broadcast with target_id == sourceTargetID) onto the parent
-// step identified by (dstTargetID, dstExecutionID). file, if non-nil, receives
-// the same content so catchup/historical reads pick it up. Call RemoveLogMirror
-// when the synchronous wait ends (before the step log file is closed).
-func (h *Hub) AddLogMirror(srcExecutionID, sourceTargetID, dstTargetID, dstExecutionID string, file io.Writer) {
+// stream (lines broadcast with target_id == sourceTargetID) onto the parent.
+// It targets the parent step terminal (dstTargetID, dstExecutionID) and, when
+// dstMainTargetID is non-empty, also the parent's global/aggregated terminal
+// (dstMainTargetID, dstExecutionID) — so a WORKFLOW step's child output shows
+// inline in the parent view without selecting the step, matching how LOCAL/
+// REMOTE steps already surface there. file and mainFile, if non-nil, receive
+// the same content so catchup/historical reads pick it up (step view and global
+// view respectively). Call RemoveLogMirror when the synchronous wait ends
+// (before the step log file is closed).
+func (h *Hub) AddLogMirror(srcExecutionID, sourceTargetID, dstTargetID, dstExecutionID, dstMainTargetID string, file, mainFile io.Writer) {
 	h.mu.Lock()
 	h.logMirrors[srcExecutionID] = &logMirror{
-		sourceTargetID: sourceTargetID,
-		dstTargetID:    dstTargetID,
-		dstExecutionID: dstExecutionID,
-		file:           file,
-		active:         true,
+		sourceTargetID:  sourceTargetID,
+		dstTargetID:     dstTargetID,
+		dstExecutionID:  dstExecutionID,
+		dstMainTargetID: dstMainTargetID,
+		file:            file,
+		mainFile:        mainFile,
+		active:          true,
 	}
 	h.mu.Unlock()
 }
@@ -338,9 +349,13 @@ func (h *Hub) BroadcastLog(targetID string, executionID string, content string) 
 	}
 }
 
-// mirrorLog forwards a child log line onto the parent step: it appends to the
-// parent step log file (for catchup/historical) and broadcasts a copy under the
-// parent (target_id, execution_id) so the parent step terminal shows it live.
+// mirrorLog forwards a child log line onto the parent. It appends to the parent
+// step log file and (when configured) the parent main log file for catchup/
+// historical reads, then broadcasts a copy under the parent step terminal
+// (dstTargetID) and, when dstMainTargetID is set, under the parent global
+// terminal (dstMainTargetID) — both keyed to the parent execution_id so the
+// live views show it. The step terminal and the global view subscribe by
+// (execution_id, target_id), so the two broadcasts never double up in one view.
 func (h *Hub) mirrorLog(mir *logMirror, content string) {
 	mir.mu.Lock()
 	if !mir.active {
@@ -350,7 +365,10 @@ func (h *Hub) mirrorLog(mir *logMirror, content string) {
 	if mir.file != nil {
 		mir.file.Write([]byte(content)) //nolint:errcheck
 	}
-	dstTarget, dstExec := mir.dstTargetID, mir.dstExecutionID
+	if mir.mainFile != nil {
+		mir.mainFile.Write([]byte(content)) //nolint:errcheck
+	}
+	dstTarget, dstExec, dstMain := mir.dstTargetID, mir.dstExecutionID, mir.dstMainTargetID
 	mir.mu.Unlock()
 
 	// Keep the parent execution's stream alive so the long-running child does
@@ -363,10 +381,19 @@ func (h *Hub) mirrorLog(mir *logMirror, content string) {
 	}
 	h.mu.Unlock()
 
+	h.emitMirrored(dstTarget, dstExec, content)
+	if dstMain != "" {
+		h.emitMirrored(dstMain, dstExec, content)
+	}
+}
+
+// emitMirrored broadcasts a single mirrored log line under (targetID,
+// executionID) on the parent execution's topic.
+func (h *Hub) emitMirrored(targetID, executionID, content string) {
 	mmsg := map[string]interface{}{
 		"type":         "log",
-		"target_id":    dstTarget,
-		"execution_id": dstExec,
+		"target_id":    targetID,
+		"execution_id": executionID,
 		"content":      content,
 		"is_catchup":   false,
 	}
