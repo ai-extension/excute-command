@@ -1484,7 +1484,7 @@ const EndpointWidgetCard: React.FC<EndpointWidgetCardProps> = ({ widget, workflo
                 </div>
                 <div className="flex-1 min-w-0">
                     <p className="text-xs font-black uppercase tracking-tight truncate">{widget.title || 'Endpoint'}</p>
-                    <p className="text-[10px] text-muted-foreground font-medium truncate uppercase tracking-widest">{selectedWf?.name || 'No workflow'}</p>
+                    <p className="text-[10px] text-muted-foreground font-medium truncate uppercase tracking-widest">{selectedWf?.name || widget.workflow_name || 'No workflow'}</p>
                 </div>
                 <button onClick={onEdit} className="h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors border border-transparent hover:border-border">
                     <SettingsIcon className="w-3.5 h-3.5" />

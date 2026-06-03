@@ -141,13 +141,59 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
     // serializePayloadRows drops empty keys. The draft keeps them alive on re-render.
     const [payloadDraft, setPayloadDraft] = useState<Record<string, PayloadRow[]>>({});
     const nsId = parentWf?.namespace_id;
+    // Datasets already fetched by reference, so the list fetch below + the per-step
+    // resolver don't refetch or clobber each other (groups changes every keystroke).
+    const fetchedDatasetIdsRef = React.useRef<Set<string>>(new Set());
     useEffect(() => {
         if (!nsId) return;
         apiFetch(`${API_BASE_URL}/namespaces/${nsId}/datasets?limit=15`)
             .then(r => r.json())
-            .then(d => setDatasets(d.items || []))
+            .then(d => {
+                const items: Dataset[] = d.items || [];
+                // Merge instead of replace so datasets resolved by reference are kept.
+                setDatasets(prev => {
+                    const m = new Map(prev.map(x => [x.id, x]));
+                    items.forEach(x => m.set(x.id, x));
+                    return Array.from(m.values());
+                });
+            })
             .catch(() => { });
     }, [nsId]);
+
+    // The dataset select only loads the first ~15 datasets and has no server-side
+    // search, so a DATASET step referencing a dataset outside that page renders blank
+    // with no columns. Resolve each referenced dataset by id and merge it in.
+    useEffect(() => {
+        if (!nsId) return;
+        const referenced = Array.from(new Set(
+            groups
+                .flatMap(g => g.steps || [])
+                .filter(s => s.action_type === 'DATASET' && s.dataset_id)
+                .map(s => s.dataset_id as string)
+        ));
+        const missing = referenced.filter(did =>
+            !fetchedDatasetIdsRef.current.has(did) && !datasets.some(d => d.id === did)
+        );
+        if (missing.length === 0) return;
+        missing.forEach(did => fetchedDatasetIdsRef.current.add(did));
+        Promise.all(missing.map(async (did) => {
+            try {
+                const res = await apiFetch(`${API_BASE_URL}/datasets/${did}`);
+                if (!res.ok) return null;
+                return await res.json() as Dataset;
+            } catch {
+                return null;
+            }
+        })).then(results => {
+            const fetched = results.filter((d): d is Dataset => !!d);
+            if (fetched.length === 0) return;
+            setDatasets(prev => {
+                const m = new Map(prev.map(x => [x.id, x]));
+                fetched.forEach(x => m.set(x.id, x));
+                return Array.from(m.values());
+            });
+        });
+    }, [nsId, groups, datasets]);
     const parentInputs = parentWf?.inputs || [];
 
     return (

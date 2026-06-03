@@ -355,10 +355,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     <div
                         key={t.id}
                         className={cn(
-                            "pointer-events-auto flex items-start gap-4 p-4 rounded-md border shadow-2xl animate-in slide-in-from-right-full duration-500",
-                            t.type === 'error' ? "bg-red-500/10 border-red-500/20 text-red-500" :
-                                t.type === 'success' ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500" :
-                                    "bg-indigo-500/10 border-indigo-500/20 text-indigo-500"
+                            "pointer-events-auto flex items-start gap-4 p-4 rounded-md border shadow-2xl animate-in slide-in-from-right-full duration-500 text-white",
+                            t.type === 'error' ? "bg-red-500 border-red-600" :
+                                t.type === 'success' ? "bg-emerald-500 border-emerald-600" :
+                                    "bg-indigo-500 border-indigo-600"
                         )}
                     >
                         <div className="mt-0.5">
@@ -374,7 +374,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         </div>
                         <button
                             onClick={() => removeToast(t.id)}
-                            className="text-foreground/40 hover:text-foreground transition-colors p-1"
+                            className="text-white/60 hover:text-white transition-colors p-1"
                         >
                             <X className="h-4 w-4" />
                         </button>
