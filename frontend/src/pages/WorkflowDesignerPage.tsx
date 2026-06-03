@@ -178,9 +178,53 @@ const WorkflowDesignerPage = () => {
                 const response = await apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/workflows?limit=15`);
                 if (!response.ok) throw new Error(`Workflows fetch failed: ${response.status}`);
                 const data = await response.json();
-                setAllWorkflows(data.items || (Array.isArray(data) ? data : []));
+                const items = data.items || (Array.isArray(data) ? data : []);
+                // Merge instead of replace: this list only returns the first page
+                // (~15) of workflows. Referenced target workflows fetched separately
+                // (see fetchReferencedWorkflows) must not be wiped out by this fetch.
+                setAllWorkflows(prev => {
+                    const existing = new Map(prev.map((w: Workflow) => [w.id, w]));
+                    items.forEach((w: Workflow) => {
+                        if (w.id !== id) existing.set(w.id, w);
+                    });
+                    return Array.from(existing.values());
+                });
             } catch (error) {
                 console.error('Failed to fetch all workflows:', error);
+            }
+        };
+
+        // The list endpoint only returns the first ~15 workflows, so WORKFLOW-type
+        // steps that reference a target_workflow_id outside that page have no entry
+        // in allWorkflows -> their name and input mapping don't render. Fetch the
+        // detail of every referenced target workflow and merge it into allWorkflows.
+        const fetchReferencedWorkflows = async (loadedGroups: any[]) => {
+            const targetIds = Array.from(new Set(
+                (loadedGroups || [])
+                    .flatMap((g: any) => g.steps || [])
+                    .filter((s: any) => s.action_type === 'WORKFLOW' && s.target_workflow_id)
+                    .map((s: any) => s.target_workflow_id as string)
+            )).filter(tid => tid && tid !== id);
+            if (targetIds.length === 0) return;
+            try {
+                const results = await Promise.all(targetIds.map(async (tid) => {
+                    try {
+                        const res = await apiFetch(`${API_BASE_URL}/workflows/${tid}`);
+                        if (!res.ok) return null;
+                        return await res.json() as Workflow;
+                    } catch {
+                        return null;
+                    }
+                }));
+                const fetched = results.filter((w): w is Workflow => !!w);
+                if (fetched.length === 0) return;
+                setAllWorkflows(prev => {
+                    const existing = new Map(prev.map((w: Workflow) => [w.id, w]));
+                    fetched.forEach((w) => existing.set(w.id, w));
+                    return Array.from(existing.values());
+                });
+            } catch (error) {
+                console.error('Failed to fetch referenced workflows:', error);
             }
         };
 
@@ -228,7 +272,11 @@ const WorkflowDesignerPage = () => {
                     return cleanedGroup;
                 });
 
-                setGroups(cleanGroups.sort((a: any, b: any) => a.order - b.order));
+                const sortedGroups = cleanGroups.sort((a: any, b: any) => a.order - b.order);
+                setGroups(sortedGroups);
+                // Pull in full detail of any workflows referenced by WORKFLOW steps
+                // so their name + input mapping render in the step builder.
+                fetchReferencedWorkflows(sortedGroups);
                 setInputs((data.inputs || []).map((inp: WorkflowInput) => ({
                     ...inp,
                     id: inp.id || generateUUID(),

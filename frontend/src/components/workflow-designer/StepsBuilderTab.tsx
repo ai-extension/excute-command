@@ -135,6 +135,11 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
     const [datasets, setDatasets] = useState<Dataset[]>([]);
     // Per-step flag: edit payload as raw JSON instead of the field builder. Keyed by step id.
     const [rawPayload, setRawPayload] = useState<Record<string, boolean>>({});
+    // Per-step draft of the dataset payload field rows. Editing state can hold rows
+    // with an empty or duplicate key (a freshly added field, or all dataset columns
+    // already used); those don't round-trip through dataset_payload because
+    // serializePayloadRows drops empty keys. The draft keeps them alive on re-render.
+    const [payloadDraft, setPayloadDraft] = useState<Record<string, PayloadRow[]>>({});
     const nsId = parentWf?.namespace_id;
     useEffect(() => {
         if (!nsId) return;
@@ -1158,10 +1163,13 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
 
                                                                                                 {(step.dataset_operation === 'INSERT' || step.dataset_operation === 'UPDATE') && (() => {
                                                                                                     const stepKey = step.id || `${gIdx}-${sIdx}`;
-                                                                                                    const rows = parsePayloadRows(step.dataset_payload);
-                                                                                                    const isRaw = rawPayload[stepKey] || rows === null; // arrays / invalid JSON force raw
+                                                                                                    const parsed = parsePayloadRows(step.dataset_payload);
+                                                                                                    const isRaw = rawPayload[stepKey] || parsed === null; // arrays / invalid JSON force raw
+                                                                                                    // Prefer the draft in structured mode so in-progress empty-key rows persist.
+                                                                                                    const rows = isRaw ? parsed : (payloadDraft[stepKey] ?? parsed ?? []);
                                                                                                     const dsCols = parseDsColumns(datasets.find(d => d.id === step.dataset_id)?.columns);
                                                                                                     const writeRows = (next: PayloadRow[]) => {
+                                                                                                        setPayloadDraft(prev => ({ ...prev, [stepKey]: next }));
                                                                                                         const ng = [...groups];
                                                                                                         ng[gIdx]!.steps![sIdx].dataset_payload = serializePayloadRows(next);
                                                                                                         setGroups(ng);
@@ -1181,7 +1189,11 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                                     )}
                                                                                                                     <Button type="button" variant={isRaw ? 'default' : 'outline'} size="sm" className="h-6 text-[10px] px-2 gap-1 rounded-md"
                                                                                                                         disabled={rows === null}
-                                                                                                                        onClick={() => setRawPayload({ ...rawPayload, [stepKey]: !rawPayload[stepKey] })}
+                                                                                                                        onClick={() => {
+                                                                                                                            setRawPayload({ ...rawPayload, [stepKey]: !rawPayload[stepKey] });
+                                                                                                                            // Drop draft so structured mode re-parses the (possibly hand-edited) raw JSON.
+                                                                                                                            setPayloadDraft(prev => { const n = { ...prev }; delete n[stepKey]; return n; });
+                                                                                                                        }}
                                                                                                                         title={rows === null ? 'Array / invalid JSON — raw only' : 'Toggle raw JSON'}>
                                                                                                                         <Braces className="w-3 h-3" /> JSON
                                                                                                                     </Button>
