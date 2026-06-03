@@ -247,6 +247,15 @@ const WorkflowDesignerPage = () => {
                 setAiGuide(data.ai_guide || '');
                 const defaultServerIdVal = data.default_server_id || '';
                 setDefaultServerId(defaultServerIdVal || undefined);
+                // The server list is paginated (~15); merge the embedded default_server
+                // so the General tab select shows its label even when it's outside that page.
+                if (data.default_server) {
+                    setAvailableServers(prev => {
+                        const m = new Map(prev.map((s: ServerType) => [s.id, s]));
+                        m.set(data.default_server.id, data.default_server);
+                        return Array.from(m.values());
+                    });
+                }
                 setTargetFolder(data.target_folder || '');
                 setCleanupFiles(!!data.cleanup_files);
                 setTimeoutMinutes(data.timeout_minutes || 15);

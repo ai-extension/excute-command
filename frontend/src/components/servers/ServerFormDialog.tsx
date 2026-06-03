@@ -87,6 +87,12 @@ export const ServerFormDialog: React.FC<ServerFormDialogProps> = ({
                         <SearchableSelect
                             options={[
                                 { label: 'Direct Connection (No VPN)', value: 'none' },
+                                // Fallback: the dropdown only loads the first ~15 VPNs, so a saved
+                                // vpn_id outside that page would show blank. Use the embedded vpn
+                                // on the edited server as an extra option.
+                                ...(formData.vpn_id && formData.vpn_id !== 'none' && formData.vpn && !vpns.some(v => v.id === formData.vpn_id)
+                                    ? [{ label: formData.vpn.name.toUpperCase(), value: formData.vpn_id }]
+                                    : []),
                                 ...vpns.map(v => ({ label: v.name.toUpperCase(), value: v.id }))
                             ]}
                             value={(formData.vpn_id || "none") as string}
