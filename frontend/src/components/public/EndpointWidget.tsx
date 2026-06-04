@@ -8,7 +8,7 @@ import { PageWidget } from '../../types';
 import { ExecutionHistoryEntry } from '../../lib/executionHistory';
 import { resolveButtonStyle } from '../ButtonStylePicker';
 import AnsiText from '../AnsiText';
-import { API_BASE_URL, streamResponseLines } from '../../lib/api';
+import { API_BASE_URL, streamResponseLines, createLineBatcher } from '../../lib/api';
 
 interface EndpointWidgetProps {
     widget: PageWidget;
@@ -85,11 +85,16 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
                 return;
             }
             // Stream the body so lines render as chunks arrive instead of
-            // blocking until the whole log file downloads.
+            // blocking until the whole log file downloads. Batched per frame to
+            // avoid a re-render per chunk on large logs.
+            const batcher = createLineBatcher(batch => {
+                if (logReqRef.current === reqId) setLogLines(prev => [...prev, ...batch]);
+            });
             await streamResponseLines(res, lines => {
                 if (logReqRef.current !== reqId) return;
-                setLogLines(prev => [...prev, ...lines]);
+                batcher.push(lines);
             });
+            batcher.flush();
         } catch (e: any) {
             if (logReqRef.current === reqId) setLogError(e?.message || 'Failed to load log');
         } finally {

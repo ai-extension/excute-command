@@ -35,3 +35,47 @@ export async function streamResponseLines(
     buf += decoder.decode();
     if (buf.length > 0) onLines([buf]);
 }
+
+export interface LineBatcher {
+    /** Queue lines; emit is coalesced to at most once per animation frame. */
+    push: (lines: string[]) => void;
+    /** Force-emit any queued lines now (e.g. at end-of-stream). */
+    flush: () => void;
+    /** Drop queued lines and cancel the scheduled frame (e.g. on unmount). */
+    cancel: () => void;
+}
+
+/**
+ * Coalesce frequent line pushes into at most one `emit` call per animation
+ * frame. A streamed log delivers many chunks; without batching each chunk would
+ * trigger its own React re-render (render thrash on large logs). Batching caps
+ * re-renders at ~one per frame while the body streams.
+ */
+export function createLineBatcher(emit: (lines: string[]) => void): LineBatcher {
+    let pending: string[] = [];
+    let raf = 0;
+
+    const run = () => {
+        raf = 0;
+        if (pending.length === 0) return;
+        const batch = pending;
+        pending = [];
+        emit(batch);
+    };
+
+    return {
+        push(lines) {
+            if (lines.length === 0) return;
+            pending.push(...lines);
+            if (!raf) raf = requestAnimationFrame(run);
+        },
+        flush() {
+            if (raf) { cancelAnimationFrame(raf); raf = 0; }
+            run();
+        },
+        cancel() {
+            if (raf) { cancelAnimationFrame(raf); raf = 0; }
+            pending = [];
+        },
+    };
+}

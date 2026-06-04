@@ -18,7 +18,7 @@ import {
 import { cn } from '../lib/utils';
 import { Workflow, WorkflowGroup, WorkflowStep, WorkflowExecution } from '../types';
 import { useAuth } from '../context/AuthContext';
-import { API_BASE_URL, streamResponseLines } from '../lib/api';
+import { API_BASE_URL, streamResponseLines, createLineBatcher } from '../lib/api';
 import TerminalLog from './TerminalLog';
 
 interface ExecutionMonitorProps {
@@ -342,32 +342,40 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
         return resultGroups.sort((a, b) => a.order - b.order);
     }, [workflow, execution, mode]);
 
-    // Effect for Data Fetching (Historical Mode logs)
+    // Load full workflow if not present. Kept separate from log fetching so a
+    // workflow load doesn't re-trigger (and re-stream) the logs — that caused a
+    // double-fetch and a visible clear/re-render flicker.
     useEffect(() => {
-        if (mode === 'HISTORICAL' && execution) {
-            // Load full workflow if not present
-            if (!workflow) {
-                apiFetch(`${API_BASE_URL}/workflows/${execution.workflow_id}`)
-                    .then(res => res.json())
-                    .then(setWorkflow);
-            }
-            // Fetch global logs — stream the body so lines render as chunks
-            // arrive instead of blocking until the whole file downloads.
-            let cancelled = false;
-            setGlobalLogs([]);
-            apiFetch(`${API_BASE_URL}/executions/${execution.id}/logs`)
-                .then(res => {
-                    if (!res.ok) return;
-                    return streamResponseLines(res, lines => {
-                        if (cancelled) return;
-                        const filtered = lines.filter(line => line.length > 0);
-                        if (filtered.length > 0) setGlobalLogs(prev => [...prev, ...filtered]);
-                    });
-                })
-                .catch(() => { /* keep partial logs on mid-stream/fetch error */ });
-            return () => { cancelled = true; };
+        if (mode === 'HISTORICAL' && execution && !workflow) {
+            apiFetch(`${API_BASE_URL}/workflows/${execution.workflow_id}`)
+                .then(res => res.json())
+                .then(setWorkflow);
         }
-    }, [mode, execution?.id, apiFetch, !!workflow]);
+    }, [mode, execution?.id, workflow, apiFetch]);
+
+    // Fetch global logs — stream the body so lines render as chunks arrive
+    // instead of blocking until the whole file downloads. Batched per frame to
+    // avoid a re-render per chunk.
+    useEffect(() => {
+        if (mode !== 'HISTORICAL' || !execution) return;
+
+        let cancelled = false;
+        setGlobalLogs([]);
+        const batcher = createLineBatcher(batch => {
+            if (!cancelled) setGlobalLogs(prev => [...prev, ...batch]);
+        });
+        apiFetch(`${API_BASE_URL}/executions/${execution.id}/logs`)
+            .then(res => {
+                if (!res.ok) return;
+                return streamResponseLines(res, lines => {
+                    if (cancelled) return;
+                    batcher.push(lines.filter(line => line.length > 0));
+                });
+            })
+            .then(() => { if (!cancelled) batcher.flush(); })
+            .catch(() => { if (!cancelled) batcher.flush(); /* keep partial logs */ });
+        return () => { cancelled = true; batcher.cancel(); };
+    }, [mode, execution?.id, apiFetch]);
 
     useEffect(() => {
         if (mode !== 'HISTORICAL' || !execution || (!activeStepID && !activeGroupID)) {
@@ -381,6 +389,9 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
 
         let cancelled = false;
         setStepLogs([]);
+        const batcher = createLineBatcher(batch => {
+            if (!cancelled) setStepLogs(prev => [...prev, ...batch]);
+        });
         apiFetch(url)
             .then(res => {
                 if (!res.ok) {
@@ -389,12 +400,12 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                 }
                 return streamResponseLines(res, lines => {
                     if (cancelled) return;
-                    const filtered = lines.filter(line => line.length > 0);
-                    if (filtered.length > 0) setStepLogs(prev => [...prev, ...filtered]);
+                    batcher.push(lines.filter(line => line.length > 0));
                 });
             })
+            .then(() => { if (!cancelled) batcher.flush(); })
             .catch(() => { if (!cancelled) setStepLogs(['[Log file not found]']); });
-        return () => { cancelled = true; };
+        return () => { cancelled = true; batcher.cancel(); };
     }, [activeStepID, activeGroupID, execution, mode]);
 
     if (!workflow) return null;
