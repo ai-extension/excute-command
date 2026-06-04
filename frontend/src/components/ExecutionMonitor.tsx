@@ -18,7 +18,7 @@ import {
 import { cn } from '../lib/utils';
 import { Workflow, WorkflowGroup, WorkflowStep, WorkflowExecution } from '../types';
 import { useAuth } from '../context/AuthContext';
-import { API_BASE_URL, streamResponseLines, createLineBatcher } from '../lib/api';
+import { API_BASE_URL } from '../lib/api';
 import TerminalLog from './TerminalLog';
 
 interface ExecutionMonitorProps {
@@ -50,20 +50,21 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
     const [patchedStatuses, setPatchedStatuses] = useState<Record<string, string>>({});
     const [activeStepID, setActiveStepID] = useState<string | null>(null);
     const [activeGroupID, setActiveGroupID] = useState<string | null>(null);
-    const [globalLogs, setGlobalLogs] = useState<string[]>([]);
-    const [stepLogs, setStepLogs] = useState<string[]>([]);
     const [isStatusWSReady, setIsStatusWSReady] = useState(false);
     const [isTerminalReady, setIsTerminalReady] = useState(false);
     const [showStopConfirm, setShowStopConfirm] = useState(false);
     const { apiFetch, showToast } = useAuth();
-    
+
+    // Hold the currently displayed log lines in a ref (not state) so streamed
+    // batches don't re-render the whole monitor. Previously the log state lived
+    // here, so every chunk reconciled the heavy sidebar/step tree and starved
+    // paints — the log showed up all at once instead of streaming. TerminalLog
+    // now owns the streaming + render; it reports lines here only so the footer
+    // "Download Trace" button can save them. A ref write triggers no render.
+    const logsRef = React.useRef<string[]>([]);
     const handleLogsChange = useCallback((newLogs: string[]) => {
-        if (activeStepID || activeGroupID) {
-            setStepLogs(newLogs);
-        } else {
-            setGlobalLogs(newLogs);
-        }
-    }, [activeStepID, activeGroupID]);
+        logsRef.current = newLogs;
+    }, []);
     const workflowID = workflow?.id;
     const executionIDRef = React.useRef<string | undefined>(execution?.id || (workflow as any)?.execution_id);
     const wsRef = React.useRef<WebSocket | null>(null);
@@ -97,19 +98,22 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
     useEffect(() => {
         if (mode === 'HISTORICAL' && initialExecution) {
             setExecution(initialExecution);
-            // Always track the prop's workflow (row summary first, full detail
-            // after). Skipping when groups are absent would leave a previously
-            // opened record's step tree on screen when switching to a new row.
+            // Track the prop's workflow (row summary first, full detail after) but
+            // never downgrade a groups-filled workflow back to a summary — the
+            // /workflows fetch above may have already populated the step tree.
             if (initialExecution.workflow) {
-                setWorkflow(initialExecution.workflow);
+                setWorkflow(prev => {
+                    const incoming = initialExecution.workflow!;
+                    if (prev?.groups?.length && !incoming.groups?.length) return prev;
+                    return incoming;
+                });
             }
         }
     }, [initialExecution, mode]);
 
     const handleDownloadLogs = () => {
         if (!workflow) return;
-        const logsToDownload = (activeStepID || activeGroupID) ? stepLogs : globalLogs;
-        const content = logsToDownload.join('\n');
+        const content = logsRef.current.join('\n');
         const blob = new Blob([content], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -360,78 +364,32 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
         return resultGroups.sort((a, b) => a.order - b.order);
     }, [workflow, execution, mode]);
 
-    // Load full workflow if not present. Kept separate from log fetching so a
-    // workflow load doesn't re-trigger (and re-stream) the logs — that caused a
-    // double-fetch and a visible clear/re-render flicker.
-    useEffect(() => {
-        if (mode === 'HISTORICAL' && execution && !workflow) {
-            apiFetch(`${API_BASE_URL}/workflows/${execution.workflow_id}`)
-                .then(res => res.json())
-                .then(setWorkflow);
-        }
-    }, [mode, execution?.id, workflow, apiFetch]);
-
-    // Fetch global logs — stream the body so lines render as chunks arrive
-    // instead of blocking until the whole file downloads. Batched per frame to
-    // avoid a re-render per chunk.
+    // Fetch the full workflow (groups + steps) as soon as the monitor opens so the
+    // sidebar step tree renders immediately. The history list row only carries a
+    // workflow summary (no groups); without this the steps wouldn't appear until
+    // the much heavier execution-detail fetch returned. This is a light, separate
+    // request so the sidebar doesn't wait behind the detail/log work. Ref-guarded
+    // so a genuinely groups-less workflow can't loop-refetch; never downgrades.
+    const fullWfFetchedRef = React.useRef<string | null>(null);
     useEffect(() => {
         if (mode !== 'HISTORICAL' || !execution) return;
+        if (workflow?.groups && workflow.groups.length > 0) return;
+        const wfId = execution.workflow_id;
+        if (!wfId || fullWfFetchedRef.current === wfId) return;
+        fullWfFetchedRef.current = wfId;
+        apiFetch(`${API_BASE_URL}/workflows/${wfId}`)
+            .then(res => res.json())
+            .then(wf => setWorkflow(prev => (prev?.groups?.length ? prev : wf)))
+            .catch(err => console.error('Failed to load workflow:', err));
+    }, [mode, execution?.id, execution?.workflow_id, workflow?.groups?.length, apiFetch]);
 
-        let cancelled = false;
-        setGlobalLogs([]);
-        const batcher = createLineBatcher(batch => {
-            if (!cancelled) setGlobalLogs(prev => [...prev, ...batch]);
-        });
-        apiFetch(`${API_BASE_URL}/executions/${execution.id}/logs`)
-            .then(res => {
-                if (!res.ok) return;
-                return streamResponseLines(res, lines => {
-                    if (cancelled) return;
-                    batcher.push(lines.filter(line => line.length > 0));
-                });
-            })
-            .then(() => { if (!cancelled) batcher.flush(); })
-            .catch(() => { if (!cancelled) batcher.flush(); /* keep partial logs */ });
-        return () => { cancelled = true; batcher.cancel(); };
-    }, [mode, execution?.id, apiFetch]);
-
-    useEffect(() => {
-        if (mode !== 'HISTORICAL' || !execution || (!activeStepID && !activeGroupID)) {
-            setStepLogs([]);
-            return;
-        }
-
-        const url = activeStepID
-            ? `${API_BASE_URL}/executions/${execution.id}/logs?step_id=${activeStepID}`
-            : `${API_BASE_URL}/executions/${execution.id}/logs?group_id=${activeGroupID}`;
-
-        let cancelled = false;
-        setStepLogs([]);
-        const batcher = createLineBatcher(batch => {
-            if (!cancelled) setStepLogs(prev => [...prev, ...batch]);
-        });
-        apiFetch(url)
-            .then(res => {
-                if (!res.ok) {
-                    if (!cancelled) setStepLogs(['[Log file not found]']);
-                    return;
-                }
-                return streamResponseLines(res, lines => {
-                    if (cancelled) return;
-                    batcher.push(lines.filter(line => line.length > 0));
-                });
-            })
-            .then(() => { if (!cancelled) batcher.flush(); })
-            .catch(() => { if (!cancelled) setStepLogs(['[Log file not found]']); });
-        return () => { cancelled = true; batcher.cancel(); };
-    }, [activeStepID, activeGroupID, execution, mode]);
+    // Historical log streaming lives in TerminalLog now (keyed on the target it
+    // displays), so a streamed chunk re-renders only the terminal subtree — not
+    // this whole monitor. Keeping the log state here meant every chunk reconciled
+    // the sidebar/step tree and starved paints (log dumped all at once).
 
     if (!workflow) return null;
 
-    const getStepOutput = (stepID: string) => {
-        if (mode === 'LIVE') return [];
-        return stepLogs;
-    };
 
     const getStepStatus = (stepID: string) => {
         // 0. Check real-time patched statuses first (most robust against clobbering)
@@ -759,7 +717,6 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                             isGroup={!!activeGroupID && !activeStepID}
                             isLive={mode === 'LIVE'}
                             showHeader={false}
-                            initialLogs={activeStepID || activeGroupID ? stepLogs : globalLogs}
                             onLogsChange={handleLogsChange}
                             onReady={() => setIsTerminalReady(true)}
                             className="flex-1 border-0 rounded-none bg-transparent"

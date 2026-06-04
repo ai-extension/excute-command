@@ -4,7 +4,24 @@ import { Terminal as TerminalIcon, Download, Trash2, ChevronDown } from 'lucide-
 import { Button } from './ui/button';
 import Ansi from 'ansi-to-react';
 import { useAuth } from '../context/AuthContext';
-import { API_BASE_URL } from '../lib/api';
+import { API_BASE_URL, streamResponseLines, createLineBatcher } from '../lib/api';
+
+// One log line, memoized so an append only renders the NEW lines. Without this,
+// every streamed batch re-ran the ANSI parser for all accumulated lines (O(n²)),
+// which on a large historical log saturates the main thread — Chrome then can't
+// paint between chunks and dumps the whole log at once at end-of-stream (Safari's
+// scheduler happens to interleave paints, so it looked fine there). Keyed by a
+// stable append-only index, so prior lines keep identical props and skip re-render.
+const LogLine = React.memo(({ index, text }: { index: number; text: string }) => (
+    <div className="flex gap-2 group">
+        <span className="text-muted-foreground/40 select-none text-[10px] w-6 shrink-0 pt-0.5">
+            {(index + 1).toString().padStart(2, '0')}
+        </span>
+        <span className="whitespace-pre leading-relaxed min-w-fit flex-1">
+            <Ansi linkify={false}>{text}</Ansi>
+        </span>
+    </div>
+));
 
 interface TerminalLogProps {
     targetID: string;
@@ -50,11 +67,40 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
         }
     }, [targetID, executionID, isLive, isGlobal, isGroup, apiFetch]);
 
+    // Historical mode: stream the log file for the current target right here.
+    // Owning the stream + state locally means each chunk re-renders only this
+    // terminal subtree — not the parent ExecutionMonitor (whose sidebar/step tree
+    // would otherwise reconcile per chunk and starve paints, so the log dumped
+    // all at once instead of streaming). Batched per frame to cap re-renders.
     useEffect(() => {
-        if (!isLive) {
-            setLogs(initialLogs);
+        if (isLive || !executionID) return;
+
+        let cancelled = false;
+        setLogs([]);
+
+        let url = `${API_BASE_URL}/executions/${executionID}/logs`;
+        if (!isGlobal) {
+            url += isGroup ? `?group_id=${targetID}` : `?step_id=${targetID}`;
         }
-    }, [initialLogs, isLive]);
+
+        const batcher = createLineBatcher(batch => {
+            if (!cancelled) setLogs(prev => [...prev, ...batch]);
+        });
+        apiFetch(url)
+            .then(res => {
+                if (!res.ok) {
+                    if (!cancelled && !isGlobal) setLogs(['[Log file not found]']);
+                    return;
+                }
+                return streamResponseLines(res, lines => {
+                    if (cancelled) return;
+                    batcher.push(lines.filter(l => l.length > 0));
+                });
+            })
+            .then(() => { if (!cancelled) batcher.flush(); })
+            .catch(() => { if (!cancelled) batcher.flush(); /* keep partial logs */ });
+        return () => { cancelled = true; batcher.cancel(); };
+    }, [isLive, executionID, targetID, isGlobal, isGroup, apiFetch]);
 
     // Clear logs when executionID changes to avoid bleeding old run logs into a new run
     useEffect(() => {
@@ -146,7 +192,7 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
         if (autoScroll && scrollRef.current) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
-        if (isLive && onLogsChange) {
+        if (onLogsChange) {
             onLogsChange(logs);
         }
     }, [logs, autoScroll, onLogsChange, isLive]);
@@ -242,14 +288,7 @@ const TerminalLog: React.FC<TerminalLogProps> = ({
                 ) : (
                     <div className="flex flex-col gap-0.5">
                         {logs.map((log, i) => (
-                            <div key={i} className="flex gap-2 group animate-in fade-in duration-300">
-                                <span className="text-muted-foreground/40 select-none text-[10px] w-6 shrink-0 pt-0.5">
-                                    {(i + 1).toString().padStart(2, '0')}
-                                </span>
-                                <span className="whitespace-pre leading-relaxed min-w-fit flex-1">
-                                    <Ansi linkify={false}>{log}</Ansi>
-                                </span>
-                            </div>
+                            <LogLine key={i} index={i} text={log} />
                         ))}
                     </div>
                 )}

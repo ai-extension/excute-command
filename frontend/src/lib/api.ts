@@ -22,6 +22,7 @@ export async function streamResponseLines(
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buf = '';
+    let lastYield = typeof performance !== 'undefined' ? performance.now() : 0;
 
     for (;;) {
         const { done, value } = await reader.read();
@@ -30,6 +31,21 @@ export async function streamResponseLines(
         const lines = buf.split('\n');
         buf = lines.pop() ?? '';
         if (lines.length > 0) onLines(lines);
+
+        // The browser only paints when this task yields. When the body is already
+        // buffered, reader.read() resolves via microtasks back-to-back, so the loop
+        // runs to completion without ever yielding — the batched lines then flush in
+        // a single frame (looks like "all at once" in Chrome; Safari/DevTools happen
+        // to yield differently and appear to stream). Yield to a frame every ~32ms so
+        // paints — incremental log lines AND a sibling sidebar render — interleave
+        // with reading. The time gate keeps the overhead negligible on huge logs.
+        if (typeof requestAnimationFrame !== 'undefined') {
+            const now = performance.now();
+            if (now - lastYield >= 32) {
+                lastYield = now;
+                await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+            }
+        }
     }
 
     buf += decoder.decode();
@@ -52,15 +68,24 @@ export interface LineBatcher {
  * re-renders at ~one per frame while the body streams.
  */
 export function createLineBatcher(emit: (lines: string[]) => void): LineBatcher {
+    // Cap how many lines we hand to React per frame. When the whole body arrives at
+    // once — e.g. served from the HTTP cache on a repeat open — a single emit would
+    // push tens of thousands of lines into one synchronous render and freeze the
+    // main thread (the log "dumps all at once" instead of streaming). Spreading the
+    // emit across frames keeps each render cheap and the stream visible regardless
+    // of how fast the bytes arrive (cache hit or network-paced).
+    const MAX_PER_FRAME = 800;
     let pending: string[] = [];
     let raf = 0;
 
     const run = () => {
         raf = 0;
         if (pending.length === 0) return;
-        const batch = pending;
-        pending = [];
+        const batch = pending.slice(0, MAX_PER_FRAME);
+        pending = pending.slice(MAX_PER_FRAME);
         emit(batch);
+        // More than one frame's worth queued (big burst) → keep draining next frame.
+        if (pending.length > 0) raf = requestAnimationFrame(run);
     };
 
     return {
@@ -70,8 +95,10 @@ export function createLineBatcher(emit: (lines: string[]) => void): LineBatcher 
             if (!raf) raf = requestAnimationFrame(run);
         },
         flush() {
-            if (raf) { cancelAnimationFrame(raf); raf = 0; }
-            run();
+            // Kick a drain if none is scheduled; run() reschedules itself until
+            // pending empties, so a large tail still spreads across frames instead
+            // of one blocking emit.
+            if (!raf) run();
         },
         cancel() {
             if (raf) { cancelAnimationFrame(raf); raf = 0; }

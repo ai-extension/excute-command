@@ -489,6 +489,10 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
                     <DialogTitle className="sr-only">Execution Detail</DialogTitle>
                     {selectedExec && (
                         <ExecutionMonitor
+                            // Re-key by execution id so switching to a different record
+                            // remounts fresh (no stale workflow/steps); enriching the
+                            // SAME record (row -> detail) keeps the id, so no remount.
+                            key={selectedExec.id}
                             mode={selectedExec.status === 'RUNNING' ? 'LIVE' : 'HISTORICAL'}
                             execution={selectedExec}
                             onClose={() => setSelectedExec(null)}
