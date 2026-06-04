@@ -128,7 +128,7 @@ func (s *DashboardService) getStats(namespaceID uuid.UUID, user *domain.User, is
 	if isGlobal {
 		schedules, schTotal, _ = s.scheduleRepo.ListGlobalPaginated(5, 0, "", nil, &schScope)
 	} else {
-		schedules, schTotal, _ = s.scheduleRepo.ListPaginated(namespaceID, 5, 0, "", nil, nil, &schScope)
+		schedules, schTotal, _ = s.scheduleRepo.ListPaginated(namespaceID, 5, 0, "", nil, nil, nil, nil, &schScope)
 	}
 
 	active := 0

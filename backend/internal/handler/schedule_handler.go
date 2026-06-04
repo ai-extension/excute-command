@@ -61,8 +61,22 @@ func (h *ScheduleHandler) List(c *gin.Context) {
 		}
 	}
 
+	// Calendar view sends the visible window (RFC3339). When both are present the
+	// list is range-filtered and returned unpaginated (see repo ListPaginated).
+	var from, to *time.Time
+	if f := c.Query("from"); f != "" {
+		if t, err := time.Parse(time.RFC3339, f); err == nil {
+			from = &t
+		}
+	}
+	if tq := c.Query("to"); tq != "" {
+		if t, err := time.Parse(time.RFC3339, tq); err == nil {
+			to = &t
+		}
+	}
+
 	user, _ := c.Get("user")
-	schedules, total, err := h.service.ListPaginated(nsID, limit, offset, searchTerm, tagIDs, createdBy, user.(*domain.User))
+	schedules, total, err := h.service.ListPaginated(nsID, limit, offset, searchTerm, tagIDs, createdBy, from, to, user.(*domain.User))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -600,7 +600,7 @@ type ScheduleRepository interface {
 	Create(s *Schedule) error
 	GetByID(id uuid.UUID, scope *PermissionScope) (*Schedule, error)
 	List(namespaceID uuid.UUID, scope *PermissionScope) ([]Schedule, error)
-	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, tagIDs []uuid.UUID, createdBy *uuid.UUID, scope *PermissionScope) ([]Schedule, int64, error)
+	ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, tagIDs []uuid.UUID, createdBy *uuid.UUID, from, to *time.Time, scope *PermissionScope) ([]Schedule, int64, error)
 	ListGlobalPaginated(limit, offset int, searchTerm string, tagIDs []uuid.UUID, scope *PermissionScope) ([]Schedule, int64, error)
 	Update(s *Schedule) error
 	Delete(id uuid.UUID) error

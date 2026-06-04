@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
     format,
     startOfMonth,
@@ -25,6 +25,9 @@ interface ScheduleCalendarProps {
     onEdit: (schedule: Schedule) => void;
     onToggleStatus: (id: string) => void;
     onCreate?: (date: Date) => void;
+    // Reports the visible grid window (start/end) so the parent can fetch the
+    // schedules for that range. Fires on mount and whenever the month changes.
+    onRangeChange?: (start: Date, end: Date) => void;
 }
 
 const DOT_COLORS: Record<string, string> = {
@@ -41,7 +44,7 @@ function getOneTimeDayForMonth(schedule: Schedule, year: number, month: number):
     return null;
 }
 
-const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({ schedules, onEdit, onToggleStatus, onCreate }) => {
+const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({ schedules, onEdit, onToggleStatus, onCreate, onRangeChange }) => {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [hoveredDay, setHoveredDay] = useState<Date | null>(null);
     const [selectedDay, setSelectedDay] = useState<Date | null>(null);
@@ -55,6 +58,14 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({ schedules, onEdit, 
     const calStart = startOfWeek(monthStart, { weekStartsOn: 1 });
     const calEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
     const days = eachDayOfInterval({ start: calStart, end: calEnd });
+
+    // Report the visible window up so the parent can fetch schedules for it.
+    // Keyed on the month (currentDate) only — re-runs on month nav, not on every
+    // render — and the parent dedupes identical windows.
+    useEffect(() => {
+        onRangeChange?.(calStart, calEnd);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentDate]);
 
     // Build a map: day string -> schedules for that day
     const dayScheduleMap = useMemo(() => {

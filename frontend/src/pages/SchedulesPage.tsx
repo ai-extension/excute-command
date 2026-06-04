@@ -25,7 +25,10 @@ const SchedulesPage = () => {
     const [appliedSearchTerm, setAppliedSearchTerm] = useState('');
     const [appliedTagIds, setAppliedTagIds] = useState<string[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+    const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar');
+    // Visible calendar window (RFC3339), reported by ScheduleCalendar on month nav.
+    // In calendar mode the fetch is scoped to this range instead of paginated.
+    const [calRange, setCalRange] = useState<{ from: string; to: string } | null>(null);
     const [selectedCreatedBy, setSelectedCreatedBy] = useState<string | undefined>(undefined);
     const { users: availableUsers, fetchUsers } = useUsers();
     const [availableTags, setAvailableTags] = useState<Tag[]>([]);
@@ -72,6 +75,9 @@ const SchedulesPage = () => {
 
     const fetchSchedules = async () => {
         if (!activeNamespace) return;
+        // Calendar mode fetches by the visible window; wait until it's reported so
+        // we don't fire a throwaway paginated request first.
+        if (viewMode === 'calendar' && !calRange) return;
         setIsLoading(true);
         try {
             let url = `${API_BASE_URL}/namespaces/${activeNamespace.id}/schedules?limit=${limit}&offset=${offset}`;
@@ -82,6 +88,9 @@ const SchedulesPage = () => {
                 });
             }
             if (selectedCreatedBy) url += `&created_by=${selectedCreatedBy}`;
+            if (viewMode === 'calendar' && calRange) {
+                url += `&from=${encodeURIComponent(calRange.from)}&to=${encodeURIComponent(calRange.to)}`;
+            }
             const response = await apiFetch(url);
             const data = await response.json();
             setSchedules(data.items || []);
@@ -95,8 +104,11 @@ const SchedulesPage = () => {
 
     useEffect(() => {
         fetchSchedules();
+    }, [activeNamespace, offset, limit, appliedSearchTerm, appliedTagIds, selectedCreatedBy, viewMode, calRange?.from, calRange?.to]);
+
+    useEffect(() => {
         fetchTags();
-    }, [activeNamespace, offset, limit, appliedSearchTerm, appliedTagIds, selectedCreatedBy]);
+    }, [activeNamespace]);
 
     const handleSaveSchedule = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -295,6 +307,11 @@ const SchedulesPage = () => {
                     onEdit={handleOpenForm}
                     onToggleStatus={handleToggleStatus}
                     onCreate={(date: Date) => handleOpenForm(undefined, date)}
+                    onRangeChange={(start: Date, end: Date) => {
+                        const from = start.toISOString();
+                        const to = end.toISOString();
+                        setCalRange(prev => (prev && prev.from === from && prev.to === to) ? prev : { from, to });
+                    }}
                 />
             )}
 

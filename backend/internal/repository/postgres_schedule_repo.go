@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/user/csm-backend/internal/domain"
 	"gorm.io/gorm"
@@ -57,7 +59,7 @@ func (r *PostgresScheduleRepo) List(namespaceID uuid.UUID, scope *domain.Permiss
 	return ss, nil
 }
 
-func (r *PostgresScheduleRepo) ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, tagIDs []uuid.UUID, createdBy *uuid.UUID, scope *domain.PermissionScope) ([]domain.Schedule, int64, error) {
+func (r *PostgresScheduleRepo) ListPaginated(namespaceID uuid.UUID, limit, offset int, searchTerm string, tagIDs []uuid.UUID, createdBy *uuid.UUID, from, to *time.Time, scope *domain.PermissionScope) ([]domain.Schedule, int64, error) {
 	var ss []domain.Schedule
 	var total int64
 
@@ -76,20 +78,35 @@ func (r *PostgresScheduleRepo) ListPaginated(namespaceID uuid.UUID, limit, offse
 		db = db.Where("created_by = ?", createdBy)
 	}
 
+	// Calendar range filter: ONE_TIME schedules are bounded to their next_run_at,
+	// so only those landing inside the visible window are relevant. RECURRING ones
+	// have no single date — the calendar expands their cron occurrences client-side
+	// — so always include them regardless of next_run_at.
+	rangeMode := from != nil && to != nil
+	if rangeMode {
+		db = db.Where(
+			"type = ? OR (type = ? AND next_run_at BETWEEN ? AND ?)",
+			domain.ScheduleTypeRecurring, domain.ScheduleTypeOneTime, *from, *to,
+		)
+	}
+
 	if err := db.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
-	if err := db.
+	q := db.
 		Preload("User").
 		Preload("ScheduledWorkflows").
 		Preload("ScheduledWorkflows.Workflow").
 		Preload("Hooks", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
 		Preload("Hooks.TargetWorkflow").
 		Preload("Tags").
-		Limit(limit).Offset(offset).
-		Order("created_at desc").
-		Find(&ss).Error; err != nil {
+		Order("created_at desc")
+	// In range (calendar) mode the whole window is shown at once — no pagination.
+	if !rangeMode {
+		q = q.Limit(limit).Offset(offset)
+	}
+	if err := q.Find(&ss).Error; err != nil {
 		return nil, 0, err
 	}
 	for i := range ss {
