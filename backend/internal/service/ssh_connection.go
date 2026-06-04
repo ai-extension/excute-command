@@ -29,6 +29,26 @@ func NewSSHConnection(server *domain.Server, vpnConnector *VpnConnector) (*SSHCo
 	return &SSHConnection{client: client, server: server}, nil
 }
 
+// reapRemote force-kills the remote process recorded in pidPath — its PID, its
+// process group (leading "-"), and its direct children (pkill -P) — over a fresh
+// SSH session, then removes the pidfile. Immediate SIGKILL, no TERM grace, so a
+// stop/timeout halts the command without delay. Best-effort + fully POSIX; the
+// group/pkill variants cover the cases the bare PID misses, and pkill may be
+// absent (busybox) so errors are swallowed.
+func (c *SSHConnection) reapRemote(pidPath string) {
+	ks, err := c.client.NewSession()
+	if err != nil {
+		return
+	}
+	defer ks.Close()
+	_ = ks.Run(fmt.Sprintf(
+		"P=$(cat %s 2>/dev/null); "+
+			"if [ -n \"$P\" ]; then "+
+			"kill -KILL -\"$P\" 2>/dev/null; kill -KILL \"$P\" 2>/dev/null; pkill -KILL -P \"$P\" 2>/dev/null; "+
+			"fi; rm -f %s",
+		pidPath, pidPath))
+}
+
 func (c *SSHConnection) Execute(ctx context.Context, command string, writers ...io.Writer) (string, error) {
 	session, err := c.client.NewSession()
 	if err != nil {
@@ -53,9 +73,8 @@ func (c *SSHConnection) Execute(ctx context.Context, command string, writers ...
 	// Without a PTY, closing the SSH session does NOT reliably signal the remote
 	// process, so a cancelled command can keep running (orphaned) on the server.
 	// Mitigation: the remote shell records its PID to a pidfile (and removes it on
-	// exit via a trap); on cancellation we open a second session to TERM→KILL that
-	// process, its process group, and its direct children. echo/trap write to a
-	// file, not stdout, so the command's real output (and the CWD marker) is
+	// exit via a trap); on cancellation we reap it via reapRemote. echo/trap write
+	// to a file, not stdout, so the command's real output (and the CWD marker) is
 	// unaffected.
 	pidPath := fmt.Sprintf("/tmp/.wf_%s.pid", uuid.New().String())
 	wrapped := fmt.Sprintf("echo $$ > %s; trap 'rm -f %s' EXIT; %s", pidPath, pidPath, command)
@@ -69,21 +88,7 @@ func (c *SSHConnection) Execute(ctx context.Context, command string, writers ...
 		case <-ctx.Done():
 			// Unblock the local Run first, then reap the remote process tree.
 			session.Close()
-			if ks, kerr := c.client.NewSession(); kerr == nil {
-				// Best-effort, fully POSIX. The leading "-" targets the process
-				// group (works when the shell is the group leader); the bare PID
-				// and pkill -P cover the common cases otherwise. pkill may be
-				// absent (busybox) — errors are swallowed.
-				_ = ks.Run(fmt.Sprintf(
-					"P=$(cat %s 2>/dev/null); "+
-						"if [ -n \"$P\" ]; then "+
-						"kill -TERM -\"$P\" 2>/dev/null; kill -TERM \"$P\" 2>/dev/null; pkill -TERM -P \"$P\" 2>/dev/null; "+
-						"sleep 2; "+
-						"kill -KILL -\"$P\" 2>/dev/null; kill -KILL \"$P\" 2>/dev/null; pkill -KILL -P \"$P\" 2>/dev/null; "+
-						"fi; rm -f %s",
-					pidPath, pidPath))
-				ks.Close()
-			}
+			c.reapRemote(pidPath)
 		case <-done:
 		}
 	}()
@@ -258,21 +263,36 @@ func (c *SSHConnection) ExecuteWithTTY(ctx context.Context, command string, stdi
 		}()
 	}
 
+	// A PTY session.Close() only sends SIGHUP; commands that ignore SIGHUP (or
+	// spawned children) survive a stop/timeout. So, like the non-PTY Execute, record
+	// the remote shell PID and on cancellation reap it via reapRemote (SIGKILL of the
+	// process, its group, and its direct children). The pidfile write/trap go to a
+	// file (not the PTY), so interactive output and auto-input are unaffected.
+	pidPath := fmt.Sprintf("/tmp/.wf_%s.pid", uuid.New().String())
+	wrapped := fmt.Sprintf("echo $$ > %s; trap 'rm -f %s' EXIT; %s", pidPath, pidPath, command)
+
 	done := make(chan struct{})
-	defer close(done)
+	killDone := make(chan struct{})
 	go func() {
+		defer close(killDone)
 		select {
 		case <-ctx.Done():
+			// Unblock the local Run first, then reap the remote process tree.
 			session.Close()
+			c.reapRemote(pidPath)
 		case <-done:
 		}
 	}()
 
-	if err := session.Run(command); err != nil {
+	runErr := session.Run(wrapped)
+	close(done)
+	<-killDone // ensure the reaper finished while c.client is still open
+
+	if runErr != nil {
 		if ctx.Err() != nil {
 			return capBuf.String(), ctx.Err()
 		}
-		return capBuf.String(), fmt.Errorf("tty command failed: %w", err)
+		return capBuf.String(), fmt.Errorf("tty command failed: %w", runErr)
 	}
 	return capBuf.String(), nil
 }
