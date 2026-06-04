@@ -447,12 +447,17 @@ func (h *WorkflowHandler) GetExecution(c *gin.Context) {
 	c.JSON(http.StatusOK, execution)
 }
 
-// serveLogFile streams a log file to the client. It sets X-Content-Type-Options:
-// nosniff so the browser hands body chunks to the fetch ReadableStream reader as
-// they arrive, instead of withholding the first ~1KB for client-side MIME
-// sniffing. That sniff buffer is why the log viewers appeared to "wait for the
-// whole call, then dump" unless DevTools (which disables the buffer) was open.
+// serveLogFile streams a log file to the client incrementally. Two layers buffer
+// a streamed response and must each be told not to:
+//   - X-Accel-Buffering: no — the production nginx reverse proxy defaults to
+//     proxy_buffering on, which accumulates the whole upstream body before
+//     forwarding it ("show up all at once after the call finishes"). This header
+//     disables buffering for this single response without touching nginx config.
+//   - X-Content-Type-Options: nosniff + an explicit Content-Type — stops the
+//     browser from withholding the first ~1KB for client-side MIME sniffing
+//     before handing chunks to the fetch ReadableStream reader.
 func serveLogFile(c *gin.Context, path string) {
+	c.Header("X-Accel-Buffering", "no")
 	c.Header("X-Content-Type-Options", "nosniff")
 	c.Header("Content-Type", "text/plain; charset=utf-8")
 	c.File(path)
