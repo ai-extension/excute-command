@@ -1462,14 +1462,8 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 				return fmt.Errorf("interpolation error: %w", renderErr)
 			}
 
-			cmdPreview := command
-			if len(cmdPreview) > 500 {
-				cmdPreview = cmdPreview[:500] + "..."
-			}
-			cmdMsg := fmt.Sprintf("\033[90m$ %s\033[0m\n", cmdPreview)
-			fmt.Fprint(mainLogFile, cmdMsg)
-			fmt.Fprint(stepLogFile, cmdMsg)
-			e.hub.BroadcastLog(workflowID.String(), executionID.String(), cmdMsg)
+			// Command echo intentionally suppressed: only the command's output is
+			// logged, not the rendered command source.
 
 			// Resolve AutoInputs variables for this step iteration
 			if len(execCfg.AutoInputs) > 0 {
