@@ -18,7 +18,7 @@ import {
 import { cn } from '../lib/utils';
 import { Workflow, WorkflowGroup, WorkflowStep, WorkflowExecution } from '../types';
 import { useAuth } from '../context/AuthContext';
-import { API_BASE_URL } from '../lib/api';
+import { API_BASE_URL, streamResponseLines } from '../lib/api';
 import TerminalLog from './TerminalLog';
 
 interface ExecutionMonitorProps {
@@ -351,27 +351,50 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                     .then(res => res.json())
                     .then(setWorkflow);
             }
-            // Fetch global logs
+            // Fetch global logs — stream the body so lines render as chunks
+            // arrive instead of blocking until the whole file downloads.
+            let cancelled = false;
+            setGlobalLogs([]);
             apiFetch(`${API_BASE_URL}/executions/${execution.id}/logs`)
-                .then(res => res.text())
-                .then(text => setGlobalLogs(text.split('\n').filter(line => line.length > 0)));
+                .then(res => {
+                    if (!res.ok) return;
+                    return streamResponseLines(res, lines => {
+                        if (cancelled) return;
+                        const filtered = lines.filter(line => line.length > 0);
+                        if (filtered.length > 0) setGlobalLogs(prev => [...prev, ...filtered]);
+                    });
+                })
+                .catch(() => { /* keep partial logs on mid-stream/fetch error */ });
+            return () => { cancelled = true; };
         }
     }, [mode, execution?.id, apiFetch, !!workflow]);
 
     useEffect(() => {
-        if (mode === 'HISTORICAL' && execution && activeStepID) {
-            apiFetch(`${API_BASE_URL}/executions/${execution.id}/logs?step_id=${activeStepID}`)
-                .then(res => res.text())
-                .then(text => setStepLogs(text.split('\n').filter(line => line.length > 0)))
-                .catch(() => setStepLogs(['[Log file not found]']));
-        } else if (mode === 'HISTORICAL' && execution && activeGroupID) {
-            apiFetch(`${API_BASE_URL}/executions/${execution.id}/logs?group_id=${activeGroupID}`)
-                .then(res => res.text())
-                .then(text => setStepLogs(text.split('\n').filter(line => line.length > 0)))
-                .catch(() => setStepLogs(['[Log file not found]']));
-        } else {
+        if (mode !== 'HISTORICAL' || !execution || (!activeStepID && !activeGroupID)) {
             setStepLogs([]);
+            return;
         }
+
+        const url = activeStepID
+            ? `${API_BASE_URL}/executions/${execution.id}/logs?step_id=${activeStepID}`
+            : `${API_BASE_URL}/executions/${execution.id}/logs?group_id=${activeGroupID}`;
+
+        let cancelled = false;
+        setStepLogs([]);
+        apiFetch(url)
+            .then(res => {
+                if (!res.ok) {
+                    if (!cancelled) setStepLogs(['[Log file not found]']);
+                    return;
+                }
+                return streamResponseLines(res, lines => {
+                    if (cancelled) return;
+                    const filtered = lines.filter(line => line.length > 0);
+                    if (filtered.length > 0) setStepLogs(prev => [...prev, ...filtered]);
+                });
+            })
+            .catch(() => { if (!cancelled) setStepLogs(['[Log file not found]']); });
+        return () => { cancelled = true; };
     }, [activeStepID, activeGroupID, execution, mode]);
 
     if (!workflow) return null;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Zap, Play, Loader2, CheckCircle2, AlertTriangle, Square, History, RotateCcw, XCircle, Clock, FileText } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -8,7 +8,7 @@ import { PageWidget } from '../../types';
 import { ExecutionHistoryEntry } from '../../lib/executionHistory';
 import { resolveButtonStyle } from '../ButtonStylePicker';
 import AnsiText from '../AnsiText';
-import { API_BASE_URL } from '../../lib/api';
+import { API_BASE_URL, streamResponseLines } from '../../lib/api';
 
 interface EndpointWidgetProps {
     widget: PageWidget;
@@ -60,7 +60,12 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
     const hasHistory = history.length > 0;
     const styleResolved = resolveButtonStyle(widget.style, 'premium-gradient');
 
+    const logReqRef = useRef(0);
+
     const openLog = async (entry: ExecutionHistoryEntry) => {
+        // Stale-request guard: if another entry is opened mid-stream, older
+        // streams must stop appending so their lines don't bleed into the new view.
+        const reqId = ++logReqRef.current;
         setLogEntry(entry);
         setLogLines([]);
         setLogError(null);
@@ -73,17 +78,22 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
             const headers: Record<string, string> = {};
             if (pageToken) headers['X-Page-Token'] = pageToken;
             const res = await fetch(`${API_BASE_URL}/public/pages/${slug}/executions/${entry.executionId}/logs`, { headers });
+            if (logReqRef.current !== reqId) return;
             if (!res.ok) {
                 const txt = await res.text();
                 setLogError(`Failed to load log (${res.status})${txt ? ': ' + txt.slice(0, 200) : ''}`);
                 return;
             }
-            const text = await res.text();
-            setLogLines(text.split('\n'));
+            // Stream the body so lines render as chunks arrive instead of
+            // blocking until the whole log file downloads.
+            await streamResponseLines(res, lines => {
+                if (logReqRef.current !== reqId) return;
+                setLogLines(prev => [...prev, ...lines]);
+            });
         } catch (e: any) {
-            setLogError(e?.message || 'Failed to load log');
+            if (logReqRef.current === reqId) setLogError(e?.message || 'Failed to load log');
         } finally {
-            setLogLoading(false);
+            if (logReqRef.current === reqId) setLogLoading(false);
         }
     };
 
