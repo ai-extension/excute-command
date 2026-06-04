@@ -68,6 +68,12 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
     const offsetRef = useRef(0);
     const [selectedExec, setSelectedExec] = useState<WorkflowExecution | null>(null);
     const [isMonitorMaximized, setIsMonitorMaximized] = useState(false);
+    // Id of the execution whose detail is being fetched before its popup opens, so
+    // the clicked row can show a loading indicator during the wait.
+    const [loadingExecId, setLoadingExecId] = useState<string | null>(null);
+    // Latest execution whose detail was requested, so a slower earlier fetch can't
+    // clobber the selection when rows are clicked in quick succession.
+    const detailReqRef = useRef<string | null>(null);
     const wsRef = useRef<WebSocket | null>(null);
     const [now, setNow] = useState(Date.now());
 
@@ -199,37 +205,21 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
     }, [workflowId, namespaceId, status, executedBy, search, tagIds]);
 
     const fetchExecutionDetail = async (exec: WorkflowExecution) => {
-        // RUNNING executions open in LIVE mode where the workflow groups drive the
-        // live step tree and WebSocket status patches mutate the execution; fetch
-        // the full detail up front so we don't drop the tree or clobber live
-        // status with a stale snapshot.
-        if (exec.status === 'RUNNING') {
-            try {
-                const response = await apiFetch(`${API_BASE_URL}/executions/${exec.id}`);
-                setSelectedExec(response.ok ? await response.json() : exec);
-            } catch (error) {
-                console.error('Failed to fetch execution detail:', error);
-                setSelectedExec(exec);
-            }
-            return;
-        }
-
-        // Finished executions: open the monitor immediately with the lightweight
-        // row so the log stream (keyed only on execution id) starts at once, then
-        // swap in the full detail. The detail endpoint preloads
-        // Workflow.Groups.Steps + execution Steps and is heavy; awaiting it before
-        // mounting was what made the log show up slowly.
-        setSelectedExec(exec);
+        // Fetch the full execution (workflow groups+steps + per-step statuses)
+        // BEFORE opening the popup, so the sidebar step tree is already populated
+        // the moment the monitor appears. Falls back to the lightweight row on error.
+        detailReqRef.current = exec.id;
+        setLoadingExecId(exec.id);
         try {
             const response = await apiFetch(`${API_BASE_URL}/executions/${exec.id}`);
-            if (response.ok) {
-                const detail: WorkflowExecution = await response.json();
-                // Swap in enriched detail (steps + workflow groups), unless the
-                // user already switched to another execution mid-fetch.
-                setSelectedExec(prev => (prev && prev.id === detail.id ? detail : prev));
-            }
+            const data = response.ok ? await response.json() : exec;
+            if (detailReqRef.current !== exec.id) return; // a newer row was clicked
+            setSelectedExec(data);
         } catch (error) {
             console.error('Failed to fetch execution detail:', error);
+            if (detailReqRef.current === exec.id) setSelectedExec(exec);
+        } finally {
+            setLoadingExecId(cur => (cur === exec.id ? null : cur));
         }
     };
 
@@ -398,7 +388,9 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
                                     </div>
                                 </div>
                             </div>
-                            <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
+                            {loadingExecId === exec.id
+                                ? <Loader2 className="w-4 h-4 text-primary animate-spin shrink-0" />
+                                : <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />}
                         </CardContent>
                     </Card>
 
