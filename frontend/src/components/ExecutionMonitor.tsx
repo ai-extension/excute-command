@@ -53,6 +53,14 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
     const [isStatusWSReady, setIsStatusWSReady] = useState(false);
     const [isTerminalReady, setIsTerminalReady] = useState(false);
     const [showStopConfirm, setShowStopConfirm] = useState(false);
+    // LIVE only: hold the log terminal off until the sidebar step tree is loaded,
+    // so steps always paint before any log line. Safe to defer — the live log WS
+    // replays the buffered output via request_catchup on (re)connect, so gating
+    // the terminal mount loses no lines. Already true when the caller passed a
+    // workflow that has groups (designer run) so that path mounts immediately.
+    const [liveStructureReady, setLiveStructureReady] = useState(
+        mode !== 'LIVE' || !!(initialWorkflow?.groups && initialWorkflow.groups.length > 0)
+    );
     const { apiFetch, showToast } = useAuth();
 
     // Hold the currently displayed log lines in a ref (not state) so streamed
@@ -128,24 +136,49 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
         URL.revokeObjectURL(url);
     };
 
+    // Coalesce overlapping /workflows syncs. The mount-time eager load and the
+    // ws.onopen post-subscribe sync can fire near-simultaneously; running them as
+    // concurrent GETs lets their responses race and clobber each other (an older
+    // response landing last). Instead we serialize: a call arriving mid-flight
+    // flags a single re-run so the LAST requested sync still happens exactly once
+    // after the current one finishes — we never drop ws.onopen's sync, which is
+    // the authoritative post-subscribe read of the workflow-level status (that
+    // status is NOT in the hub's replay buffer — only step/group statuses are).
+    const syncInFlightRef = React.useRef(false);
+    const syncPendingRef = React.useRef(false);
+    // Latest workflow-level status seen on the status WS. syncStatus reads the DB
+    // row, whose status can lag a live WS update — preserve the live value so a
+    // late-resolving sync can't downgrade e.g. RUNNING back to a stale PENDING.
+    const latestWfStatusRef = React.useRef<string | null>(null);
     const syncStatus = useCallback(async () => {
         if (!workflowID) return;
+        if (syncInFlightRef.current) { syncPendingRef.current = true; return; }
+        syncInFlightRef.current = true;
         try {
-            const data = await apiFetch(`${API_BASE_URL}/workflows/${workflowID}`, {});
-            const updatedWF = await data.json();
-            setWorkflow(prev => {
-                if (!prev) return updatedWF;
+            do {
+                syncPendingRef.current = false;
+                const data = await apiFetch(`${API_BASE_URL}/workflows/${workflowID}`, {});
+                const updatedWF = await data.json();
+                setWorkflow(prev => {
+                    if (!prev) return updatedWF;
 
-                // Preserve execution_id if it's attached to the workflow object
-                const next = { ...updatedWF };
-                if ((prev as any).execution_id && !(next as any).execution_id) {
-                    (next as any).execution_id = (prev as any).execution_id;
-                }
+                    // Preserve execution_id if it's attached to the workflow object
+                    const next = { ...updatedWF };
+                    if ((prev as any).execution_id && !(next as any).execution_id) {
+                        (next as any).execution_id = (prev as any).execution_id;
+                    }
+                    // Don't let a stale DB status overwrite a newer live WS status
+                    if (latestWfStatusRef.current) {
+                        next.status = latestWfStatusRef.current;
+                    }
 
-                return next;
-            });
+                    return next;
+                });
+            } while (syncPendingRef.current);
         } catch (err) {
             console.error('Failed to sync workflow status:', err);
+        } finally {
+            syncInFlightRef.current = false;
         }
     }, [workflowID, apiFetch]);
 
@@ -198,6 +231,12 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
                 const targetType = msg.target_type;
 
                 setPatchedStatuses(prev => ({ ...prev, [targetID]: status }));
+
+                // Remember the live workflow-level status so a later syncStatus()
+                // (whose DB read may lag) can't downgrade it.
+                if (targetID === workflowID) {
+                    latestWfStatusRef.current = status;
+                }
 
                 setWorkflow(prev => {
                     if (!prev) return prev;
@@ -382,6 +421,27 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
             .then(wf => setWorkflow(prev => (prev?.groups?.length ? prev : wf)))
             .catch(err => console.error('Failed to load workflow:', err));
     }, [mode, execution?.id, execution?.workflow_id, workflow?.groups?.length, apiFetch]);
+
+    // LIVE: pull the full workflow (groups + steps) immediately on open so the
+    // sidebar step tree shows up right away. The list-run path (WorkflowPage)
+    // passes only a workflow summary — ListPaginated doesn't preload Groups/Steps
+    // — so without this the steps wouldn't appear until the status WS opened and
+    // called syncStatus() in onopen, which races behind the log stream: logs
+    // showed first, then the steps. syncStatus already merges while preserving
+    // execution_id. Ref + groups-length guard so it fires once and never loops.
+    const liveWfFetchedRef = React.useRef<string | null>(null);
+    useEffect(() => {
+        if (mode !== 'LIVE' || !workflowID) return;
+        if (workflow?.groups && workflow.groups.length > 0) {
+            setLiveStructureReady(true);
+            return;
+        }
+        if (liveWfFetchedRef.current === workflowID) return;
+        liveWfFetchedRef.current = workflowID;
+        // Open the terminal once the structure load settles (even on failure, so a
+        // genuinely groups-less workflow never wedges the log view shut).
+        syncStatus().finally(() => setLiveStructureReady(true));
+    }, [mode, workflowID, workflow?.groups?.length, syncStatus]);
 
     // Historical log streaming lives in TerminalLog now (keyed on the target it
     // displays), so a streamed chunk re-renders only the terminal subtree — not
@@ -708,19 +768,28 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
 
                 <div className="flex-1 flex flex-col bg-background min-w-0 overflow-hidden">
                     <div className="flex-1 flex flex-col overflow-hidden p-1">
-                        <TerminalLog
-                            targetID={activeStepID || activeGroupID || (workflow?.id || 'GLOBAL')}
-                            executionID={execution?.id || (workflow as any)?.execution_id}
-                            parentExecutionID={execution?.parent_execution_id}
-                            isActive={true}
-                            isGlobal={!activeStepID && !activeGroupID}
-                            isGroup={!!activeGroupID && !activeStepID}
-                            isLive={mode === 'LIVE'}
-                            showHeader={false}
-                            onLogsChange={handleLogsChange}
-                            onReady={() => setIsTerminalReady(true)}
-                            className="flex-1 border-0 rounded-none bg-transparent"
-                        />
+                        {liveStructureReady ? (
+                            <TerminalLog
+                                targetID={activeStepID || activeGroupID || (workflow?.id || 'GLOBAL')}
+                                executionID={execution?.id || (workflow as any)?.execution_id}
+                                parentExecutionID={execution?.parent_execution_id}
+                                isActive={true}
+                                isGlobal={!activeStepID && !activeGroupID}
+                                isGroup={!!activeGroupID && !activeStepID}
+                                isLive={mode === 'LIVE'}
+                                showHeader={false}
+                                onLogsChange={handleLogsChange}
+                                onReady={() => setIsTerminalReady(true)}
+                                className="flex-1 border-0 rounded-none bg-transparent"
+                            />
+                        ) : (
+                            <div className="flex-1 flex flex-col items-center justify-center opacity-20 gap-3 grayscale">
+                                <Terminal className="w-8 h-8" />
+                                <p className="text-[10px] font-black uppercase tracking-[0.3em]">
+                                    Initializing console...
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
