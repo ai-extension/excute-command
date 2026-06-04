@@ -422,10 +422,13 @@ func (h *Hub) BroadcastStatus(targetID string, executionID string, targetType st
 	}
 	jsonMsg, _ := json.Marshal(msg)
 
-	select {
-	case h.broadcast <- jsonMsg:
-	default:
-	}
+	// Status messages carry terminal state (RUNNING -> SUCCESS/FAILED). They must
+	// not be dropped: a non-blocking send discarded the SUCCESS whenever the
+	// channel was momentarily full (e.g. flooded by the step's own log output),
+	// leaving the step stuck on RUNNING in the UI. Send blocking like BroadcastLog
+	// so a full channel delays the status instead of losing it. The per-target
+	// buffer above (s.StepStatuses) still backs late subscribers via catch-up.
+	h.broadcast <- jsonMsg
 }
 
 func (h *Hub) Register(conn *websocket.Conn, access AccessContext) *Client {
