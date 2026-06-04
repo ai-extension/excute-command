@@ -560,6 +560,7 @@ type WorkflowExecutionRepository interface {
 	GetExecutionAnalytics(namespaceID uuid.UUID, days int, scope *PermissionScope) ([]map[string]interface{}, error)
 	CleanupInterruptedExecutions() error
 	GetRunningExecutions() ([]WorkflowExecution, error)
+	GetStatusesByIDs(ids []uuid.UUID) ([]WorkflowExecution, error)
 }
 
 type GlobalVariableRepository interface {

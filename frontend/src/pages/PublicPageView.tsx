@@ -71,8 +71,58 @@ const PublicPageView = () => {
 
     // Execution history (persisted per slug in localStorage)
     const [historyMap, setHistoryMap] = useState<HistoryMap>({});
+
+    // Resolve the real status of entries persisted as RUNNING. Public history lives in
+    // localStorage and is only patched for the *active* run via the live terminal, so a
+    // reload (or closing the terminal / starting another run) leaves finished records
+    // stuck spinning forever. Reconcile them in a single batched request rather than one
+    // call per record.
+    const reconcileRunningStatuses = useCallback(async (map: HistoryMap) => {
+        if (!slug) return;
+        const runningIds = new Set<string>();
+        Object.values(map).forEach(list =>
+            list.forEach(e => { if (e.status === 'RUNNING') runningIds.add(e.executionId); })
+        );
+        if (runningIds.size === 0) return;
+        try {
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+            if (pageToken) headers['X-Page-Token'] = pageToken;
+            // Raw fetch (not apiFetch): a tokenless reconcile on a password page returns
+            // 401, and apiFetch would clear auth state + toast on non-ok. Mirror
+            // EndpointWidget.openLog, which uses plain fetch for the same reason.
+            const res = await fetch(`${API_BASE_URL}/public/pages/${slug}/execution-statuses`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ execution_ids: Array.from(runningIds) }),
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            const statuses: { id: string; status: string }[] = data.statuses || [];
+            const resolved = statuses.filter(s => s.status && s.status !== 'RUNNING');
+            if (resolved.length === 0) return;
+            setHistoryMap(prev => {
+                let next = prev;
+                resolved.forEach(s => {
+                    Object.keys(next).forEach(widgetId => {
+                        if (next[widgetId].some(e => e.executionId === s.id)) {
+                            next = updateEntryStatus(next, widgetId, s.id, s.status);
+                        }
+                    });
+                });
+                return next;
+            });
+        } catch {
+            // network/parse error: leave entries as-is, retried next time history opens
+        }
+    }, [slug, pageToken]);
+
     useEffect(() => {
-        if (slug) setHistoryMap(loadHistory(slug));
+        if (slug) {
+            const loaded = loadHistory(slug);
+            setHistoryMap(loaded);
+            reconcileRunningStatuses(loaded);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [slug]);
     useEffect(() => {
         if (slug) saveHistory(slug, historyMap);
@@ -505,6 +555,7 @@ const PublicPageView = () => {
                                             history={historyMap[widget.id] || []}
                                             slug={slug}
                                             pageToken={pageToken}
+                                            onOpenHistory={() => reconcileRunningStatuses(historyMap)}
                                         />
                                     );
                                 }

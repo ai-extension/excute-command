@@ -447,6 +447,17 @@ func (h *WorkflowHandler) GetExecution(c *gin.Context) {
 	c.JSON(http.StatusOK, execution)
 }
 
+// serveLogFile streams a log file to the client. It sets X-Content-Type-Options:
+// nosniff so the browser hands body chunks to the fetch ReadableStream reader as
+// they arrive, instead of withholding the first ~1KB for client-side MIME
+// sniffing. That sniff buffer is why the log viewers appeared to "wait for the
+// whole call, then dump" unless DevTools (which disables the buffer) was open.
+func serveLogFile(c *gin.Context, path string) {
+	c.Header("X-Content-Type-Options", "nosniff")
+	c.Header("Content-Type", "text/plain; charset=utf-8")
+	c.File(path)
+}
+
 func (h *WorkflowHandler) GetExecutionLogs(c *gin.Context) {
 	idStr := c.Param("exec_id")
 	id, err := uuid.Parse(idStr)
@@ -482,7 +493,7 @@ func (h *WorkflowHandler) GetExecutionLogs(c *gin.Context) {
 		}
 		path := filepath.Join(execLogDir, stepUUID.String()+".log")
 		if _, err := os.Stat(path); err == nil {
-			c.File(path)
+			serveLogFile(c, path)
 			return
 		}
 	} else if groupID != "" {
@@ -506,7 +517,7 @@ func (h *WorkflowHandler) GetExecutionLogs(c *gin.Context) {
 	} else {
 		mainLogPath := filepath.Join(execLogDir, "workflow.log")
 		if _, err := os.Stat(mainLogPath); err == nil {
-			c.File(mainLogPath)
+			serveLogFile(c, mainLogPath)
 			return
 		}
 
@@ -523,7 +534,7 @@ func (h *WorkflowHandler) GetExecutionLogs(c *gin.Context) {
 				oldPath = filepath.Join(cwd, oldPath)
 			}
 			if _, err := os.Stat(oldPath); err == nil {
-				c.File(oldPath)
+				serveLogFile(c, oldPath)
 				return
 			}
 		}

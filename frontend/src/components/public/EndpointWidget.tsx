@@ -19,6 +19,7 @@ interface EndpointWidgetProps {
     history?: ExecutionHistoryEntry[];
     slug?: string;
     pageToken?: string | null;
+    onOpenHistory?: () => void;
 }
 
 const statusStyle = (status: string) => {
@@ -50,6 +51,7 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
     history = [],
     slug,
     pageToken,
+    onOpenHistory,
 }) => {
     const [historyOpen, setHistoryOpen] = useState(false);
     const [logEntry, setLogEntry] = useState<ExecutionHistoryEntry | null>(null);
@@ -125,7 +127,7 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
                     {hasHistory && (
                         <button
                             type="button"
-                            onClick={() => setHistoryOpen(true)}
+                            onClick={() => { setHistoryOpen(true); onOpenHistory?.(); }}
                             title="View execution history"
                             className="relative h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors border border-transparent hover:border-border"
                         >

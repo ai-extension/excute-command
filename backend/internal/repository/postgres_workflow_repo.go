@@ -723,3 +723,18 @@ func (r *PostgresWorkflowExecutionRepo) GetRunningExecutions() ([]domain.Workflo
 		Find(&execs).Error
 	return execs, err
 }
+
+// GetStatusesByIDs returns only the lightweight status fields for a set of executions
+// in a single query. Used by public history reconciliation so the client can resolve
+// stale RUNNING entries in one round-trip, without the heavy Preload that GetByID does.
+func (r *PostgresWorkflowExecutionRepo) GetStatusesByIDs(ids []uuid.UUID) ([]domain.WorkflowExecution, error) {
+	if len(ids) == 0 {
+		return []domain.WorkflowExecution{}, nil
+	}
+	var execs []domain.WorkflowExecution
+	err := r.db.
+		Select("id", "workflow_id", "status", "finished_at").
+		Where("id IN ?", ids).
+		Find(&execs).Error
+	return execs, err
+}

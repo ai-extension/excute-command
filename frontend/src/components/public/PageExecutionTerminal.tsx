@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, ChevronDown, Maximize2, ChevronUp } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import AnsiText from '../AnsiText';
@@ -163,7 +164,10 @@ const PageExecutionTerminal: React.FC<PageExecutionTerminalProps> = ({
         return <div className="hidden" aria-hidden="true" />;
     }
 
-    return (
+    // Portal to <body> so the live terminal escapes any ancestor stacking context on the
+    // page and reliably sits above the per-widget history/log dialogs (Radix portals at
+    // z-50). z-[200] keeps it the topmost layer while a run is in progress.
+    return createPortal(
         <div
             ref={containerRef}
             style={(() => {
@@ -174,7 +178,7 @@ const PageExecutionTerminal: React.FC<PageExecutionTerminalProps> = ({
                 return s;
             })()}
             className={cn(
-                "fixed z-[110]",
+                "fixed z-[200]",
                 !dragState.current && !resizeState.current && "transition-all duration-500 ease-in-out",
                 position && terminalState !== 'maximized' ? "" :
                     terminalState === 'minimized' ? "bottom-8 right-8" :
@@ -256,7 +260,8 @@ const PageExecutionTerminal: React.FC<PageExecutionTerminalProps> = ({
                     }}
                 />
             )}
-        </div>
+        </div>,
+        document.body
     );
 };
 

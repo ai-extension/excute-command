@@ -219,6 +219,12 @@ func (s *WorkflowService) GetExecution(id uuid.UUID, user *domain.User) (*domain
 	return s.execRepo.GetByID(id, &scope)
 }
 
+// GetExecutionStatuses returns lightweight status rows for a set of execution IDs in
+// one query. Caller is responsible for any ownership/visibility filtering.
+func (s *WorkflowService) GetExecutionStatuses(ids []uuid.UUID) ([]domain.WorkflowExecution, error) {
+	return s.execRepo.GetStatusesByIDs(ids)
+}
+
 func (s *WorkflowService) CreateGroup(group *domain.WorkflowGroup) error {
 	if group.ID == uuid.Nil {
 		group.ID = uuid.New()

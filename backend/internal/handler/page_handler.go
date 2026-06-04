@@ -506,7 +506,7 @@ func (h *PageHandler) GetPublicExecutionLog(c *gin.Context) {
 	execLogDir := filepath.Join(cwd, "data", "logs", "executions", execID.String())
 	mainLogPath := filepath.Join(execLogDir, "workflow.log")
 	if _, err := os.Stat(mainLogPath); err == nil {
-		c.File(mainLogPath)
+		serveLogFile(c, mainLogPath)
 		return
 	}
 
@@ -521,12 +521,94 @@ func (h *PageHandler) GetPublicExecutionLog(c *gin.Context) {
 			oldPath = filepath.Join(cwd, oldPath)
 		}
 		if _, err := os.Stat(oldPath); err == nil {
-			c.File(oldPath)
+			serveLogFile(c, oldPath)
 			return
 		}
 	}
 
 	c.JSON(http.StatusNotFound, gin.H{"error": "log file not found"})
+}
+
+// GetPublicExecutionStatuses resolves the current status of a batch of executions in a
+// single request. Public history is persisted client-side as RUNNING; on reload (or
+// after the live terminal is closed) those entries never reconcile, so they spin
+// forever. The client sends every stale RUNNING id at once and we answer with their
+// real status — one round-trip instead of one request per record.
+func (h *PageHandler) GetPublicExecutionStatuses(c *gin.Context) {
+	slug := c.Param("slug")
+
+	page, err := h.service.GetPageBySlug(slug)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "page not found"})
+		return
+	}
+
+	if !h.checkPublicAccess(c, page) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "page is not public"})
+		return
+	}
+
+	if page.ExpiresAt != nil && page.ExpiresAt.Before(time.Now()) {
+		c.JSON(http.StatusGone, gin.H{"error": "page has expired"})
+		return
+	}
+
+	if !h.verifyPageToken(c, page) {
+		return
+	}
+
+	var body struct {
+		ExecutionIDs []string `json:"execution_ids"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	// Cap the batch so a public caller can't ask for an unbounded set.
+	const maxIDs = 100
+	if len(body.ExecutionIDs) > maxIDs {
+		body.ExecutionIDs = body.ExecutionIDs[:maxIDs]
+	}
+
+	ids := make([]uuid.UUID, 0, len(body.ExecutionIDs))
+	for _, raw := range body.ExecutionIDs {
+		if id, err := uuid.Parse(raw); err == nil {
+			ids = append(ids, id)
+		}
+	}
+
+	type statusItem struct {
+		ID         string     `json:"id"`
+		Status     string     `json:"status"`
+		FinishedAt *time.Time `json:"finished_at,omitempty"`
+	}
+	out := make([]statusItem, 0, len(ids))
+
+	if len(ids) > 0 {
+		// Only expose executions that actually belong to this page's workflows.
+		allowed := make(map[uuid.UUID]bool, len(page.Workflows))
+		for _, pw := range page.Workflows {
+			allowed[pw.WorkflowID] = true
+		}
+
+		execs, err := h.workflowService.GetExecutionStatuses(ids)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load statuses"})
+			return
+		}
+		for _, e := range execs {
+			if allowed[e.WorkflowID] {
+				out = append(out, statusItem{
+					ID:         e.ID.String(),
+					Status:     string(e.Status),
+					FinishedAt: e.FinishedAt,
+				})
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"statuses": out})
 }
 
 // pageReferencesDataset returns true when the page layout has at least one widget
