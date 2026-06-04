@@ -88,6 +88,24 @@ const ExecutionMonitor: React.FC<ExecutionMonitorProps> = ({
             });
         }
     }, [initialWorkflow]);
+
+    // Sync from the execution prop in HISTORICAL mode. The history list opens the
+    // monitor immediately with the lightweight row execution (so the log stream
+    // starts at once), then swaps in the full detail — steps + workflow.groups.
+    // Reflect that enrichment into local state without re-keying the log stream
+    // (execution id is unchanged, so the stream effect doesn't restart).
+    useEffect(() => {
+        if (mode === 'HISTORICAL' && initialExecution) {
+            setExecution(initialExecution);
+            // Always track the prop's workflow (row summary first, full detail
+            // after). Skipping when groups are absent would leave a previously
+            // opened record's step tree on screen when switching to a new row.
+            if (initialExecution.workflow) {
+                setWorkflow(initialExecution.workflow);
+            }
+        }
+    }, [initialExecution, mode]);
+
     const handleDownloadLogs = () => {
         if (!workflow) return;
         const logsToDownload = (activeStepID || activeGroupID) ? stepLogs : globalLogs;

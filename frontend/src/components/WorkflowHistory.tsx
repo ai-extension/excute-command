@@ -68,7 +68,6 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
     const offsetRef = useRef(0);
     const [selectedExec, setSelectedExec] = useState<WorkflowExecution | null>(null);
     const [isMonitorMaximized, setIsMonitorMaximized] = useState(false);
-    const [loadingDetail, setLoadingDetail] = useState(false);
     const wsRef = useRef<WebSocket | null>(null);
     const [now, setNow] = useState(Date.now());
 
@@ -200,14 +199,37 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
     }, [workflowId, namespaceId, status, executedBy, search, tagIds]);
 
     const fetchExecutionDetail = async (exec: WorkflowExecution) => {
+        // RUNNING executions open in LIVE mode where the workflow groups drive the
+        // live step tree and WebSocket status patches mutate the execution; fetch
+        // the full detail up front so we don't drop the tree or clobber live
+        // status with a stale snapshot.
+        if (exec.status === 'RUNNING') {
+            try {
+                const response = await apiFetch(`${API_BASE_URL}/executions/${exec.id}`);
+                setSelectedExec(response.ok ? await response.json() : exec);
+            } catch (error) {
+                console.error('Failed to fetch execution detail:', error);
+                setSelectedExec(exec);
+            }
+            return;
+        }
+
+        // Finished executions: open the monitor immediately with the lightweight
+        // row so the log stream (keyed only on execution id) starts at once, then
+        // swap in the full detail. The detail endpoint preloads
+        // Workflow.Groups.Steps + execution Steps and is heavy; awaiting it before
+        // mounting was what made the log show up slowly.
+        setSelectedExec(exec);
         try {
-            setLoadingDetail(true);
             const response = await apiFetch(`${API_BASE_URL}/executions/${exec.id}`);
-            if (response.ok) setSelectedExec(await response.json());
+            if (response.ok) {
+                const detail: WorkflowExecution = await response.json();
+                // Swap in enriched detail (steps + workflow groups), unless the
+                // user already switched to another execution mid-fetch.
+                setSelectedExec(prev => (prev && prev.id === detail.id ? detail : prev));
+            }
         } catch (error) {
             console.error('Failed to fetch execution detail:', error);
-        } finally {
-            setLoadingDetail(false);
         }
     };
 
@@ -465,11 +487,7 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
                         : "max-w-5xl w-[90vw] h-[85vh] rounded-md border-2"
                 )}>
                     <DialogTitle className="sr-only">Execution Detail</DialogTitle>
-                    {loadingDetail ? (
-                        <div className="h-full flex items-center justify-center">
-                            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                        </div>
-                    ) : selectedExec && (
+                    {selectedExec && (
                         <ExecutionMonitor
                             mode={selectedExec.status === 'RUNNING' ? 'LIVE' : 'HISTORICAL'}
                             execution={selectedExec}
