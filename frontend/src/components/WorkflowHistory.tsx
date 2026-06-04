@@ -32,6 +32,15 @@ import { cn } from '../lib/utils';
 
 const PAGE_SIZE = 15;
 
+// A "root" is a top-level row in the execution tree: either it has no parent, or its
+// parent isn't part of the list (so it can't be nested under anything). Children that
+// ride along with their parent are nested, not counted as page slots. Mirror this with
+// renderExecutionTree's root logic so paging stays aligned with what's rendered.
+const countRoots = (list: WorkflowExecution[]): number => {
+    const ids = new Set(list.map(e => e.id));
+    return list.filter(e => !e.parent_execution_id || !ids.has(e.parent_execution_id)).length;
+};
+
 interface WorkflowHistoryProps {
     workflowId?: string;
     namespaceId?: string;
@@ -164,7 +173,11 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
                 const totalCount: number = Array.isArray(data) ? data.length : (data.total || 0);
                 setTotal(totalCount);
                 setExecutions(prev => replace ? items : [...prev, ...items]);
-                offsetRef.current = currentOffset + items.length;
+                // The namespace endpoint paginates parent executions only and ships their
+                // child (sub-workflow / hook) rows alongside. Those children are nested by
+                // renderExecutionTree, so advance the offset by the number of ROOT rows in
+                // this page (parent missing => still a root, e.g. the per-workflow view).
+                offsetRef.current = currentOffset + countRoots(items);
             }
         } catch (error) {
             console.error('Failed to fetch history:', error);
@@ -379,7 +392,9 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
         return roots.map(root => renderExecRow(root));
     };
 
-    const hasMore = executions.length < total;
+    // `total` counts root executions only (children are nested), so page against roots.
+    const parentCount = countRoots(executions);
+    const hasMore = parentCount < total;
 
     if (loading) {
         return (
@@ -430,11 +445,11 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
                                 ) : (
                                     <ChevronDown className="w-3.5 h-3.5" />
                                 )}
-                                {loadingMore ? 'Loading...' : `Load more (${total - executions.length} remaining)`}
+                                {loadingMore ? 'Loading...' : `Load more (${total - parentCount} remaining)`}
                             </Button>
                         </div>
                     )}
-                    {!hasMore && executions.length >= PAGE_SIZE && (
+                    {!hasMore && parentCount >= PAGE_SIZE && (
                         <p className="text-center text-[10px] text-muted-foreground/40 font-bold uppercase tracking-widest pt-2">
                             All {total} runs loaded
                         </p>

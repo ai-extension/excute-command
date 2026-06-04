@@ -278,21 +278,29 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
                         </DialogTitle>
                     </DialogHeader>
                     <div className="flex-1 min-h-0 overflow-y-auto bg-black/90 rounded-md p-4 font-mono text-xs leading-relaxed scrollbar-thin">
-                        {logLoading ? (
+                        {logError ? (
+                            <div className="text-rose-400">{logError}</div>
+                        ) : logLines.length > 0 ? (
+                            <>
+                                {logLines.map((line, i) => (
+                                    <div key={i} className="whitespace-pre-wrap min-h-[1.2rem] text-zinc-200">
+                                        <AnsiText text={line} />
+                                    </div>
+                                ))}
+                                {logLoading && (
+                                    <div className="flex items-center gap-2 text-zinc-500 mt-1">
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                        <span>Streaming…</span>
+                                    </div>
+                                )}
+                            </>
+                        ) : logLoading ? (
                             <div className="flex items-center gap-2 text-zinc-500">
                                 <Loader2 className="w-4 h-4 animate-spin" />
                                 <span>Loading log...</span>
                             </div>
-                        ) : logError ? (
-                            <div className="text-rose-400">{logError}</div>
-                        ) : logLines.length === 0 ? (
-                            <div className="text-zinc-600">(empty)</div>
                         ) : (
-                            logLines.map((line, i) => (
-                                <div key={i} className="whitespace-pre-wrap min-h-[1.2rem] text-zinc-200">
-                                    <AnsiText text={line} />
-                                </div>
-                            ))
+                            <div className="text-zinc-600">(empty)</div>
                         )}
                     </div>
                 </DialogContent>

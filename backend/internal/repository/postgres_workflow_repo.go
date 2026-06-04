@@ -500,7 +500,11 @@ func (r *PostgresWorkflowExecutionRepo) ListByNamespaceIDPaginated(namespaceID u
 	var total int64
 	db := r.db.Model(&domain.WorkflowExecution{}).
 		Joins("JOIN workflows w2 ON w2.id = workflow_executions.workflow_id").
-		Where("w2.namespace_id = ?", namespaceID)
+		Where("w2.namespace_id = ?", namespaceID).
+		// Only paginate/count top-level (parent) executions. Sub-workflow / hook
+		// child executions are pulled in separately below and nested on the FE,
+		// so they no longer eat page slots or inflate the total.
+		Where("workflow_executions.parent_execution_id IS NULL")
 
 	if scope != nil && !scope.IsGlobal {
 		rbacCond := r.db.Where("w2.namespace_id IN ? OR workflow_executions.workflow_id IN ?", scope.AllowedNamespaceIDs, scope.AllowedItemIDs)
@@ -530,10 +534,61 @@ func (r *PostgresWorkflowExecutionRepo) ListByNamespaceIDPaginated(namespaceID u
 		return nil, 0, err
 	}
 
-	err := db.Preload("User").Preload("Workflow").Preload("Schedule").Preload("Page").
+	if err := db.Preload("User").Preload("Workflow").Preload("Schedule").Preload("Page").
 		Order("workflow_executions.created_at DESC").
-		Limit(limit).Offset(offset).Find(&execs).Error
-	return execs, total, err
+		Limit(limit).Offset(offset).Find(&execs).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Join the full child subtree for the parent executions on this page so the
+	// FE can render them nested. Children are intentionally excluded from `total`.
+	parentIDs := make([]uuid.UUID, len(execs))
+	for i := range execs {
+		parentIDs[i] = execs[i].ID
+	}
+	children, err := r.loadExecutionDescendants(parentIDs)
+	if err != nil {
+		return nil, 0, err
+	}
+	execs = append(execs, children...)
+
+	return execs, total, nil
+}
+
+// loadExecutionDescendants returns every execution nested under the given parent
+// executions (children, grandchildren, ...). The parent/child graph is a tree
+// bounded by the executor's nesting cap (<= 4 levels), so the level-by-level walk
+// terminates as soon as a level yields no further children.
+func (r *PostgresWorkflowExecutionRepo) loadExecutionDescendants(parentIDs []uuid.UUID) ([]domain.WorkflowExecution, error) {
+	var all []domain.WorkflowExecution
+	seen := make(map[uuid.UUID]bool)
+	current := parentIDs
+	for len(current) > 0 {
+		var level []domain.WorkflowExecution
+		if err := r.db.
+			Preload("User").Preload("Workflow").Preload("Schedule").Preload("Page").
+			Where("parent_execution_id IN ?", current).
+			Order("created_at ASC").
+			Find(&level).Error; err != nil {
+			return nil, err
+		}
+		// Guard against duplicate / cyclic data so the walk always terminates even if
+		// the parent/child graph isn't a clean tree.
+		next := make([]uuid.UUID, 0, len(level))
+		for i := range level {
+			if seen[level[i].ID] {
+				continue
+			}
+			seen[level[i].ID] = true
+			all = append(all, level[i])
+			next = append(next, level[i].ID)
+		}
+		if len(next) == 0 {
+			break
+		}
+		current = next
+	}
+	return all, nil
 }
 
 func (r *PostgresWorkflowExecutionRepo) ListGlobalPaginated(limit, offset int, status string, workflowID *uuid.UUID, executedBy *uuid.UUID, tagIDs []uuid.UUID, scope *domain.PermissionScope) ([]domain.WorkflowExecution, int64, error) {
