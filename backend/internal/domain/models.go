@@ -608,6 +608,7 @@ type ScheduleRepository interface {
 	RemoveWorkflows(scheduleID uuid.UUID) error
 	ListActive() ([]Schedule, error)
 	UpdateStatus(id uuid.UUID, status string) error
+	UpdateNextRunAt(id uuid.UUID, t *time.Time) error
 }
 
 type WorkflowFileRepository interface {

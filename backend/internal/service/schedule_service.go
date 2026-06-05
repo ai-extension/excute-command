@@ -18,6 +18,7 @@ type ScheduleService struct {
 	executor *WorkflowExecutor
 	cron     *cron.Cron
 	entries  map[uuid.UUID]cron.EntryID
+	timers   map[uuid.UUID]*time.Timer
 	mu       sync.Mutex
 }
 
@@ -28,6 +29,7 @@ func NewScheduleService(repo domain.ScheduleRepository, execRepo domain.Workflow
 		executor: executor,
 		cron:     cron.New(cron.WithParser(cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor))),
 		entries:  make(map[uuid.UUID]cron.EntryID),
+		timers:   make(map[uuid.UUID]*time.Timer),
 	}
 	s.cron.Start()
 	return s
@@ -103,17 +105,14 @@ func (s *ScheduleService) Update(schedule *domain.Schedule, workflowConfigs []do
 	if schedule.Status != "" {
 		existing.Status = schedule.Status
 	}
-	if schedule.NextRunAt != nil {
-		existing.NextRunAt = schedule.NextRunAt
-	}
+	// Full-replace fields: caller sends the desired end-state, so nil/empty must
+	// be honored (clear), not silently kept. repo.Update's own nil-guards still
+	// treat a nil slice as "no change" vs an empty slice as "clear".
+	existing.NextRunAt = schedule.NextRunAt
 	existing.CatchUp = schedule.CatchUp
 	existing.Retries = schedule.Retries
-	if len(schedule.Tags) > 0 {
-		existing.Tags = schedule.Tags
-	}
-	if len(schedule.Hooks) > 0 {
-		existing.Hooks = schedule.Hooks
-	}
+	existing.Tags = schedule.Tags
+	existing.Hooks = schedule.Hooks
 
 	if err := s.repo.Update(existing); err != nil {
 		return err
@@ -237,22 +236,34 @@ func (s *ScheduleService) addScheduleToCron(schedule domain.Schedule) {
 		}
 		s.entries[schedule.ID] = entryID
 
-		// Update NextRunAt
+		// Update NextRunAt (targeted column write — must not touch associations)
 		entry := s.cron.Entry(entryID)
 		next := entry.Next
-		schedule.NextRunAt = &next
-		s.repo.Update(&schedule)
+		s.repo.UpdateNextRunAt(schedule.ID, &next)
 	} else if schedule.Type == domain.ScheduleTypeOneTime {
 		if schedule.NextRunAt != nil {
 			scheduledAt := schedule.NextRunAt.UTC()
 			if scheduledAt.After(now) {
 				delay := scheduledAt.Sub(now)
 				log.Printf("[ScheduleService] Scheduling '%s' to fire in %v", schedule.Name, delay)
-				time.AfterFunc(delay, func() {
+				var timer *time.Timer
+				timer = time.AfterFunc(delay, func() {
+					// Guard against a stale fire: if this timer was superseded
+					// (Update created a new one) or cancelled (Delete/Pause), skip.
+					s.mu.Lock()
+					superseded := s.timers[schedule.ID] != timer
+					if !superseded {
+						delete(s.timers, schedule.ID)
+					}
+					s.mu.Unlock()
+					if superseded {
+						return
+					}
 					log.Printf("[ScheduleService] Firing one-time schedule: %s", schedule.Name)
 					s.runScheduledWorkflows(schedule.ID)
 					s.repo.UpdateStatus(schedule.ID, "PAUSED")
 				})
+				s.timers[schedule.ID] = timer
 			}
 		}
 	}
@@ -262,6 +273,10 @@ func (s *ScheduleService) removeScheduleFromCron(id uuid.UUID) {
 	if entryID, ok := s.entries[id]; ok {
 		s.cron.Remove(entryID)
 		delete(s.entries, id)
+	}
+	if timer, ok := s.timers[id]; ok {
+		timer.Stop()
+		delete(s.timers, id)
 	}
 }
 
@@ -336,13 +351,16 @@ func (s *ScheduleService) runScheduledWorkflows(scheduleID uuid.UUID) {
 	// Update NextRunAt for recurring
 	if schedule.Type == domain.ScheduleTypeRecurring {
 		s.mu.Lock()
-		if entryID, ok := s.entries[schedule.ID]; ok {
-			entry := s.cron.Entry(entryID)
-			next := entry.Next
-			schedule.NextRunAt = &next
-			s.repo.Update(schedule)
+		entryID, ok := s.entries[schedule.ID]
+		var next time.Time
+		if ok {
+			next = s.cron.Entry(entryID).Next
 		}
 		s.mu.Unlock()
+		if ok {
+			// targeted column write — must not touch associations
+			s.repo.UpdateNextRunAt(schedule.ID, &next)
+		}
 	}
 }
 

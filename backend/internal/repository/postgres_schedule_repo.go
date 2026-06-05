@@ -226,6 +226,12 @@ func (r *PostgresScheduleRepo) UpdateStatus(id uuid.UUID, status string) error {
 	return r.db.Model(&domain.Schedule{}).Where("id = ?", id).Update("status", status).Error
 }
 
+// UpdateNextRunAt updates only the next_run_at column. It deliberately avoids
+// the full Update() path so it never touches Hooks/Workflows/Tags associations.
+func (r *PostgresScheduleRepo) UpdateNextRunAt(id uuid.UUID, t *time.Time) error {
+	return r.db.Model(&domain.Schedule{}).Where("id = ?", id).Update("next_run_at", t).Error
+}
+
 func (r *PostgresScheduleRepo) populateStats(s *domain.Schedule) {
 	var count int64
 	r.db.Model(&domain.WorkflowExecution{}).Where("scheduled_id = ?", s.ID).Count(&count)

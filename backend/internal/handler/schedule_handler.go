@@ -292,9 +292,11 @@ func (h *ScheduleHandler) Update(c *gin.Context) {
 
 	userVal, _ := c.Get("user")
 	user := userVal.(*domain.User)
-	schedule, err := h.service.GetByID(id, user)
+	// Use WRITE scope so a read-only user is rejected here (404/permission)
+	// instead of slipping through to service.Update and surfacing as a 500.
+	schedule, err := h.service.GetByIDWithAction(id, user, "WRITE")
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "schedule not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "schedule not found or permission denied"})
 		return
 	}
 
@@ -325,13 +327,12 @@ func (h *ScheduleHandler) Update(c *gin.Context) {
 		})
 	}
 
-	// Fetch existing again to calculate diff (or use original fetch if it wasn't mutated yet)
-	// Actually, we mutated the object already. To get a clean diff, we should have fetched it twice or copied it.
-	// Let's refetch it or use the already fetched one before mutation.
-
-	// Re-fetching the unmodified state for diff
-	existing, _ := h.service.GetByID(id, user)
-	diff := utils.CalculateDiff(existing, schedule)
+	// Re-fetch the unmodified state for the audit diff. Skip the diff if it
+	// fails rather than passing a nil snapshot into CalculateDiff.
+	var diff map[string]interface{}
+	if existing, derr := h.service.GetByID(id, user); derr == nil {
+		diff = utils.CalculateDiff(existing, schedule)
+	}
 
 	if err := h.service.Update(schedule, workflowConfigs, user); err != nil {
 		// Ensure diff is not nil before adding error
