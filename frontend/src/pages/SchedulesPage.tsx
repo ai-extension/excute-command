@@ -3,7 +3,7 @@ import { Calendar, ChevronRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNamespace } from '../context/NamespaceContext';
 import { API_BASE_URL } from '../lib/api';
-import { formatToLocalInput, convertToUTC } from '../lib/date';
+import { formatToLocalInput, formatToLocalDate, convertToUTC, dateInputToUTC } from '../lib/date';
 import { Schedule, Workflow, Tag } from '../types';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import ScheduleCalendar from '../components/ScheduleCalendar';
@@ -53,6 +53,8 @@ const SchedulesPage = () => {
         type: 'ONE_TIME',
         cron_expression: '',
         next_run_at: '',
+        start_date: '',
+        end_date: '',
         status: 'ACTIVE',
         retries: 0,
         workflows: [] as { id: string, name: string, inputs: string }[],
@@ -120,11 +122,16 @@ const SchedulesPage = () => {
                 ? `${API_BASE_URL}/schedules/${editingSchedule?.id}`
                 : `${API_BASE_URL}/namespaces/${activeNamespace.id}/schedules`;
 
+            const isRecurring = formData.type === 'RECURRING';
             const payload = {
                 ...formData,
                 next_run_at: formData.type === 'ONE_TIME' && formData.next_run_at
                     ? convertToUTC(formData.next_run_at)
                     : formData.next_run_at,
+                // Window bounds apply only to RECURRING; blanks clear the bound.
+                // Start anchors to local 00:00, end to local 23:59:59.999 (inclusive day).
+                start_date: isRecurring ? dateInputToUTC(formData.start_date, false) : '',
+                end_date: isRecurring ? dateInputToUTC(formData.end_date, true) : '',
                 tags: formData.tags,
                 workflows: formData.workflows.map(w => ({ id: w.id, inputs: w.inputs })),
                 hooks: formData.hooks.map((h, idx) => ({ ...h, order: idx }))
@@ -194,6 +201,8 @@ const SchedulesPage = () => {
                 type: schedule.type,
                 cron_expression: schedule.cron_expression || '',
                 next_run_at: formatToLocalInput(schedule.next_run_at),
+                start_date: formatToLocalDate(schedule.start_date),
+                end_date: formatToLocalDate(schedule.end_date),
                 status: schedule.status,
                 retries: schedule.retries || 0,
                 workflows: schedule.scheduled_workflows?.map(sw => ({
@@ -209,14 +218,19 @@ const SchedulesPage = () => {
             setIsEditing(false);
             setEditingSchedule(null);
 
-            // Default next run to now
+            // Default next run to now, or to the calendar day the user clicked
+            // "Create" on (keeping the current time-of-day so it's not midnight).
             const now = new Date();
+            const nextRun = date ? new Date(date) : now;
+            if (date) nextRun.setHours(now.getHours(), now.getMinutes(), 0, 0);
 
             setFormData({
                 name: '',
                 type: 'ONE_TIME',
                 cron_expression: '0 0 * * *',
-                next_run_at: formatToLocalInput(now),
+                next_run_at: formatToLocalInput(nextRun),
+                start_date: '',
+                end_date: '',
                 status: 'ACTIVE',
                 retries: 0,
                 workflows: [],
@@ -306,6 +320,7 @@ const SchedulesPage = () => {
                     schedules={schedules}
                     onEdit={handleOpenForm}
                     onToggleStatus={handleToggleStatus}
+                    onDelete={handleDelete}
                     onCreate={(date: Date) => handleOpenForm(undefined, date)}
                     onRangeChange={(start: Date, end: Date) => {
                         const from = start.toISOString();

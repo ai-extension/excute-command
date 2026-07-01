@@ -33,6 +33,28 @@ export const convertToUTC = (localInput?: string | null): string => {
 };
 
 /**
+ * Formats a UTC ISO string (or Date) to a local "YYYY-MM-DD" for <input type="date">.
+ * e.g. "2026-07-01T17:00:00Z" -> "2026-07-02" (assuming UTC+7)
+ */
+export const formatToLocalDate = (dateInput?: string | Date | null): string => {
+    const local = formatToLocalInput(dateInput); // "YYYY-MM-DDTHH:mm" (local)
+    return local ? local.slice(0, 10) : '';
+};
+
+/**
+ * Converts a local "YYYY-MM-DD" from <input type="date"> to a UTC ISO string,
+ * anchored to the given local time-of-day. `endOfDay` anchors to 23:59:59.999
+ * (inclusive window end); otherwise to 00:00:00 (window start).
+ * A date-only string must be combined with a time before parsing, otherwise
+ * `new Date("2026-07-01")` is interpreted as UTC midnight, not local.
+ */
+export const dateInputToUTC = (dateInput?: string | null, endOfDay = false): string => {
+    if (!dateInput) return '';
+    const suffix = endOfDay ? 'T23:59:59.999' : 'T00:00:00';
+    return convertToUTC(`${dateInput}${suffix}`);
+};
+
+/**
  * Formats a UTC ISO string for friendly local display
  */
 export const formatDisplayDate = (isoString?: string | null): string => {

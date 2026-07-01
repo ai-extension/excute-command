@@ -442,6 +442,11 @@ type Schedule struct {
 	Type               ScheduleType       `json:"type" gorm:"not null"`
 	CronExpression     string             `json:"cron_expression"`
 	NextRunAt          *time.Time         `json:"next_run_at"`
+	// StartDate/EndDate bound a RECURRING schedule's active window (both optional).
+	// The cron only fires while now is within [StartDate, EndDate]. Nil means
+	// unbounded on that side. Ignored for ONE_TIME.
+	StartDate          *time.Time         `json:"start_date"`
+	EndDate            *time.Time         `json:"end_date"`
 	Status             string             `json:"status" gorm:"default:'ACTIVE'"` // ACTIVE, PAUSED
 	Retries            int                `json:"retries" gorm:"default:0"`
 	CatchUp            bool               `json:"catch_up" gorm:"default:false"`

@@ -286,6 +286,8 @@ export interface Schedule {
     type: ScheduleType;
     cron_expression?: string;
     next_run_at?: string;
+    start_date?: string;
+    end_date?: string;
     status: 'ACTIVE' | 'PAUSED';
     retries: number;
     catch_up: boolean;

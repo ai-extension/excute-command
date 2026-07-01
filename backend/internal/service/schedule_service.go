@@ -109,6 +109,8 @@ func (s *ScheduleService) Update(schedule *domain.Schedule, workflowConfigs []do
 	// be honored (clear), not silently kept. repo.Update's own nil-guards still
 	// treat a nil slice as "no change" vs an empty slice as "clear".
 	existing.NextRunAt = schedule.NextRunAt
+	existing.StartDate = schedule.StartDate
+	existing.EndDate = schedule.EndDate
 	existing.CatchUp = schedule.CatchUp
 	existing.Retries = schedule.Retries
 	existing.Tags = schedule.Tags
@@ -214,21 +216,58 @@ func (s *ScheduleService) GetByIDWithAction(id uuid.UUID, user *domain.User, act
 func (s *ScheduleService) addScheduleToCron(schedule domain.Schedule) {
 	now := time.Now().UTC()
 
-	// Catch-up logic: triggers only if CatchUp flag is true
+	// Catch-up logic: triggers only if CatchUp flag is true. A recurring schedule
+	// must not catch up outside its [StartDate, EndDate] window — otherwise a
+	// server restart after the window closed would fire a stale missed run.
 	if schedule.CatchUp && schedule.Status == "ACTIVE" && schedule.NextRunAt != nil && schedule.NextRunAt.Before(now) {
-		log.Printf("[ScheduleService] Catch-up triggering for schedule '%s' (missed %v ago)", schedule.Name, now.Sub(*schedule.NextRunAt))
-		go s.runScheduledWorkflows(schedule.ID)
+		outsideWindow := schedule.Type == domain.ScheduleTypeRecurring &&
+			((schedule.StartDate != nil && now.Before(*schedule.StartDate)) ||
+				(schedule.EndDate != nil && now.After(*schedule.EndDate)))
+		if !outsideWindow {
+			log.Printf("[ScheduleService] Catch-up triggering for schedule '%s' (missed %v ago)", schedule.Name, now.Sub(*schedule.NextRunAt))
+			go s.runScheduledWorkflows(schedule.ID)
 
-		if schedule.Type == domain.ScheduleTypeOneTime {
-			// Mark as finished/paused immediately after triggering catch-up
-			s.repo.UpdateStatus(schedule.ID, "PAUSED")
-			return
+			if schedule.Type == domain.ScheduleTypeOneTime {
+				// Mark as finished/paused immediately after triggering catch-up
+				s.repo.UpdateStatus(schedule.ID, "PAUSED")
+				return
+			}
 		}
 	}
 
 	if schedule.Type == domain.ScheduleTypeRecurring {
+		// If the run window has already closed, don't register the cron at all;
+		// pause it and clear next_run so its state reflects that it can't fire.
+		if schedule.EndDate != nil && now.After(*schedule.EndDate) {
+			log.Printf("[ScheduleService] Recurring '%s' end date passed; not scheduling", schedule.Name)
+			if schedule.Status == "ACTIVE" {
+				s.repo.UpdateStatus(schedule.ID, "PAUSED")
+				s.repo.UpdateNextRunAt(schedule.ID, nil)
+			}
+			return
+		}
+
+		start := schedule.StartDate
+		end := schedule.EndDate
+		scheduleID := schedule.ID
+		scheduleName := schedule.Name
 		entryID, err := s.cron.AddFunc(schedule.CronExpression, func() {
-			s.runScheduledWorkflows(schedule.ID)
+			fireNow := time.Now().UTC()
+			// Before the window opens: skip this tick, keep the entry for later.
+			if start != nil && fireNow.Before(*start) {
+				return
+			}
+			// After the window closes: stop firing and pause the schedule.
+			if end != nil && fireNow.After(*end) {
+				s.mu.Lock()
+				s.removeScheduleFromCron(scheduleID)
+				s.mu.Unlock()
+				s.repo.UpdateStatus(scheduleID, "PAUSED")
+				s.repo.UpdateNextRunAt(scheduleID, nil)
+				log.Printf("[ScheduleService] Recurring '%s' window closed; paused", scheduleName)
+				return
+			}
+			s.runScheduledWorkflows(scheduleID)
 		})
 		if err != nil {
 			log.Printf("[ScheduleService] Failed to add cron for %s: %v", schedule.Name, err)
@@ -236,10 +275,21 @@ func (s *ScheduleService) addScheduleToCron(schedule domain.Schedule) {
 		}
 		s.entries[schedule.ID] = entryID
 
-		// Update NextRunAt (targeted column write — must not touch associations)
+		// Update NextRunAt (targeted column write — must not touch associations).
+		// Advance to the window start if the schedule opens later, and clear it if
+		// no cron occurrence lands inside the window.
 		entry := s.cron.Entry(entryID)
 		next := entry.Next
-		s.repo.UpdateNextRunAt(schedule.ID, &next)
+		if start != nil && next.Before(*start) && entry.Schedule != nil {
+			// Next() returns the first activation strictly after its argument, so
+			// step back 1s to keep an occurrence landing exactly on the start.
+			next = entry.Schedule.Next(start.Add(-time.Second))
+		}
+		if end != nil && next.After(*end) {
+			s.repo.UpdateNextRunAt(schedule.ID, nil)
+		} else {
+			s.repo.UpdateNextRunAt(schedule.ID, &next)
+		}
 	} else if schedule.Type == domain.ScheduleTypeOneTime {
 		if schedule.NextRunAt != nil {
 			scheduledAt := schedule.NextRunAt.UTC()
@@ -359,7 +409,11 @@ func (s *ScheduleService) runScheduledWorkflows(scheduleID uuid.UUID) {
 		s.mu.Unlock()
 		if ok {
 			// targeted column write — must not touch associations
-			s.repo.UpdateNextRunAt(schedule.ID, &next)
+			if schedule.EndDate != nil && next.After(*schedule.EndDate) {
+				s.repo.UpdateNextRunAt(schedule.ID, nil)
+			} else {
+				s.repo.UpdateNextRunAt(schedule.ID, &next)
+			}
 		}
 	}
 }

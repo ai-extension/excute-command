@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     format,
     startOfMonth,
@@ -14,7 +15,7 @@ import {
     parseISO,
 } from 'date-fns';
 import { CronExpressionParser } from 'cron-parser';
-import { ChevronLeft, ChevronRight, CalendarClock, Repeat, Clock, Edit3, Play, Pause } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CalendarClock, Repeat, Clock, Edit3, Play, Pause, Trash2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { cn } from '../lib/utils';
@@ -24,6 +25,7 @@ interface ScheduleCalendarProps {
     schedules: Schedule[];
     onEdit: (schedule: Schedule) => void;
     onToggleStatus: (id: string) => void;
+    onDelete?: (schedule: Schedule) => void;
     onCreate?: (date: Date) => void;
     // Reports the visible grid window (start/end) so the parent can fetch the
     // schedules for that range. Fires on mount and whenever the month changes.
@@ -44,7 +46,8 @@ function getOneTimeDayForMonth(schedule: Schedule, year: number, month: number):
     return null;
 }
 
-const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({ schedules, onEdit, onToggleStatus, onCreate, onRangeChange }) => {
+const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({ schedules, onEdit, onToggleStatus, onDelete, onCreate, onRangeChange }) => {
+    const navigate = useNavigate();
     const [currentDate, setCurrentDate] = useState(new Date());
     const [hoveredDay, setHoveredDay] = useState<Date | null>(null);
     const [selectedDay, setSelectedDay] = useState<Date | null>(null);
@@ -80,8 +83,15 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({ schedules, onEdit, 
                     map[key].push(schedule);
                 }
             } else if (showRecurring && schedule.type === 'RECURRING' && schedule.cron_expression) {
+                // Clamp the cron expansion to the schedule's active window so the
+                // calendar doesn't paint runs on days it will never fire (matches
+                // the backend guard). Bounds are optional.
+                const winStart = schedule.start_date ? parseISO(schedule.start_date) : null;
+                const winEnd = schedule.end_date ? parseISO(schedule.end_date) : null;
                 try {
                     days.forEach(day => {
+                        if (winStart && day < winStart) return;
+                        if (winEnd && day > winEnd) return;
                         try {
                             const interval = CronExpressionParser.parse(schedule.cron_expression!, {
                                 currentDate: new Date(day.getTime() - 1000),
@@ -290,7 +300,13 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({ schedules, onEdit, 
                                                             "w-1.5 h-1.5 rounded-full shrink-0",
                                                             s.status === 'ACTIVE' ? 'bg-emerald-500' : 'bg-slate-500'
                                                         )} />
-                                                        <p className="text-xs font-black truncate">{s.name}</p>
+                                                        <p
+                                                            className="text-xs font-black truncate cursor-pointer hover:text-primary transition-colors"
+                                                            onClick={(e) => { e.stopPropagation(); navigate(`/schedules/${s.id}`); }}
+                                                            title="View detail"
+                                                        >
+                                                            {s.name}
+                                                        </p>
                                                     </div>
                                                     <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
                                                         {s.type === 'RECURRING' ? (
@@ -311,7 +327,7 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({ schedules, onEdit, 
                                                         {s.status}
                                                     </Badge>
                                                 </div>
-                                                <div className="flex flex-col gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <div className="flex flex-row gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
@@ -333,6 +349,17 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({ schedules, onEdit, 
                                                             : <Play className="w-3 h-3" />
                                                         }
                                                     </Button>
+                                                    {onDelete && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-6 w-6 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                                            onClick={(e) => { e.stopPropagation(); onDelete(s); }}
+                                                            title="Delete"
+                                                        >
+                                                            <Trash2 className="w-3 h-3" />
+                                                        </Button>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>

@@ -136,6 +136,8 @@ func (h *ScheduleHandler) Create(c *gin.Context) {
 		Type           string `json:"type" binding:"required"`
 		CronExpression string `json:"cron_expression"`
 		NextRunAt      string `json:"next_run_at"`
+		StartDate      string `json:"start_date"`
+		EndDate        string `json:"end_date"`
 		Retries        int    `json:"retries"`
 		Status         string `json:"status"`
 		CatchUp        bool   `json:"catch_up"`
@@ -172,6 +174,16 @@ func (h *ScheduleHandler) Create(c *gin.Context) {
 	if req.NextRunAt != "" {
 		if t, err := parseTimestamp(req.NextRunAt); err == nil {
 			schedule.NextRunAt = &t
+		}
+	}
+	if req.StartDate != "" {
+		if t, err := parseTimestamp(req.StartDate); err == nil {
+			schedule.StartDate = &t
+		}
+	}
+	if req.EndDate != "" {
+		if t, err := parseTimestamp(req.EndDate); err == nil {
+			schedule.EndDate = &t
 		}
 	}
 
@@ -274,6 +286,8 @@ func (h *ScheduleHandler) Update(c *gin.Context) {
 		Type           string `json:"type" binding:"required"`
 		CronExpression string `json:"cron_expression"`
 		NextRunAt      string `json:"next_run_at"`
+		StartDate      string `json:"start_date"`
+		EndDate        string `json:"end_date"`
 		Retries        int    `json:"retries"`
 		Status         string `json:"status"`
 		CatchUp        bool   `json:"catch_up"`
@@ -317,6 +331,22 @@ func (h *ScheduleHandler) Update(c *gin.Context) {
 		}
 	} else {
 		schedule.NextRunAt = nil
+	}
+
+	// Full-replace: an omitted bound clears the window on that side.
+	if req.StartDate != "" {
+		if t, err := parseTimestamp(req.StartDate); err == nil {
+			schedule.StartDate = &t
+		}
+	} else {
+		schedule.StartDate = nil
+	}
+	if req.EndDate != "" {
+		if t, err := parseTimestamp(req.EndDate); err == nil {
+			schedule.EndDate = &t
+		}
+	} else {
+		schedule.EndDate = nil
 	}
 
 	var workflowConfigs []domain.ScheduleWorkflow
