@@ -423,8 +423,24 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                                                                                         : 'Default Value'}
                                                                     </label>
                                                                      {input.type === 'file' ? (
-                                                                         <div className="h-8 flex items-center px-3 border border-dashed border-border/50 rounded-md bg-muted/10">
-                                                                             <span className="text-[10px] text-muted-foreground italic">No default value for files</span>
+                                                                         <div className="space-y-2">
+                                                                             <div className="h-8 flex items-center px-3 border border-dashed border-border/50 rounded-md bg-muted/10">
+                                                                                 <span className="text-[10px] text-muted-foreground italic">No default value for files</span>
+                                                                             </div>
+                                                                             <div className="flex items-center justify-between bg-muted/20 p-2 rounded-md border border-border/50">
+                                                                                 <div className="space-y-0.5">
+                                                                                     <label className="text-[10px] font-black uppercase tracking-widest text-primary">Allow folder upload</label>
+                                                                                     <p className="text-[10px] text-muted-foreground">Let users pick an entire folder (structure preserved)</p>
+                                                                                 </div>
+                                                                                 <Switch
+                                                                                     checked={input.allow_folder || false}
+                                                                                     onCheckedChange={(val) => {
+                                                                                         const ni = [...inputs];
+                                                                                         ni[idx].allow_folder = val;
+                                                                                         setInputs(ni);
+                                                                                     }}
+                                                                                 />
+                                                                             </div>
                                                                          </div>
                                                                      ) : input.type === 'dataset-select' || input.type === 'dataset-multi-select' ? (
                                                                         <DatasetInputConfigEditor

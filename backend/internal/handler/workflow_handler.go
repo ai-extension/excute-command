@@ -804,6 +804,31 @@ func (h *WorkflowHandler) UploadInputFile(c *gin.Context) {
 		return
 	}
 
+	// Folder upload: when the client sends a relative_path, preserve the
+	// directory tree under the session dir instead of flattening the file.
+	// The single-file path below is left untouched for normal uploads.
+	if relPath := c.PostForm("relative_path"); relPath != "" {
+		localPath, rootPath, err := resolveFolderUploadPath(absBaseDir, relPath)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if err := os.MkdirAll(filepath.Dir(localPath), 0755); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create directory"})
+			return
+		}
+		if err := c.SaveUploadedFile(file, localPath); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save file"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"path":       localPath,
+			"root_path":  rootPath,
+			"session_id": inputSessionID,
+		})
+		return
+	}
+
 	// Format: slugified-name_unix-time.ext
 	ext := filepath.Ext(file.Filename)
 	nameOnly := strings.TrimSuffix(file.Filename, ext)
@@ -824,6 +849,38 @@ func (h *WorkflowHandler) UploadInputFile(c *gin.Context) {
 		"path":       localPath,
 		"session_id": inputSessionID,
 	})
+}
+
+// resolveFolderUploadPath maps a client-supplied relative path (e.g.
+// "myfolder/sub/a.txt") to a safe absolute destination under baseDir,
+// preserving the directory tree. It rejects any path that would escape
+// baseDir (path-traversal guard). rootPath is the top-level folder dir,
+// which callers use to reference the uploaded folder as a whole.
+func resolveFolderUploadPath(baseDir, relPath string) (localPath, rootPath string, err error) {
+	// Force-absolute then Clean to strip "..", then drop the leading slash.
+	clean := strings.TrimPrefix(filepath.Clean("/"+filepath.ToSlash(relPath)), "/")
+	if clean == "" || clean == "." {
+		return "", "", fmt.Errorf("invalid relative_path")
+	}
+
+	// Reject shell-dangerous characters in any path segment. Unlike single-file
+	// uploads (which slugify the name), folder uploads keep original names, and
+	// file-type inputs skip the global SecurityRegex — so the folder/file name
+	// could otherwise carry a command-injection payload into a templated command.
+	// This still allows Unicode names (e.g. Japanese) and spaces.
+	if strings.ContainsAny(clean, "`$;|&<>\n\r") {
+		return "", "", fmt.Errorf("relative_path contains disallowed characters")
+	}
+
+	localPath = filepath.Join(baseDir, clean)
+	// Defense-in-depth: the resolved path must stay within baseDir.
+	if localPath != baseDir && !strings.HasPrefix(localPath, baseDir+string(os.PathSeparator)) {
+		return "", "", fmt.Errorf("relative_path escapes upload directory")
+	}
+
+	firstSeg := strings.SplitN(clean, "/", 2)[0]
+	rootPath = filepath.Join(baseDir, firstSeg)
+	return localPath, rootPath, nil
 }
 
 // Slugify converts a string to a safe, URL-friendly format

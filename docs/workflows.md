@@ -53,6 +53,7 @@ Inputs collect parameters from the user before a workflow starts. Every input is
 - **Pattern** — extra regex on top of the global security regex.
 - **CollapseInitially** — hides inputs under a "Show more" group for cleaner UIs.
 - **Group** — visually clusters related inputs in the run dialog.
+- **Allow Folder** (`file` type only) — lets the user pick an **entire folder**. The directory tree is preserved on upload and transferred recursively to the server. Like a single file input, the value is an object; use `{{ input.my_folder.path }}` to get the remote folder root (e.g. `/tmp/csm_inputs/<session>/my_folder`).
 
 > [!TIP]
 > Use descriptive input keys (`git_branch`, `target_env`) — they appear in MCP tool schemas and AI agents use them to decide how to fill the form.

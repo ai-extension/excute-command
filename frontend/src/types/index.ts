@@ -241,6 +241,7 @@ export interface WorkflowInput {
     type: 'input' | 'textarea' | 'number' | 'select' | 'multi-select' | 'multi-input' | 'file' | 'dataset-select' | 'dataset-multi-select';
     default_value: string;
     collapse_initially?: boolean;
+    allow_folder?: boolean;
     required: boolean;
     order?: number;
     created_at: string;

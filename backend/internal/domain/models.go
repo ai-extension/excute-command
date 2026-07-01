@@ -365,6 +365,7 @@ type WorkflowInput struct {
 	Type         string    `json:"type" gorm:"not null;default:'input'"` // input, number, select, multi-select, multi-input, file, dataset-select, dataset-multi-select
 	DefaultValue      string    `json:"default_value"`
 	CollapseInitially bool      `json:"collapse_initially" gorm:"default:false"`
+	AllowFolder       bool      `json:"allow_folder" gorm:"default:false"` // type=file only: let users pick an entire folder (structure preserved)
 	Required          bool      `json:"required" gorm:"default:false"`
 	Order        int       `json:"order" gorm:"default:0"`
 	CreatedAt    time.Time `json:"created_at" gorm:"<-:create"`

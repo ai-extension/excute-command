@@ -2589,12 +2589,18 @@ func (e *WorkflowExecutor) uploadSessionFilesIfNeeded(ctx context.Context, execI
 		}
 
 		for _, entry := range entries {
+			localEntryPath := filepath.Join(localDir, entry.Name())
+			remoteEntryPath := filepath.Join(remoteDir, entry.Name())
+
 			if entry.IsDir() {
+				// Folder input (allow_folder): upload the whole tree, structure preserved.
+				if err = e.uploadDirToServer(ctx, serverID, localEntryPath, remoteEntryPath); err != nil {
+					return fmt.Errorf("failed to upload input folder %s: %w", entry.Name(), err)
+				}
 				continue
 			}
-			localFilePath := filepath.Join(localDir, entry.Name())
-			
-			err = e.serverService.UploadFileToServers(ctx, []uuid.UUID{serverID}, localFilePath, filepath.Join(remoteDir, entry.Name()), nil)
+
+			err = e.serverService.UploadFileToServers(ctx, []uuid.UUID{serverID}, localEntryPath, remoteEntryPath, nil)
 			if err != nil {
 				return fmt.Errorf("failed to upload input file %s: %w", entry.Name(), err)
 			}
@@ -2607,6 +2613,29 @@ func (e *WorkflowExecutor) uploadSessionFilesIfNeeded(ctx context.Context, execI
 	}
 
 	return nil
+}
+
+// uploadDirToServer recursively uploads a local directory to a remote server,
+// preserving the directory tree. It reuses the existing per-file transfer and
+// command primitives (which already create parent dirs on upload), and only
+// issues an explicit mkdir for directories so empty folders are preserved too.
+func (e *WorkflowExecutor) uploadDirToServer(ctx context.Context, serverID uuid.UUID, localDir, remoteDir string) error {
+	return filepath.Walk(localDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(localDir, path)
+		if err != nil {
+			return err
+		}
+		remotePath := filepath.Join(remoteDir, rel)
+
+		if info.IsDir() {
+			_, err := e.serverService.ExecuteCommand(ctx, serverID, fmt.Sprintf("mkdir -p %s", strconv.Quote(remotePath)), nil)
+			return err
+		}
+		return e.serverService.UploadFileToServers(ctx, []uuid.UUID{serverID}, path, remotePath, nil)
+	})
 }
 
 func (e *WorkflowExecutor) extractSessionIDsFromObject(obj interface{}, prefix string, sessions map[string]bool) {

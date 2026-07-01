@@ -101,6 +101,7 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
 }) => {
     const [values, setValues] = useState<Record<string, string>>({});
     const [files, setFiles] = useState<Record<string, File>>({});
+    const [folderFiles, setFolderFiles] = useState<Record<string, File[]>>({});
     const [multiInputFiles, setMultiInputFiles] = useState<Record<string, Record<number, Record<string, File>>>>({});
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [isUploading, setIsUploading] = useState(false);
@@ -224,6 +225,7 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
 
             setValues(initialValues);
             setFiles({});
+            setFolderFiles({});
             setMultiInputFiles({});
             setErrors({});
         }
@@ -283,7 +285,10 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                     }
                 }
             } else if (input.type === 'file') {
-                if (input.required && !files[input.key]) {
+                const hasValue = input.allow_folder
+                    ? (folderFiles[input.key]?.length ?? 0) > 0
+                    : !!files[input.key];
+                if (input.required && !hasValue) {
                     newErrors[input.key] = 'This field is required';
                 }
             } else if (input.type === 'dataset-select') {
@@ -357,6 +362,58 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                         });
                     } catch (err) {
                         setErrors(prev => ({ ...prev, [input.key]: 'Failed to upload file' }));
+                        hasError = true;
+                    }
+                }
+            }
+
+            // Handle folder inputs (type=file + allow_folder): upload each file
+            // preserving its relative path so the backend rebuilds the tree.
+            for (const input of inputs) {
+                if (input.type === 'file' && input.allow_folder && folderFiles[input.key]?.length) {
+                    try {
+                        const list = folderFiles[input.key];
+                        let rootPath = '';
+                        let totalSize = 0;
+
+                        for (const file of list) {
+                            const relativePath = (file as any).webkitRelativePath || file.name;
+                            const formData = new FormData();
+                            formData.append('file', file);
+                            formData.append('session_id', sessionId);
+                            formData.append('relative_path', relativePath);
+
+                            let token = localStorage.getItem('token');
+                            if (!token) token = sessionStorage.getItem('token');
+
+                            const finalHeaders = { ...headers };
+                            if (token && !finalHeaders['Authorization']) {
+                                finalHeaders['Authorization'] = `Bearer ${token}`;
+                            }
+
+                            const res = await fetch(uploadUrl, {
+                                method: 'POST',
+                                headers: finalHeaders,
+                                body: formData
+                            });
+
+                            if (!res.ok) throw new Error('Upload failed');
+                            const data = await res.json();
+                            if (data.root_path) rootPath = data.root_path;
+                            totalSize += file.size;
+                        }
+
+                        const folderName = (list[0] as any).webkitRelativePath?.split('/')[0] || 'folder';
+                        // Store the folder root path; templates resolve {{ input.key }} to the remote folder.
+                        finalValues[input.key] = JSON.stringify({
+                            path: rootPath,
+                            name: folderName,
+                            size: totalSize,
+                            is_folder: true,
+                            file_count: list.length
+                        });
+                    } catch (err) {
+                        setErrors(prev => ({ ...prev, [input.key]: 'Failed to upload folder' }));
                         hasError = true;
                     }
                 }
@@ -653,19 +710,36 @@ const WorkflowInputDialog: React.FC<WorkflowInputDialogProps> = ({
                                     <div className="relative">
                                         <Input
                                             type="file"
+                                            {...(input.allow_folder ? ({ webkitdirectory: '', directory: '', multiple: true } as any) : {})}
                                             onChange={(e) => {
-                                                const file = e.target.files?.[0];
-                                                if (file) {
-                                                    setFiles({ ...files, [input.key]: file });
+                                                if (input.allow_folder) {
+                                                    const list = Array.from(e.target.files || []);
+                                                    if (list.length) {
+                                                        setFolderFiles({ ...folderFiles, [input.key]: list });
+                                                    } else {
+                                                        const nf = { ...folderFiles };
+                                                        delete nf[input.key];
+                                                        setFolderFiles(nf);
+                                                    }
                                                 } else {
-                                                    const nf = { ...files };
-                                                    delete nf[input.key];
-                                                    setFiles(nf);
+                                                    const file = e.target.files?.[0];
+                                                    if (file) {
+                                                        setFiles({ ...files, [input.key]: file });
+                                                    } else {
+                                                        const nf = { ...files };
+                                                        delete nf[input.key];
+                                                        setFiles(nf);
+                                                    }
                                                 }
                                                 if (errors[input.key]) setErrors({ ...errors, [input.key]: '' });
                                             }}
                                             className={`h-9 px-3 cursor-pointer file:cursor-pointer file:mr-3 file:py-0 file:h-full file:px-3 file:rounded-md file:border-0 file:text-[10px] file:font-bold file:bg-indigo-500/10 file:text-indigo-500 hover:file:bg-indigo-500/20 bg-background focus:border-indigo-500 text-xs font-semibold rounded-md transition-all ${errors[input.key] ? 'border-destructive' : 'border-border'}`}
                                         />
+                                        {input.allow_folder && folderFiles[input.key]?.length ? (
+                                            <p className="mt-1 text-[10px] text-muted-foreground">
+                                                {folderFiles[input.key].length} file(s) selected from “{(folderFiles[input.key][0] as any).webkitRelativePath?.split('/')[0] || 'folder'}”
+                                            </p>
+                                        ) : null}
                                     </div>
                                 ) : (
                                     <Input
