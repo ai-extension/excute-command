@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-    Save, ChevronLeft, Plus, Trash2, GripVertical,
+    Save, ChevronLeft, Plus, Trash2, GripVertical, ArrowLeft, ArrowRight,
     Settings as SettingsIcon, Globe, Lock, Copy,
     Terminal, Zap, Monitor, RefreshCw, X, Palette, Clock, ServerIcon, Link2, Type,
     FileText, ImageIcon, Frame, Activity, Table2, BarChart3, TrendingUp
@@ -459,6 +459,82 @@ const PageDesignerPage = () => {
     const updateWidget = (wid: string, updates: Partial<PageWidget>) =>
         setWidgets(prev => prev.map(w => w.id === wid ? { ...w, ...updates } : w));
 
+    // Reorder a widget within its own sibling group (same parent) by swapping it with
+    // the neighbour above/below. Deterministic alternative to the nested-Droppable drag,
+    // which @hello-pangea/dnd can't hit-test reliably inside a section. Children are
+    // never sections, so a plain index swap keeps the flat array's structure intact.
+    const moveWidget = (wid: string, dir: 'prev' | 'next') => {
+        setWidgets(prev => {
+            const target = prev.find(w => w.id === wid);
+            if (!target) return prev;
+            const parent = target.parent_id || null;
+            // Absolute indices of the siblings, in their current order.
+            const siblingIdxs = prev.reduce<number[]>((acc, w, i) => {
+                if ((w.parent_id || null) === parent) acc.push(i);
+                return acc;
+            }, []);
+            const pos = siblingIdxs.findIndex(i => prev[i].id === wid);
+            const swapPos = dir === 'prev' ? pos - 1 : pos + 1;
+            if (swapPos < 0 || swapPos >= siblingIdxs.length) return prev; // at an edge
+            const a = siblingIdxs[pos];
+            const b = siblingIdxs[swapPos];
+            const next = [...prev];
+            [next[a], next[b]] = [next[b], next[a]];
+            return next;
+        });
+    };
+
+    // Floating action toolbar shown ABOVE a widget box (hover-reveal). Used for both
+    // top-level widgets and section children so the placement is consistent; children
+    // additionally get left/right reorder controls (top-level reorder via drag).
+    const renderToolbar = (opts: {
+        onEdit: () => void;
+        onRemove: () => void;
+        move?: { onPrev: () => void; onNext: () => void; disablePrev: boolean; disableNext: boolean };
+    }) => (
+        <div className="absolute -top-3 right-2 z-20 flex items-center gap-0.5 p-0.5 rounded-md bg-card border border-border shadow-md opacity-0 group-hover/tb:opacity-100 transition-opacity">
+            {opts.move && (
+                <>
+                    <button
+                        type="button"
+                        title="Move left"
+                        disabled={opts.move.disablePrev}
+                        onClick={(e) => { e.stopPropagation(); opts.move!.onPrev(); }}
+                        className="h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    >
+                        <ArrowLeft className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                        type="button"
+                        title="Move right"
+                        disabled={opts.move.disableNext}
+                        onClick={(e) => { e.stopPropagation(); opts.move!.onNext(); }}
+                        className="h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    >
+                        <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                    <div className="w-px h-4 bg-border mx-0.5" />
+                </>
+            )}
+            <button
+                type="button"
+                title="Settings"
+                onClick={(e) => { e.stopPropagation(); opts.onEdit(); }}
+                className="h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+                <SettingsIcon className="w-3.5 h-3.5" />
+            </button>
+            <button
+                type="button"
+                title="Delete"
+                onClick={(e) => { e.stopPropagation(); opts.onRemove(); }}
+                className="h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+            >
+                <Trash2 className="w-3.5 h-3.5" />
+            </button>
+        </div>
+    );
+
     const handleDragStart = (start: { draggableId: string }) => {
         // Palette drag: detect SECTION-from-palette via draggableId convention so we can
         // disable nested section droppables (no section-in-section).
@@ -743,12 +819,17 @@ const PageDesignerPage = () => {
                                                                     {...provided.draggableProps}
                                                                     className={cn(
                                                                         "transition-all duration-200 rounded-md",
+                                                                        widget.type !== 'SECTION' && "relative group/tb",
                                                                         widget.type === 'SECTION' ? "w-full" :
                                                                             widget.size === 'half' ? "w-[calc(50%-10px)]" : widget.size === 'third' ? "w-[calc((100%-40px)/3)]" : "w-full",
                                                                         snapshot.isDragging && "opacity-80 scale-[1.02] z-50",
                                                                         snapshot.combineTargetFor && widget.type === 'SECTION' && "ring-2 ring-primary ring-offset-2 ring-offset-background scale-[1.01]"
                                                                     )}
                                                                 >
+                                                                    {widget.type !== 'SECTION' && renderToolbar({
+                                                                        onEdit: () => setEditingWidgetId(widget.id),
+                                                                        onRemove: () => removeWidget(widget.id),
+                                                                    })}
                                                                     {widget.type === 'ENDPOINT' ? (
                                                                         <EndpointWidgetCard
                                                                             widget={widget}
@@ -756,6 +837,7 @@ const PageDesignerPage = () => {
                                                                             onEdit={() => setEditingWidgetId(widget.id)}
                                                                             onRemove={() => removeWidget(widget.id)}
                                                                             dragHandleProps={provided.dragHandleProps}
+                                                                            hideActions
                                                                         />
                                                                     ) : widget.type === 'TERMINAL' ? (
                                                                         <TerminalWidgetCard
@@ -763,6 +845,7 @@ const PageDesignerPage = () => {
                                                                             onEdit={() => setEditingWidgetId(widget.id)}
                                                                             onRemove={() => removeWidget(widget.id)}
                                                                             dragHandleProps={provided.dragHandleProps}
+                                                                            hideActions
                                                                         />
                                                                     ) : widget.type === 'LINK' ? (
                                                                         <LinkWidgetCard
@@ -770,6 +853,7 @@ const PageDesignerPage = () => {
                                                                             onEdit={() => setEditingWidgetId(widget.id)}
                                                                             onRemove={() => removeWidget(widget.id)}
                                                                             dragHandleProps={provided.dragHandleProps}
+                                                                            hideActions
                                                                         />
                                                                     ) : widget.type === 'TEXT' || widget.type === 'IMAGE' || widget.type === 'IFRAME' || widget.type === 'STATUS' || widget.type === 'TABLE' || widget.type === 'CHART' || widget.type === 'METRIC' ? (
                                                                         <ContentWidgetCard
@@ -777,6 +861,7 @@ const PageDesignerPage = () => {
                                                                             onEdit={() => setEditingWidgetId(widget.id)}
                                                                             onRemove={() => removeWidget(widget.id)}
                                                                             dragHandleProps={provided.dragHandleProps}
+                                                                            hideActions
                                                                         />
                                                                     ) : (
                                                                         <SectionWidgetCard
@@ -803,11 +888,21 @@ const PageDesignerPage = () => {
                                                                                                         ref={childProvided.innerRef}
                                                                                                         {...childProvided.draggableProps}
                                                                                                         className={cn(
-                                                                                                            "transition-all duration-200",
+                                                                                                            "transition-all duration-200 relative group/tb",
                                                                                                             child.size === 'half' ? "w-[calc(50%-10px)]" : child.size === 'third' ? "w-[calc((100%-40px)/3)]" : "w-full",
                                                                                                             childSnapshot.isDragging && "opacity-80 scale-[1.02] z-50"
                                                                                                         )}
                                                                                                     >
+                                                                                                        {renderToolbar({
+                                                                                                            onEdit: () => setEditingWidgetId(child.id),
+                                                                                                            onRemove: () => removeWidget(child.id),
+                                                                                                            move: {
+                                                                                                                onPrev: () => moveWidget(child.id, 'prev'),
+                                                                                                                onNext: () => moveWidget(child.id, 'next'),
+                                                                                                                disablePrev: cIdx === 0,
+                                                                                                                disableNext: cIdx === widgets.filter(w => w.parent_id === widget.id).length - 1,
+                                                                                                            },
+                                                                                                        })}
                                                                                                         {child.type === 'ENDPOINT' ? (
                                                                                                             <EndpointWidgetCard
                                                                                                                 widget={child}
@@ -815,6 +910,7 @@ const PageDesignerPage = () => {
                                                                                                                 onEdit={() => setEditingWidgetId(child.id)}
                                                                                                                 onRemove={() => removeWidget(child.id)}
                                                                                                                 dragHandleProps={childProvided.dragHandleProps}
+                                                                                                                hideActions
                                                                                                             />
                                                                                                         ) : child.type === 'TERMINAL' ? (
                                                                                                             <TerminalWidgetCard
@@ -822,6 +918,7 @@ const PageDesignerPage = () => {
                                                                                                                 onEdit={() => setEditingWidgetId(child.id)}
                                                                                                                 onRemove={() => removeWidget(child.id)}
                                                                                                                 dragHandleProps={childProvided.dragHandleProps}
+                                                                                                                hideActions
                                                                                                             />
                                                                                                         ) : child.type === 'LINK' ? (
                                                                                                             <LinkWidgetCard
@@ -829,6 +926,7 @@ const PageDesignerPage = () => {
                                                                                                                 onEdit={() => setEditingWidgetId(child.id)}
                                                                                                                 onRemove={() => removeWidget(child.id)}
                                                                                                                 dragHandleProps={childProvided.dragHandleProps}
+                                                                                                                hideActions
                                                                                                             />
                                                                                                         ) : child.type === 'TEXT' || child.type === 'IMAGE' || child.type === 'IFRAME' || child.type === 'STATUS' || child.type === 'TABLE' || child.type === 'CHART' || child.type === 'METRIC' ? (
                                                                                                             <ContentWidgetCard
@@ -836,6 +934,7 @@ const PageDesignerPage = () => {
                                                                                                                 onEdit={() => setEditingWidgetId(child.id)}
                                                                                                                 onRemove={() => removeWidget(child.id)}
                                                                                                                 dragHandleProps={childProvided.dragHandleProps}
+                                                                                                                hideActions
                                                                                                             />
                                                                                                         ) : null}
                                                                                                     </div>
@@ -1472,9 +1571,10 @@ interface EndpointWidgetCardProps {
     onEdit: () => void;
     onRemove: () => void;
     dragHandleProps: any;
+    hideActions?: boolean;
 }
 
-const EndpointWidgetCard: React.FC<EndpointWidgetCardProps> = ({ widget, workflows, onEdit, onRemove, dragHandleProps }) => {
+const EndpointWidgetCard: React.FC<EndpointWidgetCardProps> = ({ widget, workflows, onEdit, onRemove, dragHandleProps, hideActions }) => {
     const selectedWf = workflows.find(w => w.id === widget.workflow_id);
     return (
         <div className="group bg-card border border-border rounded-md overflow-hidden hover:border-primary/40 transition-all shadow-sm">
@@ -1486,12 +1586,16 @@ const EndpointWidgetCard: React.FC<EndpointWidgetCardProps> = ({ widget, workflo
                     <p className="text-xs font-black uppercase tracking-tight truncate">{widget.title || 'Endpoint'}</p>
                     <p className="text-[10px] text-muted-foreground font-medium truncate uppercase tracking-widest">{selectedWf?.name || widget.workflow_name || 'No workflow'}</p>
                 </div>
-                <button onClick={onEdit} className="h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors border border-transparent hover:border-border">
-                    <SettingsIcon className="w-3.5 h-3.5" />
-                </button>
-                <button onClick={onRemove} className="h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors border border-transparent hover:border-border">
-                    <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                {!hideActions && (
+                    <>
+                        <button onClick={onEdit} className="h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors border border-transparent hover:border-border">
+                            <SettingsIcon className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={onRemove} className="h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors border border-transparent hover:border-border">
+                            <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                    </>
+                )}
             </div>
             <div className="p-6">
                 {(() => {
@@ -1516,9 +1620,10 @@ interface TerminalWidgetCardProps {
     onEdit: () => void;
     onRemove: () => void;
     dragHandleProps: any;
+    hideActions?: boolean;
 }
 
-const TerminalWidgetCard: React.FC<TerminalWidgetCardProps> = ({ widget, onEdit, onRemove, dragHandleProps }) => (
+const TerminalWidgetCard: React.FC<TerminalWidgetCardProps> = ({ widget, onEdit, onRemove, dragHandleProps, hideActions }) => (
     <div className="group bg-[#0a0b0e] border border-white/10 rounded-md overflow-hidden hover:border-emerald-500/30 transition-all shadow-sm">
         <div className="flex items-center justify-between px-5 py-3 bg-white/5 border-b border-white/5">
             <div className="flex items-center gap-3">
@@ -1533,14 +1638,16 @@ const TerminalWidgetCard: React.FC<TerminalWidgetCardProps> = ({ widget, onEdit,
                 <Terminal className="w-3.5 h-3.5 text-emerald-400 ml-2" />
                 <span className="text-xs font-mono font-bold text-emerald-400/80 uppercase truncate max-w-[120px]">{widget.title}</span>
             </div>
-            <div className="flex gap-2">
-                <button onClick={onEdit} className="h-7 w-7 rounded-full flex items-center justify-center text-zinc-600 hover:text-zinc-300 hover:bg-white/5 transition-colors">
-                    <SettingsIcon className="w-3 h-3" />
-                </button>
-                <button onClick={onRemove} className="h-7 w-7 rounded-full flex items-center justify-center text-zinc-600 hover:text-rose-400 hover:bg-rose-500/10 transition-colors">
-                    <Trash2 className="w-3 h-3" />
-                </button>
-            </div>
+            {!hideActions && (
+                <div className="flex gap-2">
+                    <button onClick={onEdit} className="h-7 w-7 rounded-full flex items-center justify-center text-zinc-600 hover:text-zinc-300 hover:bg-white/5 transition-colors">
+                        <SettingsIcon className="w-3 h-3" />
+                    </button>
+                    <button onClick={onRemove} className="h-7 w-7 rounded-full flex items-center justify-center text-zinc-600 hover:text-rose-400 hover:bg-rose-500/10 transition-colors">
+                        <Trash2 className="w-3 h-3" />
+                    </button>
+                </div>
+            )}
         </div>
         <div className="px-6 py-4 min-h-[80px] font-mono text-xs text-zinc-400">
             <span className="text-zinc-600">$ </span>
@@ -1555,9 +1662,10 @@ interface LinkWidgetCardProps {
     onEdit: () => void;
     onRemove: () => void;
     dragHandleProps: any;
+    hideActions?: boolean;
 }
 
-const LinkWidgetCard: React.FC<LinkWidgetCardProps> = ({ widget, onEdit, onRemove, dragHandleProps }) => (
+const LinkWidgetCard: React.FC<LinkWidgetCardProps> = ({ widget, onEdit, onRemove, dragHandleProps, hideActions }) => (
     <div className="group bg-card border border-border rounded-md overflow-hidden hover:border-indigo-500/40 transition-all shadow-sm">
         <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-card">
             <div className="flex items-center gap-3">
@@ -1569,14 +1677,16 @@ const LinkWidgetCard: React.FC<LinkWidgetCardProps> = ({ widget, onEdit, onRemov
                     <span className="text-[10px] text-muted-foreground font-mono truncate max-w-[120px]">{widget.url || '---'}</span>
                 </div>
             </div>
-            <div className="flex gap-2 shrink-0">
-                <button onClick={onEdit} className="h-7 w-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
-                    <SettingsIcon className="w-3 h-3" />
-                </button>
-                <button onClick={onRemove} className="h-7 w-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
-                    <Trash2 className="w-3 h-3" />
-                </button>
-            </div>
+            {!hideActions && (
+                <div className="flex gap-2 shrink-0">
+                    <button onClick={onEdit} className="h-7 w-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                        <SettingsIcon className="w-3 h-3" />
+                    </button>
+                    <button onClick={onRemove} className="h-7 w-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
+                        <Trash2 className="w-3 h-3" />
+                    </button>
+                </div>
+            )}
         </div>
         <div className="p-4">
             {widget.description && (
@@ -1651,9 +1761,10 @@ interface ContentWidgetCardProps {
     onEdit: () => void;
     onRemove: () => void;
     dragHandleProps: any;
+    hideActions?: boolean;
 }
 
-const ContentWidgetCard: React.FC<ContentWidgetCardProps> = ({ widget, onEdit, onRemove, dragHandleProps }) => {
+const ContentWidgetCard: React.FC<ContentWidgetCardProps> = ({ widget, onEdit, onRemove, dragHandleProps, hideActions }) => {
     const meta = WIDGET_META[widget.type] || WIDGET_META.TEXT;
     const colorClasses = `bg-${meta.color}-500/10 text-${meta.color}-500 group-hover:bg-${meta.color}-500/20`;
 
@@ -1670,12 +1781,16 @@ const ContentWidgetCard: React.FC<ContentWidgetCardProps> = ({ widget, onEdit, o
                     <p className="text-xs font-black uppercase tracking-tight truncate">{widget.title || meta.label}</p>
                     <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-widest">{meta.label}</p>
                 </div>
-                <button onClick={onEdit} className="h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors border border-transparent hover:border-border">
-                    <SettingsIcon className="w-3.5 h-3.5" />
-                </button>
-                <button onClick={onRemove} className="h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors border border-transparent hover:border-border">
-                    <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                {!hideActions && (
+                    <>
+                        <button onClick={onEdit} className="h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors border border-transparent hover:border-border">
+                            <SettingsIcon className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={onRemove} className="h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors border border-transparent hover:border-border">
+                            <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                    </>
+                )}
             </div>
             <div className="p-5">
                 {widget.type === 'TEXT' && (

@@ -361,7 +361,11 @@ const DatasetsPage = () => {
                             <TableRow key={d.id} className="group border-border hover:bg-muted/30 transition-all duration-200">
                                 <TableCell className="px-6 py-4">
                                     <div>
-                                        <p className="text-sm font-black tracking-tight text-primary">{d.name}</p>
+                                        <p
+                                            onClick={() => openEditDialog(d)}
+                                            className="text-sm font-black tracking-tight text-primary cursor-pointer hover:opacity-70 transition-opacity"
+                                            title="Edit dataset"
+                                        >{d.name}</p>
                                         <p className="text-[10px] font-bold text-muted-foreground/70 mt-0.5">{d.key}</p>
                                     </div>
                                 </TableCell>

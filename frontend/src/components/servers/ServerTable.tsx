@@ -60,7 +60,14 @@ export const ServerTable: React.FC<ServerTableProps> = ({
                                 <div className="flex items-center gap-3">
                                     <div>
                                         <div className="flex items-center gap-2">
-                                            <p className="text-sm font-black tracking-tight">{server.name}</p>
+                                            <p
+                                                onClick={() => server.connection_type !== 'LOCAL' && onEdit(server)}
+                                                className={cn(
+                                                    "text-sm font-black tracking-tight",
+                                                    server.connection_type !== 'LOCAL' && "cursor-pointer hover:opacity-70 transition-opacity"
+                                                )}
+                                                title={server.connection_type === 'LOCAL' ? undefined : 'Edit server'}
+                                            >{server.name}</p>
                                             {server.connection_type === 'LOCAL' && (
                                                 <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px] h-4 font-black uppercase tracking-widest px-1.5">System</Badge>
                                             )}

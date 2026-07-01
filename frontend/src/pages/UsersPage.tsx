@@ -527,7 +527,11 @@ const UsersPage = () => {
                                     <div className="flex items-center gap-4">
                                         <div>
                                             <p className="text-sm font-black tracking-tight flex items-center gap-2">
-                                                {u.full_name || u.username}
+                                                <span
+                                                    onClick={() => openEditDialog(u)}
+                                                    className="cursor-pointer hover:opacity-70 transition-opacity"
+                                                    title="Edit user"
+                                                >{u.full_name || u.username}</span>
                                                 {u.username === 'admin' && <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />}
                                             </p>
                                             <p className="text-xs text-muted-foreground font-medium flex items-center gap-1.5 mt-0.5">

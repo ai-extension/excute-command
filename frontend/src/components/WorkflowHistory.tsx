@@ -335,7 +335,7 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
                         onClick={() => fetchExecutionDetail(exec)}
                     >
                         <CardContent className="p-3 flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-3 overflow-hidden">
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
                                 <div className={cn(
                                     "w-1 h-9 rounded-full shrink-0",
                                     exec.status === 'SUCCESS' ? 'bg-green-500' :
@@ -352,16 +352,27 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
                                         <ChevronDown className={cn("w-4 h-4 transition-transform", !isExpanded && "-rotate-90")} />
                                     </Button>
                                 )}
-                                <div className="space-y-1 overflow-hidden">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="text-xs font-mono text-muted-foreground shrink-0">#{exec.id.slice(0, 8)}</span>
-                                        {getStatusBadge(exec.status)}
-                                        {getTriggerBadge(exec)}
-                                        {exec.workflow?.name && (
-                                            <Badge variant="outline" className="bg-white/5 border-white/10 text-[10px] uppercase tracking-tighter truncate max-w-[150px]">
-                                                {exec.workflow.name}
-                                            </Badge>
-                                        )}
+                                <div className="space-y-1 min-w-0 flex-1">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <span className="shrink-0">{getStatusBadge(exec.status)}</span>
+                                        <span
+                                            className="text-sm font-bold text-foreground truncate min-w-0 flex-1"
+                                            title={exec.workflow?.name}
+                                        >
+                                            {exec.workflow?.name || 'Workflow'}
+                                        </span>
+                                        <span className="shrink-0">{getTriggerBadge(exec)}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground font-medium">
+                                        <span className="font-mono shrink-0">#{exec.id.slice(0, 8)}</span>
+                                        <span className="flex items-center gap-1 shrink-0">
+                                            <Calendar className="w-3 h-3" />
+                                            {format(new Date(exec.started_at), 'MMM d, HH:mm:ss')}
+                                        </span>
+                                        <span className="flex items-center gap-1 shrink-0">
+                                            <Clock className="w-3 h-3" />
+                                            {getDuration(exec.started_at, exec.finished_at)}
+                                        </span>
                                         {exec.workflow?.tags && exec.workflow.tags.length > 0 && (
                                             <div className="flex flex-wrap gap-1">
                                                 {exec.workflow.tags.map(tag => (
@@ -375,16 +386,6 @@ const WorkflowHistory: React.FC<WorkflowHistoryProps> = ({
                                                 ))}
                                             </div>
                                         )}
-                                    </div>
-                                    <div className="flex items-center gap-4 text-xs text-muted-foreground font-medium whitespace-nowrap overflow-hidden">
-                                        <span className="flex items-center gap-1 shrink-0">
-                                            <Calendar className="w-3 h-3" />
-                                            {format(new Date(exec.started_at), 'MMM d, HH:mm:ss')}
-                                        </span>
-                                        <span className="flex items-center gap-1 shrink-0">
-                                            <Clock className="w-3 h-3" />
-                                            {getDuration(exec.started_at, exec.finished_at)}
-                                        </span>
                                     </div>
                                 </div>
                             </div>

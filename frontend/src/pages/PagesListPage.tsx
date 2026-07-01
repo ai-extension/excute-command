@@ -273,7 +273,11 @@ const PagesListPage = () => {
                             <div key={page.id} className="group bg-card border border-border rounded-md p-5 hover:border-primary/50 transition-all duration-300 shadow-sm hover:shadow-xl hover:shadow-primary/5 relative overflow-hidden flex flex-col min-h-[220px]">
                                 <div className="flex items-start justify-between mb-4">
                                     <div className="flex flex-col gap-1">
-                                        <h3 className="text-lg font-bold group-hover:text-primary transition-colors line-clamp-1">{page.title}</h3>
+                                        <h3
+                                            onClick={() => navigate(`/pages/${page.id}/edit`)}
+                                            className="text-lg font-bold hover:text-primary transition-colors line-clamp-1 cursor-pointer"
+                                            title="Open page"
+                                        >{page.title}</h3>
                                         <div className="flex items-center gap-2">
                                             <Badge variant="outline" className="text-[10px] font-mono py-0 h-5 lowercase bg-muted/50">
                                                 /{page.slug}

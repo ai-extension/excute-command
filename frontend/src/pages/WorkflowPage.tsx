@@ -692,10 +692,14 @@ const WorkflowPage = () => {
                                                     <div className="flex items-center gap-3">
                                                         <div>
                                                             <div className="flex items-center gap-2">
-                                                                <p className={cn(
-                                                                    "text-sm font-black tracking-tight transition-colors",
-                                                                    wf.is_public ? "group-hover:text-indigo-500" : "group-hover:text-amber-500"
-                                                                )}>{wf.name}</p>
+                                                                <p
+                                                                    onClick={() => navigate(`/workflows/${wf.id}/edit`)}
+                                                                    className={cn(
+                                                                        "text-sm font-black tracking-tight transition-colors cursor-pointer",
+                                                                        wf.is_public ? "hover:text-indigo-500" : "hover:text-amber-500"
+                                                                    )}
+                                                                    title="Open workflow"
+                                                                >{wf.name}</p>
                                                                 {!wf.is_public && (
                                                                     <SquareChartGantt className="w-3 h-3 text-amber-500 opacity-60" />
                                                                 )}

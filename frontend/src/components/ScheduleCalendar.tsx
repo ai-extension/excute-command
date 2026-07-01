@@ -291,7 +291,9 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({ schedules, onEdit, 
                                     {selectedDaySchedules.map(s => (
                                         <div
                                             key={s.id}
-                                            className="bg-muted/30 rounded-md p-3 border border-border hover:border-primary/30 transition-all group"
+                                            className="bg-muted/30 rounded-md p-3 border border-border hover:border-primary/30 transition-all group cursor-pointer"
+                                            onClick={() => navigate(`/schedules/${s.id}`)}
+                                            title="View detail"
                                         >
                                             <div className="flex items-start justify-between gap-2">
                                                 <div className="flex-1 min-w-0">
@@ -300,11 +302,7 @@ const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({ schedules, onEdit, 
                                                             "w-1.5 h-1.5 rounded-full shrink-0",
                                                             s.status === 'ACTIVE' ? 'bg-emerald-500' : 'bg-slate-500'
                                                         )} />
-                                                        <p
-                                                            className="text-xs font-black truncate cursor-pointer hover:text-primary transition-colors"
-                                                            onClick={(e) => { e.stopPropagation(); navigate(`/schedules/${s.id}`); }}
-                                                            title="View detail"
-                                                        >
+                                                        <p className="text-xs font-black truncate group-hover:text-primary transition-colors">
                                                             {s.name}
                                                         </p>
                                                     </div>

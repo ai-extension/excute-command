@@ -307,8 +307,10 @@ const TagsPage = () => {
                                     <div className="flex flex-col gap-1.5">
                                         <div className="flex items-center gap-4">
                                             <div
-                                                className="px-3 py-1 w-max rounded-md text-xs font-bold border"
+                                                onClick={() => openEditDialog(t)}
+                                                className="px-3 py-1 w-max rounded-md text-xs font-bold border cursor-pointer hover:opacity-80 transition-opacity"
                                                 style={{ backgroundColor: `${t.color}20`, color: t.color, borderColor: `${t.color}40` }}
+                                                title="Edit tag"
                                             >
                                                 {t.name}
                                             </div>

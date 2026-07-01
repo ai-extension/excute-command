@@ -304,7 +304,11 @@ const GlobalVariablesPage = () => {
                                 <TableCell className="px-6 py-4">
                                     <div className="flex items-center gap-4">
                                         <div>
-                                            <p className="text-sm font-black tracking-tight text-primary uppercase">{v.key}</p>
+                                            <p
+                                                onClick={() => openEditDialog(v)}
+                                                className="text-sm font-black tracking-tight text-primary uppercase cursor-pointer hover:opacity-70 transition-opacity"
+                                                title="Edit variable"
+                                            >{v.key}</p>
                                             <p className="text-xs text-muted-foreground font-medium line-clamp-1 opacity-70 mt-0.5">
                                                 {v.description || 'No description provided'}
                                             </p>

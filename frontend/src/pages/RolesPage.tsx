@@ -181,7 +181,11 @@ const RolesPage = () => {
                                         {(role.permissions || []).length} PERMISSIONS
                                     </Badge>
                                 </div>
-                                <CardTitle className="text-xl font-black tracking-tight group-hover:text-primary transition-colors">{role.name}</CardTitle>
+                                <CardTitle
+                                    onClick={() => navigate(`/roles/${role.id}/permissions`)}
+                                    className="text-xl font-black tracking-tight hover:text-primary transition-colors cursor-pointer"
+                                    title="Manage permissions"
+                                >{role.name}</CardTitle>
                                 <CardDescription className="text-xs font-medium leading-relaxed mt-2 italic opacity-70">
                                     {role.description || 'Global access controls for system entities.'}
                                 </CardDescription>
