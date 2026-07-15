@@ -24,16 +24,18 @@ type PageHandler struct {
 	executor        *service.WorkflowExecutor
 	terminalService *service.TerminalService
 	datasetService  *service.DatasetService
+	scheduleService *service.ScheduleService
 	auditLog        domain.AuditLogService
 }
 
-func NewPageHandler(s *service.PageService, ws *service.WorkflowService, e *service.WorkflowExecutor, ts *service.TerminalService, ds *service.DatasetService, auditLog domain.AuditLogService) *PageHandler {
+func NewPageHandler(s *service.PageService, ws *service.WorkflowService, e *service.WorkflowExecutor, ts *service.TerminalService, ds *service.DatasetService, ss *service.ScheduleService, auditLog domain.AuditLogService) *PageHandler {
 	return &PageHandler{
 		service:         s,
 		workflowService: ws,
 		executor:        e,
 		terminalService: ts,
 		datasetService:  ds,
+		scheduleService: ss,
 		auditLog:        auditLog,
 	}
 }
@@ -825,6 +827,227 @@ func (h *PageHandler) UploadPublicInputFile(c *gin.Context) {
 		"path":       localPath,
 		"session_id": inputSessionID,
 	})
+}
+
+// Guardrails for public (page-originated) scheduling.
+const (
+	maxPublicScheduleRepeatDays = 10 // cap on the recurring window a visitor can request
+	maxActiveSchedulesPerPage   = 20 // cap on concurrent active schedules per page
+)
+
+// pageWidgetAllowsSchedule reports whether the page layout has an ENDPOINT widget bound to
+// workflowID with scheduling enabled (allow_schedule). Loose JSON → false on parse failure.
+func pageWidgetAllowsSchedule(layout string, workflowID uuid.UUID) bool {
+	if layout == "" {
+		return false
+	}
+	var doc struct {
+		Widgets []struct {
+			Type          string `json:"type"`
+			WorkflowID    string `json:"workflow_id"`
+			AllowSchedule bool   `json:"allow_schedule"`
+		} `json:"widgets"`
+	}
+	if err := json.Unmarshal([]byte(layout), &doc); err != nil {
+		return false
+	}
+	target := workflowID.String()
+	for _, w := range doc.Widgets {
+		if w.Type == "ENDPOINT" && w.WorkflowID == target && w.AllowSchedule {
+			return true
+		}
+	}
+	return false
+}
+
+// resolvePublicPage runs the shared public-page access checks (slug → public/expiry → token)
+// used by the scheduling endpoints. On failure it writes the HTTP error and returns nil.
+func (h *PageHandler) resolvePublicPage(c *gin.Context) *domain.Page {
+	slug := c.Param("slug")
+	page, err := h.service.GetPageBySlug(slug)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "page not found"})
+		return nil
+	}
+	if !h.checkPublicAccess(c, page) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "page is not public"})
+		return nil
+	}
+	if page.ExpiresAt != nil && page.ExpiresAt.Before(time.Now()) {
+		c.JSON(http.StatusGone, gin.H{"error": "page has expired"})
+		return nil
+	}
+	if !h.verifyPageToken(c, page) {
+		return nil // verifyPageToken already wrote the error
+	}
+	return page
+}
+
+// CreatePublicSchedule lets a public visitor schedule an ENDPOINT widget's workflow. The
+// workflow must belong to the page and its widget must opt into scheduling. A one-time run
+// (default) becomes ONE_TIME; opting into repeat turns it into a daily RECURRING schedule
+// bounded to a [run_at, run_at + N days] window (N capped server-side).
+func (h *PageHandler) CreatePublicSchedule(c *gin.Context) {
+	workflowID, err := uuid.Parse(c.Param("workflow_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid workflow id"})
+		return
+	}
+	page := h.resolvePublicPage(c)
+	if page == nil {
+		return
+	}
+
+	inPage := false
+	for _, pw := range page.Workflows {
+		if pw.WorkflowID == workflowID {
+			inPage = true
+			break
+		}
+	}
+	if !inPage {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "workflow not part of this page"})
+		return
+	}
+	if !pageWidgetAllowsSchedule(page.Layout, workflowID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "scheduling not enabled for this widget"})
+		return
+	}
+
+	var req struct {
+		RunAt      string            `json:"run_at" binding:"required"` // RFC3339 first-run time
+		Repeat     bool              `json:"repeat"`
+		RepeatDays int               `json:"repeat_days"`
+		Inputs     map[string]string `json:"inputs"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	runAt, err := parseTimestamp(req.RunAt)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid run_at"})
+		return
+	}
+	if !runAt.After(time.Now()) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "run_at must be in the future"})
+		return
+	}
+
+	if n, err := h.scheduleService.CountActiveByPage(page.ID); err == nil && n >= maxActiveSchedulesPerPage {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "too many active schedules for this page"})
+		return
+	}
+
+	inputsJSON := "{}"
+	if len(req.Inputs) > 0 {
+		if b, mErr := json.Marshal(req.Inputs); mErr == nil {
+			inputsJSON = string(b)
+		}
+	}
+
+	runAtUTC := runAt.UTC()
+	schedule := &domain.Schedule{
+		NamespaceID:       page.NamespaceID,
+		PageID:            &page.ID,
+		Status:            "ACTIVE",
+		CreatedBy:         page.CreatedBy,
+		CreatedByUsername: page.CreatedByUsername,
+	}
+
+	if req.Repeat && req.RepeatDays > 0 {
+		days := req.RepeatDays
+		if days > maxPublicScheduleRepeatDays {
+			days = maxPublicScheduleRepeatDays
+		}
+		start := runAtUTC
+		end := runAtUTC.AddDate(0, 0, days)
+		schedule.Type = domain.ScheduleTypeRecurring
+		// The cron engine runs in the server's local timezone, so derive the daily H:M from
+		// the local representation of the chosen instant — otherwise a non-UTC server would
+		// fire at the wrong wall-clock time. StartDate/EndDate stay UTC instants (the window
+		// checks compare against time.Now().UTC()).
+		runAtLocal := runAtUTC.In(time.Local)
+		schedule.CronExpression = fmt.Sprintf("%d %d * * *", runAtLocal.Minute(), runAtLocal.Hour())
+		schedule.StartDate = &start
+		schedule.EndDate = &end
+		schedule.Name = fmt.Sprintf("%s — daily x%dd", page.Title, days)
+	} else {
+		schedule.Type = domain.ScheduleTypeOneTime
+		schedule.NextRunAt = &runAtUTC
+		schedule.Name = fmt.Sprintf("%s — one-time", page.Title)
+	}
+
+	workflowConfigs := []domain.ScheduleWorkflow{{WorkflowID: workflowID, Inputs: inputsJSON}}
+	if err := h.scheduleService.CreateForPage(schedule, workflowConfigs); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	h.auditLog.LogAction(c, "CREATE", "SCHEDULE", schedule.ID.String(), map[string]string{"page_id": page.ID.String(), "workflow_id": workflowID.String()}, "SUCCESS")
+	// Don't echo the page owner's identity back to a public creator.
+	schedule.CreatedBy = nil
+	schedule.CreatedByUsername = ""
+	c.JSON(http.StatusCreated, schedule)
+}
+
+// ListPublicSchedules returns the schedules a page created, optionally filtered to one
+// workflow (the widget only shows its own). Internal server ids are stripped.
+func (h *PageHandler) ListPublicSchedules(c *gin.Context) {
+	page := h.resolvePublicPage(c)
+	if page == nil {
+		return
+	}
+	list, err := h.scheduleService.ListByPage(page.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	wfFilter := c.Query("workflow_id")
+	out := make([]domain.Schedule, 0, len(list))
+	for _, sc := range list {
+		if wfFilter != "" {
+			match := false
+			for _, sw := range sc.ScheduledWorkflows {
+				if sw.WorkflowID.String() == wfFilter {
+					match = true
+					break
+				}
+			}
+			if !match {
+				continue
+			}
+		}
+		// Strip everything internal: the schedules tab only needs status/type/timing. Drop
+		// the full workflow rows (name/description/ai_guide/creator) and the schedule's
+		// creator identity rather than leak them to public (possibly anonymous) visitors.
+		sc.CreatedBy = nil
+		sc.CreatedByUsername = ""
+		for i := range sc.ScheduledWorkflows {
+			sc.ScheduledWorkflows[i].Workflow = nil
+		}
+		out = append(out, sc)
+	}
+	c.JSON(http.StatusOK, gin.H{"schedules": out})
+}
+
+// CancelPublicSchedule cancels a page-owned schedule. The service verifies the schedule
+// actually belongs to this page before deleting.
+func (h *PageHandler) CancelPublicSchedule(c *gin.Context) {
+	scheduleID, err := uuid.Parse(c.Param("schedule_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid schedule id"})
+		return
+	}
+	page := h.resolvePublicPage(c)
+	if page == nil {
+		return
+	}
+	if err := h.scheduleService.CancelForPage(page.ID, scheduleID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	h.auditLog.LogAction(c, "DELETE", "SCHEDULE", scheduleID.String(), map[string]string{"page_id": page.ID.String()}, "SUCCESS")
+	c.JSON(http.StatusOK, gin.H{"message": "schedule cancelled"})
 }
 
 func (h *PageHandler) sanitizePage(page *domain.Page) {

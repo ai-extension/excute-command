@@ -291,6 +291,8 @@ export interface Schedule {
     start_date?: string;
     end_date?: string;
     status: 'ACTIVE' | 'PAUSED';
+    // Set when the schedule was created from a public page's ENDPOINT widget.
+    page_id?: string | null;
     retries: number;
     catch_up: boolean;
     created_by?: string;
@@ -377,6 +379,10 @@ export interface PageWidget {
     label?: string;
     style?: string;
     show_log?: boolean;
+    // When true, the public page shows a "Schedule" button on this ENDPOINT widget,
+    // letting visitors schedule the workflow (one-time or daily-recurring). See
+    // POST /public/pages/:slug/schedule/:workflow_id.
+    allow_schedule?: boolean;
     description?: string;
     // LINK-specific
     url?: string;

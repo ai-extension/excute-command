@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"sync"
 	"time"
@@ -83,6 +84,76 @@ func (s *ScheduleService) Create(schedule *domain.Schedule, workflowConfigs []do
 		s.addScheduleToCron(*reloaded)
 	}
 	return nil
+}
+
+// --- Public (page-originated) schedule operations ---
+// These mirror Create/Delete/List but are NOT RBAC-scoped: they are driven by public
+// page visitors, so callers (the public page handler) enforce their own guardrails
+// (page access, workflow ownership, caps). Schedules created here always carry PageID.
+
+// CreateForPage persists and arms a schedule created from a public page. Same cron/timer
+// wiring as Create, minus the RBAC user/scope.
+func (s *ScheduleService) CreateForPage(schedule *domain.Schedule, workflowConfigs []domain.ScheduleWorkflow) error {
+	schedule.ID = uuid.New()
+	if err := s.repo.Create(schedule); err != nil {
+		return err
+	}
+	for _, config := range workflowConfigs {
+		config.ID = uuid.New()
+		config.ScheduleID = schedule.ID
+		if err := s.repo.AddScheduledWorkflow(&config); err != nil {
+			return err
+		}
+	}
+	reloaded, err := s.repo.GetByID(schedule.ID, nil)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if reloaded.Status == "ACTIVE" {
+		s.addScheduleToCron(*reloaded)
+	}
+	return nil
+}
+
+// ListByPage returns all schedules a public page created (for the widget history tab).
+func (s *ScheduleService) ListByPage(pageID uuid.UUID) ([]domain.Schedule, error) {
+	return s.repo.ListByPageID(pageID)
+}
+
+// CountActiveByPage counts non-paused schedules for a page (guardrail: cap per page).
+func (s *ScheduleService) CountActiveByPage(pageID uuid.UUID) (int, error) {
+	list, err := s.repo.ListByPageID(pageID)
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	for _, sc := range list {
+		if sc.Status == "ACTIVE" {
+			n++
+		}
+	}
+	return n, nil
+}
+
+// CancelForPage removes a schedule, but only if it belongs to the given page. Prevents a
+// public caller from deleting a schedule that isn't tied to their page.
+func (s *ScheduleService) CancelForPage(pageID, scheduleID uuid.UUID) error {
+	sch, err := s.repo.GetByID(scheduleID, nil)
+	if err != nil {
+		return err
+	}
+	if sch.PageID == nil || *sch.PageID != pageID {
+		return errors.New("schedule does not belong to this page")
+	}
+	s.mu.Lock()
+	s.removeScheduleFromCron(scheduleID)
+	s.mu.Unlock()
+	if err := s.repo.RemoveWorkflows(scheduleID); err != nil {
+		return err
+	}
+	return s.repo.Delete(scheduleID)
 }
 
 func (s *ScheduleService) Update(schedule *domain.Schedule, workflowConfigs []domain.ScheduleWorkflow, user *domain.User) error {
@@ -370,7 +441,7 @@ func (s *ScheduleService) runScheduledWorkflows(scheduleID uuid.UUID) {
 			for attempt := 0; attempt <= maxRetries; attempt++ {
 				execID := uuid.New()
 				// Background execution, nil user
-				err := s.executor.Run(ctx, w.ID, execID, in, &schedule.ID, nil, "SCHEDULE", nil, nil, nil, nil)
+				err := s.executor.Run(ctx, w.ID, execID, in, &schedule.ID, schedule.PageID, "SCHEDULE", nil, nil, nil, nil)
 				if err == nil {
 					success = true
 					break

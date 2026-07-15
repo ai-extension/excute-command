@@ -454,6 +454,9 @@ type Schedule struct {
 	StartDate          *time.Time         `json:"start_date"`
 	EndDate            *time.Time         `json:"end_date"`
 	Status             string             `json:"status" gorm:"default:'ACTIVE'"` // ACTIVE, PAUSED
+	// PageID is set when the schedule was created from a public page's ENDPOINT widget
+	// (self-service scheduling). Nil for regular admin-created schedules.
+	PageID             *uuid.UUID         `json:"page_id,omitempty" gorm:"type:uuid;index"`
 	Retries            int                `json:"retries" gorm:"default:0"`
 	CatchUp            bool               `json:"catch_up" gorm:"default:false"`
 	CreatedBy          *uuid.UUID         `json:"created_by,omitempty" gorm:"type:uuid;index;<-:create"`
@@ -615,6 +618,7 @@ type ScheduleRepository interface {
 	ListGlobalPaginated(limit, offset int, searchTerm string, tagIDs []uuid.UUID, scope *PermissionScope) ([]Schedule, int64, error)
 	Update(s *Schedule) error
 	Delete(id uuid.UUID) error
+	ListByPageID(pageID uuid.UUID) ([]Schedule, error)
 	AddScheduledWorkflow(sw *ScheduleWorkflow) error
 	RemoveWorkflows(scheduleID uuid.UUID) error
 	ListActive() ([]Schedule, error)

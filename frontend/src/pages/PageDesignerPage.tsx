@@ -1313,6 +1313,16 @@ const PageDesignerPage = () => {
                                             <div className={cn("absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-200", activeWidget.show_log ? "right-0.5" : "left-0.5")} />
                                         </button>
                                     </div>
+                                    <div className="flex items-center justify-between p-5 bg-muted/20 rounded-md border border-border/40">
+                                        <div>
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-1">Allow Scheduling</p>
+                                            <p className="text-xs font-medium text-muted-foreground leading-none">Show a "Schedule" button on the public page (one-time or daily-recurring)</p>
+                                        </div>
+                                        <button onClick={() => updateWidget(activeWidget.id, { allow_schedule: !activeWidget.allow_schedule })}
+                                            className={cn("w-12 h-6 rounded-full transition-all relative shrink-0 shadow-inner", activeWidget.allow_schedule ? "bg-primary" : "bg-muted-foreground/20")}>
+                                            <div className={cn("absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-200", activeWidget.allow_schedule ? "right-0.5" : "left-0.5")} />
+                                        </button>
+                                    </div>
                                 </div>
                             )}
 

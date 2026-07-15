@@ -194,6 +194,24 @@ func (r *PostgresScheduleRepo) Delete(id uuid.UUID) error {
 	return r.db.Delete(&domain.Schedule{}, "id = ?", id).Error
 }
 
+// ListByPageID returns all schedules created from a given public page, newest first.
+// Used by the public page's per-widget schedule listing (no RBAC scope).
+func (r *PostgresScheduleRepo) ListByPageID(pageID uuid.UUID) ([]domain.Schedule, error) {
+	var ss []domain.Schedule
+	if err := r.db.
+		Preload("ScheduledWorkflows").
+		Preload("ScheduledWorkflows.Workflow").
+		Where("page_id = ?", pageID).
+		Order("created_at desc").
+		Find(&ss).Error; err != nil {
+		return nil, err
+	}
+	for i := range ss {
+		r.populateStats(&ss[i])
+	}
+	return ss, nil
+}
+
 func (r *PostgresScheduleRepo) AddScheduledWorkflow(sw *domain.ScheduleWorkflow) error {
 	return r.db.Create(sw).Error
 }

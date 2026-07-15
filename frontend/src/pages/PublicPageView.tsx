@@ -579,6 +579,7 @@ const PublicPageView = () => {
                                             slug={slug}
                                             pageToken={pageToken}
                                             onOpenHistory={() => reconcileRunningStatuses(historyMap)}
+                                            workflowInputs={page?.workflows?.find(p => p.workflow_id === widget.workflow_id)?.workflow?.inputs || []}
                                         />
                                     );
                                 }
