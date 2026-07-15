@@ -167,9 +167,11 @@ const PublicPageView = () => {
     }, []);
     const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    // Parent-widgets sidebar collapse (desktop only), persisted across visits.
+    // Parent-widgets floating drawer. Closed by default; a persisted '0' means the visitor
+    // explicitly opened it before, so we restore that. Any other value (including no key)
+    // keeps it closed.
     const [parentSidebarCollapsed, setParentSidebarCollapsed] = useState<boolean>(
-        () => localStorage.getItem('public-parent-sidebar-collapsed') === '1'
+        () => localStorage.getItem('public-parent-sidebar-collapsed') !== '0'
     );
     useEffect(() => {
         localStorage.setItem('public-parent-sidebar-collapsed', parentSidebarCollapsed ? '1' : '0');
@@ -495,7 +497,7 @@ const PublicPageView = () => {
                     </Button>
                 </div>
 
-                <main className={cn("mx-auto px-6 pt-24 pb-32", hasParentSidebar ? "max-w-7xl" : "max-w-6xl")}>
+                <main className="max-w-6xl mx-auto px-6 pt-24 pb-32">
                     <div className="flex flex-col items-center text-center mb-16 space-y-4">
                         <h1 className="text-5xl md:text-7xl font-black ">{page?.title}</h1>
                         <p className="text-lg text-muted-foreground font-medium italic opacity-70">
@@ -539,51 +541,6 @@ const PublicPageView = () => {
                         )}
                     </div>
 
-                    <div className={cn(hasParentSidebar && "flex flex-col lg:flex-row gap-8 items-start")}>
-                        {hasParentSidebar && page?.parent && (
-                            <>
-                                {/* Mobile: collapsible parent panel above content */}
-                                <details className="lg:hidden w-full group rounded-xl border border-border bg-muted/20">
-                                    <summary className="flex items-center justify-between gap-2 px-4 py-3 cursor-pointer list-none select-none">
-                                        <span className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-muted-foreground">
-                                            <Home className="w-4 h-4 text-amber-500" />
-                                            {page.parent.title || 'Parent'} widgets
-                                        </span>
-                                        <span className="text-muted-foreground/60 group-open:rotate-90 transition-transform">›</span>
-                                    </summary>
-                                    <div className="px-3 pb-3">
-                                        <ParentSidebar
-                                            parentTitle={page.parent.title}
-                                            parentSlug={page.parent.slug}
-                                            widgets={parentWidgets}
-                                        />
-                                    </div>
-                                </details>
-                                {/* Desktop: sticky left sidebar, collapsible to a thin rail */}
-                                <aside className={cn("hidden lg:block shrink-0 transition-[width] duration-300", parentSidebarCollapsed ? "w-12" : "w-72")}>
-                                    <div className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto custom-scrollbar pr-1">
-                                        {parentSidebarCollapsed ? (
-                                            <button
-                                                onClick={() => setParentSidebarCollapsed(false)}
-                                                title={`Show ${page.parent.title || 'parent'} widgets`}
-                                                className="flex flex-col items-center gap-3 w-10 py-3 rounded-xl border border-border bg-muted/30 hover:bg-muted/50 hover:border-primary/40 transition-colors"
-                                            >
-                                                <PanelLeftOpen className="w-4 h-4 text-muted-foreground" />
-                                                <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground [writing-mode:vertical-rl]">Parent</span>
-                                            </button>
-                                        ) : (
-                                            <ParentSidebar
-                                                parentTitle={page.parent.title}
-                                                parentSlug={page.parent.slug}
-                                                widgets={parentWidgets}
-                                                onCollapse={() => setParentSidebarCollapsed(true)}
-                                            />
-                                        )}
-                                    </div>
-                                </aside>
-                            </>
-                        )}
-                        <div className={cn(hasParentSidebar && "flex-1 min-w-0 w-full")}>
                     {widgets.length > 0 && (
                         <div className="mb-10 max-w-xl mx-auto">
                             <div className="relative">
@@ -851,8 +808,6 @@ const PublicPageView = () => {
                             <p className="text-sm font-bold uppercase">No nodes deployed</p>
                         </div>
                     )}
-                        </div>
-                    </div>
                 </main>
 
                 <WorkflowInputDialog
@@ -956,6 +911,31 @@ const PublicPageView = () => {
                     >
                         <ArrowUp className="w-5 h-5" />
                     </button>
+                )}
+
+                {/* Parent widgets: floating drawer. Closed by default it's just an edge button
+                    (like the scroll-to-top control); opening it overlays a floating card on the
+                    left margin — fixed, so it never pushes or reflows the page content. */}
+                {hasParentSidebar && page?.parent && (
+                    parentSidebarCollapsed ? (
+                        <button
+                            onClick={() => setParentSidebarCollapsed(false)}
+                            title={`Show ${page.parent.title || 'parent'} widgets`}
+                            className="fixed top-32 left-6 z-50 px-2 py-3 rounded-full bg-card border border-border text-foreground shadow-lg flex flex-col items-center gap-2 hover:scale-105 hover:border-primary/50 transition-all duration-200 animate-in fade-in slide-in-from-left-4"
+                        >
+                            <PanelLeftOpen className="w-4 h-4" />
+                            <span className="text-xs font-black uppercase tracking-widest [writing-mode:vertical-rl]">Sidebar</span>
+                        </button>
+                    ) : (
+                        <div className="fixed left-6 top-32 z-50 w-72 max-w-[calc(100vw-3rem)] animate-in fade-in slide-in-from-left-4 duration-200">
+                            <ParentSidebar
+                                parentTitle={page.parent.title}
+                                parentSlug={page.parent.slug}
+                                widgets={parentWidgets}
+                                onCollapse={() => setParentSidebarCollapsed(true)}
+                            />
+                        </div>
+                    )
                 )}
             </div>
         </div>

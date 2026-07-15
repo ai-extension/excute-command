@@ -132,8 +132,10 @@ const ParentSidebar: React.FC<{
     });
 
     return (
-        <div className="rounded-xl border border-border bg-muted/30 p-3.5 shadow-sm">
-            <div className="flex items-center gap-2 mb-4">
+        // Bounded height so the widget list scrolls internally while the header stays pinned.
+        // max-h matches the drawer offset in PublicPageView (top-32 → calc(100vh-10rem)).
+        <div className="flex flex-col max-h-[calc(100vh-10rem)] rounded-xl border border-border bg-card shadow-premium overflow-hidden">
+            <div className="flex items-center gap-2 p-3.5 pb-3 shrink-0 border-b border-border/40">
                 <a
                     href={parentHref}
                     className="group flex items-center gap-2 px-1 flex-1 min-w-0 text-muted-foreground hover:text-amber-500 transition-colors"
@@ -158,7 +160,7 @@ const ParentSidebar: React.FC<{
                     </button>
                 )}
             </div>
-            <div className="space-y-3">{body}</div>
+            <div className="space-y-3 overflow-y-auto custom-scrollbar p-3.5 pt-3 min-h-0">{body}</div>
         </div>
     );
 };
