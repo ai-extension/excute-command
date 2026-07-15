@@ -1604,9 +1604,97 @@ func (e *WorkflowExecutor) runStep(ctx context.Context, step *domain.WorkflowSte
 	return nil
 }
 
-// runConvertStep parses a templated text source into JSON. If the rendered text is valid
-// JSON it is normalized; otherwise it is wrapped as a JSON string so the result is always
-// valid JSON and usable by later steps via {{ flow.<group>.step.<action_key> }}.
+// convertField is one field extractor for a CONVERT step in field-extract mode.
+type convertField struct {
+	Name    string `json:"name"`
+	Start   string `json:"start"`
+	EndMode string `json:"end_mode"` // "delimiter" | "eol" | "eof"
+	End     string `json:"end"`      // only used when EndMode == "delimiter"
+	Format  string `json:"format"`   // "string" | "number"
+	Default string `json:"default"`
+}
+
+// asJSONNumber reports whether s is a valid JSON number literal and returns it as a
+// json.Number. Unlike strconv.ParseFloat it rejects NaN/Inf/hex-floats/leading-zeros, which
+// ParseFloat accepts but json.Marshal later refuses ("invalid number literal") — a mismatch
+// that would otherwise fail the whole CONVERT step on one odd token.
+func asJSONNumber(s string) (json.Number, bool) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return "", false
+	}
+	var n json.Number
+	dec := json.NewDecoder(strings.NewReader(s))
+	if err := dec.Decode(&n); err != nil || dec.More() {
+		return "", false
+	}
+	return n, true
+}
+
+// extractField greps a single value out of source per the field's start/end rules.
+// Capture begins right AFTER the first occurrence of start (empty start = source beginning).
+// It ends at the next delimiter / newline / end-of-source depending on EndMode; a missing
+// delimiter or newline falls back to end-of-source. The captured text is trimmed, then
+// coerced to the requested format. Default is used when start is not found, the capture is
+// empty, or a number fails to parse.
+func extractField(source string, f convertField) interface{} {
+	def := func() interface{} {
+		if f.Format == "number" {
+			if n, ok := asJSONNumber(f.Default); ok {
+				return n
+			}
+			return nil // non-numeric default in number mode → null
+		}
+		return f.Default
+	}
+
+	begin := 0
+	if f.Start != "" {
+		idx := strings.Index(source, f.Start)
+		if idx < 0 {
+			return def()
+		}
+		begin = idx + len(f.Start)
+	}
+
+	rest := source[begin:]
+	endIdx := len(rest)
+	switch f.EndMode {
+	case "delimiter":
+		if f.End != "" {
+			if i := strings.Index(rest, f.End); i >= 0 {
+				endIdx = i
+			}
+		}
+	case "eol":
+		if i := strings.IndexByte(rest, '\n'); i >= 0 {
+			endIdx = i
+		}
+	}
+	captured := strings.TrimSpace(rest[:endIdx])
+
+	if captured == "" {
+		return def()
+	}
+
+	if f.Format == "number" {
+		if n, ok := asJSONNumber(captured); ok {
+			return n
+		}
+		return def()
+	}
+	return captured
+}
+
+// runConvertStep converts a templated text source into JSON.
+//
+// Field-extract mode (step.ConvertFields is a non-empty JSON array): each field greps a value
+// out of the rendered source and the step returns a JSON object {name: value, ...}. Later steps
+// can then read a single field via {{ flow.<group>.step.<action_key>.<name> }} or the whole
+// object via {{ flow.<group>.step.<action_key>|json }} (set an action_key + Output Format = JSON).
+//
+// Legacy mode (step.ConvertFields empty): if the rendered text is valid JSON it is normalized;
+// otherwise it is wrapped as a JSON string so the result is always valid JSON.
 func (e *WorkflowExecutor) runConvertStep(step *domain.WorkflowStep, inputs map[string]string, variables []domain.WorkflowVariable, flowData map[string]interface{}, namespaceID uuid.UUID, user *domain.User, item interface{}, index int, mainLogFile *os.File, stepLogFile *os.File, workflowID uuid.UUID, executionID uuid.UUID) (string, error) {
 	pcontext := e.getInterpolationContext(inputs, variables, flowData, namespaceID, user, item, index, uuid.Nil, executionID)
 	rendered, err := e.renderTemplate(step.ConvertSource, pcontext)
@@ -1619,6 +1707,33 @@ func (e *WorkflowExecutor) runConvertStep(step *domain.WorkflowStep, inputs map[
 		fmt.Fprint(mainLogFile, msg)
 		fmt.Fprint(stepLogFile, msg)
 		e.hub.BroadcastLog(workflowID.String(), executionID.String(), msg)
+	}
+
+	// Field-extract mode
+	if fieldsStr := strings.TrimSpace(step.ConvertFields); fieldsStr != "" && fieldsStr != "[]" {
+		var fields []convertField
+		if uerr := json.Unmarshal([]byte(fieldsStr), &fields); uerr != nil {
+			return "", fmt.Errorf("convert_fields is not valid JSON: %w", uerr)
+		}
+		if len(fields) > 0 {
+			// Output is a JSON object keyed by field name (json.Marshal emits keys sorted, which
+			// is fine — later steps read fields by name, not by position). A later field with a
+			// duplicate name overwrites an earlier one.
+			result := make(map[string]interface{}, len(fields))
+			for _, f := range fields {
+				if f.Name == "" {
+					continue
+				}
+				val := extractField(rendered, f)
+				result[f.Name] = val
+				logf("\033[90m$ CONVERT field %s → %v\033[0m\n", f.Name, val)
+			}
+			b, merr := json.Marshal(result)
+			if merr != nil {
+				return "", fmt.Errorf("convert result marshal error: %w", merr)
+			}
+			return string(b), nil
+		}
 	}
 
 	trimmed := strings.TrimSpace(rendered)

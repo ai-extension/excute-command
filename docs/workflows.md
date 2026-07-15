@@ -148,7 +148,18 @@ Run another workflow as a step.
 Read or mutate a [Dataset](datasets.md) without leaving the run. Pick a dataset and an operation — **Find Many / Find One / INSERT / UPDATE / DELETE**. Filter and payload are templated. The JSON result is captured into `flow.*` (set an `action_key`, keep Output Format = JSON) for later steps. See the [Datasets guide](datasets.md#-the-dataset-step).
 
 ### CONVERT
-Parse a templated text **source** into JSON so later steps can read structured fields. The source (e.g. `{{ flow.grp.step.raw }}`) is rendered, then parsed as JSON; if it isn't valid JSON it's wrapped as a JSON string. Result is captured into `flow.*` (set an `action_key`, Output Format = JSON).
+Turn a templated text **source** into JSON so later steps can read structured fields. Two modes:
+
+- **No fields (legacy)** — the rendered source (e.g. `{{ flow.grp.step.raw }}`) is parsed as JSON; if it isn't valid JSON it's wrapped as a JSON string.
+- **With fields (grep)** — add one or more fields, each greps a value out of the source and the step returns a JSON **object** `{name: value, …}`. Per field:
+  - **start** — capture begins right *after* the first occurrence of this marker (empty = from the beginning of the source).
+  - **end** — `until char` (a delimiter string), `end of line`, or `to end` of the source. A missing delimiter/newline falls back to end-of-source.
+  - **format** — `string` or `number` (number-parse failure falls back to the default).
+  - **default** — used when start isn't found, the capture is empty, or a number fails to parse.
+
+Result is captured into `flow.*` (set an `action_key`, Output Format = JSON). A later step reads a single field with `{{ flow.grp.step.key.name }}` or the whole object with `{{ flow.grp.step.key|json }}` (e.g. an HTTP body, a DATASET payload, or a sub-workflow input).
+
+> **Example** — source `Order: 12345, name: Bob` with fields `id` (start `Order: `, until char `,`, number) and `name` (start `name: `, to end, string) → `{"id":12345,"name":"Bob"}`.
 
 ### TTY
 For interactive prompts (`sudo`, `ssh-keygen`, vault unlocks). Define regex/keystroke pairs; CSM watches output and types responses automatically.

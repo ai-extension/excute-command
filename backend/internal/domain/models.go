@@ -349,6 +349,11 @@ type WorkflowStep struct {
 	DatasetLimit         int        `json:"dataset_limit" gorm:"default:0"`      // QUERY cap; 0 = default cap
 	// Convert action (ActionType == "CONVERT") — parse a templated text source into JSON
 	ConvertSource        string     `json:"convert_source"`
+	// ConvertFields: JSON array of field extractors, e.g.
+	// [{"name":"id","start":"Order: ","end_mode":"delimiter","end":",","format":"number","default":"0"}].
+	// When non-empty, CONVERT greps each field out of the rendered source and returns a JSON object
+	// {name: value, ...}. When empty, CONVERT keeps the legacy whole-source-to-JSON behavior.
+	ConvertFields        string     `json:"convert_fields" gorm:"default:'[]'"`
 	TargetWorkflowID     *uuid.UUID `json:"target_workflow_id,omitempty" gorm:"type:uuid;index"`
 	TargetWorkflowInputs string     `json:"target_workflow_inputs,omitempty"` // JSON string of inputs for the target workflow
 	WaitToFinish         *bool      `json:"wait_to_finish" gorm:"default:true"`

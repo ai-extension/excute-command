@@ -59,6 +59,7 @@ export interface WorkflowStep {
     dataset_payload?: string;
     dataset_limit?: number;
     convert_source?: string;
+    convert_fields?: string; // JSON array of { name, start, end_mode, end, format, default }
     target_workflow_id?: string;
     target_workflow_inputs?: string; // JSON string
     wait_to_finish: boolean;

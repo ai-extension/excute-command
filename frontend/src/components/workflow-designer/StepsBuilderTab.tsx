@@ -1325,7 +1325,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                             </div>
                                                                                         ) : step.action_type === 'CONVERT' ? (
                                                                                             <div className="space-y-3 bg-muted/20 border border-border/50 rounded-md p-3">
-                                                                                                <label className="text-[10px] font-bold uppercase tracking-widest text-amber-500">Convert Source → JSON</label>
+                                                                                                <label className="text-[10px] font-bold uppercase tracking-widest text-amber-500">Source text</label>
                                                                                                 <Textarea
                                                                                                     value={step.convert_source || ''}
                                                                                                     onChange={(e) => {
@@ -1336,8 +1336,84 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                     placeholder={'{{ flow.grp.step.raw }}  or  {{ input.payload }}'}
                                                                                                     className="text-[10px] font-mono min-h-[80px] bg-background border-border"
                                                                                                 />
-                                                                                                <p className="text-[9px] text-muted-foreground/60 font-mono">
-                                                                                                    Parses the rendered text as JSON (else wraps as a JSON string). Result → <code className="bg-amber-500/10 px-1 rounded">{`{{ flow.${group.key || 'group'}.step.${step.action_key || 'key'} }}`}</code> (set Action Key + Format=JSON).
+                                                                                                {(() => {
+                                                                                                    let fields: any[] = [];
+                                                                                                    try { const p = JSON.parse(step.convert_fields || '[]'); if (Array.isArray(p)) fields = p; } catch { fields = []; }
+                                                                                                    const writeFields = (next: any[]) => {
+                                                                                                        const ng = [...groups];
+                                                                                                        ng[gIdx]!.steps![sIdx].convert_fields = JSON.stringify(next);
+                                                                                                        setGroups(ng);
+                                                                                                    };
+                                                                                                    return (
+                                                                                                        <div className="space-y-2">
+                                                                                                            <div className="flex items-center justify-between">
+                                                                                                                <label className="text-[10px] font-bold uppercase tracking-widest text-amber-500">Fields (grep)</label>
+                                                                                                                <Button type="button" variant="outline" size="sm" className="h-6 text-[10px] px-2 gap-1 rounded-md"
+                                                                                                                    onClick={() => writeFields([...fields, { name: '', start: '', end_mode: 'eof', end: '', format: 'string', default: '' }])}>
+                                                                                                                    <Plus className="w-3 h-3" /> Field
+                                                                                                                </Button>
+                                                                                                            </div>
+                                                                                                            {fields.length === 0 ? (
+                                                                                                                <p className="text-[9px] text-muted-foreground/50 italic">No fields → whole source parsed as JSON (legacy). Add a field to grep values out.</p>
+                                                                                                            ) : (
+                                                                                                                <div className="space-y-2">
+                                                                                                                    {fields.map((f, fi) => (
+                                                                                                                        <div key={fi} className="space-y-1.5 bg-background/60 border border-border/50 rounded-md p-2.5">
+                                                                                                                            {/* Row 1: field name + remove */}
+                                                                                                                            <div className="flex items-center gap-1.5">
+                                                                                                                                <Input value={f.name || ''} placeholder="output field name"
+                                                                                                                                    onChange={(e) => writeFields(fields.map((x, i) => i === fi ? { ...x, name: e.target.value } : x))}
+                                                                                                                                    className="h-8 flex-1 text-[11px] font-mono bg-background border-border" />
+                                                                                                                                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0 rounded-md hover:bg-destructive/10 hover:text-destructive"
+                                                                                                                                    onClick={() => writeFields(fields.filter((_, i) => i !== fi))}>
+                                                                                                                                    <X className="w-3.5 h-3.5" />
+                                                                                                                                </Button>
+                                                                                                                            </div>
+                                                                                                                            {/* Row 2: format + default under one label */}
+                                                                                                                            <div className="space-y-1">
+                                                                                                                                <label className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/70">Format – Default value</label>
+                                                                                                                                <div className="flex items-center gap-1.5">
+                                                                                                                                    <select value={f.format || 'string'}
+                                                                                                                                        onChange={(e) => writeFields(fields.map((x, i) => i === fi ? { ...x, format: e.target.value } : x))}
+                                                                                                                                        className="h-8 px-2 w-24 shrink-0 text-[10px] font-bold border border-border rounded-md bg-background text-foreground outline-none cursor-pointer">
+                                                                                                                                        <option value="string">string</option>
+                                                                                                                                        <option value="number">number</option>
+                                                                                                                                    </select>
+                                                                                                                                    <Input value={f.default || ''} placeholder="default value"
+                                                                                                                                        onChange={(e) => writeFields(fields.map((x, i) => i === fi ? { ...x, default: e.target.value } : x))}
+                                                                                                                                        className="h-8 flex-1 text-[11px] font-mono bg-background border-border" />
+                                                                                                                                </div>
+                                                                                                                            </div>
+                                                                                                                            {/* Row 3: grep rule — start + end under one label */}
+                                                                                                                            <div className="space-y-1">
+                                                                                                                                <label className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/70">Start – End</label>
+                                                                                                                                <div className="flex items-center gap-1.5">
+                                                                                                                                    <Input value={f.start || ''} placeholder="start (empty = from beginning)"
+                                                                                                                                        onChange={(e) => writeFields(fields.map((x, i) => i === fi ? { ...x, start: e.target.value } : x))}
+                                                                                                                                        className="h-8 flex-1 text-[11px] font-mono bg-background border-border" />
+                                                                                                                                    <select value={f.end_mode || 'eof'}
+                                                                                                                                        onChange={(e) => writeFields(fields.map((x, i) => i === fi ? { ...x, end_mode: e.target.value } : x))}
+                                                                                                                                        className="h-8 px-2 w-28 shrink-0 text-[10px] font-bold border border-border rounded-md bg-background text-foreground outline-none cursor-pointer">
+                                                                                                                                        <option value="delimiter">until char</option>
+                                                                                                                                        <option value="eol">end of line</option>
+                                                                                                                                        <option value="eof">to end</option>
+                                                                                                                                    </select>
+                                                                                                                                    {f.end_mode === 'delimiter' && (
+                                                                                                                                        <Input value={f.end || ''} placeholder="end char"
+                                                                                                                                            onChange={(e) => writeFields(fields.map((x, i) => i === fi ? { ...x, end: e.target.value } : x))}
+                                                                                                                                            className="h-8 w-24 shrink-0 text-[11px] font-mono bg-background border-border" />
+                                                                                                                                    )}
+                                                                                                                                </div>
+                                                                                                                            </div>
+                                                                                                                        </div>
+                                                                                                                    ))}
+                                                                                                                </div>
+                                                                                                            )}
+                                                                                                        </div>
+                                                                                                    );
+                                                                                                })()}
+                                                                                                <p className="text-[9px] text-muted-foreground/60 font-mono pt-1 border-t border-border/50">
+                                                                                                    With fields → grep an object. Read one field <code className="bg-amber-500/10 px-1 rounded">{`{{ flow.${group.key || 'group'}.step.${step.action_key || 'key'}.name }}`}</code> or the whole object <code className="bg-amber-500/10 px-1 rounded">{`{{ flow.${group.key || 'group'}.step.${step.action_key || 'key'}|json }}`}</code>. No fields → source parsed as JSON. (set Action Key + Format=JSON).
                                                                                                 </p>
                                                                                             </div>
                                                                                         ) : (
