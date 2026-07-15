@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { CalendarClock, Loader2, Repeat, ListChecks } from 'lucide-react';
+import { CalendarClock, Loader2, Repeat, ListChecks, Plus, Trash2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
-import { cn } from '../../lib/utils';
+import { cn, generateUUID } from '../../lib/utils';
 import { API_BASE_URL } from '../../lib/api';
-import { WorkflowInput } from '../../types';
+import { WorkflowInput, MultiInputItem } from '../../types';
 
 const MAX_REPEAT_DAYS = 10;
 
-// Complex input types need upload/picker infra that doesn't fit a "schedule for later" flow;
-// they fall back to a plain text field so the value can still be provided.
-const RICH_TYPES = new Set(['file', 'dataset-select', 'dataset-multi-select', 'multi-input']);
+// File/dataset inputs need upload/picker infra that doesn't fit a "schedule for later" flow;
+// they fall back to a plain text field so the value can still be provided. multi-input and
+// multi-select are handled natively below (same JSON value format as WorkflowInputDialog),
+// so the value produced here matches an immediate run and the shared draft stays consistent.
+const RICH_TYPES = new Set(['file', 'dataset-select', 'dataset-multi-select']);
 
 // Share the exact same input draft as the run-flow WorkflowInputDialog so values a visitor
 // typed in one dialog are restored in the other (keyed by public:{slug}:widget:{id}).
@@ -89,7 +91,15 @@ const PublicScheduleDialog: React.FC<{
         if (!open) return;
         const seed: Record<string, string> = {};
         for (const inp of inputs) {
-            seed[inp.key] = (!RICH_TYPES.has(inp.type) && inp.type !== 'multi-select') ? (inp.default_value || '') : '';
+            if (inp.type === 'multi-input') {
+                seed[inp.key] = inp.collapse_initially ? '[]' : '[{}]';
+            } else if (inp.type === 'multi-select') {
+                seed[inp.key] = '[]';
+            } else if (RICH_TYPES.has(inp.type)) {
+                seed[inp.key] = '';
+            } else {
+                seed[inp.key] = inp.default_value || '';
+            }
         }
         const draft = loadDraft(storageKey, inputs);
         setValues(draft ? { ...seed, ...draft } : seed);
@@ -114,10 +124,67 @@ const PublicScheduleDialog: React.FC<{
         try { (e.currentTarget as HTMLInputElement & { showPicker?: () => void }).showPicker?.(); } catch { /* unsupported */ }
     };
 
+    // multi-select value is a JSON array string (same format WorkflowInputDialog produces),
+    // so a scheduled run receives the exact same value an immediate run would.
+    const parseMultiSelect = (v: string): string[] => {
+        try {
+            const a = JSON.parse(v || '[]');
+            if (Array.isArray(a)) return a.map(String);
+        } catch { /* legacy comma-joined draft */ }
+        return (v || '').split(',').map(s => s.trim()).filter(Boolean);
+    };
     const toggleMulti = (key: string, opt: string) => {
-        const cur = (values[key] || '').split(',').map(s => s.trim()).filter(Boolean);
+        const cur = parseMultiSelect(values[key] || '');
         const next = cur.includes(opt) ? cur.filter(o => o !== opt) : [...cur, opt];
-        setVal(key, next.join(','));
+        setVal(key, JSON.stringify(next));
+    };
+
+    // multi-input value is a JSON array of row objects (same as WorkflowInputDialog).
+    const parseRows = (v: string): Record<string, string>[] => {
+        try {
+            const rows = JSON.parse(v || '[]');
+            return Array.isArray(rows) ? rows : [];
+        } catch {
+            return [];
+        }
+    };
+    const parseMultiConfig = (defaultValue: string): MultiInputItem[] => {
+        try {
+            const cfg = JSON.parse(defaultValue || '[]');
+            if (Array.isArray(cfg)) return cfg;
+        } catch { /* fall through to comma-list form */ }
+        return (defaultValue || '').split(',').map(k => ({
+            id: generateUUID(), key: k.trim(), label: k.trim(), type: 'input' as const,
+        })).filter(c => c.key);
+    };
+    const updateRow = (key: string, rowIndex: number, field: string, v: string) => {
+        const rows = parseRows(values[key] || '');
+        if (!rows[rowIndex]) rows[rowIndex] = {};
+        rows[rowIndex][field] = v;
+        setVal(key, JSON.stringify(rows));
+    };
+    const addRow = (key: string) => {
+        const rows = parseRows(values[key] || '');
+        rows.push({});
+        setVal(key, JSON.stringify(rows));
+    };
+    const removeRow = (key: string, rowIndex: number) => {
+        const rows = parseRows(values[key] || '');
+        rows.splice(rowIndex, 1);
+        setVal(key, JSON.stringify(rows));
+    };
+
+    // Required-field emptiness, type-aware (a JSON "[]" must count as empty).
+    const isInputEmpty = (inp: WorkflowInput, val: string): boolean => {
+        const v = (val ?? '').trim();
+        if (inp.type === 'multi-select' || inp.type === 'dataset-multi-select') {
+            return parseMultiSelect(v).length === 0;
+        }
+        if (inp.type === 'multi-input') {
+            const rows = parseRows(v);
+            return !rows.some(r => r && Object.values(r).some(x => String(x ?? '').trim() !== ''));
+        }
+        return v === '' || v === '[]';
     };
 
     const submit = async () => {
@@ -129,7 +196,7 @@ const PublicScheduleDialog: React.FC<{
         if (isNaN(runAtLocal.getTime())) { setError('Invalid date/time.'); return; }
         if (runAtLocal.getTime() <= Date.now()) { setError('Pick a time in the future.'); return; }
 
-        const missing = sortedInputs.filter(i => i.required && !(values[i.key] || '').trim());
+        const missing = sortedInputs.filter(i => i.required && isInputEmpty(i, values[i.key] || ''));
         if (missing.length > 0) {
             setError(`Fill required input(s): ${missing.map(m => m.label || m.key).join(', ')}`);
             return;
@@ -181,7 +248,7 @@ const PublicScheduleDialog: React.FC<{
         }
         if (inp.type === 'multi-select') {
             const opts = (inp.default_value || '').split(',').map(o => o.trim()).filter(Boolean);
-            const selected = val.split(',').map(s => s.trim()).filter(Boolean);
+            const selected = parseMultiSelect(val);
             return (
                 <div className="flex flex-wrap gap-1.5">
                     {opts.map(o => {
@@ -199,6 +266,60 @@ const PublicScheduleDialog: React.FC<{
                         );
                     })}
                     {opts.length === 0 && <span className="text-xs text-muted-foreground/60">No options configured</span>}
+                </div>
+            );
+        }
+        if (inp.type === 'multi-input') {
+            const rows = parseRows(val);
+            const config = parseMultiConfig(inp.default_value);
+            return (
+                <div className="space-y-2">
+                    {rows.map((row, rowIndex) => (
+                        <div key={rowIndex} className="group/row relative flex flex-wrap gap-2 p-2.5 bg-muted/30 border border-border rounded-md">
+                            {config.map(field => (
+                                <div key={field.key} className="flex flex-col gap-1 min-w-[160px] flex-1">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground truncate" title={field.label || field.key}>
+                                        {field.label || field.key}
+                                    </span>
+                                    {field.type === 'select' ? (
+                                        <select
+                                            value={row[field.key] || ''}
+                                            onChange={e => updateRow(inp.key, rowIndex, field.key, e.target.value)}
+                                            className="h-8 px-2 bg-background border border-border rounded-md text-xs outline-none focus:border-primary/50"
+                                        >
+                                            <option value="">— Select —</option>
+                                            {(field.options || '').split(',').map(o => o.trim()).filter(Boolean).map(o => (
+                                                <option key={o} value={o}>{o}</option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        // file type has no upload infra in the schedule flow → plain text fallback
+                                        <Input
+                                            type={field.type === 'number' ? 'number' : 'text'}
+                                            value={row[field.key] || ''}
+                                            onChange={e => updateRow(inp.key, rowIndex, field.key, e.target.value)}
+                                            className="h-8 bg-background border-border rounded-md text-xs"
+                                            placeholder={field.type === 'file' ? `(${field.label || field.key}) enter value` : `Enter ${field.label || field.key}...`}
+                                        />
+                                    )}
+                                </div>
+                            ))}
+                            <button
+                                type="button"
+                                onClick={() => removeRow(inp.key, rowIndex)}
+                                className="absolute -right-2 -top-2 h-6 w-6 rounded-full bg-destructive text-white flex items-center justify-center opacity-0 group-hover/row:opacity-100 transition-opacity shadow-lg"
+                            >
+                                <Trash2 className="w-3 h-3" />
+                            </button>
+                        </div>
+                    ))}
+                    <button
+                        type="button"
+                        onClick={() => addRow(inp.key)}
+                        className="w-full h-8 flex items-center justify-center gap-1.5 border border-dashed border-primary/40 text-primary bg-primary/5 hover:bg-primary/10 text-[10px] font-bold uppercase tracking-widest rounded-md transition-colors"
+                    >
+                        <Plus className="w-3.5 h-3.5" /> Add Entry
+                    </button>
                 </div>
             );
         }

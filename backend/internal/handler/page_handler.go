@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -831,34 +832,10 @@ func (h *PageHandler) UploadPublicInputFile(c *gin.Context) {
 
 // Guardrails for public (page-originated) scheduling.
 const (
-	maxPublicScheduleRepeatDays = 10 // cap on the recurring window a visitor can request
-	maxActiveSchedulesPerPage   = 20 // cap on concurrent active schedules per page
+	maxPublicScheduleRepeatDays = 10  // cap on the recurring window a visitor can request
+	maxActiveSchedulesPerPage   = 20  // cap on concurrent active schedules per page
+	maxTotalSchedulesPerPage    = 100 // cap on total retained schedule rows per page (prunes old terminal ones)
 )
-
-// pageWidgetAllowsSchedule reports whether the page layout has an ENDPOINT widget bound to
-// workflowID with scheduling enabled (allow_schedule). Loose JSON → false on parse failure.
-func pageWidgetAllowsSchedule(layout string, workflowID uuid.UUID) bool {
-	if layout == "" {
-		return false
-	}
-	var doc struct {
-		Widgets []struct {
-			Type          string `json:"type"`
-			WorkflowID    string `json:"workflow_id"`
-			AllowSchedule bool   `json:"allow_schedule"`
-		} `json:"widgets"`
-	}
-	if err := json.Unmarshal([]byte(layout), &doc); err != nil {
-		return false
-	}
-	target := workflowID.String()
-	for _, w := range doc.Widgets {
-		if w.Type == "ENDPOINT" && w.WorkflowID == target && w.AllowSchedule {
-			return true
-		}
-	}
-	return false
-}
 
 // resolvePublicPage runs the shared public-page access checks (slug → public/expiry → token)
 // used by the scheduling endpoints. On failure it writes the HTTP error and returns nil.
@@ -909,7 +886,7 @@ func (h *PageHandler) CreatePublicSchedule(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "workflow not part of this page"})
 		return
 	}
-	if !pageWidgetAllowsSchedule(page.Layout, workflowID) {
+	if !page.WidgetAllowsSchedule(workflowID) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "scheduling not enabled for this widget"})
 		return
 	}
@@ -933,9 +910,24 @@ func (h *PageHandler) CreatePublicSchedule(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "run_at must be in the future"})
 		return
 	}
+	// A public schedule must not outlive the page: reject a first run at/after expiry. The
+	// recurring window's end is clamped to the page expiry below. This is the create-time
+	// guard; runScheduledWorkflows re-checks page state at fire time as the real enforcement.
+	if page.ExpiresAt != nil && !runAt.Before(*page.ExpiresAt) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "run time is at or after the page's expiration"})
+		return
+	}
 
-	if n, err := h.scheduleService.CountActiveByPage(page.ID); err == nil && n >= maxActiveSchedulesPerPage {
-		c.JSON(http.StatusTooManyRequests, gin.H{"error": "too many active schedules for this page"})
+	// Cap concurrent active schedules AND total retained rows per page. This is the real
+	// creation ceiling: LoginRateLimiter only throttles failed (4xx) calls, so a stream of
+	// successful (201) creations would otherwise be unbounded.
+	if err := h.scheduleService.EnforcePageScheduleCaps(page.ID, maxActiveSchedulesPerPage, maxTotalSchedulesPerPage); err != nil {
+		if errors.Is(err, service.ErrScheduleCapReached) {
+			c.JSON(http.StatusTooManyRequests, gin.H{"error": err.Error()})
+		} else {
+			// Infrastructure failure — fail closed and don't leak the internal error.
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to validate schedule limits"})
+		}
 		return
 	}
 
@@ -962,6 +954,10 @@ func (h *PageHandler) CreatePublicSchedule(c *gin.Context) {
 		}
 		start := runAtUTC
 		end := runAtUTC.AddDate(0, 0, days)
+		// Never let the recurring window extend past the page's own expiry.
+		if page.ExpiresAt != nil && end.After(*page.ExpiresAt) {
+			end = page.ExpiresAt.UTC()
+		}
 		schedule.Type = domain.ScheduleTypeRecurring
 		// The cron engine runs in the server's local timezone, so derive the daily H:M from
 		// the local representation of the chosen instant — otherwise a non-UTC server would
@@ -1024,6 +1020,10 @@ func (h *PageHandler) ListPublicSchedules(c *gin.Context) {
 		sc.CreatedByUsername = ""
 		for i := range sc.ScheduledWorkflows {
 			sc.ScheduledWorkflows[i].Workflow = nil
+			// Inputs are supplied by whoever created the schedule and may hold values another
+			// visitor typed (ids, emails, tokens). A public — possibly anonymous — list must
+			// not echo them back to other visitors.
+			sc.ScheduledWorkflows[i].Inputs = ""
 		}
 		out = append(out, sc)
 	}
