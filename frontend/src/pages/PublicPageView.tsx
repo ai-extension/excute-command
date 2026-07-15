@@ -31,6 +31,10 @@ import LoginDialog from '../components/LoginDialog';
 import ChartWidget from '../components/public/ChartWidget';
 import MetricWidget from '../components/public/MetricWidget';
 import DatasetTableWidget from '../components/public/DatasetTableWidget';
+import GaugeWidget from '../components/public/GaugeWidget';
+import ProgressWidget from '../components/public/ProgressWidget';
+import StatGridWidget from '../components/public/StatGridWidget';
+import SparklineWidget from '../components/public/SparklineWidget';
 import ParentSidebar from '../components/public/ParentSidebar';
 
 const PublicPageView = () => {
@@ -750,6 +754,18 @@ const PublicPageView = () => {
                                 }
                                 if (widget.type === 'METRIC') {
                                     return <MetricWidget widget={widget} slug={slug} pageToken={pageToken} />;
+                                }
+                                if (widget.type === 'GAUGE') {
+                                    return <GaugeWidget widget={widget} slug={slug} pageToken={pageToken} />;
+                                }
+                                if (widget.type === 'PROGRESS') {
+                                    return <ProgressWidget widget={widget} slug={slug} pageToken={pageToken} />;
+                                }
+                                if (widget.type === 'STAT_GRID') {
+                                    return <StatGridWidget widget={widget} slug={slug} pageToken={pageToken} />;
+                                }
+                                if (widget.type === 'SPARKLINE') {
+                                    return <SparklineWidget widget={widget} slug={slug} pageToken={pageToken} />;
                                 }
                                 return null;
                             };

@@ -4,7 +4,8 @@ import {
     Save, ChevronLeft, Plus, Trash2, GripVertical, ArrowLeft, ArrowRight,
     Settings as SettingsIcon, Globe, Lock, Copy,
     Terminal, Zap, Monitor, RefreshCw, X, Palette, Clock, ServerIcon, Link2, Type,
-    FileText, ImageIcon, Frame, Activity, Table2, BarChart3, TrendingUp
+    FileText, ImageIcon, Frame, Activity, Table2, BarChart3, TrendingUp,
+    Gauge, Target, LayoutGrid
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -72,6 +73,18 @@ const PALETTE_ITEMS: PaletteItem[] = [
     { type: 'METRIC', label: 'Metric / KPI', description: 'Big number from dataset',
       icon: <TrendingUp className="w-3.5 h-3.5" />,
       iconClass: 'bg-emerald-500/10 text-emerald-500 group-hover:bg-emerald-500/20' },
+    { type: 'GAUGE', label: 'Gauge', description: 'Radial value vs thresholds',
+      icon: <Gauge className="w-3.5 h-3.5" />,
+      iconClass: 'bg-amber-500/10 text-amber-500 group-hover:bg-amber-500/20' },
+    { type: 'PROGRESS', label: 'Progress Bar', description: 'Value toward a target',
+      icon: <Target className="w-3.5 h-3.5" />,
+      iconClass: 'bg-sky-500/10 text-sky-500 group-hover:bg-sky-500/20' },
+    { type: 'STAT_GRID', label: 'Stat Grid', description: 'KPI tiles from group-by',
+      icon: <LayoutGrid className="w-3.5 h-3.5" />,
+      iconClass: 'bg-violet-500/10 text-violet-500 group-hover:bg-violet-500/20' },
+    { type: 'SPARKLINE', label: 'Sparkline', description: 'Mini trend + delta',
+      icon: <Activity className="w-3.5 h-3.5" />,
+      iconClass: 'bg-cyan-500/10 text-cyan-500 group-hover:bg-cyan-500/20' },
 ];
 
 // Per-type defaults. Pulled out of the React component so palette drops can use the
@@ -141,6 +154,26 @@ const createWidget = (
             metric_label: 'Records',
             metric_static_value: '0',
             metric_format: 'number',
+        };
+        case 'GAUGE': return {
+            id, type, title: 'Gauge', size: 'third',
+            data_source: 'static', metric_static_value: '65', metric_format: 'number',
+            metric_label: 'Usage', gauge_min: 0, gauge_max: 100, gauge_warn: 70, gauge_crit: 90,
+        };
+        case 'PROGRESS': return {
+            id, type, title: 'Progress', size: 'third',
+            data_source: 'static', metric_static_value: '40', metric_format: 'number',
+            metric_label: 'Progress', progress_target: 100,
+        };
+        case 'STAT_GRID': return {
+            id, type, title: 'Stats', size: 'half',
+            data_source: 'static', metric_format: 'number',
+            chart_static_data: '[{"key":"OK","value":12},{"key":"Warning","value":3},{"key":"Error","value":1}]',
+        };
+        case 'SPARKLINE': return {
+            id, type, title: 'Trend', size: 'third',
+            data_source: 'static', metric_format: 'number', metric_label: 'This week',
+            chart_static_data: '[{"key":"Mon","value":10},{"key":"Tue","value":14},{"key":"Wed","value":12},{"key":"Thu","value":18},{"key":"Fri","value":22}]',
         };
     }
 };
@@ -860,7 +893,7 @@ const PageDesignerPage = () => {
                                                                             dragHandleProps={provided.dragHandleProps}
                                                                             hideActions
                                                                         />
-                                                                    ) : widget.type === 'TEXT' || widget.type === 'IMAGE' || widget.type === 'IFRAME' || widget.type === 'STATUS' || widget.type === 'TABLE' || widget.type === 'CHART' || widget.type === 'METRIC' ? (
+                                                                    ) : widget.type === 'TEXT' || widget.type === 'IMAGE' || widget.type === 'IFRAME' || widget.type === 'STATUS' || widget.type === 'TABLE' || widget.type === 'CHART' || widget.type === 'METRIC' || widget.type === 'GAUGE' || widget.type === 'PROGRESS' || widget.type === 'STAT_GRID' || widget.type === 'SPARKLINE' ? (
                                                                         <ContentWidgetCard
                                                                             widget={widget}
                                                                             onEdit={() => setEditingWidgetId(widget.id)}
@@ -933,7 +966,7 @@ const PageDesignerPage = () => {
                                                                                                                 dragHandleProps={childProvided.dragHandleProps}
                                                                                                                 hideActions
                                                                                                             />
-                                                                                                        ) : child.type === 'TEXT' || child.type === 'IMAGE' || child.type === 'IFRAME' || child.type === 'STATUS' || child.type === 'TABLE' || child.type === 'CHART' || child.type === 'METRIC' ? (
+                                                                                                        ) : child.type === 'TEXT' || child.type === 'IMAGE' || child.type === 'IFRAME' || child.type === 'STATUS' || child.type === 'TABLE' || child.type === 'CHART' || child.type === 'METRIC' || child.type === 'GAUGE' || child.type === 'PROGRESS' || child.type === 'STAT_GRID' || child.type === 'SPARKLINE' ? (
                                                                                                             <ContentWidgetCard
                                                                                                                 widget={child}
                                                                                                                 onEdit={() => setEditingWidgetId(child.id)}
@@ -1627,6 +1660,154 @@ const PageDesignerPage = () => {
                                     )}
                                 </div>
                             )}
+
+                            {activeWidget.type === 'GAUGE' && (
+                                <div className="space-y-6">
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Label</label>
+                                            <Input value={activeWidget.metric_label || ''} onChange={(e) => updateWidget(activeWidget.id, { metric_label: e.target.value })} className="h-8 text-xs" placeholder="e.g. CPU" />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Unit</label>
+                                            <Input value={activeWidget.metric_unit || ''} onChange={(e) => updateWidget(activeWidget.id, { metric_unit: e.target.value })} className="h-8 text-xs" placeholder="%" />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Min</label>
+                                            <Input type="number" value={activeWidget.gauge_min ?? ''} onChange={(e) => updateWidget(activeWidget.id, { gauge_min: e.target.value === '' ? undefined : Number(e.target.value) })} className="h-8 text-xs" placeholder="0" />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Max</label>
+                                            <Input type="number" value={activeWidget.gauge_max ?? ''} onChange={(e) => updateWidget(activeWidget.id, { gauge_max: e.target.value === '' ? undefined : Number(e.target.value) })} className="h-8 text-xs" placeholder="100" />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Warn ≥</label>
+                                            <Input type="number" value={activeWidget.gauge_warn ?? ''} onChange={(e) => updateWidget(activeWidget.id, { gauge_warn: e.target.value === '' ? undefined : Number(e.target.value) })} className="h-8 text-xs" placeholder="70" />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Crit ≥</label>
+                                            <Input type="number" value={activeWidget.gauge_crit ?? ''} onChange={(e) => updateWidget(activeWidget.id, { gauge_crit: e.target.value === '' ? undefined : Number(e.target.value) })} className="h-8 text-xs" placeholder="90" />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Format</label>
+                                        <select value={activeWidget.metric_format || 'number'} onChange={(e) => updateWidget(activeWidget.id, { metric_format: e.target.value as PageWidget['metric_format'] })} className="h-8 px-2 w-full text-xs font-bold border border-border rounded-md bg-background text-foreground outline-none cursor-pointer">
+                                            <option value="number">Number</option><option value="percent">Percent (×100)</option><option value="currency">Currency</option>
+                                        </select>
+                                    </div>
+                                    <DataSourceToggle widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
+                                    {activeWidget.data_source === 'dataset' ? (
+                                        <>
+                                            <DatasetSourceConfig value={activeWidget.dataset} onChange={(v) => updateWidget(activeWidget.id, { dataset: v })} slots={{ showGroupBy: false, showMetric: true, showFn: true, showLimit: false, showSort: false }} />
+                                            <ReloadIntervalPicker widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
+                                        </>
+                                    ) : (
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Static Value</label>
+                                            <Input value={activeWidget.metric_static_value || ''} onChange={(e) => updateWidget(activeWidget.id, { metric_static_value: e.target.value })} className="h-8 text-xs font-mono" placeholder="65" />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {activeWidget.type === 'PROGRESS' && (
+                                <div className="space-y-6">
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Label</label>
+                                            <Input value={activeWidget.metric_label || ''} onChange={(e) => updateWidget(activeWidget.id, { metric_label: e.target.value })} className="h-8 text-xs" placeholder="e.g. Quota" />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Unit</label>
+                                            <Input value={activeWidget.metric_unit || ''} onChange={(e) => updateWidget(activeWidget.id, { metric_unit: e.target.value })} className="h-8 text-xs" placeholder="GB" />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Target</label>
+                                            <Input type="number" value={activeWidget.progress_target ?? ''} onChange={(e) => updateWidget(activeWidget.id, { progress_target: e.target.value === '' ? undefined : Number(e.target.value) })} className="h-8 text-xs" placeholder="100" />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Format</label>
+                                            <select value={activeWidget.metric_format || 'number'} onChange={(e) => updateWidget(activeWidget.id, { metric_format: e.target.value as PageWidget['metric_format'] })} className="h-8 px-2 w-full text-xs font-bold border border-border rounded-md bg-background text-foreground outline-none cursor-pointer">
+                                                <option value="number">Number</option><option value="percent">Percent (×100)</option><option value="currency">Currency</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <DataSourceToggle widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
+                                    {activeWidget.data_source === 'dataset' ? (
+                                        <>
+                                            <DatasetSourceConfig value={activeWidget.dataset} onChange={(v) => updateWidget(activeWidget.id, { dataset: v })} slots={{ showGroupBy: false, showMetric: true, showFn: true, showLimit: false, showSort: false }} />
+                                            <ReloadIntervalPicker widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
+                                        </>
+                                    ) : (
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Static Value</label>
+                                            <Input value={activeWidget.metric_static_value || ''} onChange={(e) => updateWidget(activeWidget.id, { metric_static_value: e.target.value })} className="h-8 text-xs font-mono" placeholder="40" />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {activeWidget.type === 'STAT_GRID' && (
+                                <div className="space-y-6">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Format</label>
+                                        <select value={activeWidget.metric_format || 'number'} onChange={(e) => updateWidget(activeWidget.id, { metric_format: e.target.value as PageWidget['metric_format'] })} className="h-8 px-2 w-full text-xs font-bold border border-border rounded-md bg-background text-foreground outline-none cursor-pointer">
+                                            <option value="number">Number</option><option value="percent">Percent (×100)</option><option value="currency">Currency</option>
+                                        </select>
+                                    </div>
+                                    <DataSourceToggle widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
+                                    {activeWidget.data_source === 'dataset' ? (
+                                        <>
+                                            <DatasetSourceConfig value={activeWidget.dataset} onChange={(v) => updateWidget(activeWidget.id, { dataset: v })} slots={{ showGroupBy: true, showMetric: true, showFn: true, showLimit: true, showSort: true }} />
+                                            <ReloadIntervalPicker widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
+                                        </>
+                                    ) : (
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Static Data (JSON [&#123;key,value&#125;])</label>
+                                            <textarea value={activeWidget.chart_static_data || ''} onChange={(e) => updateWidget(activeWidget.id, { chart_static_data: e.target.value })} rows={4} className="w-full px-3 py-2 text-xs font-mono border border-border rounded-md bg-background text-foreground outline-none" placeholder='[{"key":"OK","value":12}]' />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {activeWidget.type === 'SPARKLINE' && (
+                                <div className="space-y-6">
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Label</label>
+                                            <Input value={activeWidget.metric_label || ''} onChange={(e) => updateWidget(activeWidget.id, { metric_label: e.target.value })} className="h-8 text-xs" placeholder="e.g. Requests" />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Unit</label>
+                                            <Input value={activeWidget.metric_unit || ''} onChange={(e) => updateWidget(activeWidget.id, { metric_unit: e.target.value })} className="h-8 text-xs" placeholder="/min" />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Format</label>
+                                        <select value={activeWidget.metric_format || 'number'} onChange={(e) => updateWidget(activeWidget.id, { metric_format: e.target.value as PageWidget['metric_format'] })} className="h-8 px-2 w-full text-xs font-bold border border-border rounded-md bg-background text-foreground outline-none cursor-pointer">
+                                            <option value="number">Number</option><option value="percent">Percent (×100)</option><option value="currency">Currency</option>
+                                        </select>
+                                    </div>
+                                    <DataSourceToggle widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
+                                    {activeWidget.data_source === 'dataset' ? (
+                                        <>
+                                            <DatasetSourceConfig value={activeWidget.dataset} onChange={(v) => updateWidget(activeWidget.id, { dataset: v })} slots={{ showGroupBy: true, showMetric: true, showFn: true, showLimit: true, showSort: true }} />
+                                            <ReloadIntervalPicker widget={activeWidget} onChange={(v) => updateWidget(activeWidget.id, v)} />
+                                        </>
+                                    ) : (
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Static Data (JSON [&#123;key,value&#125;])</label>
+                                            <textarea value={activeWidget.chart_static_data || ''} onChange={(e) => updateWidget(activeWidget.id, { chart_static_data: e.target.value })} rows={4} className="w-full px-3 py-2 text-xs font-mono border border-border rounded-md bg-background text-foreground outline-none" placeholder='[{"key":"Mon","value":10}]' />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                         <div className="px-8 py-6 bg-muted/10 border-t border-border/40 flex flex-col gap-3">
                             <Button onClick={() => setEditingWidgetId(null)} className="premium-gradient text-white text-[10px] font-black uppercase tracking-[0.2em] h-9 rounded-md shadow-premium">
@@ -1945,6 +2126,43 @@ const ContentWidgetCard: React.FC<ContentWidgetCardProps> = ({ widget, onEdit, o
                             </p>
                             <p className="text-[10px] text-muted-foreground uppercase tracking-widest">{widget.metric_label || 'Metric'}</p>
                         </div>
+                    </div>
+                )}
+                {widget.type === 'GAUGE' && (
+                    <div className="flex items-center gap-3 p-3 rounded-md bg-amber-500/5 border border-amber-500/20">
+                        <Gauge className="w-5 h-5 text-amber-500 opacity-70" />
+                        <div>
+                            <p className="text-sm font-black text-amber-600">
+                                {widget.data_source === 'dataset' ? '— from dataset —' : (widget.metric_static_value || '0')}
+                                {widget.metric_unit && <span className="text-[10px] text-muted-foreground ml-1">{widget.metric_unit}</span>}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-widest">{widget.metric_label || 'Gauge'} · 0–{widget.gauge_max ?? 100}</p>
+                        </div>
+                    </div>
+                )}
+                {widget.type === 'PROGRESS' && (
+                    <div className="p-3 rounded-md bg-sky-500/5 border border-sky-500/20 space-y-2">
+                        <div className="flex items-center gap-2 text-sky-600">
+                            <Target className="w-4 h-4 opacity-70" />
+                            <span className="text-xs font-black">
+                                {widget.data_source === 'dataset' ? '— dataset —' : (widget.metric_static_value || '0')} / {widget.progress_target ?? 100}
+                            </span>
+                        </div>
+                        <div className="h-2 rounded-full bg-muted-foreground/15 overflow-hidden">
+                            <div className="h-full bg-sky-500 rounded-full" style={{ width: `${Math.min(100, ((Number(widget.metric_static_value) || 0) / (widget.progress_target || 100)) * 100)}%` }} />
+                        </div>
+                    </div>
+                )}
+                {widget.type === 'STAT_GRID' && (
+                    <div className="h-20 flex items-center justify-center rounded-md bg-violet-500/5 border border-violet-500/20 text-violet-500">
+                        <LayoutGrid className="w-5 h-5 mr-2 opacity-60" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest opacity-70">Stat grid · {widget.data_source === 'dataset' ? (widget.dataset?.dataset_id ? 'Dataset' : 'No dataset') : 'Static'}</span>
+                    </div>
+                )}
+                {widget.type === 'SPARKLINE' && (
+                    <div className="h-20 flex items-center justify-center rounded-md bg-cyan-500/5 border border-cyan-500/20 text-cyan-500">
+                        <Activity className="w-5 h-5 mr-2 opacity-60" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest opacity-70">Trend · {widget.data_source === 'dataset' ? (widget.dataset?.dataset_id ? 'Dataset' : 'No dataset') : 'Static'}</span>
                     </div>
                 )}
             </div>

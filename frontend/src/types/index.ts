@@ -320,7 +320,7 @@ export interface PageWorkflow {
 }
 
 export type PageWidgetSize = 'full' | 'half' | 'third';
-export type PageWidgetType = 'TERMINAL' | 'ENDPOINT' | 'LINK' | 'SECTION' | 'TEXT' | 'IMAGE' | 'IFRAME' | 'STATUS' | 'TABLE' | 'CHART' | 'METRIC';
+export type PageWidgetType = 'TERMINAL' | 'ENDPOINT' | 'LINK' | 'SECTION' | 'TEXT' | 'IMAGE' | 'IFRAME' | 'STATUS' | 'TABLE' | 'CHART' | 'METRIC' | 'GAUGE' | 'PROGRESS' | 'STAT_GRID' | 'SPARKLINE';
 export type PageWidgetReload = 'realtime' | '5' | '10' | '30' | '60';
 export type ChartKind = 'line' | 'bar' | 'pie' | 'area';
 export type AggregateFn = 'count' | 'sum' | 'avg' | 'min' | 'max';
@@ -409,11 +409,18 @@ export interface PageWidget {
     // CHART-specific
     chart_kind?: ChartKind;
     chart_static_data?: string;   // JSON array of {key,value} for data_source==='static'
-    // METRIC-specific
+    // METRIC / GAUGE / PROGRESS / SPARKLINE share the single-value fields below.
     metric_label?: string;
     metric_unit?: string;
     metric_format?: 'number' | 'percent' | 'currency';
     metric_static_value?: string; // when data_source==='static'
+    // GAUGE-specific: radial arc with optional colour thresholds.
+    gauge_min?: number;   // arc start (default 0)
+    gauge_max?: number;   // arc end (default 100)
+    gauge_warn?: number;  // value ≥ warn → amber
+    gauge_crit?: number;  // value ≥ crit → rose
+    // PROGRESS-specific: value vs target → percentage bar.
+    progress_target?: number; // default 100
     // SECTION nesting — id of parent SECTION widget (top-level when undefined)
     parent_id?: string;
 }
