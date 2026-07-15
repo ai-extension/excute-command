@@ -1,7 +1,7 @@
 import React from 'react';
 import {
     Home, ChevronRight, ExternalLink, Zap, Terminal, Link2, FileText, ImageIcon,
-    Frame, Activity, Table2, BarChart3, TrendingUp, Type,
+    Frame, Activity, Table2, BarChart3, TrendingUp, Type, PanelLeftClose,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -40,7 +40,9 @@ const ParentSidebar: React.FC<{
     parentTitle: string;
     parentSlug: string;
     widgets: PageWidget[];
-}> = ({ parentTitle, parentSlug, widgets }) => {
+    // When provided, renders a collapse button in the header (desktop rail toggle).
+    onCollapse?: () => void;
+}> = ({ parentTitle, parentSlug, widgets, onCollapse }) => {
     const parentHref = `/public/pages/${parentSlug}`;
 
     // A single widget rendered as a compact row. Self-contained widgets (TEXT/STATUS/LINK)
@@ -131,19 +133,31 @@ const ParentSidebar: React.FC<{
 
     return (
         <div className="rounded-xl border border-border bg-muted/30 p-3.5 shadow-sm">
-            <a
-                href={parentHref}
-                className="group flex items-center gap-2 mb-4 px-1 text-muted-foreground hover:text-amber-500 transition-colors"
-                title={`Back to ${parentTitle || 'parent page'}`}
-            >
-                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-amber-500/10 text-amber-500 group-hover:bg-amber-500/20 transition-colors shrink-0">
-                    <Home className="w-3.5 h-3.5" />
-                </span>
-                <span className="flex flex-col min-w-0">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">Parent</span>
-                    <span className="text-xs font-black truncate">{parentTitle || 'Parent page'}</span>
-                </span>
-            </a>
+            <div className="flex items-center gap-2 mb-4">
+                <a
+                    href={parentHref}
+                    className="group flex items-center gap-2 px-1 flex-1 min-w-0 text-muted-foreground hover:text-amber-500 transition-colors"
+                    title={`Back to ${parentTitle || 'parent page'}`}
+                >
+                    <span className="flex items-center justify-center w-6 h-6 rounded-full bg-amber-500/10 text-amber-500 group-hover:bg-amber-500/20 transition-colors shrink-0">
+                        <Home className="w-3.5 h-3.5" />
+                    </span>
+                    <span className="flex flex-col min-w-0">
+                        <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">Parent</span>
+                        <span className="text-xs font-black truncate">{parentTitle || 'Parent page'}</span>
+                    </span>
+                </a>
+                {onCollapse && (
+                    <button
+                        type="button"
+                        onClick={onCollapse}
+                        title="Collapse sidebar"
+                        className="shrink-0 h-7 w-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors"
+                    >
+                        <PanelLeftClose className="w-4 h-4" />
+                    </button>
+                )}
+            </div>
             <div className="space-y-3">{body}</div>
         </div>
     );

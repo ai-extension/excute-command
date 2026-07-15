@@ -12,12 +12,9 @@ const NAME_SET = new Set<string>(iconNames);
 // All available icon names (~1900), used by the searchable picker.
 export const ALL_ICON_NAMES: string[] = iconNames as unknown as string[];
 
-// Icons shown before the user types anything — keeps the picker approachable.
+// A few common icons shown before the user types — everything else via search.
 export const POPULAR_ICON_NAMES: string[] = [
-    'zap', 'play', 'rocket', 'terminal', 'server', 'database', 'globe', 'link-2', 'file-text',
-    'image', 'frame', 'activity', 'table-2', 'chart-column', 'trending-up', 'type', 'bell', 'settings',
-    'circle-check', 'triangle-alert', 'clock', 'cloud', 'cpu', 'hard-drive', 'lock', 'mail', 'star',
-    'heart', 'folder', 'download', 'upload', 'refresh-cw', 'git-branch', 'package', 'wrench',
+    'rocket', 'zap', 'server', 'database', 'terminal', 'globe', 'bell', 'activity',
 ];
 
 export function isIconName(name: string | undefined): name is string {

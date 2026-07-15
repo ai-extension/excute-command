@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import {
     Zap, Loader2, Monitor, Terminal, Clock, Sun, Moon, Copy, Check, Link2, Search,
-    FileText, ImageIcon, Frame, Activity, Table2, ArrowUp, Home
+    FileText, ImageIcon, Frame, Activity, Table2, ArrowUp, Home, PanelLeftOpen
 } from 'lucide-react';
 import { cn, copyToClipboard as clipboardCopy } from '../lib/utils';
 import { WidgetIcon } from '../lib/widgetIcons';
@@ -166,6 +166,14 @@ const PublicPageView = () => {
         return () => window.removeEventListener('scroll', onScroll);
     }, []);
     const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // Parent-widgets sidebar collapse (desktop only), persisted across visits.
+    const [parentSidebarCollapsed, setParentSidebarCollapsed] = useState<boolean>(
+        () => localStorage.getItem('public-parent-sidebar-collapsed') === '1'
+    );
+    useEffect(() => {
+        localStorage.setItem('public-parent-sidebar-collapsed', parentSidebarCollapsed ? '1' : '0');
+    }, [parentSidebarCollapsed]);
 
     // Persist public-theme separately and drive global ThemeProvider so it doesn't override us
     useEffect(() => {
@@ -551,14 +559,26 @@ const PublicPageView = () => {
                                         />
                                     </div>
                                 </details>
-                                {/* Desktop: sticky left sidebar */}
-                                <aside className="hidden lg:block w-72 shrink-0">
+                                {/* Desktop: sticky left sidebar, collapsible to a thin rail */}
+                                <aside className={cn("hidden lg:block shrink-0 transition-[width] duration-300", parentSidebarCollapsed ? "w-12" : "w-72")}>
                                     <div className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto custom-scrollbar pr-1">
-                                        <ParentSidebar
-                                            parentTitle={page.parent.title}
-                                            parentSlug={page.parent.slug}
-                                            widgets={parentWidgets}
-                                        />
+                                        {parentSidebarCollapsed ? (
+                                            <button
+                                                onClick={() => setParentSidebarCollapsed(false)}
+                                                title={`Show ${page.parent.title || 'parent'} widgets`}
+                                                className="flex flex-col items-center gap-3 w-10 py-3 rounded-xl border border-border bg-muted/30 hover:bg-muted/50 hover:border-primary/40 transition-colors"
+                                            >
+                                                <PanelLeftOpen className="w-4 h-4 text-muted-foreground" />
+                                                <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground [writing-mode:vertical-rl]">Parent</span>
+                                            </button>
+                                        ) : (
+                                            <ParentSidebar
+                                                parentTitle={page.parent.title}
+                                                parentSlug={page.parent.slug}
+                                                widgets={parentWidgets}
+                                                onCollapse={() => setParentSidebarCollapsed(true)}
+                                            />
+                                        )}
                                     </div>
                                 </aside>
                             </>
