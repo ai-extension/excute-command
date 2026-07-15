@@ -910,13 +910,6 @@ func (h *PageHandler) CreatePublicSchedule(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "run_at must be in the future"})
 		return
 	}
-	// A public schedule must not outlive the page: reject a first run at/after expiry. The
-	// recurring window's end is clamped to the page expiry below. This is the create-time
-	// guard; runScheduledWorkflows re-checks page state at fire time as the real enforcement.
-	if page.ExpiresAt != nil && !runAt.Before(*page.ExpiresAt) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "run time is at or after the page's expiration"})
-		return
-	}
 
 	// Cap concurrent active schedules AND total retained rows per page. This is the real
 	// creation ceiling: LoginRateLimiter only throttles failed (4xx) calls, so a stream of
@@ -954,10 +947,6 @@ func (h *PageHandler) CreatePublicSchedule(c *gin.Context) {
 		}
 		start := runAtUTC
 		end := runAtUTC.AddDate(0, 0, days)
-		// Never let the recurring window extend past the page's own expiry.
-		if page.ExpiresAt != nil && end.After(*page.ExpiresAt) {
-			end = page.ExpiresAt.UTC()
-		}
 		schedule.Type = domain.ScheduleTypeRecurring
 		// The cron engine runs in the server's local timezone, so derive the daily H:M from
 		// the local representation of the chosen instant — otherwise a non-UTC server would

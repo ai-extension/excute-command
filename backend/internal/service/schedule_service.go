@@ -12,7 +12,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/robfig/cron/v3"
 	"github.com/user/csm-backend/internal/domain"
-	"gorm.io/gorm"
 )
 
 // ErrScheduleCapReached is returned by EnforcePageScheduleCaps when a page already holds the
@@ -22,7 +21,6 @@ var ErrScheduleCapReached = errors.New("too many active schedules for this page"
 type ScheduleService struct {
 	repo     domain.ScheduleRepository
 	execRepo domain.WorkflowExecutionRepository
-	pageRepo domain.PageRepository
 	executor *WorkflowExecutor
 	cron     *cron.Cron
 	entries  map[uuid.UUID]cron.EntryID
@@ -30,11 +28,10 @@ type ScheduleService struct {
 	mu       sync.Mutex
 }
 
-func NewScheduleService(repo domain.ScheduleRepository, execRepo domain.WorkflowExecutionRepository, pageRepo domain.PageRepository, executor *WorkflowExecutor) *ScheduleService {
+func NewScheduleService(repo domain.ScheduleRepository, execRepo domain.WorkflowExecutionRepository, executor *WorkflowExecutor) *ScheduleService {
 	s := &ScheduleService{
 		repo:     repo,
 		execRepo: execRepo,
-		pageRepo: pageRepo,
 		executor: executor,
 		cron:     cron.New(cron.WithParser(cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor))),
 		entries:  make(map[uuid.UUID]cron.EntryID),
@@ -42,16 +39,6 @@ func NewScheduleService(repo domain.ScheduleRepository, execRepo domain.Workflow
 	}
 	s.cron.Start()
 	return s
-}
-
-// pauseSchedule disarms a schedule (cron + timer), marks it PAUSED and clears its next run.
-// Used when a page-originated schedule can no longer legitimately fire.
-func (s *ScheduleService) pauseSchedule(id uuid.UUID) {
-	s.mu.Lock()
-	s.removeScheduleFromCron(id)
-	s.mu.Unlock()
-	s.repo.UpdateStatus(id, "PAUSED")
-	s.repo.UpdateNextRunAt(id, nil)
 }
 
 func (s *ScheduleService) Init() {
@@ -458,42 +445,6 @@ func (s *ScheduleService) runScheduledWorkflows(scheduleID uuid.UUID) {
 
 	log.Printf("[ScheduleService] Triggering schedule: %s", schedule.Name)
 
-	// Page-originated schedules must not outlive the page's public access. Re-check the page
-	// state HERE (fire time): the create-time guard can't cover the page later being expired,
-	// made private, deleted, having the workflow removed, or the widget's scheduling turned
-	// off. If the page no longer permits this schedule, skip the run and pause it so future
-	// ticks stop too.
-	var pageForSchedule *domain.Page
-	if schedule.PageID != nil {
-		page, err := s.pageRepo.GetByID(*schedule.PageID, nil)
-		if err != nil {
-			// Page gone for good (deleted) → pause so it stops ticking. A transient load
-			// failure (DB blip) must only skip THIS run, not permanently disable a recurring
-			// schedule, so leave it armed to retry next tick.
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				log.Printf("[ScheduleService] Page-schedule '%s' paused: page no longer exists", schedule.Name)
-				s.pauseSchedule(schedule.ID)
-			} else {
-				log.Printf("[ScheduleService] Page-schedule '%s' skipped this run: page load failed (%v)", schedule.Name, err)
-			}
-			return
-		}
-		now := time.Now()
-		anyAllowed := false
-		for _, sw := range schedule.ScheduledWorkflows {
-			if page.CanPublicSchedule(sw.WorkflowID, now) {
-				anyAllowed = true
-				break
-			}
-		}
-		if !anyAllowed {
-			log.Printf("[ScheduleService] Page-schedule '%s' skipped: page no longer permits scheduling; pausing", schedule.Name)
-			s.pauseSchedule(schedule.ID)
-			return
-		}
-		pageForSchedule = page
-	}
-
 	ctx := context.Background()
 
 	// 1. Run BEFORE hooks
@@ -509,10 +460,6 @@ func (s *ScheduleService) runScheduledWorkflows(scheduleID uuid.UUID) {
 
 	for _, sw := range schedule.ScheduledWorkflows {
 		if sw.Workflow == nil {
-			continue
-		}
-		// For page schedules, run only workflows the page still permits (see fire-time check).
-		if pageForSchedule != nil && !pageForSchedule.CanPublicSchedule(sw.WorkflowID, time.Now()) {
 			continue
 		}
 

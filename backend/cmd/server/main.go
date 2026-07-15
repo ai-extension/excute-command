@@ -130,7 +130,7 @@ func main() {
 	globalVarService := service.NewGlobalVariableService(globalVarRepo)
 	datasetService := service.NewDatasetService(datasetRepo)
 	workflowExecutor := service.NewWorkflowExecutor(workflowRepo, workflowGroupRepo, workflowStepRepo, workflowInputRepo, execRepo, serverService, hub, globalVarRepo, datasetRepo)
-	scheduleService := service.NewScheduleService(scheduleRepo, execRepo, pageRepo, workflowExecutor)
+	scheduleService := service.NewScheduleService(scheduleRepo, execRepo, workflowExecutor)
 	tagService := service.NewTagService(tagRepo)
 	vpnService := service.NewVpnConfigService(vpnRepo)
 	pageService := service.NewPageService(pageRepo)
