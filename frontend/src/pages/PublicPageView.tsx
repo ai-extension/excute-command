@@ -5,6 +5,7 @@ import {
     FileText, ImageIcon, Frame, Activity, Table2, ArrowUp, Home
 } from 'lucide-react';
 import { cn, copyToClipboard as clipboardCopy } from '../lib/utils';
+import { WidgetIcon } from '../lib/widgetIcons';
 import { Page, PageWidget, PageLayout, WorkflowInput } from '../types';
 import { Button } from '../components/ui/button';
 import WorkflowInputDialog from '../components/WorkflowInputDialog';
@@ -30,6 +31,7 @@ import LoginDialog from '../components/LoginDialog';
 import ChartWidget from '../components/public/ChartWidget';
 import MetricWidget from '../components/public/MetricWidget';
 import DatasetTableWidget from '../components/public/DatasetTableWidget';
+import ParentSidebar from '../components/public/ParentSidebar';
 
 const PublicPageView = () => {
     const { slug } = useParams();
@@ -447,6 +449,17 @@ const PublicPageView = () => {
         );
     }
 
+    // Parent widgets sidebar: only when this page opted in AND the backend actually
+    // returned the parent's layout (stripped otherwise). Parsed read-only for display.
+    let parentWidgets: PageWidget[] = [];
+    if (page?.show_parent_sidebar && page?.parent?.layout) {
+        try {
+            const pl: PageLayout = JSON.parse(page.parent.layout);
+            parentWidgets = pl.widgets || [];
+        } catch (_) { /* malformed parent layout — skip sidebar */ }
+    }
+    const hasParentSidebar = !!(page?.parent?.slug && parentWidgets.length > 0);
+
     return (
         <div className="min-h-screen transition-colors duration-300">
             <div className="min-h-screen bg-background text-foreground selection:bg-primary/20 pb-20">
@@ -474,7 +487,7 @@ const PublicPageView = () => {
                     </Button>
                 </div>
 
-                <main className="max-w-6xl mx-auto px-6 pt-24 pb-32">
+                <main className={cn("mx-auto px-6 pt-24 pb-32", hasParentSidebar ? "max-w-7xl" : "max-w-6xl")}>
                     <div className="flex flex-col items-center text-center mb-16 space-y-4">
                         <h1 className="text-5xl md:text-7xl font-black ">{page?.title}</h1>
                         <p className="text-lg text-muted-foreground font-medium italic opacity-70">
@@ -518,6 +531,39 @@ const PublicPageView = () => {
                         )}
                     </div>
 
+                    <div className={cn(hasParentSidebar && "flex flex-col lg:flex-row gap-8 items-start")}>
+                        {hasParentSidebar && page?.parent && (
+                            <>
+                                {/* Mobile: collapsible parent panel above content */}
+                                <details className="lg:hidden w-full group rounded-xl border border-border bg-muted/20">
+                                    <summary className="flex items-center justify-between gap-2 px-4 py-3 cursor-pointer list-none select-none">
+                                        <span className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-muted-foreground">
+                                            <Home className="w-4 h-4 text-amber-500" />
+                                            {page.parent.title || 'Parent'} widgets
+                                        </span>
+                                        <span className="text-muted-foreground/60 group-open:rotate-90 transition-transform">›</span>
+                                    </summary>
+                                    <div className="px-3 pb-3">
+                                        <ParentSidebar
+                                            parentTitle={page.parent.title}
+                                            parentSlug={page.parent.slug}
+                                            widgets={parentWidgets}
+                                        />
+                                    </div>
+                                </details>
+                                {/* Desktop: sticky left sidebar */}
+                                <aside className="hidden lg:block w-72 shrink-0">
+                                    <div className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto custom-scrollbar pr-1">
+                                        <ParentSidebar
+                                            parentTitle={page.parent.title}
+                                            parentSlug={page.parent.slug}
+                                            widgets={parentWidgets}
+                                        />
+                                    </div>
+                                </aside>
+                            </>
+                        )}
+                        <div className={cn(hasParentSidebar && "flex-1 min-w-0 w-full")}>
                     {widgets.length > 0 && (
                         <div className="mb-10 max-w-xl mx-auto">
                             <div className="relative">
@@ -573,7 +619,7 @@ const PublicPageView = () => {
                                         <div className="group bg-card border border-border rounded-md overflow-hidden hover:border-indigo-500/40 transition-all shadow-sm h-full flex flex-col">
                                             <div className="flex items-center gap-4 px-8 py-4 border-b border-border bg-card">
                                                 <div className="p-2.5 rounded-md bg-indigo-500/10 text-indigo-500 ring-1 ring-indigo-500/20">
-                                                    <Link2 className="w-4 h-4" />
+                                                    <WidgetIcon name={widget.icon} fallback={Link2} className="w-4 h-4" />
                                                 </div>
                                                 <div className="flex flex-col min-w-0 flex-1">
                                                     <span className="text-sm font-black truncate">{widget.title || 'Link'}</span>
@@ -603,7 +649,7 @@ const PublicPageView = () => {
                                         <div className="bg-card border border-border rounded-md overflow-hidden shadow-sm h-full flex flex-col">
                                             <div className="flex items-center gap-4 px-8 py-4 border-b border-border bg-card">
                                                 <div className="p-2.5 rounded-md bg-sky-500/10 text-sky-500 ring-1 ring-sky-500/20">
-                                                    <FileText className="w-4 h-4" />
+                                                    <WidgetIcon name={widget.icon} fallback={FileText} className="w-4 h-4" />
                                                 </div>
                                                 <span className="text-sm font-black truncate">{widget.title || 'Text'}</span>
                                             </div>
@@ -618,7 +664,7 @@ const PublicPageView = () => {
                                         <div className="bg-card border border-border rounded-md overflow-hidden shadow-sm h-full flex flex-col">
                                             <div className="flex items-center gap-4 px-8 py-4 border-b border-border bg-card">
                                                 <div className="p-2.5 rounded-md bg-pink-500/10 text-pink-500 ring-1 ring-pink-500/20">
-                                                    <ImageIcon className="w-4 h-4" />
+                                                    <WidgetIcon name={widget.icon} fallback={ImageIcon} className="w-4 h-4" />
                                                 </div>
                                                 <span className="text-sm font-black truncate">{widget.title || 'Image'}</span>
                                             </div>
@@ -639,7 +685,7 @@ const PublicPageView = () => {
                                         <div className="bg-card border border-border rounded-md overflow-hidden shadow-sm h-full flex flex-col">
                                             <div className="flex items-center gap-4 px-8 py-4 border-b border-border bg-card">
                                                 <div className="p-2.5 rounded-md bg-violet-500/10 text-violet-500 ring-1 ring-violet-500/20">
-                                                    <Frame className="w-4 h-4" />
+                                                    <WidgetIcon name={widget.icon} fallback={Frame} className="w-4 h-4" />
                                                 </div>
                                                 <span className="text-sm font-black truncate">{widget.title || 'Embedded Content'}</span>
                                             </div>
@@ -672,7 +718,9 @@ const PublicPageView = () => {
                                     return (
                                         <div className={cn("border rounded-md overflow-hidden shadow-sm h-full flex flex-col", sc.bg, `border-${(widget.status_value || 'ok') === 'ok' ? 'emerald' : (widget.status_value || 'ok') === 'warning' ? 'amber' : (widget.status_value || 'ok') === 'error' ? 'rose' : 'sky'}-500/20`)}>
                                             <div className="p-8 flex flex-col items-center justify-center gap-3 flex-1">
-                                                <div className={cn("w-4 h-4 rounded-full animate-pulse shadow-lg", sc.dot)} />
+                                                {widget.icon
+                                                    ? <WidgetIcon name={widget.icon} fallback={Activity} className={cn("w-7 h-7", sc.text)} />
+                                                    : <div className={cn("w-4 h-4 rounded-full animate-pulse shadow-lg", sc.dot)} />}
                                                 <span className={cn("text-lg font-black uppercase tracking-tight", sc.text)}>{widget.status_label || 'Status'}</span>
                                                 {widget.description && (
                                                     <p className="text-xs text-muted-foreground text-center">{widget.description}</p>
@@ -689,7 +737,7 @@ const PublicPageView = () => {
                                         <div className="bg-card border border-border rounded-md overflow-hidden shadow-sm h-full flex flex-col">
                                             <div className="flex items-center gap-4 px-8 py-4 border-b border-border bg-card">
                                                 <div className="p-2.5 rounded-md bg-orange-500/10 text-orange-500 ring-1 ring-orange-500/20">
-                                                    <Table2 className="w-4 h-4" />
+                                                    <WidgetIcon name={widget.icon} fallback={Table2} className="w-4 h-4" />
                                                 </div>
                                                 <span className="text-sm font-black truncate">{widget.title || 'Data Table'}</span>
                                             </div>
@@ -741,7 +789,10 @@ const PublicPageView = () => {
                                     return (
                                         <div key={widget.id} className="w-full">
                                             <div className="pt-4 pb-3 border-b-2 border-border/50 mb-6">
-                                                <h2 className="text-2xl font-black">{widget.title || 'Section Header'}</h2>
+                                                <h2 className="text-2xl font-black flex items-center gap-2.5">
+                                                    {widget.icon && <WidgetIcon name={widget.icon} className="w-6 h-6 text-primary" />}
+                                                    {widget.title || 'Section Header'}
+                                                </h2>
                                                 {widget.description && (
                                                     <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{widget.description}</p>
                                                 )}
@@ -780,6 +831,8 @@ const PublicPageView = () => {
                             <p className="text-sm font-bold uppercase">No nodes deployed</p>
                         </div>
                     )}
+                        </div>
+                    </div>
                 </main>
 
                 <WorkflowInputDialog

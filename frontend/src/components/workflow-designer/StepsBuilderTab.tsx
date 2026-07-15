@@ -1412,9 +1412,6 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                         </div>
                                                                                                     );
                                                                                                 })()}
-                                                                                                <p className="text-[9px] text-muted-foreground/60 font-mono pt-1 border-t border-border/50">
-                                                                                                    With fields → grep an object. Read one field <code className="bg-amber-500/10 px-1 rounded">{`{{ flow.${group.key || 'group'}.step.${step.action_key || 'key'}.name }}`}</code> or the whole object <code className="bg-amber-500/10 px-1 rounded">{`{{ flow.${group.key || 'group'}.step.${step.action_key || 'key'}|json }}`}</code>. No fields → source parsed as JSON. (set Action Key + Format=JSON).
-                                                                                                </p>
                                                                                             </div>
                                                                                         ) : (
                                                                                             <div className="space-y-2">

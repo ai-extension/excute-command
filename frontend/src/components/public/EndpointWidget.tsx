@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Zap, Play, Loader2, CheckCircle2, AlertTriangle, Square, History, RotateCcw, XCircle, Clock, FileText } from 'lucide-react';
+import { WidgetIcon } from '../../lib/widgetIcons';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
@@ -117,7 +118,7 @@ const EndpointWidget: React.FC<EndpointWidgetProps> = ({
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-4">
                         <div className="p-2.5 rounded-md bg-primary/10 text-primary ring-1 ring-primary/20 group-hover:bg-primary group-hover:text-white transition-all duration-300">
-                            <Zap className="w-4 h-4" />
+                            <WidgetIcon name={widget.icon} fallback={Zap} className="w-4 h-4" />
                         </div>
                         <div>
                             <h3 className="text-sm font-black leading-tight">{widget.title}</h3>

@@ -643,6 +643,7 @@ type Page struct {
 	TokenTTLMinutes   int            `json:"token_ttl_minutes" gorm:"default:15"`
 	ExpiresAt         *time.Time     `json:"expires_at" gorm:"index"`
 	Layout            string         `json:"layout" gorm:"type:text"`
+	ShowParentSidebar bool           `json:"show_parent_sidebar" gorm:"default:false"` // Show parent page widgets as a sticky sidebar on the public page
 	Workflows         []PageWorkflow `json:"workflows,omitempty" gorm:"foreignKey:PageID;constraint:OnDelete:CASCADE;"`
 	Tags              []Tag          `json:"tags,omitempty" gorm:"many2many:page_tags;constraint:OnDelete:CASCADE;"`
 	CreatedBy         *uuid.UUID     `json:"created_by,omitempty" gorm:"type:uuid;index;<-:create"`

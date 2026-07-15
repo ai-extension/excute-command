@@ -838,14 +838,24 @@ func (h *PageHandler) sanitizePage(page *domain.Page) {
 		}
 	}
 	// Only expose the minimal parent info needed for the public breadcrumb link;
-	// strip the parent's password/layout/workflows so nothing internal leaks.
+	// strip the parent's password/workflows so nothing internal leaks. The parent's
+	// Layout is exposed only when this page opts into the parent sidebar — sidebar
+	// widgets render read-only and deep-link back to the parent page, so the parent's
+	// PageWorkflows (inputs/server config) are never needed here.
 	if page.Parent != nil {
-		page.Parent = &domain.Page{
+		trimmed := &domain.Page{
 			ID:       page.Parent.ID,
 			Title:    page.Parent.Title,
 			Slug:     page.Parent.Slug,
 			IsPublic: page.Parent.IsPublic,
 		}
+		// Expose the parent's layout only when opted in AND the parent is itself public —
+		// the sidebar deep-links to the parent's public page, and a private parent's layout
+		// must never leak to anonymous visitors of a public child page.
+		if page.ShowParentSidebar && page.Parent.IsPublic {
+			trimmed.Layout = page.Parent.Layout
+		}
+		page.Parent = trimmed
 	}
 }
 

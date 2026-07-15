@@ -19,6 +19,7 @@ import { SearchableSelect } from '../components/SearchableSelect';
 import { TagSelector } from '../components/TagSelector';
 import { ButtonStylePicker, resolveButtonStyle } from '../components/ButtonStylePicker';
 import { DatasetSourceConfig } from '../components/page-designer/DatasetSourceConfig';
+import { searchIcons, WidgetIcon } from '../lib/widgetIcons';
 
 
 const generateId = () => Math.random().toString(36).slice(2, 10);
@@ -295,12 +296,14 @@ const PageDesignerPage = () => {
     const [expirationOption, setExpirationOption] = useState<'none' | '1h' | '1d' | '1w'>('none');
     const [parentId, setParentId] = useState('');
     const [parentTitle, setParentTitle] = useState('');
+    const [showParentSidebar, setShowParentSidebar] = useState(false);
     const [availablePages, setAvailablePages] = useState<{ id: string; title: string }[]>([]);
 
     // Widgets
     const [widgets, setWidgets] = useState<PageWidget[]>([]);
     const [editingWidgetId, setEditingWidgetId] = useState<string | null>(null);
     const [draggingSectionId, setDraggingSectionId] = useState<string | null>(null);
+    const [iconSearch, setIconSearch] = useState('');
 
     // Available data
     const [availableWorkflows, setAvailableWorkflows] = useState<Workflow[]>([]);
@@ -325,6 +328,7 @@ const PageDesignerPage = () => {
                 setSelectedTags(data.tags || []);
                 setParentId(data.parent_id || '');
                 setParentTitle(data.parent?.title || '');
+                setShowParentSidebar(data.show_parent_sidebar ?? false);
                 if (data.password) {
                     setPassword('********');
                 } else {
@@ -419,6 +423,7 @@ const PageDesignerPage = () => {
                 title,
                 description,
                 parent_id: parentId || null,
+                show_parent_sidebar: parentId ? showParentSidebar : false,
                 slug,
                 is_public: isPublic,
                 password: password === '********' ? undefined : (password || '__CLEAR_PASSWORD__'),
@@ -1002,6 +1007,7 @@ const PageDesignerPage = () => {
                                                 setParentId(val);
                                                 const p = availablePages.find(p => p.id === val);
                                                 setParentTitle(val ? (p?.title || parentTitle) : '');
+                                                if (!val) setShowParentSidebar(false); // no parent → no sidebar
                                             }}
                                             onSearch={fetchPages}
                                             placeholder="— None —"
@@ -1009,6 +1015,20 @@ const PageDesignerPage = () => {
                                             triggerClassName="h-9 bg-background border border-border rounded-md"
                                         />
                                         <p className="text-[10px] text-muted-foreground/70">Public pages with a parent show a link back to it.</p>
+                                        {parentId && (
+                                            <label className="mt-2 flex items-start gap-2.5 rounded-md border border-border bg-background px-3 py-2.5 cursor-pointer hover:border-primary/40 transition-colors">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={showParentSidebar}
+                                                    onChange={e => setShowParentSidebar(e.target.checked)}
+                                                    className="mt-0.5 h-4 w-4 accent-primary shrink-0"
+                                                />
+                                                <span className="flex flex-col">
+                                                    <span className="text-xs font-bold">Show parent widgets as sidebar</span>
+                                                    <span className="text-[10px] text-muted-foreground/70">On the public page, render the parent's widgets as a sticky left sidebar (read-only, opens the parent page when clicked).</span>
+                                                </span>
+                                            </label>
+                                        )}
                                     </div>
                                     <div className="space-y-1.5 pt-2">
                                         <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Tags</label>
@@ -1127,7 +1147,53 @@ const PageDesignerPage = () => {
                                     </select>
                                 </div>
                             </div>
-                            
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Icon (shown on public page)</label>
+                                <Input
+                                    value={iconSearch}
+                                    onChange={e => setIconSearch(e.target.value)}
+                                    placeholder="Search icons… e.g. rocket, server, chart"
+                                    className="h-9 text-sm bg-muted/30 border border-border/50 rounded-md" />
+                                {(() => {
+                                    const results = searchIcons(iconSearch);
+                                    return (
+                                        <>
+                                            <div className="flex flex-wrap gap-1.5 max-h-44 overflow-y-auto custom-scrollbar p-0.5">
+                                                <button
+                                                    type="button"
+                                                    title="Default (per type)"
+                                                    onClick={() => updateWidget(activeWidget.id, { icon: undefined })}
+                                                    className={cn(
+                                                        "h-8 w-8 rounded-md border flex items-center justify-center text-xs font-black transition-all shrink-0",
+                                                        !activeWidget.icon ? "border-primary bg-primary/10 text-primary" : "border-border/50 text-muted-foreground hover:bg-muted/40"
+                                                    )}>
+                                                    —
+                                                </button>
+                                                {results.map(name => (
+                                                    <button
+                                                        key={name}
+                                                        type="button"
+                                                        title={name}
+                                                        onClick={() => updateWidget(activeWidget.id, { icon: name })}
+                                                        className={cn(
+                                                            "h-8 w-8 rounded-md border flex items-center justify-center transition-all shrink-0",
+                                                            activeWidget.icon === name ? "border-primary bg-primary/10 text-primary" : "border-border/50 text-muted-foreground hover:bg-muted/40"
+                                                        )}>
+                                                        <WidgetIcon name={name} className="w-4 h-4" />
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <p className="text-[10px] text-muted-foreground/60 px-1">
+                                                {iconSearch.trim()
+                                                    ? (results.length >= 72 ? 'Showing first 72 matches — refine your search.' : `${results.length} match${results.length === 1 ? '' : 'es'}${activeWidget.icon ? ` · current: ${activeWidget.icon}` : ''}`)
+                                                    : `Popular icons · type to search all${activeWidget.icon ? ` · current: ${activeWidget.icon}` : ''}`}
+                                            </p>
+                                        </>
+                                    );
+                                })()}
+                            </div>
+
                             {activeWidget.type === 'SECTION' && (
                                 <div className="space-y-6">
                                     <div className="space-y-2">

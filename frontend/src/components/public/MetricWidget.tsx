@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Activity } from 'lucide-react';
+import { WidgetIcon } from '../../lib/widgetIcons';
 import { PageWidget } from '../../types';
 import { useDatasetAggregate } from '../page-designer/useDatasetAggregate';
 
@@ -54,7 +55,7 @@ const MetricWidget: React.FC<Props> = ({ widget, slug, pageToken }) => {
         <div className="bg-card border border-border rounded-md overflow-hidden shadow-sm h-full flex flex-col">
             <div className="flex items-center gap-4 px-6 py-3 border-b border-border bg-card">
                 <div className="p-2 rounded-md bg-emerald-500/10 text-emerald-500 ring-1 ring-emerald-500/20">
-                    <Activity className="w-4 h-4" />
+                    <WidgetIcon name={widget.icon} fallback={Activity} className="w-4 h-4" />
                 </div>
                 <span className="text-sm font-black truncate">{widget.title || 'Metric'}</span>
                 {loading && isDataset && (

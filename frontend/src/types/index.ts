@@ -361,6 +361,10 @@ export interface PageWidget {
     type: PageWidgetType;
     title: string;
     size: PageWidgetSize;
+    // Optional header icon shown on the public page. A lucide kebab-case icon name
+    // (e.g. "rocket", "chart-column"), loaded lazily via lib/widgetIcons. When unset,
+    // the widget falls back to its per-type default icon.
+    icon?: string;
     // TERMINAL-specific
     server_id?: string;
     server_name?: string;
@@ -418,9 +422,14 @@ export interface Page {
     title: string;
     description: string;
     parent_id?: string | null;
-    parent?: { id: string; title: string; slug: string; is_public?: boolean } | null;
+    // `layout` is only present when this page has show_parent_sidebar enabled — the
+    // backend strips it otherwise. Used to render the parent widgets sidebar.
+    parent?: { id: string; title: string; slug: string; is_public?: boolean; layout?: string } | null;
     slug: string;
     is_public: boolean;
+    // When true and a parent exists, the public page renders the parent's widgets as a
+    // sticky left sidebar (read-only, deep-linking back to the parent page).
+    show_parent_sidebar?: boolean;
     password?: string;
     token_ttl_minutes?: number;
     expires_at?: string;

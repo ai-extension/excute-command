@@ -99,6 +99,7 @@ func (s *PageService) UpdatePage(page *domain.Page, user *domain.User) error {
 		existing.Slug = page.Slug
 	}
 	existing.IsPublic = page.IsPublic
+	existing.ShowParentSidebar = page.ShowParentSidebar
 	existing.TokenTTLMinutes = page.TokenTTLMinutes
 	if page.ExpiresAt != nil {
 		existing.ExpiresAt = page.ExpiresAt

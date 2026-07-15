@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Terminal, X, ChevronDown, Maximize2 } from 'lucide-react';
+import { WidgetIcon } from '../../lib/widgetIcons';
 import { cn } from '../../lib/utils';
 import { PageWidget } from '../../types';
 import { API_BASE_URL } from '../../lib/api';
@@ -110,7 +111,7 @@ const TerminalWidget: React.FC<TerminalWidgetProps> = ({ widget, slug, pageToken
                             <Maximize2 className="w-1.5 h-1.5 text-black opacity-0 group-hover/btn:opacity-100" />
                         </button>
                     </div>
-                    <Terminal className="w-3.5 h-3.5 text-emerald-400" />
+                    <WidgetIcon name={widget.icon} fallback={Terminal} className="w-3.5 h-3.5 text-emerald-400" />
                     <span className="text-sm font-mono font-black text-zinc-100 uppercase tracking-[0.2em]">{widget.title}</span>
                 </div>
             </div>

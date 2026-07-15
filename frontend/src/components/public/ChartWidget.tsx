@@ -4,6 +4,7 @@ import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 import { BarChart3 } from 'lucide-react';
+import { WidgetIcon } from '../../lib/widgetIcons';
 import { PageWidget, SelectAggregation, AggregateFn } from '../../types';
 import { useDatasetAggregate, AggregateBucket } from '../page-designer/useDatasetAggregate';
 
@@ -168,7 +169,7 @@ const ChartWidget: React.FC<Props> = ({ widget, slug, pageToken }) => {
         <div className="bg-card border border-border rounded-md overflow-hidden shadow-sm h-full flex flex-col">
             <div className="flex items-center gap-4 px-6 py-3 border-b border-border bg-card">
                 <div className="p-2 rounded-md bg-cyan-500/10 text-cyan-500 ring-1 ring-cyan-500/20">
-                    <BarChart3 className="w-4 h-4" />
+                    <WidgetIcon name={widget.icon} fallback={BarChart3} className="w-4 h-4" />
                 </div>
                 <span className="text-sm font-black truncate">{widget.title || 'Chart'}</span>
                 {isSingleEmptyBucket && missingGroupBy && (

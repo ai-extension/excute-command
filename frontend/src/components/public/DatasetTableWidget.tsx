@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Table2 } from 'lucide-react';
+import { WidgetIcon } from '../../lib/widgetIcons';
 import { PageWidget, DatasetRecord, PageWidgetReload, SelectAggregation } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { API_BASE_URL } from '../../lib/api';
@@ -162,7 +163,7 @@ const DatasetTableWidget: React.FC<Props> = ({ widget, slug, pageToken }) => {
         <div className="bg-card border border-border rounded-md overflow-hidden shadow-sm h-full flex flex-col">
             <div className="flex items-center gap-4 px-6 py-3 border-b border-border bg-card">
                 <div className="p-2 rounded-md bg-orange-500/10 text-orange-500 ring-1 ring-orange-500/20">
-                    <Table2 className="w-4 h-4" />
+                    <WidgetIcon name={widget.icon} fallback={Table2} className="w-4 h-4" />
                 </div>
                 <span className="text-sm font-black truncate">{widget.title || 'Data Table'}</span>
                 {aggregateMode && (
