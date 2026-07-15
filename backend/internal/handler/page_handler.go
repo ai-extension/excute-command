@@ -849,10 +849,14 @@ func (h *PageHandler) sanitizePage(page *domain.Page) {
 			Slug:     page.Parent.Slug,
 			IsPublic: page.Parent.IsPublic,
 		}
-		// Expose the parent's layout only when opted in AND the parent is itself public —
-		// the sidebar deep-links to the parent's public page, and a private parent's layout
-		// must never leak to anonymous visitors of a public child page.
-		if page.ShowParentSidebar && page.Parent.IsPublic {
+		// Expose the parent's layout only when opted in AND the parent is freely viewable
+		// on its own: public, without a password, and not expired. This mirrors exactly what
+		// GetPublicPage would return for the parent to an anonymous visitor, so the sidebar
+		// can never bypass the parent's password gate or leak an expired/private layout.
+		parentViewable := page.Parent.IsPublic &&
+			page.Parent.Password == "" &&
+			(page.Parent.ExpiresAt == nil || page.Parent.ExpiresAt.After(time.Now()))
+		if page.ShowParentSidebar && parentViewable {
 			trimmed.Layout = page.Parent.Layout
 		}
 		page.Parent = trimmed
