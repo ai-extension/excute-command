@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { CalendarClock, Loader2, Repeat, ListChecks, Plus, Trash2 } from 'lucide-react';
+import { CalendarClock, Loader2, Repeat } from 'lucide-react';
 import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Textarea } from '../ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
-import { cn, generateUUID } from '../../lib/utils';
+import { cn } from '../../lib/utils';
 import { API_BASE_URL } from '../../lib/api';
-import { WorkflowInput, MultiInputItem } from '../../types';
+import { WorkflowInput } from '../../types';
+import { WorkflowInputFields, parseTemplateMap } from '../WorkflowInputFields';
 
 const MAX_REPEAT_DAYS = 10;
 
@@ -98,7 +97,9 @@ const PublicScheduleDialog: React.FC<{
             } else if (RICH_TYPES.has(inp.type)) {
                 seed[inp.key] = '';
             } else {
-                seed[inp.key] = inp.default_value || '';
+                // A template-map default_value is config (auto-fill), not a real value → start empty
+                // so the shared textarea renders blank instead of raw JSON (matches the run dialog).
+                seed[inp.key] = parseTemplateMap(inp.default_value) ? '' : (inp.default_value || '');
             }
         }
         const draft = loadDraft(storageKey, inputs);
@@ -117,8 +118,6 @@ const PublicScheduleDialog: React.FC<{
         setDate(''); setTime(''); setRepeat(false); setRepeatDays(3); setError(null);
     };
 
-    const setVal = (key: string, v: string) => setValues(prev => ({ ...prev, [key]: v }));
-
     // Native date/time pickers only open from the calendar icon by default; open on any click.
     const openPicker = (e: React.MouseEvent<HTMLInputElement>) => {
         try { (e.currentTarget as HTMLInputElement & { showPicker?: () => void }).showPicker?.(); } catch { /* unsupported */ }
@@ -133,11 +132,6 @@ const PublicScheduleDialog: React.FC<{
         } catch { /* legacy comma-joined draft */ }
         return (v || '').split(',').map(s => s.trim()).filter(Boolean);
     };
-    const toggleMulti = (key: string, opt: string) => {
-        const cur = parseMultiSelect(values[key] || '');
-        const next = cur.includes(opt) ? cur.filter(o => o !== opt) : [...cur, opt];
-        setVal(key, JSON.stringify(next));
-    };
 
     // multi-input value is a JSON array of row objects (same as WorkflowInputDialog).
     const parseRows = (v: string): Record<string, string>[] => {
@@ -147,31 +141,6 @@ const PublicScheduleDialog: React.FC<{
         } catch {
             return [];
         }
-    };
-    const parseMultiConfig = (defaultValue: string): MultiInputItem[] => {
-        try {
-            const cfg = JSON.parse(defaultValue || '[]');
-            if (Array.isArray(cfg)) return cfg;
-        } catch { /* fall through to comma-list form */ }
-        return (defaultValue || '').split(',').map(k => ({
-            id: generateUUID(), key: k.trim(), label: k.trim(), type: 'input' as const,
-        })).filter(c => c.key);
-    };
-    const updateRow = (key: string, rowIndex: number, field: string, v: string) => {
-        const rows = parseRows(values[key] || '');
-        if (!rows[rowIndex]) rows[rowIndex] = {};
-        rows[rowIndex][field] = v;
-        setVal(key, JSON.stringify(rows));
-    };
-    const addRow = (key: string) => {
-        const rows = parseRows(values[key] || '');
-        rows.push({});
-        setVal(key, JSON.stringify(rows));
-    };
-    const removeRow = (key: string, rowIndex: number) => {
-        const rows = parseRows(values[key] || '');
-        rows.splice(rowIndex, 1);
-        setVal(key, JSON.stringify(rows));
     };
 
     // Required-field emptiness, type-aware (a JSON "[]" must count as empty).
@@ -233,110 +202,9 @@ const PublicScheduleDialog: React.FC<{
         }
     };
 
-    const fieldCls = "w-full h-10 px-3 bg-muted/30 border border-border rounded-md text-sm outline-none focus:border-primary/50 focus:ring-2 ring-primary/20 transition-all";
-
-    const renderField = (inp: WorkflowInput) => {
-        const val = values[inp.key] || '';
-        if (inp.type === 'select') {
-            const opts = (inp.default_value || '').split(',').map(o => o.trim()).filter(Boolean);
-            return (
-                <select value={val} onChange={e => setVal(inp.key, e.target.value)} className={fieldCls}>
-                    <option value="">— Select —</option>
-                    {opts.map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
-            );
-        }
-        if (inp.type === 'multi-select') {
-            const opts = (inp.default_value || '').split(',').map(o => o.trim()).filter(Boolean);
-            const selected = parseMultiSelect(val);
-            return (
-                <div className="flex flex-wrap gap-1.5">
-                    {opts.map(o => {
-                        const on = selected.includes(o);
-                        return (
-                            <button
-                                key={o}
-                                type="button"
-                                onClick={() => toggleMulti(inp.key, o)}
-                                className={cn("px-2.5 h-8 rounded-md text-xs font-bold border transition-colors",
-                                    on ? "bg-primary/10 border-primary text-primary" : "border-border text-muted-foreground hover:bg-muted/40")}
-                            >
-                                {o}
-                            </button>
-                        );
-                    })}
-                    {opts.length === 0 && <span className="text-xs text-muted-foreground/60">No options configured</span>}
-                </div>
-            );
-        }
-        if (inp.type === 'multi-input') {
-            const rows = parseRows(val);
-            const config = parseMultiConfig(inp.default_value);
-            return (
-                <div className="space-y-2">
-                    {rows.map((row, rowIndex) => (
-                        <div key={rowIndex} className="group/row relative flex flex-wrap gap-2 p-2.5 bg-muted/30 border border-border rounded-md">
-                            {config.map(field => (
-                                <div key={field.key} className="flex flex-col gap-1 min-w-[160px] flex-1">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground truncate" title={field.label || field.key}>
-                                        {field.label || field.key}
-                                    </span>
-                                    {field.type === 'select' ? (
-                                        <select
-                                            value={row[field.key] || ''}
-                                            onChange={e => updateRow(inp.key, rowIndex, field.key, e.target.value)}
-                                            className="h-8 px-2 bg-background border border-border rounded-md text-xs outline-none focus:border-primary/50"
-                                        >
-                                            <option value="">— Select —</option>
-                                            {(field.options || '').split(',').map(o => o.trim()).filter(Boolean).map(o => (
-                                                <option key={o} value={o}>{o}</option>
-                                            ))}
-                                        </select>
-                                    ) : (
-                                        // file type has no upload infra in the schedule flow → plain text fallback
-                                        <Input
-                                            type={field.type === 'number' ? 'number' : 'text'}
-                                            value={row[field.key] || ''}
-                                            onChange={e => updateRow(inp.key, rowIndex, field.key, e.target.value)}
-                                            className="h-8 bg-background border-border rounded-md text-xs"
-                                            placeholder={field.type === 'file' ? `(${field.label || field.key}) enter value` : `Enter ${field.label || field.key}...`}
-                                        />
-                                    )}
-                                </div>
-                            ))}
-                            <button
-                                type="button"
-                                onClick={() => removeRow(inp.key, rowIndex)}
-                                className="absolute -right-2 -top-2 h-6 w-6 rounded-full bg-destructive text-white flex items-center justify-center opacity-0 group-hover/row:opacity-100 transition-opacity shadow-lg"
-                            >
-                                <Trash2 className="w-3 h-3" />
-                            </button>
-                        </div>
-                    ))}
-                    <button
-                        type="button"
-                        onClick={() => addRow(inp.key)}
-                        className="w-full h-8 flex items-center justify-center gap-1.5 border border-dashed border-primary/40 text-primary bg-primary/5 hover:bg-primary/10 text-[10px] font-bold uppercase tracking-widest rounded-md transition-colors"
-                    >
-                        <Plus className="w-3.5 h-3.5" /> Add Entry
-                    </button>
-                </div>
-            );
-        }
-        if (inp.type === 'textarea') {
-            return <Textarea value={val} onChange={e => setVal(inp.key, e.target.value)} rows={3} className="bg-muted/30 border-border rounded-md text-sm" placeholder={inp.default_value} />;
-        }
-        // input / number / and rich-type fallbacks → plain text (number gets numeric input)
-        return (
-            <Input
-                type={inp.type === 'number' ? 'number' : 'text'}
-                value={val}
-                onChange={e => setVal(inp.key, e.target.value)}
-                className="h-10 bg-muted/30 border-border rounded-md text-sm"
-                placeholder={RICH_TYPES.has(inp.type) ? `(${inp.type}) enter value` : inp.default_value}
-            />
-        );
-    };
+    // Match the shared WorkflowInputFields look (bg-background, h-9, text-xs) so the timing
+    // column and the workflow-inputs column read as one consistent form.
+    const fieldCls = "w-full h-9 px-3 bg-background border border-border rounded-md text-xs font-semibold outline-none focus:border-primary/50 focus:ring-2 ring-primary/20 transition-all";
 
     return (
         <Dialog open={open} onOpenChange={(o) => { if (!o) reset(); onOpenChange(o); }}>
@@ -386,21 +254,17 @@ const PublicScheduleDialog: React.FC<{
                         )}
                     </div>
 
-                    {/* Right: workflow inputs */}
+                    {/* Right: workflow inputs — shared renderer with the run-flow dialog.
+                        richFallback → file/dataset render as plain text (schedule posts JSON, no upload/picker). */}
                     {hasInputs && (
                         <div className="md:w-1/2 p-6 border-t md:border-t-0 md:border-l border-border space-y-4 md:overflow-y-auto custom-scrollbar bg-muted/10">
-                            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                                <ListChecks className="w-3.5 h-3.5" /> Workflow inputs
-                            </div>
-                            {sortedInputs.map(inp => (
-                                <div key={inp.id || inp.key} className="space-y-1.5">
-                                    <label className="text-xs font-bold flex items-center gap-1.5">
-                                        {inp.label || inp.key}
-                                        {inp.required && <span className="text-rose-500">*</span>}
-                                    </label>
-                                    {renderField(inp)}
-                                </div>
-                            ))}
+                            <WorkflowInputFields
+                                inputs={sortedInputs}
+                                values={values}
+                                setValues={setValues}
+                                richFallback
+                                showRequiredMark
+                            />
                         </div>
                     )}
                 </div>
