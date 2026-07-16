@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Terminal, Plus, Trash2, Database, Check, Copy, Zap, GripVertical } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { cn, generateUUID } from '../../lib/utils';
@@ -29,16 +29,48 @@ const DatasetInputConfigEditor: React.FC<{
     const { apiFetch } = useAuth();
     const { activeNamespace } = useNamespace();
     const [datasets, setDatasets] = useState<Dataset[]>([]);
+    // Datasets already resolved by reference, so the list fetch + the resolver
+    // below don't refetch or clobber each other.
+    const fetchedDatasetIdsRef = useRef<Set<string>>(new Set());
+
+    const cfg: DatasetInputConfig = parseDatasetInputConfig(defaultValue);
 
     useEffect(() => {
         if (!activeNamespace) return;
         apiFetch(`${API_BASE_URL}/namespaces/${activeNamespace.id}/datasets?limit=200`)
             .then(r => r.json())
-            .then(d => setDatasets(d.items || []))
+            .then(d => {
+                const items: Dataset[] = d.items || [];
+                // Merge instead of replace so a dataset resolved by reference is kept.
+                setDatasets(prev => {
+                    const m = new Map(prev.map(x => [x.id, x]));
+                    items.forEach(x => m.set(x.id, x));
+                    return Array.from(m.values());
+                });
+            })
             .catch(() => { });
     }, [activeNamespace?.id]);
 
-    const cfg: DatasetInputConfig = parseDatasetInputConfig(defaultValue);
+    // The list fetch only loads the first 200 datasets, so an input configured with a
+    // dataset outside that page renders blank (picker shows placeholder, no columns).
+    // Resolve the referenced dataset by id and merge it in.
+    useEffect(() => {
+        const did = cfg.dataset_id;
+        if (!did) return;
+        if (fetchedDatasetIdsRef.current.has(did) || datasets.some(d => d.id === did)) return;
+        fetchedDatasetIdsRef.current.add(did);
+        apiFetch(`${API_BASE_URL}/datasets/${did}`)
+            .then(res => (res.ok ? res.json() : null))
+            .then((ds: Dataset | null) => {
+                if (!ds) return;
+                setDatasets(prev => {
+                    const m = new Map(prev.map(x => [x.id, x]));
+                    m.set(ds.id, ds);
+                    return Array.from(m.values());
+                });
+            })
+            .catch(() => { });
+    }, [cfg.dataset_id, datasets]);
     const update = (patch: Partial<DatasetInputConfig>) =>
         onChange(serializeDatasetInputConfig({ ...cfg, ...patch }));
 

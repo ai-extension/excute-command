@@ -80,6 +80,10 @@ const WorkflowDesignerPage = () => {
     const [hooks, setHooks] = useState<WorkflowHook[]>([]);
     const [files, setFiles] = useState<WorkflowFile[]>([]);
     const [allWorkflows, setAllWorkflows] = useState<Workflow[]>([]);
+    // Namespace of the workflow being edited. The current workflow is deliberately
+    // excluded from allWorkflows, so its namespace can't be derived there; the DATASET
+    // step picker needs it to scope its dataset fetch.
+    const [wfNamespaceId, setWfNamespaceId] = useState<string | undefined>(undefined);
     const [defaultServerId, setDefaultServerId] = useState<string | undefined>(undefined);
     const [targetFolder, setTargetFolder] = useState<string>('');
     const [cleanupFiles, setCleanupFiles] = useState<boolean>(false);
@@ -242,6 +246,7 @@ const WorkflowDesignerPage = () => {
                     throw new Error(data.error || `Workflow fetch failed: ${response.status}`);
                 }
                 const data = await response.json();
+                setWfNamespaceId(data.namespace_id);
                 setName(data.name);
                 setDescription(data.description);
                 setAiGuide(data.ai_guide || '');
@@ -819,6 +824,7 @@ const WorkflowDesignerPage = () => {
                                             handleSearchServers={handleSearchServers}
                                             handleSearchWorkflows={handleSearchWorkflows}
                                             id={id}
+                                            namespaceId={wfNamespaceId || activeNamespace?.id}
                                         />
                                     ) : activeTab === 'files' ? (
                                         <div className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-300">

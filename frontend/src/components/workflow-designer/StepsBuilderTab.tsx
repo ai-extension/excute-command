@@ -113,6 +113,7 @@ interface StepsBuilderTabProps {
     handleSearchServers: (query: string) => void;
     handleSearchWorkflows: (query: string) => void;
     id: string | undefined;
+    namespaceId?: string;
 }
 
 export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
@@ -121,7 +122,8 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
     handleAddGroup,
     handleSearchServers,
     handleSearchWorkflows,
-    id
+    id,
+    namespaceId
 }) => {
     const [openSettingsGroupIdx, setOpenSettingsGroupIdx] = useState<number | null>(null);
     const [openTTYSettingsGroupIdx, setOpenTTYSettingsGroupIdx] = useState<number | null>(null);
@@ -140,7 +142,9 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
     // already used); those don't round-trip through dataset_payload because
     // serializePayloadRows drops empty keys. The draft keeps them alive on re-render.
     const [payloadDraft, setPayloadDraft] = useState<Record<string, PayloadRow[]>>({});
-    const nsId = parentWf?.namespace_id;
+    // The current workflow is excluded from allWorkflows, so parentWf is undefined
+    // while editing; fall back to the namespace passed down from the page.
+    const nsId = parentWf?.namespace_id ?? namespaceId;
     // Datasets already fetched by reference, so the list fetch below + the per-step
     // resolver don't refetch or clobber each other (groups changes every keystroke).
     const fetchedDatasetIdsRef = React.useRef<Set<string>>(new Set());
@@ -194,7 +198,6 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
             });
         });
     }, [nsId, groups, datasets]);
-    const parentInputs = parentWf?.inputs || [];
 
     return (
         <>
