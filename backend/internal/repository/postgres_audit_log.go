@@ -65,7 +65,29 @@ func (r *PostgresAuditLogRepo) List(namespaceID *uuid.UUID, resourceType *string
 	return logs, total, err
 }
 
+// deleteAuditBatchSize bounds each cleanup DELETE so a large backlog is drained in
+// chunks, keeping lock duration short instead of one table-wide delete.
+const deleteAuditBatchSize = 1000
+
 func (r *PostgresAuditLogRepo) DeleteOldLogs(days int) error {
+	if days <= 0 {
+		return nil
+	}
 	cutoff := time.Now().AddDate(0, 0, -days)
-	return r.db.Where("timestamp < ?", cutoff).Delete(&domain.AuditLog{}).Error
+	for {
+		res := r.db.Exec(`
+			DELETE FROM audit_logs
+			WHERE id IN (
+				SELECT id FROM audit_logs
+				WHERE timestamp < ?
+				LIMIT ?
+			)`, cutoff, deleteAuditBatchSize)
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			break
+		}
+	}
+	return nil
 }

@@ -738,3 +738,41 @@ func (r *PostgresWorkflowExecutionRepo) GetStatusesByIDs(ids []uuid.UUID) ([]dom
 		Find(&execs).Error
 	return execs, err
 }
+
+// deleteExecutionsBatchSize bounds each cleanup DELETE so a large backlog is drained in
+// chunks — keeping memory and lock duration bounded and avoiding Postgres' 65535 bind-
+// parameter limit that a single huge `IN (...)` would hit.
+const deleteExecutionsBatchSize = 500
+
+// DeleteExecutionsOlderThan hard-deletes executions started before the cutoff, in
+// batches. Each batch is a single `DELETE ... RETURNING id` over a LIMITed subquery: it
+// physically removes the rows (triggering the ON DELETE CASCADE on steps) and returns
+// the deleted IDs so the caller can drop their on-disk log directories. Loops until no
+// more rows match.
+func (r *PostgresWorkflowExecutionRepo) DeleteExecutionsOlderThan(days int) ([]uuid.UUID, error) {
+	if days <= 0 {
+		return nil, nil
+	}
+	cutoff := time.Now().AddDate(0, 0, -days)
+
+	var deleted []uuid.UUID
+	for {
+		var ids []uuid.UUID
+		err := r.db.Raw(`
+			DELETE FROM workflow_executions
+			WHERE id IN (
+				SELECT id FROM workflow_executions
+				WHERE started_at < ?
+				LIMIT ?
+			)
+			RETURNING id`, cutoff, deleteExecutionsBatchSize).Scan(&ids).Error
+		if err != nil {
+			return deleted, err
+		}
+		if len(ids) == 0 {
+			break
+		}
+		deleted = append(deleted, ids...)
+	}
+	return deleted, nil
+}

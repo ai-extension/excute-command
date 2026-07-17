@@ -354,6 +354,80 @@ const SettingsPage = () => {
                                 </div>
                             </CardContent>
                         </Card>
+
+                        <Card className="bg-card border-border shadow-card overflow-hidden">
+                            <CardHeader className="border-b border-border bg-muted/10 p-6">
+                                <CardTitle className="text-xl font-black tracking-tight">Log Retention</CardTitle>
+                                <CardDescription className="text-xs font-medium opacity-70">Automatically clear old logs after a number of days. Leave empty or 0 to keep them forever.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="p-6 space-y-8">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    {/* Execution log retention */}
+                                    <div className="space-y-4">
+                                        <div className="space-y-1">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest text-primary/60">Execution Log Retention (days)</Label>
+                                            <p className="text-[10px] font-medium text-muted-foreground/60">Delete execution logs (records and log files) older than this. Empty or 0 = never clear.</p>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Input
+                                                type="number"
+                                                min="0"
+                                                value={systemSettings.execution_log_retention_days || ''}
+                                                onChange={(e) => setSystemSettings(prev => ({ ...prev, execution_log_retention_days: e.target.value }))}
+                                                placeholder="0"
+                                                className="h-9 bg-muted/20 border-border/50 text-sm font-bold"
+                                            />
+                                            <Button
+                                                onClick={() => updateSetting('execution_log_retention_days', systemSettings.execution_log_retention_days || '')}
+                                                className="premium-gradient px-6 font-black uppercase tracking-widest text-[10px] h-9"
+                                                disabled={isSettingsLoading}
+                                            >
+                                                Apply
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    {/* Audit log retention */}
+                                    <div className="space-y-4">
+                                        <div className="space-y-1">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest text-primary/60">Audit Log Retention (days)</Label>
+                                            <p className="text-[10px] font-medium text-muted-foreground/60">Delete audit logs older than this. Empty or 0 = never clear.</p>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Input
+                                                type="number"
+                                                min="0"
+                                                value={systemSettings.audit_log_retention_days || ''}
+                                                onChange={(e) => setSystemSettings(prev => ({ ...prev, audit_log_retention_days: e.target.value }))}
+                                                placeholder="0"
+                                                className="h-9 bg-muted/20 border-border/50 text-sm font-bold"
+                                            />
+                                            <Button
+                                                onClick={() => updateSetting('audit_log_retention_days', systemSettings.audit_log_retention_days || '')}
+                                                className="premium-gradient px-6 font-black uppercase tracking-widest text-[10px] h-9"
+                                                disabled={isSettingsLoading}
+                                            >
+                                                Apply
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="pt-6 border-t border-border">
+                                    <div className="p-4 bg-destructive/5 border border-destructive/10 rounded-md flex items-start gap-4">
+                                        <div className="p-2 rounded-md bg-destructive/10">
+                                            <Trash2 className="w-4 h-4 text-destructive" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <h4 className="text-xs font-black uppercase tracking-widest text-destructive">Irreversible</h4>
+                                            <p className="text-[10px] font-medium text-muted-foreground opacity-80 max-w-2xl">
+                                                Cleanup runs once a day (and on server start). Deleted logs and their files cannot be recovered.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
                     </div>
                 )}
 

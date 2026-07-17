@@ -147,6 +147,10 @@ func main() {
 		log.Printf("[Main] Failed to cleanup zombie executions: %v", err)
 	}
 
+	// Start log retention cleanup (execution + audit logs). No-op unless the
+	// corresponding retention-days settings are configured to a positive value.
+	service.NewRetentionService(settingsService, execRepo, auditLogService).Start()
+
 	// Initialize Handlers
 	namespaceHandler := handler.NewNamespaceHandler(namespaceRepo, auditLogService)
 	authHandler := handler.NewAuthHandler(authService, auditLogService)

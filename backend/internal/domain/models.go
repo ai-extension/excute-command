@@ -575,6 +575,10 @@ type WorkflowExecutionRepository interface {
 	CleanupInterruptedExecutions() error
 	GetRunningExecutions() ([]WorkflowExecution, error)
 	GetStatusesByIDs(ids []uuid.UUID) ([]WorkflowExecution, error)
+	// DeleteExecutionsOlderThan hard-deletes executions whose started_at is older than
+	// `days` days (steps cascade). Returns the deleted execution IDs so the caller can
+	// remove their on-disk log directories.
+	DeleteExecutionsOlderThan(days int) ([]uuid.UUID, error)
 }
 
 type GlobalVariableRepository interface {
