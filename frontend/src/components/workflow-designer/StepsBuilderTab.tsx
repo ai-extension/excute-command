@@ -1022,7 +1022,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                             <option value="WORKFLOW">Workflow</option>
                                                                                             <option value="HTTP">HTTP Request</option>
                                                                                             <option value="DATASET">Dataset</option>
-                                                                                            <option value="CONVERT">Convert → JSON</option>
+                                                                                            <option value="CONVERT">Convert</option>
                                                                                         </select>
                                                                                     </div>
                                                                                     <div className="col-span-7 space-y-3">
@@ -1362,9 +1362,9 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                                 <div className="space-y-2">
                                                                                                                     {fields.map((f, fi) => (
                                                                                                                         <div key={fi} className="space-y-1.5 bg-background/60 border border-border/50 rounded-md p-2.5">
-                                                                                                                            {/* Row 1: field name + remove */}
+                                                                                                                            {/* Row 1: output key + remove */}
                                                                                                                             <div className="flex items-center gap-1.5">
-                                                                                                                                <Input value={f.name || ''} placeholder="output field name"
+                                                                                                                                <Input value={f.name || ''} placeholder="output key"
                                                                                                                                     onChange={(e) => writeFields(fields.map((x, i) => i === fi ? { ...x, name: e.target.value } : x))}
                                                                                                                                     className="h-8 flex-1 text-[11px] font-mono bg-background border-border" />
                                                                                                                                 <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0 rounded-md hover:bg-destructive/10 hover:text-destructive"
