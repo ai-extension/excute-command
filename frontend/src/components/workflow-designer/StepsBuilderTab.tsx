@@ -947,7 +947,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                 ref={provided.innerRef}
                                                                                 {...provided.draggableProps}
                                                                                 className={cn(
-                                                                                    "flex items-center gap-4 p-4 rounded-md border transition-all group/step",
+                                                                                    "flex items-start gap-4 p-4 rounded-md border transition-all group/step",
                                                                                     snapshot.isDragging ? "bg-card border-primary/40 shadow-lg" : "bg-background/50 border-border/50 hover:bg-background"
                                                                                 )}
                                                                             >
@@ -960,9 +960,9 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                 <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center text-muted-foreground font-bold text-[10px] shrink-0 border border-border">
                                                                                     {sIdx + 1}
                                                                                 </div>
-                                                                                <div className="flex-1 grid grid-cols-12 gap-3">
+                                                                                <div className="flex-1 grid grid-cols-12 gap-3 items-start">
                                                                                     <div className="col-span-3 space-y-1">
-                                                                                        <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Action Label</label>
+                                                                                        <label className="block text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Action Label</label>
                                                                                         <Input
                                                                                             value={step.name}
                                                                                             onChange={(e) => {
@@ -974,7 +974,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                         />
                                                                                         <div className="space-y-0.5 mt-1">
                                                                                             <div className="flex items-center gap-1">
-                                                                                                <span className="text-[9px] font-mono text-muted-foreground/50">Output Key:</span>
+                                                                                                <span className="text-[9px] font-mono text-muted-foreground/50">Key:</span>
                                                                                                 <Input
                                                                                                     value={step.action_key || ''}
                                                                                                     onChange={(e) => {
@@ -993,8 +993,9 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                             )}
                                                                                         </div>
                                                                                     </div>
-                                                                                    <div className="col-span-2 space-y-1">
-                                                                                        <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Type</label>
+                                                                                    <div className="col-span-9 space-y-4">
+                                                                                        <div className="space-y-1">
+                                                                                        <label className="block text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Type</label>
                                                                                         <select
                                                                                             value={step.action_type || 'COMMAND'}
                                                                                             onChange={(e) => {
@@ -1016,7 +1017,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                 }
                                                                                                 setGroups(ng);
                                                                                             }}
-                                                                                            className="h-8 px-2 w-full text-xs font-semibold border border-border rounded-md bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 cursor-pointer"
+                                                                                            className="h-8 px-2 w-48 text-xs font-medium border border-border rounded-md bg-muted/50 text-foreground outline-none focus:ring-1 focus:ring-primary/30 cursor-pointer"
                                                                                         >
                                                                                             <option value="COMMAND">Command</option>
                                                                                             <option value="WORKFLOW">Workflow</option>
@@ -1025,7 +1026,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                             <option value="CONVERT">Convert</option>
                                                                                         </select>
                                                                                     </div>
-                                                                                    <div className="col-span-7 space-y-3">
+                                                                                    <div className="space-y-3">
                                                                                         {(!step.action_type || step.action_type === 'COMMAND') ? (
                                                                                             <div className="space-y-1">
                                                                                                 <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Execution Sequence</label>
@@ -1666,6 +1667,7 @@ export const StepsBuilderTab: React.FC<StepsBuilderTabProps> = ({
                                                                                                 </div>
                                                                                             </div>
                                                                                         )}
+                                                                                    </div>
                                                                                     </div>
                                                                                 </div>
                                                                                 <Button
