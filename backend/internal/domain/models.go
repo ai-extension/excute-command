@@ -269,6 +269,7 @@ type Workflow struct {
 	TriggerSource     string             `json:"trigger_source,omitempty" gorm:"size:50"` // For templates or specific defaults
 	Inputs            []WorkflowInput    `json:"inputs,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnDelete:CASCADE;"`
 	Variables         []WorkflowVariable `json:"variables,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnDelete:CASCADE;"`
+	Outputs           []WorkflowOutput   `json:"outputs,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnDelete:CASCADE;"`
 	Groups            []WorkflowGroup    `json:"groups,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnDelete:CASCADE;"`
 	Tags              []Tag              `json:"tags,omitempty" gorm:"many2many:workflow_tags;constraint:OnDelete:CASCADE;"`
 	Files             []WorkflowFile     `json:"files,omitempty" gorm:"foreignKey:WorkflowID;constraint:OnDelete:CASCADE;"`
@@ -375,6 +376,21 @@ type WorkflowInput struct {
 	Order        int       `json:"order" gorm:"default:0"`
 	CreatedAt    time.Time `json:"created_at" gorm:"<-:create"`
 	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+// WorkflowOutput declares one field of a workflow's Result contract. `Source` is a
+// template (e.g. "{{ flow.groupKey.step.actionKey.field }}") rendered against the final
+// execution flow-data; `Key` is the public name callers/widgets bind to. The rendered
+// values are assembled into the WorkflowExecution.Result envelope { status, result }.
+type WorkflowOutput struct {
+	ID          uuid.UUID `json:"id" gorm:"type:uuid;primaryKey"`
+	WorkflowID  uuid.UUID `json:"workflow_id" gorm:"type:uuid;index;constraint:OnDelete:CASCADE;"`
+	Key         string    `json:"key" gorm:"not null"`
+	Source      string    `json:"source" gorm:"not null;default:''"`
+	Description string    `json:"description" gorm:"default:''"`
+	Order       int       `json:"order" gorm:"default:0"`
+	CreatedAt   time.Time `json:"created_at" gorm:"<-:create"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 type WorkflowVariable struct {
@@ -492,6 +508,10 @@ type WorkflowExecution struct {
 	APIKeyID          *uuid.UUID              `json:"api_key_id,omitempty" gorm:"type:uuid;index"`
 	User              *User                   `json:"user,omitempty" gorm:"foreignKey:ExecutedBy"`
 	LogPath           string                  `json:"log_path"`
+	// Result holds the JSON envelope produced from the workflow's declared outputs:
+	// {"status":"success|failed","result":{"<output key>":<value>}}. Empty when the
+	// workflow declares no outputs. Consumed by parent WORKFLOW steps and result widgets.
+	Result            string                  `json:"result" gorm:"type:text"`
 	StartedAt         time.Time               `json:"started_at"`
 	FinishedAt        *time.Time              `json:"finished_at,omitempty"`
 	CreatedAt         time.Time               `json:"created_at" gorm:"<-:create"`
@@ -579,6 +599,9 @@ type WorkflowExecutionRepository interface {
 	// `days` days (steps cascade). Returns the deleted execution IDs so the caller can
 	// remove their on-disk log directories.
 	DeleteExecutionsOlderThan(days int) ([]uuid.UUID, error)
+	// GetLatestResult returns the most recent execution of a workflow that produced a
+	// non-empty Result envelope, or (nil, nil) when none exists.
+	GetLatestResult(workflowID uuid.UUID) (*WorkflowExecution, error)
 }
 
 type GlobalVariableRepository interface {

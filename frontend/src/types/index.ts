@@ -162,6 +162,7 @@ export interface Workflow {
     timeout_minutes?: number;
     inputs?: WorkflowInput[];
     variables?: WorkflowVariable[];
+    outputs?: WorkflowOutput[];
     groups?: WorkflowGroup[];
     tags?: Tag[];
     files?: WorkflowFile[];
@@ -247,6 +248,20 @@ export interface WorkflowInput {
     order?: number;
     created_at: string;
     updated_at: string;
+}
+
+// A declared field of a workflow's Result contract. `source` is a template
+// (e.g. "{{ flow.groupKey.step.actionKey.field }}") rendered at the end of execution;
+// `key` is the public name callers/widgets bind to.
+export interface WorkflowOutput {
+    id: string;
+    workflow_id: string;
+    key: string;
+    source: string;
+    description?: string;
+    order?: number;
+    created_at?: string;
+    updated_at?: string;
 }
 
 export interface WorkflowVariable {

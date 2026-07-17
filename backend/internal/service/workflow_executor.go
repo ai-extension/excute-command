@@ -745,6 +745,12 @@ finalize:
 		e.RunHooks(ctx, wf.Hooks, domain.HookTypeAfterSuccess, wf.NamespaceID, logFile, depth, execution.User, execution.ID, fromExecutionID, inputsMap, wf.Variables, flowData)
 	}
 
+	// Build the Result envelope from the workflow's declared outputs (opt-in: only
+	// when at least one output is declared). Rendered against the final flow-data.
+	if len(wf.Outputs) > 0 {
+		execution.Result = e.buildWorkflowResult(wf, flowData, execution.Status, inputsMap, execution)
+	}
+
 	e.execRepo.Update(execution)
 	wf.Status = execution.Status
 	e.wfRepo.UpdateStatus(wf.ID, execution.Status)
@@ -2264,6 +2270,13 @@ func (e *WorkflowExecutor) runWorkflowStep(ctx context.Context, step *domain.Wor
 	successMsg := "\033[1;32m✔ Workflow step completed successfully\033[0m\n"
 	fmt.Fprint(mainLogFile, successMsg)
 	fmt.Fprint(stepLogFile, successMsg)
+
+	// Surface the child workflow's Result envelope as this step's output so parent steps
+	// can reuse it via templating (e.g. {{ flow.groupKey.step.actionKey.result.foo }}).
+	// Falls back to "success" when the child declares no outputs.
+	if child, gerr := e.execRepo.GetByID(hookExecID, nil); gerr == nil && child != nil && strings.TrimSpace(child.Result) != "" {
+		return child.Result, nil
+	}
 	return "success", nil
 }
 
@@ -2424,6 +2437,47 @@ func (e *WorkflowExecutor) renderTemplate(templateStr string, ctx pongo2.Context
 		return "", fmt.Errorf("template syntax error: %w", err)
 	}
 	return tpl.Execute(ctx)
+}
+
+// buildWorkflowResult renders each declared output's Source template against the final
+// flow-data and assembles the Result envelope {"status":...,"result":{...}} as a JSON
+// string. A value that renders to valid JSON is stored typed (number/object/bool);
+// otherwise it is kept as the raw string. A render error yields an empty string for that
+// key (never fails the workflow). Status is normalized to "success"/"failed".
+func (e *WorkflowExecutor) buildWorkflowResult(wf *domain.Workflow, flowData map[string]interface{}, status domain.Status, inputsMap map[string]string, execution *domain.WorkflowExecution) string {
+	result := make(map[string]interface{})
+	pcontext := e.getInterpolationContext(inputsMap, wf.Variables, flowData, wf.NamespaceID, execution.User, nil, -1, uuid.Nil, execution.ID)
+	for _, out := range wf.Outputs {
+		if out.Key == "" {
+			continue
+		}
+		rendered, err := e.renderTemplate(out.Source, pcontext)
+		if err != nil {
+			e.hub.BroadcastLog(wf.ID.String(), execution.ID.String(), fmt.Sprintf("\033[1;33m⚠ Output %q render error: %v\033[0m", out.Key, err))
+			result[out.Key] = ""
+			continue
+		}
+		trimmed := strings.TrimSpace(rendered)
+		var parsed interface{}
+		dec := json.NewDecoder(strings.NewReader(trimmed))
+		dec.UseNumber()
+		if trimmed != "" && dec.Decode(&parsed) == nil {
+			result[out.Key] = parsed
+		} else {
+			result[out.Key] = rendered
+		}
+	}
+
+	statusStr := "failed"
+	if status == domain.StatusSuccess {
+		statusStr = "success"
+	}
+	envelope := map[string]interface{}{"status": statusStr, "result": result}
+	b, err := json.Marshal(envelope)
+	if err != nil {
+		return ""
+	}
+	return string(b)
 }
 
 func (e *WorkflowExecutor) getInterpolationContext(inputs map[string]string, variables []domain.WorkflowVariable, flowData map[string]interface{}, namespaceID uuid.UUID, user *domain.User, item interface{}, index int, targetServerID uuid.UUID, execID uuid.UUID) pongo2.Context {

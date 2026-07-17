@@ -62,6 +62,13 @@ func (s *WorkflowService) CreateWorkflow(wf *domain.Workflow, user *domain.User)
 		wf.Variables[i].WorkflowID = wf.ID
 	}
 
+	for i := range wf.Outputs {
+		if wf.Outputs[i].ID == uuid.Nil {
+			wf.Outputs[i].ID = uuid.New()
+		}
+		wf.Outputs[i].WorkflowID = wf.ID
+	}
+
 	for i := range wf.Groups {
 		if wf.Groups[i].ID == uuid.Nil {
 			wf.Groups[i].ID = uuid.New()
@@ -219,6 +226,12 @@ func (s *WorkflowService) GetExecution(id uuid.UUID, user *domain.User) (*domain
 	return s.execRepo.GetByID(id, &scope)
 }
 
+// GetLatestResult returns the most recent execution of a workflow that produced a
+// Result envelope (nil when none). Access is gated by the route-level RBAC middleware.
+func (s *WorkflowService) GetLatestResult(workflowID uuid.UUID) (*domain.WorkflowExecution, error) {
+	return s.execRepo.GetLatestResult(workflowID)
+}
+
 // GetExecutionStatuses returns lightweight status rows for a set of execution IDs in
 // one query. Caller is responsible for any ownership/visibility filtering.
 func (s *WorkflowService) GetExecutionStatuses(ids []uuid.UUID) ([]domain.WorkflowExecution, error) {
@@ -374,6 +387,9 @@ func (s *WorkflowService) resetWorkflowIDs(wf *domain.Workflow) {
 	}
 	for i := range wf.Variables {
 		wf.Variables[i].ID = uuid.Nil
+	}
+	for i := range wf.Outputs {
+		wf.Outputs[i].ID = uuid.Nil
 	}
 	for i := range wf.Groups {
 		wf.Groups[i].ID = uuid.Nil

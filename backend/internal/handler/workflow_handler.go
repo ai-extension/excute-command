@@ -447,6 +447,34 @@ func (h *WorkflowHandler) GetExecution(c *gin.Context) {
 	c.JSON(http.StatusOK, execution)
 }
 
+// GetLatestResult returns the Result envelope of the most recent execution of a workflow
+// that produced one. Intended for result widgets and external consumers polling for the
+// freshest workflow output. Returns result: null when the workflow has never produced a
+// Result (no declared outputs, or never run successfully).
+func (h *WorkflowHandler) GetLatestResult(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	exec, err := h.service.GetLatestResult(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if exec == nil {
+		c.JSON(http.StatusOK, gin.H{"result": nil})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"execution_id": exec.ID,
+		"finished_at":  exec.FinishedAt,
+		"result":       json.RawMessage(exec.Result),
+	})
+}
+
 // serveLogFile streams a log file to the client incrementally. Two layers buffer
 // a streamed response and must each be told not to:
 //   - X-Accel-Buffering: no — the production nginx reverse proxy defaults to

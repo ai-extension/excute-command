@@ -15,6 +15,7 @@ import {
     Pencil,
     Info,
     Download,
+    FileOutput,
     Upload,
     ClipboardPaste,
     AlertCircle,
@@ -38,6 +39,7 @@ import {
     Tag,
     WorkflowInput,
     WorkflowVariable,
+    WorkflowOutput,
     Server as ServerType,
     WorkflowHook
 } from '../types';
@@ -48,6 +50,7 @@ import HookManager from '../components/HookManager';
 import WorkflowHistory from '../components/WorkflowHistory';
 import { GeneralSettingsTab } from '../components/workflow-designer/GeneralSettingsTab';
 import { VariablesTab } from '../components/workflow-designer/VariablesTab';
+import { OutputsTab } from '../components/workflow-designer/OutputsTab';
 import { StepsBuilderTab } from '../components/workflow-designer/StepsBuilderTab';
 import { Switch } from '../components/ui/switch';
 import {
@@ -73,10 +76,11 @@ const WorkflowDesignerPage = () => {
     const [tags, setTags] = useState<Tag[]>([]);
     const [inputs, setInputs] = useState<Partial<WorkflowInput>[]>([]);
     const [variables, setVariables] = useState<Partial<WorkflowVariable>[]>([]);
+    const [outputs, setOutputs] = useState<Partial<WorkflowOutput>[]>([]);
     const [groups, setGroups] = useState<Partial<WorkflowGroup>[]>([]);
     const [availableServers, setAvailableServers] = useState<ServerType[]>([]);
     const [isSaving, setIsSaving] = useState(false);
-    const [activeTab, setActiveTab] = useState<'general' | 'steps' | 'variables' | 'files' | 'hooks' | 'history' | 'audit'>('general');
+    const [activeTab, setActiveTab] = useState<'general' | 'steps' | 'variables' | 'result' | 'files' | 'hooks' | 'history' | 'audit'>('general');
     const [hooks, setHooks] = useState<WorkflowHook[]>([]);
     const [files, setFiles] = useState<WorkflowFile[]>([]);
     const [allWorkflows, setAllWorkflows] = useState<Workflow[]>([]);
@@ -300,6 +304,10 @@ const WorkflowDesignerPage = () => {
                     ...v,
                     id: v.id || generateUUID()
                 })));
+                setOutputs((data.outputs || []).map((o: WorkflowOutput) => ({
+                    ...o,
+                    id: o.id || generateUUID()
+                })));
                 setHooks(data.hooks || []);
                 setFiles(data.files || []);
             } catch (error) {
@@ -346,6 +354,7 @@ const WorkflowDesignerPage = () => {
                 tags,
                 inputs: inputs.filter(i => i.key?.trim()).map((i, idx) => ({ ...i, order: idx })),
                 variables: variables.filter(v => v.key?.trim()).map((v, idx) => ({ ...v, order: idx })),
+                outputs: outputs.filter(o => o.key?.trim()).map((o, idx) => ({ ...o, order: idx })),
                 groups: groups.map((g: Partial<WorkflowGroup>, gIdx: number) => ({
                     ...g,
                     default_server_id: g.default_server_id || undefined,
@@ -434,6 +443,7 @@ const WorkflowDesignerPage = () => {
             tags,
             inputs,
             variables,
+            outputs,
             groups,
             hooks
         });
@@ -736,6 +746,15 @@ const WorkflowDesignerPage = () => {
                                             <Database className="w-3 h-3" /> Variables
                                         </button>
                                         <button
+                                            onClick={() => setActiveTab('result')}
+                                            className={cn(
+                                                "flex items-center gap-2 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all",
+                                                activeTab === 'result' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                                            )}
+                                        >
+                                            <FileOutput className="w-3 h-3" /> Result
+                                        </button>
+                                        <button
                                             onClick={() => setActiveTab('files')}
                                             className={cn(
                                                 "flex items-center gap-2 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all",
@@ -812,6 +831,13 @@ const WorkflowDesignerPage = () => {
                                             copyToClipboard={copyToClipboard}
                                             copiedKey={copiedKey}
                                             handleDragEnd={handleDragEnd}
+                                        />
+                                    ) : activeTab === 'result' ? (
+                                        <OutputsTab
+                                            outputs={outputs}
+                                            setOutputs={setOutputs}
+                                            copyToClipboard={copyToClipboard}
+                                            copiedKey={copiedKey}
                                         />
                                     ) : activeTab === 'steps' ? (
                                         <StepsBuilderTab

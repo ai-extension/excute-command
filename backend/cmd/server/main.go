@@ -65,6 +65,7 @@ func main() {
 		&domain.WorkflowStep{},
 		&domain.WorkflowInput{},
 		&domain.WorkflowVariable{},
+		&domain.WorkflowOutput{},
 		&domain.WorkflowExecution{},
 		&domain.WorkflowExecutionStep{},
 		&domain.GlobalVariable{},
@@ -277,6 +278,7 @@ func main() {
 			protected.GET("/workflow-files/:file_id/download", middleware.RBACMiddleware(db, userRepo, "workflows", "READ"), workflowFileHandler.Download)
 
 			protected.GET("/workflows/:id/executions", middleware.RBACMiddleware(db, userRepo, "workflows", "READ"), workflowHandler.ListExecutions)
+			protected.GET("/workflows/:id/latest-result", middleware.RBACMiddleware(db, userRepo, "workflows", "READ"), workflowHandler.GetLatestResult)
 			protected.GET("/executions/:exec_id", middleware.RBACMiddleware(db, userRepo, "workflows", "READ"), workflowHandler.GetExecution)
 			protected.POST("/executions/:exec_id/stop", middleware.RBACMiddleware(db, userRepo, "workflows", "EXECUTE"), workflowHandler.StopExecution)
 			protected.GET("/executions/:exec_id/logs", middleware.RBACMiddleware(db, userRepo, "workflows", "READ"), workflowHandler.GetExecutionLogs)

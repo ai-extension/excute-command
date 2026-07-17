@@ -27,6 +27,7 @@ func (r *PostgresWorkflowRepo) GetByID(id uuid.UUID, scope *domain.PermissionSco
 	err := db.
 		Preload("Inputs", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
 		Preload("Variables", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
+		Preload("Outputs", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
 		Preload("DefaultServer").
 		Preload("Groups", func(db *gorm.DB) *gorm.DB { return db.Order("\"order\" ASC") }).
 		Preload("Groups.DefaultServer").
@@ -187,6 +188,22 @@ func (r *PostgresWorkflowRepo) Update(wf *domain.Workflow) error {
 				}
 			}
 			if err := tx.Model(wf).Association("Variables").Replace(wf.Variables); err != nil {
+				return err
+			}
+		}
+
+		// Sync Outputs
+		if wf.Outputs != nil {
+			for i := range wf.Outputs {
+				if wf.Outputs[i].ID == uuid.Nil {
+					wf.Outputs[i].ID = uuid.New()
+				}
+				wf.Outputs[i].WorkflowID = wf.ID
+				if err := tx.Save(&wf.Outputs[i]).Error; err != nil {
+					return err
+				}
+			}
+			if err := tx.Model(wf).Association("Outputs").Replace(wf.Outputs); err != nil {
 				return err
 			}
 		}
@@ -775,4 +792,19 @@ func (r *PostgresWorkflowExecutionRepo) DeleteExecutionsOlderThan(days int) ([]u
 		deleted = append(deleted, ids...)
 	}
 	return deleted, nil
+}
+
+func (r *PostgresWorkflowExecutionRepo) GetLatestResult(workflowID uuid.UUID) (*domain.WorkflowExecution, error) {
+	var exec domain.WorkflowExecution
+	err := r.db.
+		Where("workflow_id = ? AND result <> ''", workflowID).
+		Order("started_at DESC").
+		Take(&exec).Error
+	if err == gorm.ErrRecordNotFound {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &exec, nil
 }
