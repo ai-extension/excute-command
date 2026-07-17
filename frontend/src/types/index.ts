@@ -319,7 +319,7 @@ export interface PageWorkflow {
     workflow?: Workflow;
 }
 
-export type PageWidgetSize = 'full' | 'half' | 'third';
+export type PageWidgetSize = '1/6' | '2/6' | '3/6' | '4/6' | '5/6' | 'full';
 export type PageWidgetType = 'TERMINAL' | 'ENDPOINT' | 'LINK' | 'SECTION' | 'TEXT' | 'IMAGE' | 'IFRAME' | 'STATUS' | 'TABLE' | 'CHART' | 'METRIC' | 'GAUGE' | 'PROGRESS' | 'STAT_GRID' | 'SPARKLINE';
 export type PageWidgetReload = 'realtime' | '5' | '10' | '30' | '60';
 export type ChartKind = 'line' | 'bar' | 'pie' | 'area';
@@ -423,6 +423,10 @@ export interface PageWidget {
     progress_target?: number; // default 100
     // SECTION nesting — id of parent SECTION widget (top-level when undefined)
     parent_id?: string;
+    // SECTION-specific: when true, hide the section header (title + description) so only
+    // the frame and its child widgets render. Child widgets size relative to the section's
+    // own width (see PublicPageView / PageDesignerPage container-query layout).
+    hide_header?: boolean;
 }
 
 export interface PageLayout {

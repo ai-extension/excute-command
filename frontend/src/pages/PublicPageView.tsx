@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { cn, copyToClipboard as clipboardCopy } from '../lib/utils';
 import { WidgetIcon } from '../lib/widgetIcons';
+import { topWidthClass, childWidthClass } from '../lib/widgetSizes';
 import { Page, PageWidget, PageLayout, WorkflowInput } from '../types';
 import { Button } from '../components/ui/button';
 import WorkflowInputDialog from '../components/WorkflowInputDialog';
@@ -770,8 +771,11 @@ const PublicPageView = () => {
                                 return null;
                             };
 
-                            const widthFor = (widget: PageWidget) =>
-                                widget.size === 'half' ? "w-full md:w-[calc(50%-10px)]" : widget.size === 'third' ? "w-full md:w-[calc((100%-40px)/3)]" : "w-full";
+                            // Top-level / section frame width (viewport-responsive). Section children
+                            // size as a fraction of the SECTION's own width (see childWidthClass);
+                            // a min-width floor makes them wrap down when the section is too narrow.
+                            const widthFor = (widget: PageWidget) => topWidthClass(widget.size);
+                            const childWidthFor = (widget: PageWidget) => childWidthClass(widget.size);
 
                             const topLevel = widgets.filter(w => !w.parent_id);
 
@@ -781,23 +785,25 @@ const PublicPageView = () => {
                                     const visibleChildren = children.filter(matchesSearch);
                                     if (!matchesSearch(widget) && visibleChildren.length === 0) return null;
                                     return (
-                                        <div key={widget.id} className="w-full">
-                                            <div className="pt-4 pb-3 border-b-2 border-border/50 mb-6">
-                                                <h2 className="text-2xl font-black flex items-center gap-2.5">
-                                                    {widget.icon && <WidgetIcon name={widget.icon} className="w-6 h-6 text-primary" />}
-                                                    {widget.title || 'Section Header'}
-                                                </h2>
-                                                {widget.description && (
-                                                    <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{widget.description}</p>
-                                                )}
-                                            </div>
+                                        <div key={widget.id} className={widthFor(widget)}>
+                                            {!widget.hide_header && (
+                                                <div className="pt-4 pb-3 border-b-2 border-border/50 mb-6">
+                                                    <h2 className="text-2xl font-black flex items-center gap-2.5">
+                                                        {widget.icon && <WidgetIcon name={widget.icon} className="w-6 h-6 text-primary" />}
+                                                        {widget.title || 'Section Header'}
+                                                    </h2>
+                                                    {widget.description && (
+                                                        <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{widget.description}</p>
+                                                    )}
+                                                </div>
+                                            )}
                                             {visibleChildren.length > 0 && (
                                                 <div className="flex flex-wrap gap-x-[20px] gap-y-8 items-start">
                                                     {visibleChildren.map(child => {
                                                         const body = renderWidgetBody(child);
                                                         if (!body) return null;
                                                         return (
-                                                            <div key={child.id} className={widthFor(child)}>
+                                                            <div key={child.id} className={childWidthFor(child)}>
                                                                 {body}
                                                             </div>
                                                         );

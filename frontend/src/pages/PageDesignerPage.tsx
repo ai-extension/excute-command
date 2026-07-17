@@ -21,6 +21,7 @@ import { TagSelector } from '../components/TagSelector';
 import { ButtonStylePicker, resolveButtonStyle } from '../components/ButtonStylePicker';
 import { DatasetSourceConfig } from '../components/page-designer/DatasetSourceConfig';
 import { searchIcons, WidgetIcon } from '../lib/widgetIcons';
+import { PAGE_WIDGET_SIZES, SIZE_LABELS, normalizeWidgetSize, editorTopWidthClass, childWidthClass } from '../lib/widgetSizes';
 
 
 const generateId = () => Math.random().toString(36).slice(2, 10);
@@ -96,7 +97,7 @@ const createWidget = (
     const id = generateId();
     switch (type) {
         case 'ENDPOINT': return {
-            id, type, title: 'New Endpoint', size: 'half',
+            id, type, title: 'New Endpoint', size: '3/6',
             workflow_id: ctx.workflows[0]?.id || '',
             workflow_name: ctx.workflows[0]?.name || '',
             label: ctx.workflows[0]?.name || 'Run',
@@ -111,7 +112,7 @@ const createWidget = (
             };
         }
         case 'LINK': return {
-            id, type, title: 'External Link', size: 'third',
+            id, type, title: 'External Link', size: '2/6',
             url: 'https://', label: 'Open Link', new_tab: true,
             style: 'bg-indigo-600 shadow-[0_0_20px_rgba(79,70,229,0.3)]',
             description: '',
@@ -125,7 +126,7 @@ const createWidget = (
             content: 'Enter your text here...',
         };
         case 'IMAGE': return {
-            id, type, title: 'Image', size: 'half',
+            id, type, title: 'Image', size: '3/6',
             image_url: '', alt_text: '',
         };
         case 'IFRAME': return {
@@ -133,7 +134,7 @@ const createWidget = (
             iframe_url: '', iframe_height: 400,
         };
         case 'STATUS': return {
-            id, type, title: 'Status', size: 'third',
+            id, type, title: 'Status', size: '2/6',
             status_label: 'Service', status_value: 'ok',
         };
         case 'TABLE': return {
@@ -143,35 +144,35 @@ const createWidget = (
             table_rows: [['Row 1', 'Data', 'Data'], ['Row 2', 'Data', 'Data']],
         };
         case 'CHART': return {
-            id, type, title: 'Chart', size: 'half',
+            id, type, title: 'Chart', size: '3/6',
             chart_kind: 'bar',
             data_source: 'static',
             chart_static_data: '[{"key":"A","value":10},{"key":"B","value":20},{"key":"C","value":15}]',
         };
         case 'METRIC': return {
-            id, type, title: 'Metric', size: 'third',
+            id, type, title: 'Metric', size: '2/6',
             data_source: 'static',
             metric_label: 'Records',
             metric_static_value: '0',
             metric_format: 'number',
         };
         case 'GAUGE': return {
-            id, type, title: 'Gauge', size: 'third',
+            id, type, title: 'Gauge', size: '2/6',
             data_source: 'static', metric_static_value: '65', metric_format: 'number',
             metric_label: 'Usage', gauge_min: 0, gauge_max: 100, gauge_warn: 70, gauge_crit: 90,
         };
         case 'PROGRESS': return {
-            id, type, title: 'Progress', size: 'third',
+            id, type, title: 'Progress', size: '2/6',
             data_source: 'static', metric_static_value: '40', metric_format: 'number',
             metric_label: 'Progress', progress_target: 100,
         };
         case 'STAT_GRID': return {
-            id, type, title: 'Stats', size: 'half',
+            id, type, title: 'Stats', size: '3/6',
             data_source: 'static', metric_format: 'number',
             chart_static_data: '[{"key":"OK","value":12},{"key":"Warning","value":3},{"key":"Error","value":1}]',
         };
         case 'SPARKLINE': return {
-            id, type, title: 'Trend', size: 'third',
+            id, type, title: 'Trend', size: '2/6',
             data_source: 'static', metric_format: 'number', metric_label: 'This week',
             chart_static_data: '[{"key":"Mon","value":10},{"key":"Tue","value":14},{"key":"Wed","value":12},{"key":"Thu","value":18},{"key":"Fri","value":22}]',
         };
@@ -376,7 +377,9 @@ const PageDesignerPage = () => {
                     } catch { /* ignore */ }
                 }
 
-                setWidgets(layoutWidgets);
+                // Normalize legacy widths (half/third/two-third) to the 6-col grid so the
+                // width picker matches and saved layouts stay consistent going forward.
+                setWidgets(layoutWidgets.map(w => ({ ...w, size: normalizeWidgetSize(w.size) })));
             } catch { /* ignore */ }
         };
 
@@ -858,8 +861,7 @@ const PageDesignerPage = () => {
                                                                     className={cn(
                                                                         "transition-all duration-200 rounded-md",
                                                                         widget.type !== 'SECTION' && "relative group/tb",
-                                                                        widget.type === 'SECTION' ? "w-full" :
-                                                                            widget.size === 'half' ? "w-[calc(50%-10px)]" : widget.size === 'third' ? "w-[calc((100%-40px)/3)]" : "w-full",
+                                                                        editorTopWidthClass(widget.size),
                                                                         snapshot.isDragging && "opacity-80 scale-[1.02] z-50",
                                                                         snapshot.combineTargetFor && widget.type === 'SECTION' && "ring-2 ring-primary ring-offset-2 ring-offset-background scale-[1.01]"
                                                                     )}
@@ -927,7 +929,7 @@ const PageDesignerPage = () => {
                                                                                                         {...childProvided.draggableProps}
                                                                                                         className={cn(
                                                                                                             "transition-all duration-200 relative group/tb",
-                                                                                                            child.size === 'half' ? "w-[calc(50%-10px)]" : child.size === 'third' ? "w-[calc((100%-40px)/3)]" : "w-full",
+                                                                                                            childWidthClass(child.size),
                                                                                                             childSnapshot.isDragging && "opacity-80 scale-[1.02] z-50"
                                                                                                         )}
                                                                                                     >
@@ -1174,9 +1176,9 @@ const PageDesignerPage = () => {
                                     <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Width</label>
                                     <select value={activeWidget.size} onChange={e => updateWidget(activeWidget.id, { size: e.target.value as any })}
                                         className="w-full h-9 bg-muted/30 border border-border/50 rounded-md text-xs px-4 outline-none font-bold appearance-none cursor-pointer">
-                                        <option value="third" className="bg-popover text-foreground">1/3 Width</option>
-                                        <option value="half" className="bg-popover text-foreground">Half Width</option>
-                                        <option value="full" className="bg-popover text-foreground">Full Width</option>
+                                        {PAGE_WIDGET_SIZES.map(sz => (
+                                            <option key={sz} value={sz} className="bg-popover text-foreground">{SIZE_LABELS[sz]}</option>
+                                        ))}
                                     </select>
                                 </div>
                             </div>
@@ -1237,6 +1239,16 @@ const PageDesignerPage = () => {
                                             className="w-full min-h-[80px] p-4 text-xs bg-muted/30 border border-border/50 rounded-md focus:ring-2 ring-primary/10 outline-none resize-none transition-all"
                                             placeholder="Add context or instructions for this section..."
                                         />
+                                    </div>
+                                    <div className="flex items-center justify-between p-5 bg-muted/20 rounded-md border border-border/40">
+                                        <div>
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-1">Hide header</p>
+                                            <p className="text-xs font-medium text-muted-foreground leading-none">Keep only the frame — hide title &amp; description on the public page</p>
+                                        </div>
+                                        <button onClick={() => updateWidget(activeWidget.id, { hide_header: !activeWidget.hide_header })}
+                                            className={cn("w-12 h-6 rounded-full transition-all relative shrink-0 shadow-inner", activeWidget.hide_header ? "bg-primary" : "bg-muted-foreground/20")}>
+                                            <div className={cn("absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-200", activeWidget.hide_header ? "right-0.5" : "left-0.5")} />
+                                        </button>
                                     </div>
                                 </div>
                             )}
@@ -1987,9 +1999,11 @@ const SectionWidgetCard: React.FC<SectionWidgetCardProps> = ({ widget, onEdit, o
             <div {...dragHandleProps} className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors mr-1">
                 <GripVertical className="w-4 h-4" />
             </div>
-            <h3 className="text-lg font-black tracking-tight">{widget.title || 'Section Header'}</h3>
+            {widget.hide_header
+                ? <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/50">Section · header hidden on public page</span>
+                : <h3 className="text-lg font-black tracking-tight">{widget.title || 'Section Header'}</h3>}
         </div>
-        {widget.description && (
+        {!widget.hide_header && widget.description && (
             <p className="text-xs text-muted-foreground mb-3 ml-7">{widget.description}</p>
         )}
         {children}
